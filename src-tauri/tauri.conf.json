@@ -1,0 +1,86 @@
+{
+  "package": {
+    "productName": "MdNote",
+    "version": "0.1.0"
+  },
+  "build": {
+    "distDir": "../dist",
+    "devPath": "../dist",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "yarn build"
+  },
+  "tauri": {
+    "bundle": {
+      "active": true,
+      "identifier": "com.rongxun.build",
+      "targets": ["deb", "nsis", "msi", "app","appimage", "dmg"],
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "resources": [],
+      "externalBin": [],
+      "copyright": "No copyright",
+      "category": "Productivity",
+      "shortDescription": "tauri markdown editor",
+      "longDescription": "tauri markdown editor",
+      "deb": {
+        "depends": []
+      },
+      "macOS": {
+        "frameworks": [],
+        "minimumSystemVersion": "",
+        "exceptionDomain": "",
+        "signingIdentity": null,
+        "providerShortName": null,
+        "entitlements": null
+      },
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": "",
+        "wix": {
+          "language": ["zh-CN"]
+        },
+        "webviewInstallMode": {
+          "type": "embedBootstrapper"
+        }
+      }
+    },
+    "updater": {
+      "active": false
+    },
+    "allowlist": {
+      "all": true,
+      "fs": {
+        "readFile": true,
+        "writeFile": true,
+        "readDir": true,
+        "copyFile": true,
+        "createDir": true,
+        "removeDir": true,
+        "removeFile": true,
+        "renameFile": true
+      },
+      "app": {
+        "all": true
+      },
+      "os": {
+        "all": true
+      }
+    },
+    "windows": [
+
+    ],
+    "security": {
+      "csp": null
+    },
+    "systemTray": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true
+    }
+  }
+}
