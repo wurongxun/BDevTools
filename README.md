@@ -1,13 +1,13 @@
 # md-note
 
-#### 项目介绍
+### 项目介绍
 基于tauri跨平台桌面应用框架的Markdown本地笔记软件
 
-#### 软件架构
+### 软件架构
 rust、tauri、vue3、ant-design-vue、v-md-editor
 
 
-#### 使用说明
+### 使用说明
 
 1.  yarn build 编译前端项目
 2.  yarn tauri dev 启动调试
