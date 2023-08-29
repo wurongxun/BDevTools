@@ -30,4 +30,5 @@ https://cloud.tsinghua.edu.cn/d/df482a15afb64dfeaff8/?p=/&mode=list
 ### 应用截图
 ![image](./App_2023.png)
 ### 请我喝杯咖啡
+如果您认为本仓库内容对您有价值，可以在此处对我打赏。此项并非必须，但其对我的鼓励将得以让本仓库获得持续更新
 ![image](./src/assets/coffee.jpg)
