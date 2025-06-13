@@ -1,34 +1,16 @@
-# md-note
+# Tauri + Vue + TypeScript
 
-### 项目介绍
-基于tauri跨平台桌面应用框架的Markdown本地笔记软件
+This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
 
-### 软件架构
-rust、tauri、vue3、ant-design-vue、v-md-editor
+## Recommended IDE Setup
 
+- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
 
-### 使用说明
+## Type Support For `.vue` Imports in TS
 
-1.  yarn build 编译前端项目
-2.  yarn tauri dev 启动调试
-3.  yarn tauri build 打包
-4.  yarn run serve 运行前端项目
+Since TypeScript cannot handle type information for `.vue` imports, they are shimmed to be a generic Vue component type by default. In most cases this is fine if you don't really care about component prop types outside of templates. However, if you wish to get actual prop types in `.vue` imports (for example to get props validation when using manual `h(...)` calls), you can enable Volar's Take Over mode by following these steps:
 
-### github 加速
-https://cloud.tsinghua.edu.cn/d/df482a15afb64dfeaff8/?p=/&mode=list
+1. Run `Extensions: Show Built-in Extensions` from VS Code's command palette, look for `TypeScript and JavaScript Language Features`, then right click and select `Disable (Workspace)`. By default, Take Over mode will enable itself if the default TypeScript extension is disabled.
+2. Reload the VS Code window by running `Developer: Reload Window` from the command palette.
 
-### 许可声明
-
-应用图标出处：https://www.flaticon.com/free-icon/substance_9814620
-
-### 打包类型
-"targets": ["deb","msi"]
-
-### 打包语言配置： 
-"language": ["zh-CN","en-US", "pt-BR", "fr-FR"]
-
-### 应用截图
-![image](./App_2023.png)
-### 请我喝杯咖啡
-如果您认为本仓库内容对您有价值，可以在此处对我打赏。此项并非必须，但其对我的鼓励将得以让本仓库获得持续更新
-![image](./src/assets/coffee.jpg)
+You can learn more about Take Over mode [here](https://github.com/johnsoncodehk/volar/discussions/471).
