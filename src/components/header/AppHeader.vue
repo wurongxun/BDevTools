@@ -18,14 +18,14 @@
     </div>
 </template>
 <script>
-import { createFromIconfontCN } from '@ant-design/icons-vue';
-const IconFont = createFromIconfontCN({
-    scriptUrl: '../../assets/iconfont/iconfont',
-});
+// import { createFromIconfontCN } from '@ant-design/icons-vue';
+// const IconFont = createFromIconfontCN({
+//     scriptUrl: '../../assets/iconfont/iconfont',
+// });
 import { defineComponent} from 'vue';
 export default defineComponent({
     components: {
-        IconFont
+    
     },
     props:{
         title:{

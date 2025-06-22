@@ -11,12 +11,21 @@ importers:
       '@tauri-apps/api':
         specifier: ^2
         version: 2.5.0
+      '@tauri-apps/api/core':
+        specifier: ^2
+        version: '@tauri-apps/api@2.5.0'
       '@tauri-apps/api/tauri':
+        specifier: ^2
+        version: '@tauri-apps/api@2.5.0'
+      '@tauri-apps/api/window':
         specifier: ^2
         version: '@tauri-apps/api@2.5.0'
       '@tauri-apps/plugin-opener':
         specifier: ^2
         version: 2.2.7
+      '@tauri-apps/plugin-process':
+        specifier: ^2
+        version: 2.2.1
       dayjs:
         specifier: ^1.11.13
         version: 1.11.13
@@ -624,6 +633,9 @@ packages:
 
   '@tauri-apps/plugin-opener@2.2.7':
     resolution: {integrity: sha512-uduEyvOdjpPOEeDRrhwlCspG/f9EQalHumWBtLBnp3fRp++fKGLqDOyUhSIn7PzX45b/rKep//ZQSAQoIxobLA==, tarball: https://registry.npmmirror.com/@tauri-apps/plugin-opener/-/plugin-opener-2.2.7.tgz}
+
+  '@tauri-apps/plugin-process@2.2.1':
+    resolution: {integrity: sha512-cF/k8J+YjjuowhNG1AboHNTlrGiOwgX5j6NzsX6WFf9FMzyZUchkCgZMxCdSE5NIgFX0vvOgLQhODFJgbMenLg==, tarball: https://registry.npmmirror.com/@tauri-apps/plugin-process/-/plugin-process-2.2.1.tgz}
 
   '@types/estree@1.0.7':
     resolution: {integrity: sha512-w28IoSUCJpidD/TGviZwwMJckNESJZXFu7NBZ5YJ4mEUnNraUn9Pm8HSZm/jDF1pDWYKspWE7oVphigUPRakIQ==, tarball: https://registry.npmmirror.com/@types/estree/-/estree-1.0.7.tgz}
@@ -1903,6 +1915,10 @@ snapshots:
       '@tauri-apps/cli-win32-x64-msvc': 2.5.0
 
   '@tauri-apps/plugin-opener@2.2.7':
+    dependencies:
+      '@tauri-apps/api': 2.5.0
+
+  '@tauri-apps/plugin-process@2.2.1':
     dependencies:
       '@tauri-apps/api': 2.5.0
 

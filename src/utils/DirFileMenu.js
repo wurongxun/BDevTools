@@ -1,4 +1,3 @@
-import { FileTextOutlined, FolderOpenOutlined } from '@ant-design/icons-vue';
 import { h } from 'vue';
 import StringUtil from './StringUtil'
 let _ = {}
@@ -21,9 +20,9 @@ _.dir_file = function (children_data) {
             children_ = _.dir_file(children);
         }
         if (!isfile) {
-            data.push(_.getItem(parent_id,isfile, path, label, key, () => h(FolderOpenOutlined), children_));
+            data.push(_.getItem(parent_id,isfile, path, label, key, () => h(), children_));
         } else {
-            data.push(_.getItem(parent_id,isfile, path, label, key, () => h(FileTextOutlined)));
+            data.push(_.getItem(parent_id,isfile, path, label, key, () => h()));
         }
 
     }

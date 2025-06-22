@@ -39,10 +39,10 @@
 //     scriptUrl: '../../assets/iconfont/iconfont',
 // });
 /* eslint-disable */
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { appWindow, WebviewWindow, getAll } from '@tauri-apps/api/window'
 import { defineComponent, ref } from 'vue';
-import { exit } from '@tauri-apps/api/process'
+import { exit } from '@tauri-apps/plugin-process';
 export default defineComponent({
     components: {
 
