@@ -40,7 +40,7 @@
 // });
 /* eslint-disable */
 import { invoke } from '@tauri-apps/api/core';
-import { appWindow, WebviewWindow, getAll } from '@tauri-apps/api/window'
+//import { appWindow, WebviewWindow, getAll } from '@tauri-apps/api/window'
 import { defineComponent, ref } from 'vue';
 import { exit } from '@tauri-apps/plugin-process';
 export default defineComponent({
@@ -56,25 +56,25 @@ export default defineComponent({
         };
         const handleOk = async (e) => {
             visible.value = false;
-            if (appWindow.label.indexOf('main') > -1) {
-                await exit();
-            }
+            // if (appWindow.label.indexOf('main') > -1) {
+            //     await exit();
+            // }
         };
         // 最小化
         const handleWinMin = async () => {
-            await appWindow.minimize()
+            // await appWindow.minimize()
         };
         //后台运行
         const handleCancel = async () => {
             visible.value = false;
-            await appWindow.hide()
+            // await appWindow.hide()
         };
 
         // 最大化/还原
         const handleWinMax2Min = async () => {
-            const resizable = await appWindow.isResizable()
-            if (!resizable) return
-            await appWindow.toggleMaximize()
+            // const resizable = await appWindow.isResizable()
+            // if (!resizable) return
+            // await appWindow.toggleMaximize()
         }
         const close_modal = async () => {
             visible.value = false;
@@ -84,11 +84,11 @@ export default defineComponent({
             let all_Label = getAll();
             for (let i = 0; i < all_Label.length; i++) {
                 let window_ = all_Label[i];
-                if ("about-window" == window_.label) {
-                    //有窗口，重新创建,聚焦并显示在最顶层
-                    WebviewWindow.getByLabel("about-window").setFocus()
-                    return;
-                }
+                // if ("about-window" == window_.label) {
+                //     //有窗口，重新创建,聚焦并显示在最顶层
+                //     WebviewWindow.getByLabel("about-window").setFocus()
+                //     return;
+                // }
             }
             invoke('about').then((res) => {
                 console.log(res)
