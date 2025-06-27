@@ -1,46 +1,65 @@
+use tauri::Manager;
+
 use crate::response::resp_data::{ResData, ResDataNoData};
-use crate::utils::fileUtil::{read_dir_info};
-
-
-
+use crate::utils::fileUtil::read_dir_info;
+use std::path::PathBuf;
 // 获取本地笔记列表
 #[tauri::command]
 pub async fn get_note_list(
     app_handle: tauri::AppHandle,
     notebook: String,
 ) -> Result<ResData<Vec<String>>, String> {
-    let app_dir =tauri::api::path::document_dir();
-    if let Some(dir) = app_dir {
-        // 本地文件目录
-        let local_data_dir = dir.as_path().join("notebooks");
-        // 文件夹是否存在
-        if local_data_dir.exists() {
-            let mut notes: Vec<String> = vec![];
+    //let path=tauri::path::PathResolver(app_handle);
+    let app_dir = app_handle.path().document_dir();
+    //let app_dir = tauri::path::PathResolver(); //tauri::api::path::document_dir();
+    match app_dir {
+        Ok(dir) => {
+            // 本地文件目录
+            let local_data_dir = dir.as_path().join("notebooks");
+            // 文件夹是否存在
+            if local_data_dir.exists() {
+                let mut notes: Vec<String> = vec![];
 
-            let paths = std::fs::read_dir(local_data_dir.join(notebook));
-            match paths {
-                Ok(ps) => {
-                    // 遍历文件
-                    for path in ps {
-                        let entry = path.unwrap();
-                        let path = entry.path();
-                        if path.is_file() {
-                            let name = path.file_stem().unwrap();
-                            let n = name.to_str().unwrap().to_string();
-                            println!("get_note_list - {:?}", n);
-                            notes.push(n);
+                let paths = std::fs::read_dir(local_data_dir.join(notebook));
+                match paths {
+                    Ok(ps) => {
+                        // 遍历文件
+                        for path in ps {
+                            let entry = path.unwrap();
+                            let path = entry.path();
+                            if path.is_file() {
+                                let name = path.file_stem().unwrap();
+                                let n = name.to_str().unwrap().to_string();
+                                println!("get_note_list - {:?}", n);
+                                notes.push(n);
+                            }
                         }
+                        return Ok(ResData {
+                            code: 200,
+                            msg: "success".to_string(),
+                            data: notes,
+                        });
                     }
-                    return Ok(ResData {
-                        code: 200,
-                        msg: "success".to_string(),
-                        data: notes,
-                    });
+                    Err(_) => {
+                        return Ok(ResData {
+                            code: 500,
+                            msg: "读取目录失败".to_string(),
+                            data: Vec::new(),
+                        })
+                    }
                 }
-                Err(_) => return Err("读取目录失败".to_string()),
             }
         }
+        Err(_) => {
+            return Ok(ResData {
+                code: 500,
+                msg: "获取路径失败".to_string(),
+                data: Vec::new(),
+            })
+        }
     }
+
+    // if let Some(dir) = app_dir {}
     Ok(ResData {
         code: 500,
         msg: "文件不存在".to_string(),
@@ -55,38 +74,42 @@ pub async fn read_note_file(
     current_notebook: String,
     note_title: String,
 ) -> Result<ResData<String>, String> {
-    let app_dir =tauri::api::path::document_dir();
-    if let Some(dir) = app_dir {
-        // 本地文件目录
-        let local_data_dir = dir.as_path().join("notebooks");
-        // 文件夹是否存在
-        if local_data_dir.exists() {
-            let file = local_data_dir
-                .join(current_notebook)
-                .join(note_title + ".md");
-            let content = std::fs::read_to_string(file);
-            match content {
-                Ok(s) => {
-                    return Ok(ResData {
-                        code: 200,
-                        msg: "读取成功".to_string(),
-                        data: s,
-                    })
-                }
-                Err(err) => {
-                    return Ok(ResData {
-                        code: 500,
-                        msg: "笔记读取失败".to_string(),
-                        data: err.to_string(),
-                    })
+    let app_dir = app_handle.path().document_dir();
+    match app_dir {
+        Ok(dir) => {
+            // 本地文件目录
+            let local_data_dir = dir.as_path().join("notebooks");
+            // 文件夹是否存在
+            if local_data_dir.exists() {
+                let file = local_data_dir
+                    .join(current_notebook)
+                    .join(note_title + ".md");
+                let content = std::fs::read_to_string(file);
+                match content {
+                    Ok(s) => {
+                        return Ok(ResData {
+                            code: 200,
+                            msg: "读取成功".to_string(),
+                            data: s,
+                        })
+                    }
+                    Err(err) => {
+                        return Ok(ResData {
+                            code: 500,
+                            msg: "笔记读取失败".to_string(),
+                            data: err.to_string(),
+                        })
+                    }
                 }
             }
         }
-        return Ok(ResData {
-            code: 500,
-            msg: "笔记文件不存在".to_string(),
-            data: String::new(),
-        });
+        Err(_) => {
+            return Ok(ResData {
+                code: 500,
+                msg: "获取路径失败".to_string(),
+                data: String::new(),
+            })
+        }
     }
     Ok(ResData {
         code: 500,
@@ -101,39 +124,43 @@ pub async fn create_notebook(
     app_handle: tauri::AppHandle,
     notebook_name: String,
 ) -> Result<ResDataNoData, String> {
-    let app_dir =tauri::api::path::document_dir();
-    if let Some(dir) = app_dir {
-        // 本地文件目录
-        let local_data_dir = dir.as_path().join("notebooks");
-        // 文件夹是否存在
-        if local_data_dir.exists() {
-            let dir = local_data_dir.join(notebook_name);
-            // 创建文件夹
-            let res = std::fs::create_dir_all(dir);
-            match res {
-                Ok(_) => {
-                    return Ok(ResDataNoData {
-                        code: 200,
-                        msg: "创建成功".to_string(),
-                    })
-                }
-                Err(err) => {
-                    return Ok(ResDataNoData {
-                        code: 500,
-                        msg: format!("创建失败：{0}", err.to_string()),
-                    })
+    let app_dir = app_handle.path().document_dir();
+    match app_dir {
+        Ok(dir) => {
+            // 本地文件目录
+            let local_data_dir = dir.as_path().join("notebooks");
+            // 文件夹是否存在
+            if local_data_dir.exists() {
+                let dir = local_data_dir.join(notebook_name);
+                // 创建文件夹
+                let res = std::fs::create_dir_all(dir);
+                match res {
+                    Ok(_) => {
+                        return Ok(ResDataNoData {
+                            code: 200,
+                            msg: "创建成功".to_string(),
+                        })
+                    }
+                    Err(err) => {
+                        return Ok(ResDataNoData {
+                            code: 500,
+                            msg: format!("创建失败：{0}", err.to_string()),
+                        })
+                    }
                 }
             }
+            return Ok(ResDataNoData {
+                code: 500,
+                msg: "文件夹不存在".to_string(),
+            });
         }
-        return Ok(ResDataNoData {
-            code: 500,
-            msg: "文件夹不存在".to_string(),
-        });
+        Err(_) => {
+            return Ok(ResDataNoData {
+                code: 500,
+                msg: "获取路径失败".to_string(),
+            })
+        }
     }
-    Ok(ResDataNoData {
-        code: 500,
-        msg: "文件夹不存在".to_string(),
-    })
 }
 
 /**
@@ -144,45 +171,51 @@ pub async fn create_notebook(
 pub async fn create_note_file(
     app_handle: tauri::AppHandle,
     notebook: String,
-    newNoteMdFileName:String,
+    newNoteMdFileName: String,
 ) -> Result<ResData<String>, String> {
-    let app_dir =tauri::api::path::document_dir();
-    if let Some(dir) = app_dir {
-        let local_data_dir = dir.as_path().join("notebooks");
-        if local_data_dir.exists() {
-            let newNoteMdFileName_:String=newNoteMdFileName.clone();
-            let name = chrono::prelude::Local::now().timestamp_millis().to_string();
-            let temp_file = local_data_dir.join(notebook).join(newNoteMdFileName + ".md");
-            // 创建文件
-            let res = std::fs::File::create(temp_file);
-            match res {
-                Ok(_) => {
-                    return Ok(ResData {
-                        code: 200,
-                        msg: "创建成功".to_string(),
-                        data: newNoteMdFileName_,
-                    })
-                }
-                Err(err) => {
-                    return Ok(ResData {
-                        code: 500,
-                        msg: format!("创建失败：{0}", err.to_string()),
-                        data: String::new(),
-                    })
+    let app_dir = app_handle.path().document_dir();
+    match app_dir {
+        Ok(dir) => {
+            let local_data_dir = dir.as_path().join("notebooks");
+            if local_data_dir.exists() {
+                let newNoteMdFileName_: String = newNoteMdFileName.clone();
+                let name = chrono::prelude::Local::now().timestamp_millis().to_string();
+                let temp_file = local_data_dir
+                    .join(notebook)
+                    .join(newNoteMdFileName + ".md");
+                // 创建文件
+                let res = std::fs::File::create(temp_file);
+                match res {
+                    Ok(_) => {
+                        return Ok(ResData {
+                            code: 200,
+                            msg: "创建成功".to_string(),
+                            data: newNoteMdFileName_,
+                        })
+                    }
+                    Err(err) => {
+                        return Ok(ResData {
+                            code: 500,
+                            msg: format!("创建失败：{0}", err.to_string()),
+                            data: String::new(),
+                        })
+                    }
                 }
             }
+            return Ok(ResData {
+                code: 500,
+                msg: "文件夹不存在".to_string(),
+                data: String::new(),
+            });
         }
-        return Ok(ResData {
-            code: 500,
-            msg: "文件夹不存在".to_string(),
-            data: String::new(),
-        });
+        Err(_) => {
+            return Ok(ResData {
+                code: 500,
+                msg: "获取路径失败".to_string(),
+                data: String::new(),
+            })
+        }
     }
-    Ok(ResData {
-        code: 500,
-        msg: "文件夹不存在".to_string(),
-        data: String::new(),
-    })
 }
 
 /**
@@ -199,46 +232,53 @@ pub async fn save_note(
     md_title: String,
     md_text: String,
 ) -> Result<ResDataNoData, String> {
-    let app_dir =tauri::api::path::document_dir();
-    if let Some(dir) = app_dir {
-        // 本地文件目录
-        let local_data_dir = dir.as_path().join("notebooks");
-        // 文件夹是否存在
-        if local_data_dir.exists() {
-            let path = local_data_dir
-                .join(current_notebook.clone())
-                .join(current_note + ".md");
-            let new_path = local_data_dir.join(current_notebook).join(md_title + ".md");
-            let wres = std::fs::write(path.clone(), md_text);
-            match wres {
-                Ok(_) => {
-                    //将文件或目录重命名为新名称，如果 to 已存在，则替换原始文件。如果新名称位于不同的挂载点，这将不起作用。
-                    let new_name_res = std::fs::rename(path, new_path);
-                    match new_name_res {
-                        Ok(_) => {
-                            return Ok(ResDataNoData {
-                                code: 200,
-                                msg: "操作成功".to_string(),
-                            });
-                        }
-                        Err(e) => {
-                            return Ok(ResDataNoData {
-                                code: 500,
-                                msg: e.to_string(),
-                            });
+    let app_dir = app_handle.path().document_dir();
+    match app_dir {
+        Ok(dir) => {
+            // 本地文件目录
+            let local_data_dir = dir.as_path().join("notebooks");
+            // 文件夹是否存在
+            if local_data_dir.exists() {
+                let path = local_data_dir
+                    .join(current_notebook.clone())
+                    .join(current_note + ".md");
+                let new_path = local_data_dir.join(current_notebook).join(md_title + ".md");
+                let wres = std::fs::write(path.clone(), md_text);
+                match wres {
+                    Ok(_) => {
+                        //将文件或目录重命名为新名称，如果 to 已存在，则替换原始文件。如果新名称位于不同的挂载点，这将不起作用。
+                        let new_name_res = std::fs::rename(path, new_path);
+                        match new_name_res {
+                            Ok(_) => {
+                                return Ok(ResDataNoData {
+                                    code: 200,
+                                    msg: "操作成功".to_string(),
+                                });
+                            }
+                            Err(e) => {
+                                return Ok(ResDataNoData {
+                                    code: 500,
+                                    msg: e.to_string(),
+                                });
+                            }
                         }
                     }
-                }
-                Err(e) => {
-                    return Ok(ResDataNoData {
-                        code: 500,
-                        msg: e.to_string(),
-                    });
+                    Err(e) => {
+                        return Ok(ResDataNoData {
+                            code: 500,
+                            msg: e.to_string(),
+                        });
+                    }
                 }
             }
         }
+        Err(_) => {
+            return Ok(ResDataNoData {
+                code: 500,
+                msg: "获取路径失败".to_string(),
+            })
+        }
     }
-
     Ok(ResDataNoData {
         code: 500,
         msg: "文件夹不存在".to_string(),
@@ -247,7 +287,7 @@ pub async fn save_note(
 
 /**
  * 删除本地笔记本/文件夹
- * @param app_handle 
+ * @param app_handle
  * @param current_notebook 文件夹
  */
 #[tauri::command]
@@ -255,26 +295,34 @@ pub async fn remove_notebook(
     app_handle: tauri::AppHandle,
     current_notebook: String,
 ) -> Result<ResDataNoData, String> {
-    let app_dir =tauri::api::path::document_dir();
-    if let Some(dir) = app_dir {
-        let local_data_dir = dir.as_path().join("notebooks");
-        if local_data_dir.exists() {
-            let dir = local_data_dir.join(current_notebook);
-            let remove_res = std::fs::remove_dir_all(dir);
-            match remove_res {
-                Ok(_) => {
-                    return Ok(ResDataNoData {
-                        code: 200,
-                        msg: "操作成功".to_string(),
-                    });
-                }
-                Err(e) => {
-                    return Ok(ResDataNoData {
-                        code: 500,
-                        msg: e.to_string(),
-                    });
+    let app_dir = app_handle.path().document_dir();
+    match app_dir {
+        Ok(dir) => {
+            let local_data_dir = dir.as_path().join("notebooks");
+            if local_data_dir.exists() {
+                let dir = local_data_dir.join(current_notebook);
+                let remove_res = std::fs::remove_dir_all(dir);
+                match remove_res {
+                    Ok(_) => {
+                        return Ok(ResDataNoData {
+                            code: 200,
+                            msg: "操作成功".to_string(),
+                        });
+                    }
+                    Err(e) => {
+                        return Ok(ResDataNoData {
+                            code: 500,
+                            msg: e.to_string(),
+                        });
+                    }
                 }
             }
+        }
+        Err(_) => {
+            return Ok(ResDataNoData {
+                code: 500,
+                msg: "获取路径失败".to_string(),
+            })
         }
     }
     Ok(ResDataNoData {
@@ -285,8 +333,8 @@ pub async fn remove_notebook(
 
 /**
  * 删除本地笔记
- * @param current_note 笔记 
- * 
+ * @param current_note 笔记
+ *
  */
 #[tauri::command]
 pub async fn remove_note(
@@ -294,28 +342,34 @@ pub async fn remove_note(
     current_notebook: String,
     current_note: String,
 ) -> Result<ResDataNoData, String> {
-    let app_dir =tauri::api::path::document_dir();
-    if let Some(dir) = app_dir {
-        let local_data_dir = dir.as_path().join("notebooks");
-        if local_data_dir.exists() {
-            let file = local_data_dir
-                .join(current_notebook)
-                .join(current_note);
-            let remove_res = std::fs::remove_file(file);
-            match remove_res {
-                Ok(_) => {
-                    return Ok(ResDataNoData {
-                        code: 200,
-                        msg: "操作成功".to_string(),
-                    });
-                }
-                Err(e) => {
-                    return Ok(ResDataNoData {
-                        code: 500,
-                        msg: e.to_string(),
-                    });
+    let app_dir = app_handle.path().document_dir();
+    match app_dir {
+        Ok(dir) => {
+            let local_data_dir = dir.as_path().join("notebooks");
+            if local_data_dir.exists() {
+                let file = local_data_dir.join(current_notebook).join(current_note);
+                let remove_res = std::fs::remove_file(file);
+                match remove_res {
+                    Ok(_) => {
+                        return Ok(ResDataNoData {
+                            code: 200,
+                            msg: "操作成功".to_string(),
+                        });
+                    }
+                    Err(e) => {
+                        return Ok(ResDataNoData {
+                            code: 500,
+                            msg: e.to_string(),
+                        });
+                    }
                 }
             }
+        }
+        Err(_) => {
+            return Ok(ResDataNoData {
+                code: 500,
+                msg: "获取路径失败".to_string(),
+            })
         }
     }
     Ok(ResDataNoData {
@@ -323,4 +377,3 @@ pub async fn remove_note(
         msg: "文件夹不存在".to_string(),
     })
 }
-

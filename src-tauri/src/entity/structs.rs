@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
-use tokio_tungstenite::tungstenite::Utf8Bytes;
+//use tokio_tungstenite::tungstenite::Utf8Bytes;
 
 #[derive(Debug, Clone)]
 pub enum AuthType {

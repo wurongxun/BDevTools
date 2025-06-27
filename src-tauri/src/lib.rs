@@ -1,14 +1,94 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+
+use tauri::App;
+use tauri::AppHandle;
+use tauri::{WebviewUrl, WebviewWindowBuilder};
+
+mod app;
+mod app_setup;
+mod entity;
+mod response;
+mod routes;
+mod system_menu;
+mod utils;
+
+use crate::app_setup::setup::setup_windows;
+use crate::routes::app_window::{
+    about, loding_window_close, windows_close, windows_hide, windows_maximize, windows_minimize,
+};
+use crate::routes::file_utils::get_document_notebooks;
+use crate::routes::note_book::{
+    create_note_file, create_notebook, get_note_list, read_note_file, remove_note, remove_notebook,
+    save_note,
+};
+struct Payload {
+    args: Vec<String>,
+    cwd: String,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![
+            get_document_notebooks,
+            get_note_list,
+            read_note_file,
+            create_notebook,
+            create_note_file,
+            save_note,
+            remove_notebook,
+            remove_note,
+            loding_window_close,
+            about,
+            windows_hide,
+            windows_minimize,
+            windows_maximize,
+            windows_close
+        ])
+        .setup(move |app: &mut App| {
+            let mut main_window = match WebviewWindowBuilder::new(
+                app,
+                "main-window".to_string(),
+                tauri::WebviewUrl::App("index.html".into()),
+            )
+            .title("MdNote")
+            .decorations(false)
+            .inner_size(1280.0, 720.0)
+            .center()
+            .visible(false)
+            // .menu(system_menu(&context))//窗口菜单
+            .build()
+            {
+                Ok(it) => it,
+                Err(err) => return Err(Box::new(err)),
+            };
+            //窗口阴影功能
+            // #[cfg(any(target_os = "windows", target_os = "macos"))]
+            // set_shadow(&main_window, true).expect("Unsupported platform!");
+
+            let mut loding_window = match WebviewWindowBuilder::new(
+                app,
+                "loding-window".to_string(),
+                tauri::WebviewUrl::App("/Windows/Loding".into()),
+            )
+            .title("Loding")
+            .decorations(false)
+            .inner_size(400.0, 200.0)
+            .center()
+            .visible(true)
+            .build()
+            {
+                Ok(it) => it,
+                Err(err) => return Err(Box::new(err)),
+            };
+            //窗口阴影功能
+            // #[cfg(any(target_os = "windows", target_os = "macos"))]
+            // set_shadow(&loding_window, true).expect("Unsupported platform!");
+
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
