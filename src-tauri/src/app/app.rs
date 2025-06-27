@@ -8,6 +8,7 @@ use std::{
     fs::create_dir_all,
     path::{Path, PathBuf},
 };
+use lazy_static::lazy_static;
 use tauri::{path::BaseDirectory, Manager};
 use tauri::AppHandle;
 lazy_static! {

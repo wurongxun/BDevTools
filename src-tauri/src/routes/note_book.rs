@@ -1,4 +1,4 @@
-use tauri::Manager;
+use tauri::{AppHandle, Manager};
 
 use crate::response::resp_data::{ResData, ResDataNoData};
 use crate::utils::fileUtil::read_dir_info;
@@ -6,7 +6,7 @@ use std::path::PathBuf;
 // 获取本地笔记列表
 #[tauri::command]
 pub async fn get_note_list(
-    app_handle: tauri::AppHandle,
+    app_handle: AppHandle,
     notebook: String,
 ) -> Result<ResData<Vec<String>>, String> {
     //let path=tauri::path::PathResolver(app_handle);
