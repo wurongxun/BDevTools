@@ -1,46 +1,12 @@
 <template>
-  <a-layout :style="{ height: '100%' }">
-    <AppHeader ref="element"></AppHeader>
-    <a-layout ref="Conten" :style="{ height: `${height_content}px`, minHeight: 'hidden' }">
-      <!-- <a-layout-sider width="55" style=" writing-mode: vertical-lr;align-items: center;display: flex;background-color: rgba(223, 223, 223, 0.822)"> -->
-        <!-- <span><icon-font @click="goto_router('/Home/Note')" :style="{ color: '#08c', fontSize: '28px', }"
-            type="icon-typora" /></span> -->
-        <!-- <span><icon-font @click="goto_router('/Home/About')" :style="{ color: '#08c', fontSize: '28px', }"
-            type="icon-typora" /></span>
-        <span><icon-font @click="goto_router('/Home/Test')" :style="{ color: '#08c', fontSize: '28px', }"
-            type="icon-typora" /></span> -->
-<!-- 
-            <a-menu-item key="1" style="margin-top: 0px;" @click="goto_router('/Home/Note')">
-            <icon-font  type="icon-typora" />
-            <span>Note</span>
-          </a-menu-item> -->
-
-      <!-- </a-layout-sider> -->
-
-      <!-- <a-layout-sider >
-        <a-menu v-model:selectedKeys="selectedKeys" theme="dark" mode="inline">
-          <a-menu-item key="1" style="margin-top: 0px;" @click="goto_router('/Home/Note')">
-            <icon-font  type="icon-typora" />
-            <span>Note</span>
-          </a-menu-item>
-          <a-menu-item key="2" @click="goto_router('/Home/About')">
-            <file-outlined />
-            <span>File</span>
-          </a-menu-item>
-          <a-menu-item key="3" @click="goto_router('/Home/Test')">
-            <file-outlined />
-            <span>Test</span>
-          </a-menu-item>
-        </a-menu>
-      </a-layout-sider> -->
-
-      <a-layout style="padding:0 0px;height: 100%;overflow: hidden">
-        <a-layout-content :style="{ background: '#fff', padding: '0 0px' }">
-          <router-view />
-        </a-layout-content>
-      </a-layout>
-    </a-layout>
-  </a-layout>
+  <div class="common-layout" :style="{ height: '100%' }">
+    <el-container>
+      <AppHeader ref="element"></AppHeader>
+      <el-container>
+        <el-main> <router-view /></el-main>
+      </el-container>
+    </el-container>
+  </div>
 </template>
 <script>
 
@@ -67,7 +33,7 @@ export default defineComponent({
       router.push(url)
     };
     onMounted(() => {
-    
+
 
     });
     const headerStyle = {
@@ -100,8 +66,8 @@ a-layout-sider::after {
   content: "";
   display: block;
 }
-span{
- margin-top: 10px;
+
+span {
+  margin-top: 10px;
 }
 </style>
-
