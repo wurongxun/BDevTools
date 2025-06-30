@@ -65,7 +65,9 @@ const routes = <Readonly<RouteRecordRaw[]>>[
   //     },
   //   ],
   // },
-const history = createWebHashHistory(process.env.BASE_URL);
+//const history = createWebHashHistory(process.env.BASE_URL);
+const history = createWebHashHistory("/");
+
 const router = createRouter({
   history,
   routes,

@@ -2,7 +2,7 @@
     <!-- <a-layout-header> -->
     <div class="header" data-tauri-drag-region>
         <div class="left">
-            <span><a-image :width="24" :src="logo" :preview="false" />
+            <span><a-image :width="24"  :preview="false" />
             </span>
             <span></span>
         </div>
@@ -19,7 +19,7 @@
 
     </div>
     <!-- </a-layout-header> -->
-    <a-modal v-model:visible="visible" :closable="true" :centered="true" width="500px" title="退出" @cancel="close_modal"
+    <!-- <a-modal v-model:visible="visible" :closable="true" :centered="true" width="500px" title="退出" @cancel="close_modal"
         @ok="handleOk">
         <template #footer>
             <a-button key="back" @click="handleCancel">后台运行</a-button>
@@ -30,7 +30,7 @@
         <p style="text-align:center">确认退出应用程序吗？</p>
         <br />
         <br />
-    </a-modal>
+    </a-modal> -->
 </template>
 <script>
 //import { createFromIconfontCN } from '@ant-design/icons-vue';
@@ -48,7 +48,7 @@ export default defineComponent({
 
     },
     setup() {
-        const logo = ref(require("../../assets/image/logo.png"))
+        //const logo = ref(require("../../assets/image/logo.png"))
         const a = ref("a");
         const visible = ref(false);
         const showModal = () => {
@@ -105,7 +105,6 @@ export default defineComponent({
             handleWinMax2Min,
             handleCancel,
             openAboutWin,
-            logo,
             close_modal
         }
     }
@@ -118,10 +117,10 @@ export default defineComponent({
     /*align-items 属性定义flex子项在flex容器的当前行的侧轴（纵轴）方向上的对齐方式。 */
     align-items: center;
     /* 左右边距 */
-    padding: 0 3px;
+    padding: 0 0px;
     line-height: normal;
     max-height: 30px;
-    background-color: rgb(223, 223, 223);
+    background-color: red;
 
     justify-content: space-between;
     -webkit-app-region: drag;

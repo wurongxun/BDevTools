@@ -1,7 +1,7 @@
 <template>
-  <a-row style="height: 100%">
-    <a-col :span="5" style="height: 100%; background-color: #d9d9d9;" v-contextmenu:contextmenu>
-      <a-spin :spinning="spinning"> </a-spin>
+  <el-row style="height: 100%">
+    <el-col :span="5" style="height: 100%; background-color: #d9d9d9;" v-contextmenu:contextmenu>
+      <!-- <a-spin :spinning="spinning"> </a-spin> -->
       <div class="wrapper" v-if="show_notebooks_data.length > 0">
         <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys"
           @select="selectHandle" :items="show_notebooks_data" @openChange="onOpenChange"
@@ -14,7 +14,7 @@
         </span>
       </div>
 
-    </a-col>
+    </el-col>
 
     <!-- 编辑器栏 -->
     <a-col :span="19">
@@ -28,7 +28,7 @@
         <!-- <v-md-editor v-model="mdText" height="94vh" @save="saveMdText"></v-md-editor> -->
       </div>
     </a-col>
-  </a-row>
+  </el-row>
   <v-contextmenu ref="contextmenu" v-if="data_not_null">
     <v-contextmenu-item @click="showAddNotebookModalForm">
       添加笔记
@@ -92,7 +92,7 @@ import DirFileMenu from '@/utils/DirFileMenu';
 import StringUtil from '@/utils/StringUtil';
 import NotificationUtil from '@/utils/NotificationUtil';
 import { invoke } from '@tauri-apps/api/core';
-import MdEditor from 'md-editor-v3';
+import { MdEditor } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 export default {
   name: "AppAbout",
@@ -694,7 +694,7 @@ export default {
         console.log(err);
       });
     }
-    const [api, contextHolder] = notification.useNotification();
+    //const [api, contextHolder] = NotificationUtil.useNotification();
     return {
       state,
       onOpenChange,
@@ -714,11 +714,12 @@ export default {
       removeFolder,
       showAddFolderModalForm,
       showAddNotebookModalForm,
-      api,
-      contextHolder,
+      
       reFresh,
       get_note_list
     }
+    //api,
+    //  contextHolder,
   },
   methods: {
 

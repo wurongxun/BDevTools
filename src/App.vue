@@ -33,9 +33,9 @@ document.onkeydown = function (event) {
   }
 }
 //禁止右键和检查
-document.addEventListener("contextmenu", (event) => {
-  event.preventDefault();
-});
+// document.addEventListener("contextmenu", (event) => {
+//   event.preventDefault();
+// });
 </script>
 
 <style>
@@ -43,6 +43,6 @@ document.addEventListener("contextmenu", (event) => {
   height: 100vh;
   overflow: hidden;
   /* border-radius: 40px !important;; */
-  background-color: #f3f3f3;
+  background-color: #a10606;
 }
 </style>

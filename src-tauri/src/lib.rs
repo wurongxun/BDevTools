@@ -68,21 +68,21 @@ pub fn run() {
             // #[cfg(any(target_os = "windows", target_os = "macos"))]
             // set_shadow(&main_window, true).expect("Unsupported platform!");
 
-            let mut loding_window = match WebviewWindowBuilder::new(
-                app,
-                "loding-window".to_string(),
-                tauri::WebviewUrl::App("/Windows/Loding".into()),
-            )
-            .title("Loding")
-            .decorations(false)
-            .inner_size(400.0, 200.0)
-            .center()
-            .visible(true)
-            .build()
-            {
-                Ok(it) => it,
-                Err(err) => return Err(Box::new(err)),
-            };
+            // let mut loding_window = match WebviewWindowBuilder::new(
+            //     app,
+            //     "loding-window".to_string(),
+            //     tauri::WebviewUrl::App("/Windows/Loding".into()),
+            // )
+            // .title("Loding")
+            // .decorations(false)
+            // .inner_size(400.0, 200.0)
+            // .center()
+            // .visible(true)
+            // .build()
+            // {
+            //     Ok(it) => it,
+            //     Err(err) => return Err(Box::new(err)),
+            // };
             //窗口阴影功能
             // #[cfg(any(target_os = "windows", target_os = "macos"))]
             // set_shadow(&loding_window, true).expect("Unsupported platform!");

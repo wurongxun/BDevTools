@@ -1,9 +1,10 @@
+
 <template>
-  <div class="common-layout" :style="{ height: '100%' }">
+  <div class="common-layout">
     <el-container>
-      <AppHeader ref="element"></AppHeader>
+      <el-header style="padding: 0%;"> <AppHeader ref="element"></AppHeader></el-header>
       <el-container>
-        <el-main> <router-view /></el-main>
+        <el-main><router-view /></el-main>
       </el-container>
     </el-container>
   </div>
