@@ -54,10 +54,10 @@ pub fn run() {
                 tauri::WebviewUrl::App("index.html".into()),
             )
             .title("MdNote")
-            .decorations(false)
-            .inner_size(1280.0, 720.0)
+            .decorations(true)
+            .inner_size(720.0, 7640.0)
             .center()
-            .visible(false)
+            .visible(true)
             // .menu(system_menu(&context))//窗口菜单
             .build()
             {

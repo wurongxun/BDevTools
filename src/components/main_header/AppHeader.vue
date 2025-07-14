@@ -7,14 +7,13 @@
             <span></span>
         </div>
         <div class="right">
-            <span><icon-font :style="{ color: '#08c', fontSize: '16px', }" @click="openAboutWin"
+            <span><el-icon :style="{ color: '#08c', fontSize: '16px', }" @click="openAboutWin"
                     type="icon-guanyu" /></span>
-            <span><icon-font :style="{ color: '#08c', fontSize: '16px', }" @click="handleWinMin"
+            <span><el-icon :style="{ color: '#08c', fontSize: '16px', }" @click="handleWinMin"
                     type="icon-window-min" /></span>
-            <span><icon-font :style="{ color: '#08c', fontSize: '16px', }" @click="handleWinMax2Min"
-                    type="icon-zuidahua" /></span>
-            <span><icon-font :style="{ color: '#08c', fontSize: '16px', }" @click="showModal"
-                    type="icon-guanbi" /></span>
+            <span><el-icon :style="{ color: '#08c', fontSize: '16px', }" @click="handleWinMax2Min"
+                    type="icon-zuidahua"><FullScreen /></el-icon></span>
+            <span><el-icon @click="showModal" :style="{ color: '#08c', fontSize: '16px', }" ><Close /></el-icon></span>
         </div>
 
     </div>

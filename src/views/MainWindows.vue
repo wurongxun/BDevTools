@@ -1,8 +1,10 @@
-
 <template>
   <div class="common-layout">
     <el-container>
-      <el-header style="padding: 0%;"> <AppHeader ref="element"></AppHeader></el-header>
+      <!-- <el-header style="padding: 0%;"> <AppHeader ref="element"></AppHeader></el-header> -->
+      <el-header :height=header_height style="width: 100vw;padding: 0%;display: flex;">
+        <MainHeader></MainHeader>
+      </el-header>
       <el-container>
         <el-main><router-view /></el-main>
       </el-container>
@@ -14,6 +16,7 @@
 import router from '@/router';
 import AppHeader from '@/components/main_header/AppHeader.vue';
 import { defineComponent, ref, onMounted, computed } from 'vue';
+import MainHeader from '@/components/header/MainHeader.vue';
 export default defineComponent({
   components: {
     AppHeader,
@@ -69,6 +72,6 @@ a-layout-sider::after {
 }
 
 span {
-  margin-top: 10px;
+  /* margin-top: 10px; */
 }
 </style>
