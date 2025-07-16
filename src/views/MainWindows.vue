@@ -20,6 +20,7 @@ import MainHeader from '@/components/header/MainHeader.vue';
 export default defineComponent({
   components: {
     AppHeader,
+    MainHeader,
     //IconFont,
     //LikeOutlined,
     //CommentOutlined,
