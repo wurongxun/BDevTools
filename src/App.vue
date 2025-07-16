@@ -16,9 +16,9 @@ export default {
 
 document.addEventListener('DOMContentLoaded', () => {
   //关闭loding窗口
-  setTimeout(() => {
-    invoke('loding_window_close')
-  }, 3000)
+  // setTimeout(() => {
+  //   invoke('loding_window_close')
+  // }, 3000)
 
 })
 //禁止F12

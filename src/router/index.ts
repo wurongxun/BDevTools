@@ -40,7 +40,7 @@ const routes = <Readonly<RouteRecordRaw[]>>[
         // 当 /user/:id/profile 匹配成功
         // UserProfile 将被渲染到 User 的 <router-view> 内部
         path: "Note",
-        component: () => import("../views/main_windows/NoteBookEdit.vue"),
+        component: () => import("../views/utils/notebook/NoteBookEdit.vue"),
       },
     ],
   },
@@ -51,20 +51,20 @@ const routes = <Readonly<RouteRecordRaw[]>>[
   {
     path: "/Windows/Loding",
     component: () => import("../views/loding_windows/AppLoding.vue"),
-  }
+  },
 ];
 // ,
-  // {
-  //   path: "/Business",
-  //   component: Layout,
-  //   children: [
-  //     {
-  //       path: "Ssh",
-  //       name: "Ssh",
-  //       component: () => import("@/views/element/Business/ssh/index.vue"),
-  //     },
-  //   ],
-  // },
+// {
+//   path: "/Business",
+//   component: Layout,
+//   children: [
+//     {
+//       path: "Ssh",
+//       name: "Ssh",
+//       component: () => import("@/views/element/Business/ssh/index.vue"),
+//     },
+//   ],
+// },
 //const history = createWebHashHistory(process.env.BASE_URL);
 const history = createWebHashHistory("/");
 

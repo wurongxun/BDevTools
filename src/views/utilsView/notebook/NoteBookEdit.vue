@@ -17,7 +17,7 @@
     </el-col>
 
     <!-- 编辑器栏 -->
-    <a-col :span="19">
+    <el-col :span="19">
       <div v-if="showMdEditor">
         <a-form layout="inline">
           <a-form-item style="width: 99.5%; margin: 0 auto; padding: 1px 0">
@@ -27,7 +27,7 @@
         <md-editor v-model="mdText" />
         <!-- <v-md-editor v-model="mdText" height="94vh" @save="saveMdText"></v-md-editor> -->
       </div>
-    </a-col>
+    </el-col>
   </el-row>
   <v-contextmenu ref="contextmenu" v-if="data_not_null">
     <v-contextmenu-item @click="showAddNotebookModalForm">
@@ -54,34 +54,47 @@
   </v-contextmenu>
 
 
-  <!-- 添加笔记本弹出表单 -->
-  <a-modal title="添加文件夹" v-model:visible="addFolderModalFormVisible" @cancel="handleCancelByAddFolderModal" centered>
+
+
+  <el-dialog v-model:visible="addFolderModalFormVisible" @close="handleCancelByAddFolderModal" title="添加文件夹"
+    width="500">
+    <el-form>
+      <el-form-item label="文件夹名称" :label-width="formLabelWidth">
+        <el-input v-model="newFolderName" autocomplete="off" />
+      </el-form-item>
+
+    </el-form>
     <template #footer>
-      <a-button key="back" @click="handleCancelByAddFolderModal">取消</a-button>
-      <a-button key="submit" type="primary" :loading="loading" @click="addNodeFolder">确认</a-button>
+      <div class="dialog-footer">
+        <el-button @click="handleCancelByAddFolderModal">取消</el-button>
+        <el-button type="primary" @click="addNodeFolder">
+          确认
+        </el-button>
+      </div>
     </template>
-    <div>
-      <br />
-      <br />
-      <a-input v-model:value="newFolderName" placeholder="文件夹名称" allow-clear />
-      <br />
-      <br />
-    </div>
-  </a-modal>
+  </el-dialog>
+
+
   <!-- 添加笔记本弹出表单 -->
-  <a-modal title="添加笔记" v-model:visible="addNotebookModalFormVisible" @cancel="handleCancelByAddNotebookModal" centered>
+  <el-dialog v-model:visible="addFolderModalFormVisible" @close="handleCancelByAddNotebookModal" title="添加笔记"
+    width="500">
+    <el-form>
+      <el-form-item label="笔记名称" :label-width="formLabelWidth">
+        <el-input v-model="newNoteMdFileName" autocomplete="off" />
+      </el-form-item>
+
+    </el-form>
     <template #footer>
-      <a-button key="back" @click="handleCancelByAddNotebookModal">取消</a-button>
-      <a-button key="submit" type="primary" :loading="loading" @click="addNotebook">确认</a-button>
+      <div class="dialog-footer">
+        <el-button @click="handleCancelByAddNotebookModal">取消</el-button>
+        <el-button type="primary" @click="addNodeFolder">
+          确认
+        </el-button>
+      </div>
     </template>
-    <div>
-      <br />
-      <br />
-      <a-input v-model:value="newNoteMdFileName" placeholder="笔记名称" allow-clear />
-      <br />
-      <br />
-    </div>
-  </a-modal>
+  </el-dialog>
+
+
 </template>
 <script>
 import { computed, h, onMounted, reactive, ref, toRefs, createVNode } from 'vue';
@@ -714,7 +727,7 @@ export default {
       removeFolder,
       showAddFolderModalForm,
       showAddNotebookModalForm,
-      
+
       reFresh,
       get_note_list
     }
