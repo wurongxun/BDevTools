@@ -1,26 +1,18 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, Ref, unref, watchEffect } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useI18n } from "vue-i18n";
 import { SystemInfo } from "@/entity/entitys";
-import { listen } from "@tauri-apps/api/event";
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import 'animate.css';
-import { UserFilled, Close, Minus, CopyDocument, Share, Search, More } from "@element-plus/icons-vue"
+import { Close, Minus, Share, Search, More } from "@element-plus/icons-vue"
 import { invoke } from '@tauri-apps/api/core';
-import router from '@/router';
-import { getCurrentWindow, WebviewWindow, getAll } from "@tauri-apps/api/window";
-import WindowMaximizationIcon from "@/components/Icon/WindowMaximizationIcon.vue"
-import WindowRestoreIcon from "@/components/Icon/WindowRestoreIcon.vue"
-import BlackModeIcon from "@/components/Icon/BlackModeIcon.vue"
-import WhiteModeIcon from "@/components/Icon/WhiteModeIcon.vue"
-import SettingsIcon from "@/components/Icon/SettingsIcon.vue"
-import BasicFunctionIcon from "@/components/Icon/BasicFunctionIcon.vue"
-import HelpIcon from "@/components/Icon/HelpIcon.vue"
-import SSHIcon from "@/components/Icon/SSHIcon.vue"
-import CopyIcon from "@/components/Icon/CopyIcon.vue"
-import GitIcon from "@/components/Icon/GitIcon.vue"
-import CommandIcon from "@/components/Icon/CommandIcon.vue"
-import BoxLogoIcon from "@/components/Icon/BoxLogoIcon.vue"
+import { getCurrentWindow } from '@tauri-apps/api/window';
+
+import WindowMaximizationIcon from "@/views/element/Icon/WindowMaximizationIcon.vue"
+import WindowRestoreIcon from "@/views/element/Icon/WindowRestoreIcon.vue"
+import BlackModeIcon from "@/views/element/Icon/BlackModeIcon.vue"
+import WhiteModeIcon from "@/views/element/Icon/WhiteModeIcon.vue"
+import BoxLogoIcon from "@/views/element/Icon/BoxLogoIcon.vue"
 import { useDark, useToggle } from '@vueuse/core'
 const isDark = useDark({
 
