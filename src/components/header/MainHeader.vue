@@ -8,11 +8,11 @@ import { Close, Minus, Share, Search, More } from "@element-plus/icons-vue"
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-import WindowMaximizationIcon from "@/views/element/Icon/WindowMaximizationIcon.vue"
-import WindowRestoreIcon from "@/views/element/Icon/WindowRestoreIcon.vue"
-import BlackModeIcon from "@/views/element/Icon/BlackModeIcon.vue"
-import WhiteModeIcon from "@/views/element/Icon/WhiteModeIcon.vue"
-import BoxLogoIcon from "@/views/element/Icon/BoxLogoIcon.vue"
+import WindowMaximizationIcon from "@/components//Icon/WindowMaximizationIcon.vue"
+import WindowRestoreIcon from "@/components/Icon/WindowRestoreIcon.vue"
+import BlackModeIcon from "@/components/Icon/BlackModeIcon.vue"
+import WhiteModeIcon from "@/components/Icon/WhiteModeIcon.vue"
+import BoxLogoIcon from "@/components/Icon/BoxLogoIcon.vue"
 import { useDark, useToggle } from '@vueuse/core'
 const isDark = useDark({
 
