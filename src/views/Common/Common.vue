@@ -43,7 +43,7 @@ onMounted(() => {
 <template>
   <!-- <div class="common-layout"> -->
   <el-container style="width: 100vw;">
-    <el-header :height=header_height style="width: 100vw;padding: 0%;display: flex;background-color: aqua;">
+    <el-header :height=header_height style="width: 100vw;padding: 0%;display: flex;">
       <template v-for="item in pages">
         <BackHeader v-if="$route.name === item.name" :showTitle=item.showTitle :title=unref(item.title)
           :showWinMin=item.showWinMin :showWinChange=item.showWinChange></BackHeader>
@@ -72,5 +72,15 @@ onMounted(() => {
 .element {
   scrollbar-width: none;
   /* Firefox 64+ */
+}
+.header {
+  background-color: #f8f8f8;
+  border-bottom: 1px solid #eaeaea;
+  padding: 1rem 1.5rem;
+}
+.title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #333;
 }
 </style>

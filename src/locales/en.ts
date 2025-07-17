@@ -657,8 +657,8 @@ export default {
     schedule_alarm: "Alert",
     schedule_time: "schedule time",
   },
-    Notebook:{
-    name: "笔记名称",
+  Notebook: {
+    name: "笔记",
     content: "笔记内容",
     add_notebook: "添加笔记",
     edit_notebook: "编辑笔记",

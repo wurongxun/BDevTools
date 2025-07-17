@@ -656,8 +656,8 @@ export default {
     placeholder_select_date: "请选择日期",
     placeholder_select_time: "请选择时间",
   },
-  Notebook:{
-    name: "笔记名称",
+  Notebook: {
+    name: "笔记",
     content: "笔记内容",
     add_notebook: "添加笔记",
     edit_notebook: "编辑笔记",
