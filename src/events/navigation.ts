@@ -34,6 +34,12 @@ export function useHomeNavigation() {
         name: 'Categories'
       },
       {
+        title: t('NoteBook.name', 2),
+        icon: 'mdi-apps',
+        activeIcon: 'mdi-apps',
+        name: 'NoteBook'
+      },
+      {
         title: t('ssh.SSH'),
         icon: 'mdi-ssh',
         activeIcon: 'mdi-ssh',

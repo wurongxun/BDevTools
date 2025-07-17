@@ -646,4 +646,15 @@ export default {
     schedule_alarm: "提醒",
     schedule_time: "時間",
   },
+    Notebook:{
+    name: "笔记名称",
+    content: "笔记内容",
+    add_notebook: "添加笔记",
+    edit_notebook: "编辑笔记",
+    delete_notebook: "删除笔记",
+    delete_notebook_confirm: "确定删除该笔记吗？",
+    delete_notebook_success: "删除笔记成功",
+    delete_notebook_fail: "删除笔记失败",
+    add_notebook_success: "添加笔记成功",
+  }
 };

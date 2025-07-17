@@ -53,7 +53,7 @@ const navigateTo = async function (roter_url: string) {
 };
 
 onMounted(() => {
-  listen_to_greet()
+  // listen_to_greet()
 })
 
 </script>

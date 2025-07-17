@@ -34,12 +34,13 @@ const routes = <Readonly<RouteRecordRaw[]>>[
   },
   {
     path: "/MainWindows",
-    component: () => import("@/views/appMainWindows.vue"),
+    component: () => import("@/views/common/Common.vue"),
     children: [
       {
         // 当 /user/:id/profile 匹配成功
         // UserProfile 将被渲染到 User 的 <router-view> 内部
         path: "NoteBook",
+        name: 'NoteBook',
         component: () => import("@/views/utilsView/notebook/NoteBookEdit.vue"),
       },
     ],

@@ -7,8 +7,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { UserFilled, Close, Minus, CopyDocument, Share, Search, More } from "@element-plus/icons-vue"
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import BoxLogoIcon from "@/views/element/Icon/BoxLogoIcon.vue";
-import BackHeader from "@/components/header/element/BackHeader.vue";
+import BoxLogoIcon from "@/components/Icon/BoxLogoIcon.vue";
+import BackHeader from "@/components/header/BackHeader.vue";
 import { useHomeNavigation } from '@/events/navigation.ts';
 const { pages, activePagePosition, isBackOtherPage, isInMainView } = useHomeNavigation()
 
@@ -36,16 +36,16 @@ async function listen_to_greet() {
 
 
 onMounted(() => {
-  listen_to_greet()
+  // listen_to_greet()
 })
 
 </script>
 <template>
   <!-- <div class="common-layout"> -->
   <el-container style="width: 100vw;">
-    <el-header :height=header_height style="width: 100vw;padding: 0%;display: flex;">
+    <el-header :height=header_height style="width: 100vw;padding: 0%;display: flex;background-color: aqua;">
       <template v-for="item in pages">
-        <BackHeader v-if="$route.name === item.name" :showTitle=item.showTitle :title=item.title
+        <BackHeader v-if="$route.name === item.name" :showTitle=item.showTitle :title=unref(item.title)
           :showWinMin=item.showWinMin :showWinChange=item.showWinChange></BackHeader>
       </template>
     </el-header>
