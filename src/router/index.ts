@@ -30,27 +30,39 @@ declare module "vue-router" {
 const routes = <Readonly<RouteRecordRaw[]>>[
   {
     path: "/",
-    redirect: "/MainWindows/Note",
+    redirect: "/MainWindows/NoteBook",
   },
   {
     path: "/MainWindows",
-    component: () => import("../views/MainWindows.vue"),
+    component: () => import("@/views/appMainWindows.vue"),
     children: [
       {
         // 当 /user/:id/profile 匹配成功
         // UserProfile 将被渲染到 User 的 <router-view> 内部
-        path: "Note",
-        component: () => import("../views/utilsView/notebook/NoteBookEdit.vue"),
+        path: "NoteBook",
+        component: () => import("@/views/utilsView/notebook/NoteBookEdit.vue"),
+      },
+    ],
+  },
+  {
+    path: "/MainView",
+    component: () => import("@/views/appMainWindows.vue"),
+    children: [
+      {
+        // 当 /user/:id/profile 匹配成功
+        // UserProfile 将被渲染到 User 的 <router-view> 内部
+        path: "MainView",
+        component: () => import("@/views/mainView/mainView.vue"),
       },
     ],
   },
   {
     path: "/Windows/About",
-    component: () => import("../views/windows/AppAbout.vue"),
+    component: () => import("@/views/windows/appAbout.vue"),
   },
   {
     path: "/Windows/Loding",
-    component: () => import("../views/loding_windows/AppLoding.vue"),
+    component: () => import("@/views/lodingWindows/AppLoding.vue"),
   },
 ];
 // ,

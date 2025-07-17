@@ -83,36 +83,36 @@ const windowHide = async () => {
 };
 
 const updateSettting = function () {
-   // if (userStore.appConfig.length < 1) {
-        invoke('query_setting_list').then((res): void => {
-            let res_ = res as ResponseData<Array<SettingMap>>
-            let data = res_.data as Array<SettingMap>;
-            for (let i = 0; i < data.length; i++) {
-                const element = data[i];
-                if (element.app_setting_item_name == "use_dark") {
-                    element.app_setting_item_name;
-                    element.id;
-                    userStore.insetId(element.id)
-                    let str = element.app_setting_item_value
-                    let app_setting_item_value = (str === "true" ? true : false);
-                    if (app_setting_item_value) {
-                        userStore.changeTrue();
-                        dark_mode_icon.value = "white"
-                        document.documentElement.style.setProperty('--mouse--hover--button--bg-color', '#6b6d71');
-                        document.documentElement.style.setProperty('--main--header--bg-color', '#525457');
-                    } else {
-                        userStore.changeFalse();
-                        dark_mode_icon.value = "black"
-                        document.documentElement.style.setProperty('--mouse--hover--button--bg-color', '#636466');
-                        document.documentElement.style.setProperty('--main--header--bg-color', '#409EFF');
-                    }
+    // if (userStore.appConfig.length < 1) {
+    invoke('query_setting_list').then((res): void => {
+        let res_ = res as ResponseData<Array<SettingMap>>
+        let data = res_.data as Array<SettingMap>;
+        for (let i = 0; i < data.length; i++) {
+            const element = data[i];
+            if (element.app_setting_item_name == "use_dark") {
+                element.app_setting_item_name;
+                element.id;
+                userStore.insetId(element.id)
+                let str = element.app_setting_item_value
+                let app_setting_item_value = (str === "true" ? true : false);
+                if (app_setting_item_value) {
+                    userStore.changeTrue();
+                    dark_mode_icon.value = "white"
+                    document.documentElement.style.setProperty('--mouse--hover--button--bg-color', '#6b6d71');
+                    document.documentElement.style.setProperty('--main--header--bg-color', '#525457');
+                } else {
+                    userStore.changeFalse();
+                    dark_mode_icon.value = "black"
+                    document.documentElement.style.setProperty('--mouse--hover--button--bg-color', '#636466');
+                    document.documentElement.style.setProperty('--main--header--bg-color', '#409EFF');
                 }
             }
-        })
-   // }
+        }
+    })
+    // }
 }
 onMounted(() => {
-    updateSettting()
+    //updateSettting()
 })
 
 </script>

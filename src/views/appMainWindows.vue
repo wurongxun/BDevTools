@@ -1,11 +1,10 @@
 <template>
   <div class="common-layout">
-    <el-container>
-      <!-- <el-header style="padding: 0%;"> <AppHeader ref="element"></AppHeader></el-header> -->
+    <el-container style="width: 100vw;">
       <el-header :height=header_height style="width: 100vw;padding: 0%;display: flex;">
         <MainHeader></MainHeader>
       </el-header>
-      <el-container>
+      <el-container style="height: calc(100vh - 35px);">
         <el-main><router-view /></el-main>
       </el-container>
     </el-container>
@@ -28,7 +27,7 @@ export default defineComponent({
     //EditFilled
   },
   setup() {
-
+    const header_height = '35px';
     const height_content = computed(() => {
       // 回调函数必须return，结果就是计算的结果
       // 如果计算属性依赖的数据发生变化，那么会重新计算

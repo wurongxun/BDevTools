@@ -45,17 +45,17 @@ onMounted(() => {
   <el-container style="width: 100vw;">
     <el-header :height=header_height style="width: 100vw;padding: 0%;display: flex;">
       <template v-for="item in pages">
-          <BackHeader  v-if="$route.name === item.name" :showTitle=item.showTitle :title=item.title :showWinMin=item.showWinMin
-            :showWinChange=item.showWinChange></BackHeader>
+        <BackHeader v-if="$route.name === item.name" :showTitle=item.showTitle :title=item.title
+          :showWinMin=item.showWinMin :showWinChange=item.showWinChange></BackHeader>
       </template>
     </el-header>
     <el-container style="height: calc(100vh - 35px);  ">
       <el-container style="width:100vw;">
         <el-main mode="out-in" enter-active-class="animate__animated animate__fadeIn"
           style="overflow: auto;scrollbar-width: none;" leave-active-class="animate__animated animate__fadeOut">
-        <keep-alive>
-          <router-view />
-        </keep-alive>
+          <keep-alive>
+            <router-view />
+          </keep-alive>
         </el-main>
       </el-container>
     </el-container>

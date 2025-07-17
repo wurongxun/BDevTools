@@ -43,6 +43,6 @@ document.onkeydown = function (event) {
   height: 100vh;
   overflow: hidden;
   /* border-radius: 40px !important;; */
-  background-color: #a10606;
+  /* background-color: #a10606; */
 }
 </style>

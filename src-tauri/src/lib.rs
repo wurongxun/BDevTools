@@ -55,7 +55,7 @@ pub fn run() {
             )
             .title("MdNote")
             .decorations(true)
-            .inner_size(720.0, 7640.0)
+            .inner_size(720.0, 640.0)
             .center()
             .visible(true)
             // .menu(system_menu(&context))//窗口菜单
