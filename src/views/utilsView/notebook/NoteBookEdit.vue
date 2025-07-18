@@ -94,6 +94,7 @@ import NotificationUtil from '@/utils/NotificationUtil';
 import { invoke } from '@tauri-apps/api/core';
 import { MdEditor } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
+import { NotebookInfo, ResponseData } from '@/entity/entitys';
 
 // 新增 TreeNode 组件
 
@@ -164,20 +165,23 @@ const data = reactive({
   spinning: false
 })
 
-let notebooks_data = ref([]);
+let notebooks_data = ref<NotebookInfo[]>();
+
 
 /**
  *  获取笔记本数据
  */
 let get_document_notebooks = () => {
   // 获取笔记本数据
-  invoke('get_document_notebooks').then((res) => {
-    console.log("res===============", res);
-    if (res && res.code == 200) {
-      let data_ = JSON.parse(res.data);
+  invoke<ResponseData<NotebookInfo>>('get_document_notebooks').then((res:ResponseData<NotebookInfo>) => {
+      console.log("res===============", res);
+      if (res && typeof res === 'object' && 'code' in res && res.code == 200) {
+        //值 返回ResponseData 对象，包含data、code、msg参数 例如：data {"id":"1752761254929","parent_id":"","path":"C:\\Users\\kun15\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[]}
+         let data_:NotebookInfo= res.data;
       notebooks_data.value = data_.children;
       state.rootSubmenuKeys = DirFileMenu.getRootSubmenuKeys(notebooks_data.value);
-    }
+      }
+
   }).catch((err) => {
     NotificationUtil.error("获取数据失败 ：" + err);
   });
@@ -189,20 +193,17 @@ const onError = (err) => {
 /**
  * 文件夹及文件夹下笔记信息
  */
-let show_notebooks_data = computed({
-  get() {
-    return DirFileMenu.dir_file(notebooks_data.value);
-  }
-})
+let show_notebooks_data = computed(()=>{
+    if (!notebooks_data.value) return [];
+  return DirFileMenu.dir_file(notebooks_data.value);
+});
 
 /**
  * 判断数是否为空
  */
-let data_not_null = computed({
-  get() {
-    return notebooks_data.value.length > 0;
-  }
-})
+let data_not_null = computed(()=>{
+       return Array.isArray(notebooks_data.value) && notebooks_data.value.length > 0;
+  })
 
 const state = reactive({
   rootSubmenuKeys: [],

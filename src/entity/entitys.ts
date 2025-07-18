@@ -90,7 +90,7 @@ class SshSubMenu {
   public favorites_name: string = "";
 }
 class NotebookInfo {
-  public id: number = 0;
+  public id: string = "";
   public parent_id: string = "";
   public path: string = "";
   public name: string = "";
