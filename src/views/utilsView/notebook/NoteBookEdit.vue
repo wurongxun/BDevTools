@@ -3,9 +3,12 @@
     <el-col :span="5" style="height: 100%; background-color: #d9d9d9" v-contextmenu:contextmenu>
       <!-- <a-spin :spinning="spinning"> </a-spin> -->
       <div class="wrapper" v-if="show_notebooks_data.length > 0">
-        <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys"
+        <!-- <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys"
           @select="selectHandle" :items="show_notebooks_data" @openChange="onOpenChange"
-          style="max-height: 100%; overflow: hidden auto"></a-menu>
+          style="max-height: 100%; overflow: hidden auto"></a-menu> -->
+        <el-menu default-active="2" class="el-menu-vertical-demo">
+          <TreeNode v-if="notebooks_data2" :node="notebooks_data2" />
+        </el-menu>
       </div>
       <div style="height: 100%; position: relative" v-else>
         <span style="
@@ -85,7 +88,7 @@
   </el-dialog>
 </template>
 <script setup lang="ts">
-import { computed, h, defineComponent, onMounted, reactive, ref, toRefs, createVNode } from 'vue';
+import { computed, h, defineComponent, onMounted, reactive, ref, toRefs, createVNode, PropType, toRaw } from 'vue';
 //import { notification, Modal } from 'ant-design-vue';
 import { ElMessage, ElMessageBox, ElSubMenu, ElMenuItem } from 'element-plus';
 import DirFileMenu from '@/utils/DirFileMenu';
@@ -94,7 +97,7 @@ import NotificationUtil from '@/utils/NotificationUtil';
 import { invoke } from '@tauri-apps/api/core';
 import { MdEditor } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
-import { NotebookInfo, ResponseData } from '@/entity/entitys';
+import { NotebookInfo, ResponseData, ResponseData2 } from '@/entity/entitys';
 
 // 新增 TreeNode 组件
 
@@ -103,25 +106,30 @@ const TreeNode = defineComponent({
   name: 'TreeNode',
   props: {
     node: {
-      type: Object,
+      type: Object as PropType<NotebookInfo>,
       required: true
     }
   },
   setup(props) {
     return () => {
-      const node = props.node;
+      let node: NotebookInfo = props.node;
+      //const node = Object.assign({},rawNode);
+      console.log("node==============", node);
+      console.log("node.id==============", node.id);
+      if (!node || !node.id) {
+        console.error("Invalid node data", node);
+        return null; // 避免渲染错误节点
+      }
+      const commonProps = { index: node.id, key: node.id };
       if (node.children && node.children.length > 0) {
         // 文件夹节点
         return h(
           ElSubMenu,
+          commonProps,
           {
-            index: node.key,
-            key: node.key
-          },
-          {
-            title: () => h('span', node.label),
-            default: () => node.children.map((child: any) =>
-              h(TreeNode, { node: child, key: child.key })
+            title: () => h('span', node.name),
+            default: () => node.children.map((child: NotebookInfo) =>
+              h(TreeNode, { node: child, key: child.id })
             )
           }
         );
@@ -129,11 +137,8 @@ const TreeNode = defineComponent({
         // 文件节点
         return h(
           ElMenuItem,
-          {
-            index: node.key,
-            key: node.key
-          },
-          () => h('span', node.label)
+          commonProps,
+          () => h('span', node.name)
         );
       }
     };
@@ -162,10 +167,33 @@ const data = reactive({
   mdText: "", // 文章内容Markdown格式
   loading: false,
   map: new Map(),
-  spinning: false
+  spinning: false,
+  notebooks_data2: NotebookInfo,
 })
 
 let notebooks_data = ref<NotebookInfo[]>();
+let notebooks_data2 = reactive<NotebookInfo>({
+  id: "1",
+  isfile: false,
+  name: "Nina",
+  parent_id: "",
+  path: "1/3/4",
+  children: [{
+    id: "2",
+    isfile: true,
+    name: "呵呵",
+    parent_id: "1",
+    path: "1/3/4", children: []
+  }, {
+    id: "3",
+    isfile: true,
+    name: "哈哈",
+    parent_id: "1",
+    path: "1/3/4", children: []
+  }],
+
+});
+let notebooks_data3 = ref<NotebookInfo>();
 
 
 /**
@@ -173,14 +201,20 @@ let notebooks_data = ref<NotebookInfo[]>();
  */
 let get_document_notebooks = () => {
   // 获取笔记本数据
-  invoke<ResponseData<NotebookInfo>>('get_document_notebooks').then((res:ResponseData<NotebookInfo>) => {
-      console.log("res===============", res);
-      if (res && typeof res === 'object' && 'code' in res && res.code == 200) {
-        //值 返回ResponseData 对象，包含data、code、msg参数 例如：data {"id":"1752761254929","parent_id":"","path":"C:\\Users\\kun15\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[]}
-         let data_:NotebookInfo= res.data;
+  invoke<ResponseData2<NotebookInfo>>('get_document_notebooks').then((res: ResponseData2<NotebookInfo>) => {
+    console.log("res===============", res);
+    if (res && typeof res === 'object' && 'code' in res && res.code == 200) {
+      //值 返回ResponseData 对象，包含data、code、msg参数 例如：data {"id":"1752761254929","parent_id":"","path":"C:\\Users\\kun15\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[]}
+      let data_: NotebookInfo = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+      //notebooks_data = data_;
+      notebooks_data3.value = data_;
+      notebooks_data3.value.id
+      console.log("notebooks_data3.value===============", notebooks_data3.value);
+      console.log("notebooks_data3.value.id===============", notebooks_data3.value?.id);
+
       notebooks_data.value = data_.children;
       state.rootSubmenuKeys = DirFileMenu.getRootSubmenuKeys(notebooks_data.value);
-      }
+    }
 
   }).catch((err) => {
     NotificationUtil.error("获取数据失败 ：" + err);
@@ -193,20 +227,20 @@ const onError = (err) => {
 /**
  * 文件夹及文件夹下笔记信息
  */
-let show_notebooks_data = computed(()=>{
-    if (!notebooks_data.value) return [];
+let show_notebooks_data = computed(() => {
+  if (!notebooks_data.value) return [];
   return DirFileMenu.dir_file(notebooks_data.value);
 });
 
 /**
  * 判断数是否为空
  */
-let data_not_null = computed(()=>{
-       return Array.isArray(notebooks_data.value) && notebooks_data.value.length > 0;
-  })
+let data_not_null = computed(() => {
+  return Array.isArray(notebooks_data.value) && notebooks_data.value.length > 0;
+})
 
 const state = reactive({
-  rootSubmenuKeys: [],
+  rootSubmenuKeys: [] as string[],
   openKeys: [],
   selectedKeys: [],
 });
@@ -289,7 +323,7 @@ const selectHandle = function ({ item, key, selectedKeys }) {
                   });
                 });
             } else {
-              NotificationUtil.warning("已有相同文件名，文件名将无法更改！");
+              NotificationUtil.warn("已有相同文件名，文件名将无法更改！");
               Promise.all([saveMd(data.mdText, data.mdOldTitle)])
                 .then(() => {
                   invoke('read_note_file', { currentNotebook: data.currentNotebook, noteTitle: item.name }).then(res => {

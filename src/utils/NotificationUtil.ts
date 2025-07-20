@@ -1,26 +1,34 @@
 import { ElNotification } from "element-plus";
-let _ = {
-  info: function (description: string) {
+
+const NotificationUtil = {
+  info: (description: string) => {
     ElNotification({
       title: "Info",
       message: description,
       type: "info",
     });
   },
-  warn: function (description: string) {
+  warn: (description: string) => {
     ElNotification({
       title: "Warning",
       message: description,
       type: "warning",
     });
   },
-  success: function (description: string) {
+  success: (description: string) => {
     ElNotification({
       title: "Success",
       message: description,
       type: "success",
     });
   },
+  error: (description: string) => {
+    ElNotification({
+      title: "Error",
+      message: description,
+      type: "error",
+    });
+  }
 };
 
-export default _;
+export default NotificationUtil;

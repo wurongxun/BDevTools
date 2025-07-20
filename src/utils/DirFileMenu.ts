@@ -3,14 +3,14 @@ import StringUtil from "./StringUtil";
 import { NotebookInfo } from "@/entity/entitys";
 // 修复：定义接口确保类型安全
 interface DirFileMenuUtils {
-  dir_file: (children_data: NotebookInfo) => NotebookInfo;
-  getRootSubmenuKeys: (children_data: NotebookInfo[]) => any[];
+  dir_file: (children_data: NotebookInfo[]) => NotebookInfo[];
+  getRootSubmenuKeys: (children_data: NotebookInfo[]) => string[];
   getItem: (...args: any[]) => any;
   getFolderChilrenFileNameSet: (params: any) => Set<any>;
   getFolderNameSet: (children_data: any) => Set<any>;
 }
 let _:DirFileMenuUtils = {
-  dir_file:function (children_data:NotebookInfo) :NotebookInfo{
+  dir_file:function (children_data:NotebookInfo[]) :NotebookInfo[]{
   // console.log("children_data: ", children_data);
   // console.log("children_data: " + JSON.stringify(children_data));
   // let data = new Array();
@@ -39,7 +39,7 @@ let _:DirFileMenuUtils = {
   return children_data;
 },
 
-getRootSubmenuKeys: function (children_data:NotebookInfo[]) {
+getRootSubmenuKeys: function (children_data:NotebookInfo[]):Array<string> {
   let data = new Array<string>();
   for (var i in children_data) {
     let key = children_data[i].id;
