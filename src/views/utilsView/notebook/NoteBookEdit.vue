@@ -7,7 +7,7 @@
           @select="selectHandle" :items="show_notebooks_data" @openChange="onOpenChange"
           style="max-height: 100%; overflow: hidden auto"></a-menu> -->
         <el-menu default-active="2" class="el-menu-vertical-demo">
-          <TreeNode v-if="notebooks_data2" :node="notebooks_data2" />
+          <TreeNode v-if="notebooks_data" :node="notebooks_data" />
         </el-menu>
       </div>
       <div style="height: 100%; position: relative" v-else>
@@ -168,32 +168,9 @@ const data = reactive({
   loading: false,
   map: new Map(),
   spinning: false,
-  notebooks_data2: NotebookInfo,
 })
 
-let notebooks_data = ref<NotebookInfo[]>();
-let notebooks_data2 = reactive<NotebookInfo>({
-  id: "1",
-  isfile: false,
-  name: "Nina",
-  parent_id: "",
-  path: "1/3/4",
-  children: [{
-    id: "2",
-    isfile: true,
-    name: "呵呵",
-    parent_id: "1",
-    path: "1/3/4", children: []
-  }, {
-    id: "3",
-    isfile: true,
-    name: "哈哈",
-    parent_id: "1",
-    path: "1/3/4", children: []
-  }],
-
-});
-let notebooks_data3 = ref<NotebookInfo>();
+let notebooks_data = ref<NotebookInfo>()
 
 
 /**
@@ -206,14 +183,8 @@ let get_document_notebooks = () => {
     if (res && typeof res === 'object' && 'code' in res && res.code == 200) {
       //值 返回ResponseData 对象，包含data、code、msg参数 例如：data {"id":"1752761254929","parent_id":"","path":"C:\\Users\\kun15\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[]}
       let data_: NotebookInfo = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
-      //notebooks_data = data_;
-      notebooks_data3.value = data_;
-      notebooks_data3.value.id
-      console.log("notebooks_data3.value===============", notebooks_data3.value);
-      console.log("notebooks_data3.value.id===============", notebooks_data3.value?.id);
-
-      notebooks_data.value = data_.children;
-      state.rootSubmenuKeys = DirFileMenu.getRootSubmenuKeys(notebooks_data.value);
+      notebooks_data.value = data_;
+      state.rootSubmenuKeys = DirFileMenu.getRootSubmenuKeys(notebooks_data.value .children);
     }
 
   }).catch((err) => {
@@ -229,7 +200,7 @@ const onError = (err) => {
  */
 let show_notebooks_data = computed(() => {
   if (!notebooks_data.value) return [];
-  return DirFileMenu.dir_file(notebooks_data.value);
+  return DirFileMenu.dir_file(notebooks_data.value.children);
 });
 
 /**
