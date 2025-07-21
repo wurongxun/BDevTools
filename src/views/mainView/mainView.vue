@@ -22,7 +22,7 @@ import GitIcon from "@/components/Icon/GitIcon.vue";
 import CommandIcon from "@/components/Icon/CommandIcon.vue";
 import Calendar from "@/components/Icon/Calendar.vue";
 import BoxLogoIcon from "@/components/Icon/BoxLogoIcon.vue"
-import MainHeader from '@/components/header/element/MainHeader.vue';
+import MainHeader from '@/components/header/MainHeader.vue';
 const { t, locale } = useI18n()
 const route = useRoute()
 const drawer = ref(true);

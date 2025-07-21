@@ -61,11 +61,6 @@ class ResponseData<T> {
   }
 }
 
-interface ResponseData2<T> {
-   code: number;
-   data: T;
-   msg: string;
-}
 class SettingIdValueName<T> {
   public id: string;
   public app_setting_item_name: string;
@@ -103,7 +98,6 @@ class NotebookInfo {
   public isfile: boolean = false;
   public children: Array<NotebookInfo> = [];
   //添加get set 方法
-  
 }
 
 //  {"id":"1752831345744","parent_id":"","path":"C:\\Users\\rongxun.wu01\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[{"id":"Jabalpur","parent_id":"1752831345744","path":"C:\\Users\\rongxun.wu01\\Documents\\notebooks\\Jabalpur","name":"Jabalpur","isfile":false,"children":[{"id":"OA.md","parent_id":"Jabalpur","path":"C:\\Users\\rongxun.wu01\\Documents\\notebooks\\Jabalpur\\OA.md","name":"OA.md","isfile":true,"children":[]},{"id":"OA24.md","parent_id":"Jabalpur","path":"C:\\Users\\rongxun.wu01\\Documents\\notebooks\\Jabalpur\\OA24.md","name":"OA24.md","isfile":true,"children":[]}]}]}
@@ -115,7 +109,5 @@ export {
   SettingIdValueName,
   SshLinkInfoTree,
   SshSubMenu,
-  NotebookInfo
-};  
-export type { ResponseData2 };
-
+  NotebookInfo,
+};

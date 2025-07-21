@@ -6,9 +6,12 @@
         <!-- <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys"
           @select="selectHandle" :items="show_notebooks_data" @openChange="onOpenChange"
           style="max-height: 100%; overflow: hidden auto"></a-menu> -->
-        <el-menu default-active="2" class="el-menu-vertical-demo">
-          <TreeNode v-if="notebooks_data" :node="notebooks_data" />
+
+        <el-menu default-active="2"  class="el-menu-vertical-demo">
+          <TreeNode v-if="notebooks_data" :node="notebooks_data" v-model="state.selectedNodeId"
+            @node-click="handleNodeClick" />
         </el-menu>
+
       </div>
       <div style="height: 100%; position: relative" v-else>
         <span style="
@@ -97,53 +100,20 @@ import NotificationUtil from '@/utils/NotificationUtil';
 import { invoke } from '@tauri-apps/api/core';
 import { MdEditor } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
-import { NotebookInfo, ResponseData, ResponseData2 } from '@/entity/entitys';
+import { NotebookInfo, ResponseData } from '@/entity/entitys';
+import TreeNode from '@/components/tsx/menu/TreeNode'
 
-// 新增 TreeNode 组件
 
-// 定义TreeNode组件
-const TreeNode = defineComponent({
-  name: 'TreeNode',
-  props: {
-    node: {
-      type: Object as PropType<NotebookInfo>,
-      required: true
-    }
-  },
-  setup(props) {
-    return () => {
-      let node: NotebookInfo = props.node;
-      //const node = Object.assign({},rawNode);
-      console.log("node==============", node);
-      console.log("node.id==============", node.id);
-      if (!node || !node.id) {
-        console.error("Invalid node data", node);
-        return null; // 避免渲染错误节点
-      }
-      const commonProps = { index: node.id, key: node.id };
-      if (node.children && node.children.length > 0) {
-        // 文件夹节点
-        return h(
-          ElSubMenu,
-          commonProps,
-          {
-            title: () => h('span', node.name),
-            default: () => node.children.map((child: NotebookInfo) =>
-              h(TreeNode, { node: child, key: child.id })
-            )
-          }
-        );
-      } else {
-        // 文件节点
-        return h(
-          ElMenuItem,
-          commonProps,
-          () => h('span', node.name)
-        );
-      }
-    };
-  }
-});
+// 处理节点点击事件
+const handleNodeClick = (node: NotebookInfo) => {
+  console.log('节点被点击:', node);
+  console.log('节点被点击 electedNodeId:', state.selectedNodeId);
+  // 这里可以添加自定义逻辑，比如：
+  // - 加载节点内容
+  // - 更新UI状态
+  // - 执行特定操作
+};
+
 onMounted(() => {
   get_document_notebooks()
 })
@@ -178,13 +148,13 @@ let notebooks_data = ref<NotebookInfo>()
  */
 let get_document_notebooks = () => {
   // 获取笔记本数据
-  invoke<ResponseData2<NotebookInfo>>('get_document_notebooks').then((res: ResponseData2<NotebookInfo>) => {
+  invoke<ResponseData<NotebookInfo>>('get_document_notebooks').then((res: ResponseData<NotebookInfo>) => {
     console.log("res===============", res);
     if (res && typeof res === 'object' && 'code' in res && res.code == 200) {
       //值 返回ResponseData 对象，包含data、code、msg参数 例如：data {"id":"1752761254929","parent_id":"","path":"C:\\Users\\kun15\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[]}
       let data_: NotebookInfo = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
       notebooks_data.value = data_;
-      state.rootSubmenuKeys = DirFileMenu.getRootSubmenuKeys(notebooks_data.value .children);
+      state.rootSubmenuKeys = DirFileMenu.getRootSubmenuKeys(notebooks_data.value.children);
     }
 
   }).catch((err) => {
@@ -214,12 +184,13 @@ const state = reactive({
   rootSubmenuKeys: [] as string[],
   openKeys: [],
   selectedKeys: [],
+  selectedNodeId: '', // 存储当前选中的节点ID
 });
 /**
  * SubMenu 展开/关闭的回调
  * @param {*当前展开的 SubMenu 菜单项 key 数组} openKeys
  */
-const onOpenChange = openKeys => {
+const onOpenChange = function (openKeys) {
   const latestOpenKey = openKeys.find(key => state.openKeys.indexOf(key) === -1);
   if (state.rootSubmenuKeys.indexOf(latestOpenKey) === -1) {
     state.openKeys = openKeys;
@@ -249,7 +220,6 @@ const selectHandle = function ({ item, key, selectedKeys }) {
       }
     )
       .then(() => {
-
         invoke('get_note_list', { notebook: data.currentOldNotebook }).then(res => {
           let same_file_name = false;
           if (res && res.code == 200) {
@@ -456,7 +426,7 @@ const saveMdText = (mdText) => {
           NotificationUtil.error('请选定笔记本和笔记');
         }
       } else {
-        NotificationUtil.warning("已有相同文件名，文件名将无法更改！");
+        NotificationUtil.warn("已有相同文件名，文件名将无法更改！");
         if (data.currentOldNotebook && data.currentNote) {
           // 调用保存笔记方法 保存新文件
           invoke('save_note', {
