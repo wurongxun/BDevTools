@@ -33,7 +33,7 @@
           <a-input class="mdtitle-input" :bordered="false" v-model:value="data.mdTitle" placeholder="文章标题"></a-input>
         </a-form-item>
       </a-form>
-      <MdEditor v-model="data.mdText" @onSave="saveMdText" @onError="onError" />
+      <MdEditor v-model="data.mdText" @onSave="saveMdText" style="height: 100%;" @onError="onError" />
       <!-- </div> -->
     </el-col>
   </el-row>
