@@ -129,7 +129,7 @@ onMounted(() => {
 
 const data = reactive({
   notebooks: [], // 笔记本列表
-  notes: [] as string[{title: string}], // 笔记列表
+  notes: [] as string[{ title: string }], // 笔记列表
   selectedKeys: [], // 笔记本选中项key
   currentNotebook: "", // 当前选中的文件夹
   currentOldNotebook: "", //上次选中的文件夹
@@ -220,6 +220,10 @@ const onOpenChange = function (openKeys) {
  */
 const selectHandle = function (node: NotebookInfo) {
   //console.log("selectedKeys {:?}", selectedKeys)
+
+  if (!node.isfile) {
+    return;
+  }
   data.currentNote = node.id;
   //保存原来编辑笔记
   if (
@@ -344,6 +348,7 @@ const selectHandle = function (node: NotebookInfo) {
       noteTitle: node.name,
     })
       .then((res: ResponseData<string>) => {
+        console.log("read_note_file", res);
         if (res && res.code == 200) {
           var tem = res.data;
           data.mdText = tem;
@@ -621,7 +626,7 @@ let addNotebook = function () {
       notebook: notebook,
       newNoteMdFileName: newNoteMdFileName,
     })
-      .then((res:ResponseData<string>) => {
+      .then((res: ResponseData<string>) => {
         if (res && res.code == 200) {
           var fileName = res.data;
           NotificationUtil.success("笔记创建成功：" + fileName);
@@ -674,7 +679,7 @@ let removeNote = function () {
         currentNotebook: data.currentNotebook,
         currentNote: data.currentNote,
       })
-        .then((res:ResponseData<String>) => {
+        .then((res: ResponseData<String>) => {
           if (res && res.code == 200) {
             NotificationUtil.success("操作成功");
             data.currentNote = "";
@@ -723,7 +728,7 @@ let removeFolder = function () {
     invoke<ResponseData<String>>("remove_notebook", {
       currentNotebook: data.currentNotebook,
     })
-      .then((res:ResponseData<String>) => {
+      .then((res: ResponseData<String>) => {
         if (res && res.code == 200) {
           NotificationUtil.success("操作成功");
           data.currentNotebook = "";
@@ -758,7 +763,7 @@ const handleCancelByAddNotebookModal = () => {
  */
 const reFresh = () => {
   invoke<ResponseData<NotebookInfo>>("get_document_notebooks")
-    .then((res:ResponseData<NotebookInfo>) => {
+    .then((res: ResponseData<NotebookInfo>) => {
       if (res && res.code == 200) {
         let data_ = res.data;
         console.log("\===========================", data_);
@@ -779,7 +784,7 @@ const reFresh = () => {
  */
 const get_note_list = () => {
   invoke<ResponseData<string[]>>("get_note_list", { notebook: data.currentNotebook })
-    .then((res:ResponseData<string[]>) => {
+    .then((res: ResponseData<string[]>) => {
       if (res && res.code == 200) {
         var tem = res.data;
         data.notes = tem.map((n) => {
