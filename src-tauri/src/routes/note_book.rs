@@ -3,7 +3,7 @@ use tauri::{AppHandle, Manager};
 use crate::response::resp_data::{ResData, ResDataNoData};
 use crate::utils::fileUtil::read_dir_info;
 use std::path::PathBuf;
-// 获取本地笔记列表
+// 获取本地notebook下笔记列表
 #[tauri::command]
 pub async fn get_note_list(
     app_handle: AppHandle,
@@ -19,7 +19,6 @@ pub async fn get_note_list(
             // 文件夹是否存在
             if local_data_dir.exists() {
                 let mut notes: Vec<String> = vec![];
-
                 let paths = std::fs::read_dir(local_data_dir.join(notebook));
                 match paths {
                     Ok(ps) => {
@@ -123,7 +122,7 @@ pub async fn read_note_file(
 pub async fn create_notebook(
     app_handle: tauri::AppHandle,
     notebook_name: String,
-) -> Result<ResDataNoData, String> {
+) -> Result<ResData<String>, String> {
     let app_dir = app_handle.path().document_dir();
     match app_dir {
         Ok(dir) => {
@@ -136,28 +135,32 @@ pub async fn create_notebook(
                 let res = std::fs::create_dir_all(dir);
                 match res {
                     Ok(_) => {
-                        return Ok(ResDataNoData {
+                        return Ok(ResData {
                             code: 200,
                             msg: "创建成功".to_string(),
+                            data: String::new(),
                         })
                     }
                     Err(err) => {
-                        return Ok(ResDataNoData {
+                        return Ok(ResData {
                             code: 500,
                             msg: format!("创建失败：{0}", err.to_string()),
+                            data: String::new(),
                         })
                     }
                 }
             }
-            return Ok(ResDataNoData {
+            return Ok(ResData {
                 code: 500,
                 msg: "文件夹不存在".to_string(),
+                data: String::new(),
             });
         }
         Err(_) => {
-            return Ok(ResDataNoData {
+            return Ok(ResData {
                 code: 500,
                 msg: "获取路径失败".to_string(),
+                data: String::new(),
             })
         }
     }
@@ -231,7 +234,7 @@ pub async fn save_note(
     current_note: String,
     md_title: String,
     md_text: String,
-) -> Result<ResDataNoData, String> {
+) -> Result<ResData<String>, String> {
     let app_dir = app_handle.path().document_dir();
     match app_dir {
         Ok(dir) => {
@@ -250,38 +253,43 @@ pub async fn save_note(
                         let new_name_res = std::fs::rename(path, new_path);
                         match new_name_res {
                             Ok(_) => {
-                                return Ok(ResDataNoData {
+                                return Ok(ResData {
                                     code: 200,
                                     msg: "操作成功".to_string(),
+                                    data: String::new(),
                                 });
                             }
                             Err(e) => {
-                                return Ok(ResDataNoData {
+                                return Ok(ResData {
                                     code: 500,
                                     msg: e.to_string(),
+                                    data: String::new(),
                                 });
                             }
                         }
                     }
                     Err(e) => {
-                        return Ok(ResDataNoData {
+                        return Ok(ResData {
                             code: 500,
                             msg: e.to_string(),
+                            data: String::new(),
                         });
                     }
                 }
             }
         }
         Err(_) => {
-            return Ok(ResDataNoData {
+            return Ok(ResData {
                 code: 500,
                 msg: "获取路径失败".to_string(),
+                data: String::new(),
             })
         }
     }
-    Ok(ResDataNoData {
+    Ok(ResData {
         code: 500,
         msg: "文件夹不存在".to_string(),
+        data: String::new(),
     })
 }
 
@@ -294,7 +302,7 @@ pub async fn save_note(
 pub async fn remove_notebook(
     app_handle: tauri::AppHandle,
     current_notebook: String,
-) -> Result<ResDataNoData, String> {
+) -> Result<ResData<String>, String> {
     let app_dir = app_handle.path().document_dir();
     match app_dir {
         Ok(dir) => {
@@ -304,30 +312,34 @@ pub async fn remove_notebook(
                 let remove_res = std::fs::remove_dir_all(dir);
                 match remove_res {
                     Ok(_) => {
-                        return Ok(ResDataNoData {
+                        return Ok(ResData {
                             code: 200,
                             msg: "操作成功".to_string(),
+                            data: String::new(),
                         });
                     }
                     Err(e) => {
-                        return Ok(ResDataNoData {
+                        return Ok(ResData {
                             code: 500,
                             msg: e.to_string(),
+                            data: String::new(),
                         });
                     }
                 }
             }
         }
         Err(_) => {
-            return Ok(ResDataNoData {
+            return Ok(ResData {
                 code: 500,
                 msg: "获取路径失败".to_string(),
+                data: String::new(),
             })
         }
     }
-    Ok(ResDataNoData {
+    Ok(ResData {
         code: 500,
         msg: "文件夹不存在".to_string(),
+        data: String::new(),
     })
 }
 
@@ -341,7 +353,7 @@ pub async fn remove_note(
     app_handle: tauri::AppHandle,
     current_notebook: String,
     current_note: String,
-) -> Result<ResDataNoData, String> {
+) -> Result<ResData<String>, String> {
     let app_dir = app_handle.path().document_dir();
     match app_dir {
         Ok(dir) => {
@@ -351,29 +363,33 @@ pub async fn remove_note(
                 let remove_res = std::fs::remove_file(file);
                 match remove_res {
                     Ok(_) => {
-                        return Ok(ResDataNoData {
+                        return Ok(ResData {
                             code: 200,
                             msg: "操作成功".to_string(),
+                            data: String::new(),
                         });
                     }
                     Err(e) => {
-                        return Ok(ResDataNoData {
+                        return Ok(ResData {
                             code: 500,
                             msg: e.to_string(),
+                            data: String::new(),
                         });
                     }
                 }
             }
         }
         Err(_) => {
-            return Ok(ResDataNoData {
+            return Ok(ResData {
                 code: 500,
                 msg: "获取路径失败".to_string(),
+                data: String::new(),
             })
         }
     }
-    Ok(ResDataNoData {
+    Ok(ResData {
         code: 500,
         msg: "文件夹不存在".to_string(),
+        data: String::new(),
     })
 }
