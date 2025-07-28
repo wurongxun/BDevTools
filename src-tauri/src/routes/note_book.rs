@@ -1,8 +1,9 @@
-use tauri::{AppHandle, Manager};
-
 use crate::response::resp_data::{ResData, ResDataNoData};
 use crate::utils::fileUtil::read_dir_info;
 use std::path::PathBuf;
+use tauri::{AppHandle, Manager};
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 // 获取本地notebook下笔记列表
 #[tauri::command]
 pub async fn get_note_list(
@@ -73,43 +74,60 @@ pub async fn read_note_file(
     current_notebook: String,
     note_title: String,
 ) -> Result<ResData<String>, String> {
-    let app_dir = app_handle.path().document_dir();
-    match app_dir {
-        Ok(dir) => {
-            // 本地文件目录
-            let local_data_dir = dir.as_path().join("notebooks");
-            // 文件夹是否存在
-            if local_data_dir.exists() {
-                let file = local_data_dir
-                    .join(current_notebook)
-                    .join(note_title + ".md");
-                let content = std::fs::read_to_string(file);
-                match content {
-                    Ok(s) => {
-                        return Ok(ResData {
-                            code: 200,
-                            msg: "读取成功".to_string(),
-                            data: s,
-                        })
-                    }
-                    Err(err) => {
-                        return Ok(ResData {
-                            code: 500,
-                            msg: "笔记读取失败".to_string(),
-                            data: err.to_string(),
-                        })
-                    }
-                }
-            }
+    let contents = tokio::fs::read_to_string(current_notebook).await;
+    match contents {
+        Ok(_contents) => {
+            return Ok(ResData {
+                code: 200,
+                msg: "读取成功".to_string(),
+                data: _contents,
+            })
         }
-        Err(_) => {
+        Err(err) => {
             return Ok(ResData {
                 code: 500,
-                msg: "获取路径失败".to_string(),
-                data: String::new(),
+                msg: "笔记读取失败".to_string(),
+                data: err.to_string(),
             })
         }
     }
+    // let app_dir = app_handle.path().document_dir();
+    // match app_dir {
+    //     Ok(dir) => {
+    //         // 本地文件目录
+    //         let local_data_dir = dir.as_path().join("notebooks");
+    //         // 文件夹是否存在
+    //         if local_data_dir.exists() {
+    //             let file = local_data_dir
+    //                 .join(current_notebook)
+    //                 .join(note_title + ".md");
+    //             let content = std::fs::read_to_string(file);
+    //             match content {
+    //                 Ok(s) => {
+    //                     return Ok(ResData {
+    //                         code: 200,
+    //                         msg: "读取成功".to_string(),
+    //                         data: s,
+    //                     })
+    //                 }
+    //                 Err(err) => {
+    //                     return Ok(ResData {
+    //                         code: 500,
+    //                         msg: "笔记读取失败".to_string(),
+    //                         data: err.to_string(),
+    //                     })
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     Err(_) => {
+    //         return Ok(ResData {
+    //             code: 500,
+    //             msg: "获取路径失败".to_string(),
+    //             data: String::new(),
+    //         })
+    //     }
+    // }
     Ok(ResData {
         code: 500,
         msg: "笔记文件不存在".to_string(),

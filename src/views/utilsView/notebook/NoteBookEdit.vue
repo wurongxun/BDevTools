@@ -1,6 +1,10 @@
 <template>
   <el-row style="height: 100%">
-    <el-col :span="5" style="height: 100%; background-color: #d9d9d9" v-contextmenu:contextmenu>
+    <el-col
+      :span="5"
+      style="height: 100%; background-color: #d9d9d9"
+      v-contextmenu:contextmenu
+    >
       <!-- <a-spin :spinning="spinning"> </a-spin> -->
       <div class="wrapper" v-if="show_notebooks_data.length > 0">
         <!-- <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys"
@@ -8,18 +12,24 @@
           style="max-height: 100%; overflow: hidden auto"></a-menu> -->
 
         <el-menu default-active="2" class="el-menu-vertical-demo">
-          <TreeNode v-if="notebooks_data" :node="notebooks_data" v-model="state.selectedNodeId"
-            @node-click="selectHandle" />
+          <TreeNode
+            v-if="notebooks_data"
+            :node="notebooks_data"
+            v-model="state.selectedNodeId"
+            @node-click="selectHandle"
+          />
         </el-menu>
       </div>
       <div style="height: 100%; position: relative" v-else>
-        <span style="
+        <span
+          style="
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translateX(-50%) translateY(-50%);
             color: rgb(165 164 164);
-          ">
+          "
+        >
           右击添加文件夹
         </span>
       </div>
@@ -29,10 +39,20 @@
       <!-- <div v-if="showMdEditor"> -->
       <a-form layout="inline">
         <a-form-item style="width: 99.5%; margin: 0 auto; padding: 1px 0">
-          <a-input class="mdtitle-input" :bordered="false" v-model:value="data.mdTitle" placeholder="文章标题"></a-input>
+          <a-input
+            class="mdtitle-input"
+            :bordered="false"
+            v-model:value="data.mdTitle"
+            placeholder="文章标题"
+          ></a-input>
         </a-form-item>
       </a-form>
-      <MdEditor v-model="data.mdText" @onSave="saveMdText" style="height: 100%" @onError="onError" />
+      <MdEditor
+        v-model="data.mdText"
+        @onSave="saveMdText"
+        style="height: 100%"
+        @onError="onError"
+      />
       <!-- </div> -->
     </el-col>
   </el-row>
@@ -59,8 +79,12 @@
     <v-contextmenu-item @click="reFresh">刷新</v-contextmenu-item>
   </v-contextmenu>
 
-  <el-dialog v-model:visible="addFolderModalFormVisible" @close="handleCancelByAddFolderModal" title="添加文件夹"
-    width="500">
+  <el-dialog
+    v-model:visible="addFolderModalFormVisible"
+    @close="handleCancelByAddFolderModal"
+    title="添加文件夹"
+    width="500"
+  >
     <el-form>
       <el-form-item label="文件夹名称" :label-width="formLabelWidth">
         <el-input v-model="newFolderName" autocomplete="off" />
@@ -74,8 +98,12 @@
     </template>
   </el-dialog>
   <!-- 添加笔记本弹出表单 -->
-  <el-dialog v-model:visible="addFolderModalFormVisible" @close="handleCancelByAddNotebookModal" title="添加笔记"
-    width="500">
+  <el-dialog
+    v-model:visible="addFolderModalFormVisible"
+    @close="handleCancelByAddNotebookModal"
+    title="添加笔记"
+    width="500"
+  >
     <el-form>
       <el-form-item label="笔记名称" :label-width="formLabelWidth">
         <el-input v-model="newNoteMdFileName" autocomplete="off" />
@@ -129,7 +157,7 @@ onMounted(() => {
 
 const data = reactive({
   notebooks: [], // 笔记本列表
-  notes: [] as string[{ title: string }], // 笔记列表
+  notes: [] as { title: string }[], // 笔记列表
   selectedKeys: [], // 笔记本选中项key
   currentNotebook: "", // 当前选中的文件夹
   currentOldNotebook: "", //上次选中的文件夹
@@ -238,7 +266,9 @@ const selectHandle = function (node: NotebookInfo) {
       type: "warning",
     })
       .then(() => {
-        invoke<ResponseData<String[]>>("get_note_list", { notebook: data.currentOldNotebook })
+        invoke<ResponseData<String[]>>("get_note_list", {
+          notebook: data.currentOldNotebook,
+        })
           .then((res: ResponseData<String[]>) => {
             //获取旧笔记
             let same_file_name = false;
@@ -322,7 +352,7 @@ const selectHandle = function (node: NotebookInfo) {
       })
       .catch(() => {
         invoke<ResponseData<string>>("read_note_file", {
-          currentNotebook: data.currentNotebook,
+          currentNotebook: node.path,
           noteTitle: node.name,
         })
           .then((res: ResponseData<string>) => {
@@ -344,7 +374,7 @@ const selectHandle = function (node: NotebookInfo) {
       });
   } else {
     invoke<ResponseData<string>>("read_note_file", {
-      currentNotebook: data.currentNotebook,
+      currentNotebook: node.path,
       noteTitle: node.name,
     })
       .then((res: ResponseData<string>) => {
@@ -417,7 +447,9 @@ const saveMdText = (mdText: string) => {
     NotificationUtil.error("请输入标题");
     return;
   }
-  invoke<ResponseData<string[]>>("get_note_list", { notebook: data.currentOldNotebook })
+  invoke<ResponseData<string[]>>("get_note_list", {
+    notebook: data.currentOldNotebook,
+  })
     .then((res: ResponseData<string[]>) => {
       let same_file_name = false;
       if (res && res.code == 200) {
@@ -546,7 +578,9 @@ let addNodeFolder = function () {
   data.confirmLoading = true;
   data.loading = true;
   // 创建笔记本
-  invoke<ResponseData<string>>("create_notebook", { notebookName: notebookName })
+  invoke<ResponseData<string>>("create_notebook", {
+    notebookName: notebookName,
+  })
     .then((res: ResponseData<string>) => {
       if (res && res.code == 200) {
         NotificationUtil.success("文件夹创建成功");
@@ -697,7 +731,7 @@ let removeNote = function () {
           console.log(err);
         });
     })
-    .catch(() => { });
+    .catch(() => {});
 };
 /**
  * 删除文件夹
@@ -783,7 +817,9 @@ const reFresh = () => {
  * 获取文件夹下笔记列表
  */
 const get_note_list = () => {
-  invoke<ResponseData<string[]>>("get_note_list", { notebook: data.currentNotebook })
+  invoke<ResponseData<string[]>>("get_note_list", {
+    notebook: data.currentNotebook,
+  })
     .then((res: ResponseData<string[]>) => {
       if (res && res.code == 200) {
         var tem = res.data;

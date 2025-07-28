@@ -136,56 +136,56 @@ pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<Str
     }
 }
 // 读取用户选择的目录内容
-#[tauri::command]
-pub async fn read_selected_directory(app_handle: tauri::AppHandle) -> Result<ResData<Vec<String>>, String> {
-    let dialog_result = app_handle.dialog().file().blocking_pick_folder();
+// #[tauri::command]
+// pub async fn read_selected_directory(app_handle: tauri::AppHandle) -> Result<ResData<Vec<String>>, String> {
+//     let dialog_result = app_handle.dialog().file().blocking_pick_folder();
     
-    match dialog_result {
-        Some(path) => {
-            // 用户选择了目录
-            let dir_path = path;
-            let paths = std::fs::read_dir(&dir_path);
+//     match dialog_result {
+//         Some(path) => {
+//             // 用户选择了目录
+//             let dir_path = path;
+//             let paths = std::fs::read_dir(&dir_path);
             
-            match paths {
-                Ok(entries) => {
-                    let mut files: Vec<String> = vec![];
-                    for entry in entries {
-                        match entry {
-                            Ok(entry) => {
-                                let path = entry.path();
-                                if let Some(file_name) = path.file_name() {
-                                    if let Some(name_str) = file_name.to_str() {
-                                        files.push(name_str.to_string());
-                                    }
-                                }
-                            }
-                            Err(_) => continue,
-                        }
-                    }
+//             match paths {
+//                 Ok(entries) => {
+//                     let mut files: Vec<String> = vec![];
+//                     for entry in entries {
+//                         match entry {
+//                             Ok(entry) => {
+//                                 let path = entry.path();
+//                                 if let Some(file_name) = path.file_name() {
+//                                     if let Some(name_str) = file_name.to_str() {
+//                                         files.push(name_str.to_string());
+//                                     }
+//                                 }
+//                             }
+//                             Err(_) => continue,
+//                         }
+//                     }
                     
-                    Ok(ResData {
-                        code: 200,
-                        msg: "读取成功".to_string(),
-                        data: files,
-                    })
-                }
-                Err(_) => {
-                    Ok(ResData {
-                        code: 500,
-                        msg: "无法读取目录".to_string(),
-                        data: Vec::new(),
-                    })
-                }
-            }
-        }
-        None => {
-            // 用户取消了选择
-            Ok(ResData {
-                code: 400,
-                msg: "未选择目录".to_string(),
-                data: Vec::new(),
-            })
-        }
-    }
-}
+//                     Ok(ResData {
+//                         code: 200,
+//                         msg: "读取成功".to_string(),
+//                         data: files,
+//                     })
+//                 }
+//                 Err(_) => {
+//                     Ok(ResData {
+//                         code: 500,
+//                         msg: "无法读取目录".to_string(),
+//                         data: Vec::new(),
+//                     })
+//                 }
+//             }
+//         }
+//         None => {
+//             // 用户取消了选择
+//             Ok(ResData {
+//                 code: 400,
+//                 msg: "未选择目录".to_string(),
+//                 data: Vec::new(),
+//             })
+//         }
+//     }
+// }
 
