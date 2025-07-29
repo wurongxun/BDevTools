@@ -1,10 +1,6 @@
 <template>
   <el-row style="height: 100%">
-    <el-col
-      :span="5"
-      style="height: 100%; background-color: #d9d9d9"
-      v-contextmenu:contextmenu
-    >
+    <el-col :span="5" style="height: 100%; background-color: #d9d9d9" v-contextmenu:contextmenu>
       <!-- <a-spin :spinning="spinning"> </a-spin> -->
       <div class="wrapper" v-if="show_notebooks_data.length > 0">
         <!-- <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys"
@@ -12,24 +8,18 @@
           style="max-height: 100%; overflow: hidden auto"></a-menu> -->
 
         <el-menu default-active="2" class="el-menu-vertical-demo">
-          <TreeNode
-            v-if="notebooks_data"
-            :node="notebooks_data"
-            v-model="state.selectedNodeId"
-            @node-click="selectHandle"
-          />
+          <TreeNode v-if="notebooks_data" :node="notebooks_data" v-model="state.selectedNodeId"
+            @node-click="selectHandle" />
         </el-menu>
       </div>
       <div style="height: 100%; position: relative" v-else>
-        <span
-          style="
+        <span style="
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translateX(-50%) translateY(-50%);
             color: rgb(165 164 164);
-          "
-        >
+          ">
           右击添加文件夹
         </span>
       </div>
@@ -39,20 +29,10 @@
       <!-- <div v-if="showMdEditor"> -->
       <a-form layout="inline">
         <a-form-item style="width: 99.5%; margin: 0 auto; padding: 1px 0">
-          <a-input
-            class="mdtitle-input"
-            :bordered="false"
-            v-model:value="data.mdTitle"
-            placeholder="文章标题"
-          ></a-input>
+          <a-input class="mdtitle-input" :bordered="false" v-model:value="data.mdTitle" placeholder="文章标题"></a-input>
         </a-form-item>
       </a-form>
-      <MdEditor
-        v-model="data.mdText"
-        @onSave="saveMdText"
-        style="height: 100%"
-        @onError="onError"
-      />
+      <MdEditor v-model="data.mdText" @onSave="saveMdText" style="height: 100%" @onError="onError" />
       <!-- </div> -->
     </el-col>
   </el-row>
@@ -79,12 +59,8 @@
     <v-contextmenu-item @click="reFresh">刷新</v-contextmenu-item>
   </v-contextmenu>
 
-  <el-dialog
-    v-model:visible="addFolderModalFormVisible"
-    @close="handleCancelByAddFolderModal"
-    title="添加文件夹"
-    width="500"
-  >
+  <el-dialog v-model:visible="addFolderModalFormVisible" @close="handleCancelByAddFolderModal" title="添加文件夹"
+    width="500">
     <el-form>
       <el-form-item label="文件夹名称" :label-width="formLabelWidth">
         <el-input v-model="newFolderName" autocomplete="off" />
@@ -98,12 +74,8 @@
     </template>
   </el-dialog>
   <!-- 添加笔记本弹出表单 -->
-  <el-dialog
-    v-model:visible="addFolderModalFormVisible"
-    @close="handleCancelByAddNotebookModal"
-    title="添加笔记"
-    width="500"
-  >
+  <el-dialog v-model:visible="addFolderModalFormVisible" @close="handleCancelByAddNotebookModal" title="添加笔记"
+    width="500">
     <el-form>
       <el-form-item label="笔记名称" :label-width="formLabelWidth">
         <el-input v-model="newNoteMdFileName" autocomplete="off" />
@@ -159,12 +131,13 @@ const data = reactive({
   notebooks: [], // 笔记本列表
   notes: [] as { title: string }[], // 笔记列表
   selectedKeys: [], // 笔记本选中项key
-  currentNotebook: "", // 当前选中的文件夹
-  currentOldNotebook: "", //上次选中的文件夹
-  currentNote: "", // 当前选中笔记
+  path: "", // 当前选中的文件夹
+  oldpath: "", //上次选中的文件夹
+  currentOldNote: "", // 上次选中笔记 全路径
+  currentNote: "", // 当前选中笔记 全路径
   notEditedMdtext: "", // 未编辑的文章内容
   showMdEditor: false, // 是否显示编辑器
-  newFolderName: "", // 新建笔记本的名称
+  newFolderName: "", // 新建问价夹的名称
   addNotebookModalFormVisible: false, // 是否显示添加笔记本表单
   addFolderModalFormVisible: false,
   confirmLoading: false, // 添加笔记表单等待状态（是否转圈圈）
@@ -238,7 +211,7 @@ const onOpenChange = function (openKeys) {
   } else {
     state.openKeys = latestOpenKey ? [latestOpenKey] : [];
   }
-  data.currentNotebook = latestOpenKey;
+  data.currentNote = latestOpenKey;
 };
 
 /**
@@ -266,8 +239,9 @@ const selectHandle = function (node: NotebookInfo) {
       type: "warning",
     })
       .then(() => {
+        //获取目录下笔记
         invoke<ResponseData<String[]>>("get_note_list", {
-          notebook: data.currentOldNotebook,
+          path: data.oldpath,
         })
           .then((res: ResponseData<String[]>) => {
             //获取旧笔记
@@ -284,7 +258,7 @@ const selectHandle = function (node: NotebookInfo) {
                 Promise.all([saveMd(data.mdText, data.mdTitle)]).then(() => {
                   //点击了确定，开始删除
                   invoke<ResponseData<string>>("remove_note", {
-                    currentNotebook: data.currentOldNotebook,
+                    currentNotebook: data.oldpath,
                     currentNote: data.mdOldTitle + ".md",
                   })
                     .then((res: ResponseData<string>) => {
@@ -299,7 +273,7 @@ const selectHandle = function (node: NotebookInfo) {
                       console.log(err);
                     });
                   invoke<ResponseData<string>>("read_note_file", {
-                    currentNotebook: data.currentNotebook,
+                    currentNotebook: data.currentNote,
                     noteTitle: node.name,
                   })
                     .then((res: ResponseData<string>) => {
@@ -309,7 +283,7 @@ const selectHandle = function (node: NotebookInfo) {
                         data.notEditedMdtext = tem; // 原始笔记内容
                         data.mdTitle = node.name;
                         data.mdOldTitle = node.name;
-                        data.currentOldNotebook = data.currentNotebook;
+                        data.oldpath = data.currentNote;
                         data.showMdEditor = true;
                       } else {
                         NotificationUtil.error("读取失败：" + res.msg);
@@ -321,9 +295,10 @@ const selectHandle = function (node: NotebookInfo) {
                 });
               } else {
                 NotificationUtil.warn("已有相同文件名，文件名将无法更改！");
+                //保存旧文件名称
                 Promise.all([saveMd(data.mdText, data.mdOldTitle)]).then(() => {
                   invoke<ResponseData<string>>("read_note_file", {
-                    currentNotebook: data.currentNotebook,
+                    currentNotebook: node.path,
                     noteTitle: node.name,
                   })
                     .then((res) => {
@@ -333,7 +308,7 @@ const selectHandle = function (node: NotebookInfo) {
                         data.notEditedMdtext = tem; // 原始笔记内容
                         data.mdTitle = node.name;
                         data.mdOldTitle = node.name;
-                        data.currentOldNotebook = data.currentNotebook;
+                        data.currentOldNote = node.path;
                         data.showMdEditor = true;
                       } else {
                         NotificationUtil.error("读取失败：" + res.msg);
@@ -363,7 +338,7 @@ const selectHandle = function (node: NotebookInfo) {
               data.mdTitle = node.name;
               data.mdOldTitle = node.name;
               data.showMdEditor = true;
-              data.currentOldNotebook = data.currentNotebook;
+              data.currentOldNotebook = data.currentNote;
             } else {
               NotificationUtil.error("读取失败：" + res.msg);
             }
@@ -386,7 +361,7 @@ const selectHandle = function (node: NotebookInfo) {
           data.mdTitle = node.name;
           data.mdOldTitle = node.name;
           data.showMdEditor = true;
-          data.currentOldNotebook = data.currentNotebook;
+          data.currentOldNotebook = data.currentNote;
         } else {
           NotificationUtil.error("读取失败：" + res.msg);
         }
@@ -402,20 +377,19 @@ const selectHandle = function (node: NotebookInfo) {
  * @param {笔记内容} mdText
  * @param {标题} mdTitle
  */
-const saveMd = (mdText: string, mdTitle: string) => {
+const saveMd = (mdText: string, mdTitle: string, path: string,) => {
   var p = new Promise(function () {
-    if (data.mdTitle == "") {
+    if (mdTitle == "") {
       // 标题为空
       NotificationUtil.error("请输入标题");
       return;
     }
 
-    if (data.currentOldNotebook && data.currentNote) {
-      // 不为空
+    if (data.currentOldNote && data.currentNote) {
+
       // 调用保存笔记方法
       invoke<ResponseData<string>>("save_note", {
-        currentNotebook: data.currentOldNotebook,
-        currentNote: data.currentNote,
+        path: path,
         mdTitle: mdTitle,
         mdText: mdText,
       })
@@ -585,7 +559,7 @@ let addNodeFolder = function () {
       if (res && res.code == 200) {
         NotificationUtil.success("文件夹创建成功");
         // data.notebooks.push(notebookName);
-        data.currentNotebook = notebookName; // 当前笔记本为新建的
+        data.currentNote = notebookName; // 当前笔记本为新建的
         state.selectedKeys = [notebookName]; // 选中新建的笔记本
         data.newFolderName = ""; // 清空
         data.addFolderModalFormVisible = false; // 隐藏模态表单
@@ -654,7 +628,7 @@ let addNotebook = function () {
     NotificationUtil.error("笔记名称命名不规范，不能为纯数字！");
     return;
   }
-  var notebook = data.currentNotebook;
+  var notebook = data.currentNote;
   if (notebook) {
     invoke<ResponseData<string>>("create_note_file", {
       notebook: notebook,
@@ -690,9 +664,9 @@ let addNotebook = function () {
  */
 let removeNote = function () {
   if (
-    StringUtil.isNullAndEmpty(data.currentNotebook) ||
     StringUtil.isNullAndEmpty(data.currentNote) ||
-    data.currentNotebook != data.currentOldNotebook
+    StringUtil.isNullAndEmpty(data.currentNote) ||
+    data.currentNote != data.currentOldNotebook
   ) {
     NotificationUtil.warn("请选择笔记");
     return;
@@ -710,7 +684,7 @@ let removeNote = function () {
       //查看删除笔记是否是正在编辑的笔记
       //点击了确定，开始删除
       invoke<ResponseData<String>>("remove_note", {
-        currentNotebook: data.currentNotebook,
+        currentNotebook: data.currentNote,
         currentNote: data.currentNote,
       })
         .then((res: ResponseData<String>) => {
@@ -731,13 +705,13 @@ let removeNote = function () {
           console.log(err);
         });
     })
-    .catch(() => {});
+    .catch(() => { });
 };
 /**
  * 删除文件夹
  */
 let removeFolder = function () {
-  if (StringUtil.isNullAndEmpty(data.currentNotebook)) {
+  if (StringUtil.isNullAndEmpty(data.currentNote)) {
     NotificationUtil.error("请选择文件夹！");
     return;
   }
@@ -749,7 +723,7 @@ let removeFolder = function () {
       h(
         "p",
         { style: "color:red;" },
-        `删除文件夹 "${data.currentNotebook}" 吗，文件夹下笔记文件也将一并删除！`
+        `删除文件夹 "${data.currentNote}" 吗，文件夹下笔记文件也将一并删除！`
       ),
       h("br"),
       h("br"),
@@ -760,12 +734,12 @@ let removeFolder = function () {
   }).then((action) => {
     // 点击了确定，开始删除
     invoke<ResponseData<String>>("remove_notebook", {
-      currentNotebook: data.currentNotebook,
+      currentNotebook: data.currentNote,
     })
       .then((res: ResponseData<String>) => {
         if (res && res.code == 200) {
           NotificationUtil.success("操作成功");
-          data.currentNotebook = "";
+          data.currentNote = "";
           // 重新获取笔记本列表数据
           get_document_notebooks();
         } else {
@@ -818,7 +792,7 @@ const reFresh = () => {
  */
 const get_note_list = () => {
   invoke<ResponseData<string[]>>("get_note_list", {
-    notebook: data.currentNotebook,
+    notebook: data.currentNote,
   })
     .then((res: ResponseData<string[]>) => {
       if (res && res.code == 200) {

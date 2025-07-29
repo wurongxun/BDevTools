@@ -85,6 +85,7 @@ pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<Str
     let mut children_dir_and_file_info_1 = DirAndFileInfo::create(
         "".to_string(),
         "".to_string(),
+        "notebooks".to_string(),
         "".to_string(),
         "notebooks".to_string(),
         false,
@@ -139,13 +140,13 @@ pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<Str
 // #[tauri::command]
 // pub async fn read_selected_directory(app_handle: tauri::AppHandle) -> Result<ResData<Vec<String>>, String> {
 //     let dialog_result = app_handle.dialog().file().blocking_pick_folder();
-    
+
 //     match dialog_result {
 //         Some(path) => {
 //             // 用户选择了目录
 //             let dir_path = path;
 //             let paths = std::fs::read_dir(&dir_path);
-            
+
 //             match paths {
 //                 Ok(entries) => {
 //                     let mut files: Vec<String> = vec![];
@@ -162,7 +163,7 @@ pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<Str
 //                             Err(_) => continue,
 //                         }
 //                     }
-                    
+
 //                     Ok(ResData {
 //                         code: 200,
 //                         msg: "读取成功".to_string(),
@@ -188,4 +189,3 @@ pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<Str
 //         }
 //     }
 // }
-

@@ -4,56 +4,36 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
-// 获取本地notebook下笔记列表
+// 获取目录下笔记
 #[tauri::command]
 pub async fn get_note_list(
     app_handle: AppHandle,
-    notebook: String,
+    path: String,
 ) -> Result<ResData<Vec<String>>, String> {
-    //let path=tauri::path::PathResolver(app_handle);
-    let app_dir = app_handle.path().document_dir();
-    //let app_dir = tauri::path::PathResolver(); //tauri::api::path::document_dir();
-    match app_dir {
-        Ok(dir) => {
-            // 本地文件目录
-            let local_data_dir = dir.as_path().join("notebooks");
-            // 文件夹是否存在
-            if local_data_dir.exists() {
-                let mut notes: Vec<String> = vec![];
-                let paths = std::fs::read_dir(local_data_dir.join(notebook));
-                match paths {
-                    Ok(ps) => {
-                        // 遍历文件
-                        for path in ps {
-                            let entry = path.unwrap();
-                            let path = entry.path();
-                            if path.is_file() {
-                                let name = path.file_stem().unwrap();
-                                let n = name.to_str().unwrap().to_string();
-                                println!("get_note_list - {:?}", n);
-                                notes.push(n);
-                            }
-                        }
-                        return Ok(ResData {
-                            code: 200,
-                            msg: "success".to_string(),
-                            data: notes,
-                        });
-                    }
-                    Err(_) => {
-                        return Ok(ResData {
-                            code: 500,
-                            msg: "读取目录失败".to_string(),
-                            data: Vec::new(),
-                        })
+    let paths = tokio::fs::read_dir(PathBuf::from(path)).await;
+    //文件夹下所有文件
+    let mut notes: Vec<String> = vec![];
+    match paths {
+        Ok(ps) => {
+            let mut ps = ps; // 将 ps 声明为可变变量
+            while let Some(entry) = ps.next_entry().await.map_err(|e| e.to_string())? {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(filename) = path.file_stem() {
+                        notes.push(filename.to_string_lossy().to_string());
                     }
                 }
             }
+            return Ok(ResData {
+                code: 200,
+                msg: "success".to_string(),
+                data: notes,
+            });
         }
         Err(_) => {
             return Ok(ResData {
                 code: 500,
-                msg: "获取路径失败".to_string(),
+                msg: "读取目录失败".to_string(),
                 data: Vec::new(),
             })
         }
@@ -72,7 +52,6 @@ pub async fn get_note_list(
 pub async fn read_note_file(
     app_handle: tauri::AppHandle,
     current_notebook: String,
-    note_title: String,
 ) -> Result<ResData<String>, String> {
     let contents = tokio::fs::read_to_string(current_notebook).await;
     match contents {
@@ -91,48 +70,6 @@ pub async fn read_note_file(
             })
         }
     }
-    // let app_dir = app_handle.path().document_dir();
-    // match app_dir {
-    //     Ok(dir) => {
-    //         // 本地文件目录
-    //         let local_data_dir = dir.as_path().join("notebooks");
-    //         // 文件夹是否存在
-    //         if local_data_dir.exists() {
-    //             let file = local_data_dir
-    //                 .join(current_notebook)
-    //                 .join(note_title + ".md");
-    //             let content = std::fs::read_to_string(file);
-    //             match content {
-    //                 Ok(s) => {
-    //                     return Ok(ResData {
-    //                         code: 200,
-    //                         msg: "读取成功".to_string(),
-    //                         data: s,
-    //                     })
-    //                 }
-    //                 Err(err) => {
-    //                     return Ok(ResData {
-    //                         code: 500,
-    //                         msg: "笔记读取失败".to_string(),
-    //                         data: err.to_string(),
-    //                     })
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     Err(_) => {
-    //         return Ok(ResData {
-    //             code: 500,
-    //             msg: "获取路径失败".to_string(),
-    //             data: String::new(),
-    //         })
-    //     }
-    // }
-    Ok(ResData {
-        code: 500,
-        msg: "笔记文件不存在".to_string(),
-        data: String::new(),
-    })
 }
 
 // 创建本地 笔记本/文件夹
@@ -240,35 +177,37 @@ pub async fn create_note_file(
 }
 
 /**
- * @param current_notebook 文件夹
- * @param current_note
+ * @param path 全路径名
  * @param md_title 标题/文件名
  * @param md_text 内容
  */
 #[tauri::command]
 pub async fn save_note(
     app_handle: tauri::AppHandle,
-    current_notebook: String,
-    current_note: String,
+    path: String,
     md_title: String,
     md_text: String,
 ) -> Result<ResData<String>, String> {
-    let app_dir = app_handle.path().document_dir();
-    match app_dir {
-        Ok(dir) => {
-            // 本地文件目录
-            let local_data_dir = dir.as_path().join("notebooks");
-            // 文件夹是否存在
-            if local_data_dir.exists() {
-                let path = local_data_dir
-                    .join(current_notebook.clone())
-                    .join(current_note + ".md");
-                let new_path = local_data_dir.join(current_notebook).join(md_title + ".md");
-                let wres = std::fs::write(path.clone(), md_text);
-                match wres {
-                    Ok(_) => {
+    let path_clone = path.clone(); // 克隆path以避免所有权问题
+                                   //判断文件是否存在
+    match tokio::fs::metadata(path_clone).await {
+        Ok(_) => {
+            let wres = std::fs::write(&path, md_text);
+            match wres {
+                Ok(_) => {
+                    //tokio::fs::rename(from, to)
+                    let mut _filename = String::new();
+                    let path_ = PathBuf::from(&path);
+                    if path_.is_file() {
+                        if let Some(filename) = path_.file_stem() {
+                            _filename = filename.to_string_lossy().to_string();
+                        }
+                    }
+                    if (_filename.to_lowercase() != md_title.to_lowercase()) {
+                        println!("忽略大小写相等");
+
                         //将文件或目录重命名为新名称，如果 to 已存在，则替换原始文件。如果新名称位于不同的挂载点，这将不起作用。
-                        let new_name_res = std::fs::rename(path, new_path);
+                        let new_name_res = tokio::fs::rename(path, md_title).await;
                         match new_name_res {
                             Ok(_) => {
                                 return Ok(ResData {
@@ -285,30 +224,93 @@ pub async fn save_note(
                                 });
                             }
                         }
-                    }
-                    Err(e) => {
+                    } else {
                         return Ok(ResData {
-                            code: 500,
-                            msg: e.to_string(),
+                            code: 200,
+                            msg: "操作成功".to_string(),
                             data: String::new(),
                         });
                     }
                 }
+                Err(e) => {
+                    return Ok(ResData {
+                        code: 500,
+                        msg: e.to_string(),
+                        data: String::new(),
+                    });
+                }
             }
         }
-        Err(_) => {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            println!("文件不存在");
             return Ok(ResData {
                 code: 500,
-                msg: "获取路径失败".to_string(),
+                msg: "文件不存在".to_string(),
                 data: String::new(),
-            })
+            });
+        }
+        Err(e) => {
+            println!("检查文件时出错: {}", e);
+            return Ok(ResData {
+                code: 500,
+                msg: "检查文件时出错".to_string(),
+                data: String::new(),
+            });
         }
     }
-    Ok(ResData {
-        code: 500,
-        msg: "文件夹不存在".to_string(),
-        data: String::new(),
-    })
+
+    // let app_dir = app_handle.path().document_dir();
+    // match app_dir {
+    //     Ok(dir) => {
+    //         // 本地文件目录
+    //         let local_data_dir = dir.as_path().join("notebooks");
+    //         // 文件夹是否存在
+    //         if local_data_dir.exists() {
+    //             let path = local_data_dir
+    //                 .join(current_notebook.clone())
+
+    //             let new_path = local_data_dir.join(current_notebook).join(md_title + ".md");
+    //             //写入文件
+    //             let wres = std::fs::write(path.clone(), md_text);
+    //             match wres {
+    //                 Ok(_) => {
+    //                     //将文件或目录重命名为新名称，如果 to 已存在，则替换原始文件。如果新名称位于不同的挂载点，这将不起作用。
+    //                     let new_name_res = std::fs::rename(path, new_path);
+    //                     match new_name_res {
+    //                         Ok(_) => {
+    //                             return Ok(ResData {
+    //                                 code: 200,
+    //                                 msg: "操作成功".to_string(),
+    //                                 data: String::new(),
+    //                             });
+    //                         }
+    //                         Err(e) => {
+    //                             return Ok(ResData {
+    //                                 code: 500,
+    //                                 msg: e.to_string(),
+    //                                 data: String::new(),
+    //                             });
+    //                         }
+    //                     }
+    //                 }
+    //                 Err(e) => {
+    //                     return Ok(ResData {
+    //                         code: 500,
+    //                         msg: e.to_string(),
+    //                         data: String::new(),
+    //                     });
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     Err(_) => {
+    //         return Ok(ResData {
+    //             code: 500,
+    //             msg: "获取路径失败".to_string(),
+    //             data: String::new(),
+    //         })
+    //     }
+    // }
 }
 
 /**

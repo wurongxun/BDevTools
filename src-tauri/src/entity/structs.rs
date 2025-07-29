@@ -21,6 +21,7 @@ pub struct DirAndFileInfo {
     pub id: String,
     pub parent_id: String,
     pub path: String,
+    pub folder: String,
     pub name: String,
     pub isfile: bool,
     pub children: Vec<DirAndFileInfo>,
@@ -31,6 +32,7 @@ impl DirAndFileInfo {
         id: String,
         parent_id: String,
         path: String,
+        folder: String,
         name: String,
         isfile: bool,
     ) -> DirAndFileInfo {
@@ -38,6 +40,7 @@ impl DirAndFileInfo {
             id,
             parent_id,
             path,
+            folder,
             name,
             isfile,
             children: Vec::new(),
@@ -49,11 +52,17 @@ impl DirAndFileInfo {
     pub fn get_path(&mut self) -> String {
         return self.path.clone();
     }
+    pub fn get_folder(&mut self) -> String {
+        return self.folder.clone();
+    }
     pub fn get_id(&mut self) -> String {
         return self.id.clone();
     }
     pub fn set_parent_id(&mut self, parent_id: String) {
         self.parent_id = parent_id;
+    }
+    pub fn set_folder(&mut self, folder: String) {
+        self.folder = folder;
     }
 }
 

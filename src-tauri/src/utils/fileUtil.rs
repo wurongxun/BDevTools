@@ -13,10 +13,12 @@ use super::regexUtil;
 
 pub fn all_path(root_path: &String) -> Result<Vec<String>, Box<dyn Error>> {
     let id = chrono::prelude::Local::now().timestamp_millis().to_string();
+    let folder = get_directory_path(&root_path).unwrap();
     let mut children_dir_and_file_info_1 = DirAndFileInfo::create(
         id,
         "".to_string(),
         root_path.to_string(),
+        folder,
         "notebooks".to_string(),
         false,
     );
@@ -134,11 +136,13 @@ pub fn get_dir_and_file(
             let mut d = a + c;
             *num = d;
             let b: bool = regexUtil::validate(r#"(?:md)$"#, name);
-
+            let path=String::from(path_dir_entry.as_os_str().to_str().expect(""));
+            let folder = get_directory_path(&path).unwrap();
             let mut children_dir_and_file_info_3 = DirAndFileInfo::create(
                 String::from(name),
                 children_dirAndFileInfo.get_id(),
-                String::from(path_dir_entry.as_os_str().to_str().expect("")),
+                path,
+                folder,
                 String::from(name),
                 path_dir_entry.is_file(),
             );
@@ -158,11 +162,13 @@ pub fn get_dir_and_file(
 }
 
 pub fn get_document_notebooks_data(root_path: &String) -> ResData<String> {
-    let id = chrono::prelude::Local::now().timestamp_millis().to_string();
+    let id: String = chrono::prelude::Local::now().timestamp_millis().to_string();
+    let folder = get_directory_path(root_path).unwrap();
     let mut children_dir_and_file_info_1 = DirAndFileInfo::create(
         id,
         "".to_string(),
         root_path.to_string(),
+        folder,
         "notebooks".to_string(),
         false,
     );
@@ -176,5 +182,29 @@ pub fn get_document_notebooks_data(root_path: &String) -> ResData<String> {
         code: 200,
         msg: "OK".to_string(),
         data: serde_json::to_string(&children_dir_and_file_info_1).unwrap(),
+    }
+}
+/**
+ * 判断字符串是文件路径还是文件夹路径
+ * 如果是文件夹路径直接返回
+ * 如果是文件路径则返回文件所在文件夹路径
+ */
+pub fn get_directory_path(path: &str) -> Option<String> {
+    match metadata(path) {
+        Ok(metadata) => {
+            if metadata.is_dir() {
+                // 如果是文件夹，直接返回原路径
+                Some(path.to_string())
+            } else {
+                // 如果是文件，返回所在文件夹路径
+                let path_obj = Path::new(path);
+                if let Some(parent) = path_obj.parent() {
+                    Some(parent.to_string_lossy().to_string())
+                } else {
+                    Some(".".to_string())
+                }
+            }
+        }
+        Err(_) => None,
     }
 }
