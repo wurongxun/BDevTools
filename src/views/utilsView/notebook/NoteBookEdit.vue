@@ -112,7 +112,7 @@ import { MdEditor } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
 import { NotebookInfo, ResponseData } from "@/entity/entitys";
 import TreeNode from "@/components/tsx/menu/TreeNode";
-import { request, tauri_request } from "@/utils/request";
+import { tauri_request } from "@/utils/request";
 
 // 处理节点点击事件
 const handleNodeClick = (node: NotebookInfo) => {
@@ -133,6 +133,7 @@ const data = reactive({
   files: [] as { title: string }[], // 文件列表
   selectedKeys: [], // 笔记本选中项key
   selectFolderPath: "", // 当前选中文件夹 用于建文件和子文件夹
+  selectIsFile: false,// 当前选中文件还是文件夹
   currentChooseFolderPath_md: "", // 当前选中文件的文件夹
   //lastTimeChooseFolderPath_md: "", //上次选中文件的文件夹
   currentChooseNoteAllPath_md: "", // 当前选中笔记 全路径
@@ -224,7 +225,7 @@ const onOpenChange = function (openKeys) {
  */
 const selectHandle = function (node: NotebookInfo) {
   //console.log("selectedKeys {:?}", selectedKeys)
-
+  data.selectIsFile = node.isfile;
   if (!node.isfile) {
     data.selectFolderPath = node.folder;
     return;
@@ -574,7 +575,7 @@ const showAddNotebookModalForm = () => {
  * 添加笔记
  */
 let addNotebook = async function () {
- let newNoteMdFileName = data.newNoteMdFileName.trim();
+  let newNoteMdFileName = data.newNoteMdFileName.trim();
   if (
     newNoteMdFileName == null ||
     newNoteMdFileName == undefined ||
@@ -592,7 +593,7 @@ let addNotebook = async function () {
       return;
     }
   });
- 
+
   var regex = /.*[/\\:*?|].*/;
   //存在返回true，不存在返回false
   if (regex.test(data.newNoteMdFileName)) {
@@ -605,46 +606,25 @@ let addNotebook = async function () {
     NotificationUtil.error("笔记名称命名不规范，不能为纯数字！");
     return;
   }
-  var notebook = data.currentNote;
-  if (notebook) {
-    invoke<ResponseData<string>>("create_note_file", {
-      notebook: notebook,
-      newNoteMdFileName: newNoteMdFileName,
-    })
-      .then((res: ResponseData<string>) => {
-        if (res && res.code == 200) {
-          var fileName = res.data;
-          NotificationUtil.success("笔记创建成功：" + fileName);
-          data.newNoteMdFileName = fileName;
-          data.notes.push({ title: fileName });
-          data.currentNote = fileName; // 置当前笔记为新建的临时笔记
-          // 打开该临时笔记
-          data.mdTitle = fileName;
-          data.mdText = "";
-          data.showMdEditor = true;
-          data.mdOldTitle = fileName;
-          data.notEditedMdtext = "";
-          data.addNotebookModalFormVisible = false; // 隐藏模态表单
-          get_document_notebooks();
-        } else {
-          NotificationUtil.error("笔记创建失败：" + res.msg);
-        }
-      })
-      .catch((err) => {
-        console.log(err);
-      });
+
+  let create_note_file = await tauri_request<ResponseData<string>>("create_note_file", {
+    father_path: data.selectFolderPath,
+    new_note_md_file_name: newNoteMdFileName,
+  })
+  if (create_note_file && create_note_file.code == 200) {
+    data.addNotebookModalFormVisible = false; // 隐藏模态表单
+    NotificationUtil.success("笔记创建成功");
+    get_document_notebooks();
+  } else {
+    NotificationUtil.error("笔记创建失败：" + create_note_file.msg);
   }
 };
 
 /**
- * 删除笔记
+ * 删文件
  */
-let removeNote = function () {
-  if (
-    StringUtil.isNullAndEmpty(data.currentNote) ||
-    StringUtil.isNullAndEmpty(data.currentNote) ||
-    data.currentNote != data.currentOldNotebook
-  ) {
+let removeNote = async function () {
+  if (StringUtil.isNullAndEmpty(data.currentChooseNoteAllPath_md) && data.selectIsFile) {
     NotificationUtil.warn("请选择笔记");
     return;
   }
@@ -654,33 +634,29 @@ let removeNote = function () {
     cancelButtonText: "Cancel",
     type: "warning",
     message: h("p", null, [
-      h("span", null, `确认删除笔记 ${data.currentNote} 吗？ `),
+      h("span", null, `确认删除笔记 ${data.title_md} 吗？ `),
     ]),
   })
-    .then(() => {
+    .then(async () => {
       //查看删除笔记是否是正在编辑的笔记
       //点击了确定，开始删除
-      invoke<ResponseData<String>>("remove_note", {
-        currentNotebook: data.currentNote,
-        currentNote: data.currentNote,
-      })
-        .then((res: ResponseData<String>) => {
-          if (res && res.code == 200) {
-            NotificationUtil.success("操作成功");
-            data.currentNote = "";
-            data.showMdEditor = false;
-            data.mdText = "";
-            data.mdTitle = "";
-            data.mdOldTitle = "";
-            data.notEditedMdtext = "";
-            get_document_notebooks();
-          } else {
-            NotificationUtil.error("操作失败：" + res.msg);
-          }
-        })
-        .catch((err) => {
-          console.log(err);
-        });
+
+      let remove_note = await tauri_request<ResponseData<string>>("remove_note", {
+        path: data.currentChooseNoteAllPath_md
+      });
+      if (remove_note && remove_note.code == 200) {
+        NotificationUtil.success("操作成功");
+        data.currentChooseNoteAllPath_md = "";
+        data.currentChooseFolderPath_md= "";
+        data.showMdEditor = false;
+        data.title_md = "";
+        data.editedMdtext_md = "";
+        data.lastTimeTitle_md = "";
+        data.notEditedMdtext_md = "";
+        get_document_notebooks();
+      } else {
+        NotificationUtil.error("操作失败：" + remove_note.msg);
+      }
     })
     .catch(() => { });
 };
@@ -688,7 +664,7 @@ let removeNote = function () {
  * 删除文件夹
  */
 let removeFolder = function () {
-  if (StringUtil.isNullAndEmpty(data.currentNote)) {
+  if (StringUtil.isNullAndEmpty(data.selectFolderPath)&&!data.selectIsFile) {
     NotificationUtil.error("请选择文件夹！");
     return;
   }

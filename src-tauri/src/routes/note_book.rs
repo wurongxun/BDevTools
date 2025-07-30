@@ -116,7 +116,7 @@ pub async fn create_folder(
 pub async fn create_note_file(
     app_handle: tauri::AppHandle,
     father_path: String,
-    newNoteMdFileName: String,
+    new_note_md_file_name: String,
 ) -> Result<ResData<String>, String> {
     if father_path.is_empty() {
         return Ok(ResData {
@@ -134,7 +134,7 @@ pub async fn create_note_file(
         });
     }
     let mut path_ = PathBuf::from(father_path);
-    let filename_clone = newNoteMdFileName.clone();
+    let filename_clone = new_note_md_file_name.clone();
     path_.push(filename_clone + ".md");
     let res = std::fs::File::create(path_);
     match res {
@@ -142,7 +142,7 @@ pub async fn create_note_file(
             return Ok(ResData {
                 code: 200,
                 msg: "创建成功".to_string(),
-                data: newNoteMdFileName,
+                data: new_note_md_file_name,
             })
         }
         Err(err) => {
@@ -241,51 +241,39 @@ pub async fn save_note(
 /**
  * 删除本地文件夹
  * @param app_handle
- * @param current_notebook 文件夹
+ * @param path 文件夹
  */
 #[tauri::command]
 pub async fn remove_notebook(
     app_handle: tauri::AppHandle,
-    current_notebook: String,
+    path: String,
 ) -> Result<ResData<String>, String> {
-    let app_dir = app_handle.path().document_dir();
-    match app_dir {
-        Ok(dir) => {
-            let local_data_dir = dir.as_path().join("notebooks");
-            if local_data_dir.exists() {
-                let dir = local_data_dir.join(current_notebook);
-                let remove_res = std::fs::remove_dir_all(dir);
-                match remove_res {
-                    Ok(_) => {
-                        return Ok(ResData {
-                            code: 200,
-                            msg: "操作成功".to_string(),
-                            data: String::new(),
-                        });
-                    }
-                    Err(e) => {
-                        return Ok(ResData {
-                            code: 500,
-                            msg: e.to_string(),
-                            data: String::new(),
-                        });
-                    }
-                }
-            }
+    //检查路径是否存在
+    if !Path::new(&path).exists() {
+        return Ok(ResData {
+            code: 500,
+            msg: "选择不存在！".to_string(),
+            data: String::new(),
+        });
+    }
+    let mut path_ = PathBuf::from(path);
+    let remove_res = std::fs::remove_dir_all(path_);
+    match remove_res {
+        Ok(_) => {
+            return Ok(ResData {
+                code: 200,
+                msg: "操作成功".to_string(),
+                data: String::new(),
+            });
         }
-        Err(_) => {
+        Err(e) => {
             return Ok(ResData {
                 code: 500,
-                msg: "获取路径失败".to_string(),
+                msg: e.to_string(),
                 data: String::new(),
-            })
+            });
         }
     }
-    Ok(ResData {
-        code: 500,
-        msg: "文件夹不存在".to_string(),
-        data: String::new(),
-    })
 }
 
 /**
