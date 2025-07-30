@@ -94,7 +94,7 @@ class NotebookInfo {
   public id: string = "";
   public parent_id: string = "";
   public path: string = "";
-  public folder: String = "";
+  public folder: string = "";
   public name: string = "";
   public isfile: boolean = false;
   public children: Array<NotebookInfo> = [];
