@@ -641,13 +641,13 @@ let removeNote = async function () {
       //查看删除笔记是否是正在编辑的笔记
       //点击了确定，开始删除
 
-      let remove_note = await tauri_request<ResponseData<string>>("remove_note", {
+      let remove_note = await tauri_request<ResponseData<string>>("remove_file", {
         path: data.currentChooseNoteAllPath_md
       });
       if (remove_note && remove_note.code == 200) {
         NotificationUtil.success("操作成功");
         data.currentChooseNoteAllPath_md = "";
-        data.currentChooseFolderPath_md= "";
+        data.currentChooseFolderPath_md = "";
         data.showMdEditor = false;
         data.title_md = "";
         data.editedMdtext_md = "";
@@ -658,25 +658,25 @@ let removeNote = async function () {
         NotificationUtil.error("操作失败：" + remove_note.msg);
       }
     })
-    .catch(() => { });
+    .catch((e) => { NotificationUtil.error("操作失败：" + e.msg); });
 };
 /**
  * 删除文件夹
  */
-let removeFolder = function () {
-  if (StringUtil.isNullAndEmpty(data.selectFolderPath)&&!data.selectIsFile) {
+let removeFolder = async function () {
+  if (StringUtil.isNullAndEmpty(data.selectFolderPath) && !data.selectIsFile) {
     NotificationUtil.error("请选择文件夹！");
     return;
   }
   ElMessageBox({
-    title: "删除文件",
+    title: "删除文件夹",
     message: h("div", {}, [
       h("br"),
       h("br"),
       h(
         "p",
         { style: "color:red;" },
-        `删除文件夹 "${data.currentNote}" 吗，文件夹下笔记文件也将一并删除！`
+        `删除文件夹 "${data.selectFolderPath}" 吗，文件夹下笔记文件也将一并删除！`
       ),
       h("br"),
       h("br"),
@@ -684,24 +684,20 @@ let removeFolder = function () {
     showCancelButton: true,
     confirmButtonText: "删除",
     cancelButtonText: "取消",
-  }).then((action) => {
+  }).then(async (action) => {
     // 点击了确定，开始删除
-    invoke<ResponseData<String>>("remove_notebook", {
-      currentNotebook: data.currentNote,
-    })
-      .then((res: ResponseData<String>) => {
-        if (res && res.code == 200) {
-          NotificationUtil.success("操作成功");
-          data.currentNote = "";
-          // 重新获取笔记本列表数据
-          get_document_notebooks();
-        } else {
-          NotificationUtil.error("操作失败：" + res.msg);
-        }
-      })
-      .catch((err) => {
-        console.log(err);
-      });
+    let remove_folder = await tauri_request<ResponseData<string>>("remove_folder", {
+      path: data.selectFolderPath
+    });
+    if (remove_folder && remove_folder.code == 200) {
+      NotificationUtil.success("操作成功");
+      get_document_notebooks();
+    } else {
+      NotificationUtil.error("操作失败：" + remove_folder.msg);
+    }
+
+  }).catch((err) => {
+    NotificationUtil.error("操作失败：" + err);
   });
 };
 
@@ -745,12 +741,12 @@ const reFresh = () => {
  */
 const get_note_list = () => {
   invoke<ResponseData<string[]>>("get_note_list", {
-    notebook: data.currentNote,
+    path: data.selectFolderPath,
   })
     .then((res: ResponseData<string[]>) => {
       if (res && res.code == 200) {
         var tem = res.data;
-        data.notes = tem.map((n) => {
+        data.files = tem.map((n) => {
           return { title: n };
         });
       } else {
@@ -761,32 +757,6 @@ const get_note_list = () => {
       console.log(err);
     });
 };
-//const [api, contextHolder] = NotificationUtil.useNotification();
-// return {
-//   state,
-//   onOpenChange,
-//   get_document_notebooks,
-//   notebooks_data,
-//   show_notebooks_data,
-//   data_not_null,
-//   handleCancelByAddFolderModal,
-//   handleCancelByAddNotebookModal,
-//   ...toRefs(data),
-//   saveMdText,
-//   saveMd,
-//   selectHandle,
-//   addNotebook,
-//   addNodeFolder,
-//   removeNote,
-//   removeFolder,
-//   showAddFolderModalForm,
-//   showAddNotebookModalForm,
-
-//   reFresh,
-//   get_note_list
-// }
-//api,
-//  contextHolder,
 </script>
 <style>
 .wrapper {

@@ -19,7 +19,7 @@ use crate::routes::app_window::{
 use crate::routes::file_utils::get_document_notebooks;
 use crate::routes::note_book::{
     create_folder, create_note_file, get_note_list, get_path_childrenFoldersAndFiles,
-    read_note_file, remove_note, remove_notebook, save_note,
+    read_note_file, remove_file, remove_folder, save_note,
 };
 struct Payload {
     args: Vec<String>,
@@ -39,8 +39,8 @@ pub fn run() {
             create_note_file,
             get_path_childrenFoldersAndFiles,
             save_note,
-            remove_notebook,
-            remove_note,
+            remove_folder,
+            remove_file,
             loding_window_close,
             about,
             windows_hide,
