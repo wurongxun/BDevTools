@@ -257,7 +257,7 @@ const selectHandle = function (node: NotebookInfo) {
               //String 数组集合 所属文件夹下全部文件名 查看是否有重复
               var tem = res.data;
               tem.map((n) => {
-                if (n == data.title_md) {
+                if (n == data.title_md&& data.title_md != data.lastTimeTitle_md) {
                   same_file_name = true;
                 }
               });

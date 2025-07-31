@@ -129,14 +129,14 @@ pub fn get_dir_and_file(
                 .split("/")
                 .collect();
             if pos.len() > 0 {
-                let full_name = pos[pos.len() - 1];
-                // 去掉后缀名
-                if let Some(last_dot) = full_name.rfind('.') {
-                    name = &full_name[..last_dot];
-                } else {
-                    name = full_name;
-                }
+               name = pos[pos.len() - 1];
             }
+             let mut full_name = "";
+             if let Some(last_dot) = name.rfind('.') {
+                    full_name = &name[..last_dot];
+                } else {
+                    full_name = name;
+                }
             let a: u32 = 1;
             let c: u32 = num.clone();
             let mut d = a + c;
@@ -149,7 +149,7 @@ pub fn get_dir_and_file(
                 children_dirAndFileInfo.get_id(),
                 path,
                 folder,
-                String::from(name),
+                String::from(full_name),
                 path_dir_entry.is_file(),
             );
             if (!path_1.is_file()) {

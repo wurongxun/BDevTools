@@ -167,8 +167,17 @@ pub async fn save_note(
     md_title: String,
     md_text: String,
 ) -> Result<ResData<String>, String> {
-    format!("save_note1 {}", path);
+    //format!("save_note1 {}", path);
     println!("save_note1 {}", path);
+    //判断文件名是否为空
+    if md_title.is_empty() {
+        return Ok(ResData {
+            code: 500,
+            msg: "文件名不能为空！".to_string(),
+            data: String::new(),
+        });
+    }
+
     // 克隆path以避免所有权问题
     let path_clone = path.clone();
     //判断文件是否存在
@@ -184,13 +193,19 @@ pub async fn save_note(
                             _filename = filename.to_string_lossy().to_string();
                         }
                     }
-                    if (_filename.to_lowercase() != md_title.to_lowercase()) {
-                        //将文件或目录重命名为新名称，如果 to 已存在，则替换原始文件。如果新名称位于不同的挂载点，这将不起作用。
-                        format!("save_note2 {}", path);
-                        println!(
-                            "save_note2 {}  md_title {} _filename {}",
-                            path, md_title, _filename
-                        );
+                    // 替换原来的比较代码
+                    let filename_lower = _filename.to_lowercase();
+                    let title_lower = md_title.to_lowercase();
+                    println!(
+                        "save_note2 path {}  md_title {} _filename {}  比较结果 {}",
+                        path,
+                        md_title,
+                        _filename,
+                        _filename.to_lowercase() != md_title.to_lowercase()
+                    );
+                    let bb: bool = _filename.to_lowercase() != md_title.to_lowercase();
+
+                    if bb {
                         let new_name_res = tokio::fs::rename(path, md_title).await;
                         match new_name_res {
                             Ok(_) => {
@@ -208,13 +223,13 @@ pub async fn save_note(
                                 });
                             }
                         }
-                    } else {
-                        return Ok(ResData {
-                            code: 200,
-                            msg: "操作成功".to_string(),
-                            data: String::new(),
-                        });
                     }
+
+                    return Ok(ResData {
+                        code: 200,
+                        msg: "操作成功".to_string(),
+                        data: String::new(),
+                    });
                 }
                 Err(e) => {
                     return Ok(ResData {
