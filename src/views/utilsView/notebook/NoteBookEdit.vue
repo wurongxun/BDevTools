@@ -234,13 +234,11 @@ const selectHandle = function (node: NotebookInfo) {
   if (node.path == data.currentChooseFolderPath_md) {
     return;
   }
-  //data.currentNote = node.id;
-  //旧比较文件处理 
-  // 保存原来编辑笔记
-  if (
-    (data.showMdEditor && data.notEditedMdtext_md != data.editedMdtext_md) || (data.title_md != node.name &&
-      StringUtil.isNotNullAndEmpty(data.title_md) &&
-      StringUtil.isNotNullAndEmpty(data.lastTimeTitle_md))
+  // 
+  //处理原来编辑笔记
+  if ((data.notEditedMdtext_md != data.editedMdtext_md) || (data.title_md != data.lastTimeTitle_md &&
+    StringUtil.isNotNullAndEmpty(data.title_md) &&
+    StringUtil.isNotNullAndEmpty(data.lastTimeTitle_md))
   ) {
     ElMessageBox.confirm("上一份笔记未保存，需要保存吗?", "保存笔记", {
       confirmButtonText: "保存",
@@ -267,44 +265,7 @@ const selectHandle = function (node: NotebookInfo) {
               if (!same_file_name) {
                 //先保存数据
                 Promise.all([saveMd(data.editedMdtext_md, data.title_md, data.currentChooseNoteAllPath_md)]).then(() => {
-                  // //点击了确定，开始删除
-                  // invoke<ResponseData<string>>("remove_note", {
-                  //   currentNotebook: data.oldpath,
-                  //   currentNote: data.mdOldTitle + ".md",
-                  // })
-                  //   .then((res: ResponseData<string>) => {
-                  //     if (res && res.code == 200) {
-                  //       get_document_notebooks();
-                  //       get_note_list();
-                  //     } else {
-                  //       NotificationUtil.error("删除旧文件操作失败!");
-                  //     }
-                  //   })
-                  //   .catch((err) => {
-                  //     console.log(err);
-                  //   });
-                  invoke<ResponseData<string>>("read_note_file", {
-                    currentNotebook: node.path,
-                    noteTitle: node.name,
-                  })
-                    .then((res: ResponseData<string>) => {
-                      if (res && res.code == 200) {
-                        //重新赋值
-                        var tem = res.data;
-                        data.editedMdtext_md = tem;
-                        data.notEditedMdtext_md = tem;
-                        data.title_md = node.name;
-                        data.lastTimeTitle_md = node.name;
-                        data.currentChooseNoteAllPath_md = node.path;
-                        data.currentChooseFolderPath_md = node.folder;
-                        data.showMdEditor = true;
-                      } else {
-                        NotificationUtil.error("读取失败：" + res.msg);
-                      }
-                    })
-                    .catch((err) => {
-                      NotificationUtil.error(err);
-                    });
+                  read_note_file(node);
                 })
                   .catch((err) => {
                     NotificationUtil.error("保存文件失败，" + err.getMessage());
@@ -314,28 +275,9 @@ const selectHandle = function (node: NotebookInfo) {
                 NotificationUtil.warn("已有相同文件名，文件名将无法更改！");
                 //保存旧文件名称
                 Promise.all([saveMd(data.editedMdtext_md, data.title_md, data.currentChooseNoteAllPath_md)]).then(() => {
-                  invoke<ResponseData<string>>("read_note_file", {
-                    currentNotebook: node.path,
-                    noteTitle: node.name,
-                  })
-                    .then((res) => {
-                      if (res && res.code == 200) {
-                        //重新赋值
-                        var tem = res.data;
-                        data.editedMdtext_md = tem;
-                        data.notEditedMdtext_md = tem;
-                        data.title_md = node.name;
-                        data.lastTimeTitle_md = node.name;
-                        data.currentChooseNoteAllPath_md = node.path;
-                        data.currentChooseFolderPath_md = node.folder;
-                        data.showMdEditor = true;
-                      } else {
-                        NotificationUtil.error("读取失败：" + res.msg);
-                      }
-                    })
-                    .catch((err) => {
-                      NotificationUtil.error(err);
-                    });
+                  read_note_file(node);
+                }).catch((err) => {
+                  NotificationUtil.error("保存文件失败，" + err.getMessage());
                 });
               }
             }
@@ -345,53 +287,10 @@ const selectHandle = function (node: NotebookInfo) {
           });
       })
       .catch(() => {
-        invoke<ResponseData<string>>("read_note_file", {
-          currentNotebook: node.path,
-          noteTitle: node.name,
-        })
-          .then((res: ResponseData<string>) => {
-            if (res && res.code == 200) {
-              //重新赋值
-              var tem = res.data;
-              data.editedMdtext_md = tem;
-              data.notEditedMdtext_md = tem;
-              data.title_md = node.name;
-              data.lastTimeTitle_md = node.name;
-              data.currentChooseNoteAllPath_md = node.path;
-              data.currentChooseFolderPath_md = node.folder;
-              data.showMdEditor = true;
-            } else {
-              NotificationUtil.error("读取失败：" + res.msg);
-            }
-          })
-          .catch((err) => {
-            NotificationUtil.error(err);
-          });
+        read_note_file(node);
       });
   } else {
-    invoke<ResponseData<string>>("read_note_file", {
-      currentNotebook: node.path,
-      noteTitle: node.name,
-    })
-      .then((res: ResponseData<string>) => {
-        console.log("read_note_file", res);
-        if (res && res.code == 200) {
-          //重新赋值
-          var tem = res.data;
-          data.editedMdtext_md = tem;
-          data.notEditedMdtext_md = tem;
-          data.title_md = node.name;
-          data.lastTimeTitle_md = node.name;
-          data.currentChooseNoteAllPath_md = node.path;
-          data.currentChooseFolderPath_md = node.folder;
-          data.showMdEditor = true;
-        } else {
-          NotificationUtil.error("读取失败：" + res.msg);
-        }
-      })
-      .catch((err) => {
-        NotificationUtil.error(err);
-      });
+    read_note_file(node);
   }
 };
 
@@ -757,6 +656,30 @@ const get_note_list = () => {
       console.log(err);
     });
 };
+//读取文件
+const read_note_file = async function (node: NotebookInfo) {
+  if (node.isfile) {
+    var res = await tauri_request<ResponseData<string>>("read_note_file", {
+      path: node.path
+    });
+    if (res && res.code == 200) {
+      //重新赋值
+      var tem = res.data;
+      data.editedMdtext_md = tem;
+      data.notEditedMdtext_md = tem;
+      data.title_md = node.name;
+      data.lastTimeTitle_md = node.name;
+      data.currentChooseNoteAllPath_md = node.path;
+      data.currentChooseFolderPath_md = node.folder;
+      data.showMdEditor = true;
+    } else {
+      NotificationUtil.error("读取失败：" + res.msg);
+    }
+  } else {
+    NotificationUtil.error("读取失败,不是文件!");
+  }
+};
+
 </script>
 <style>
 .wrapper {

@@ -129,14 +129,20 @@ pub fn get_dir_and_file(
                 .split("/")
                 .collect();
             if pos.len() > 0 {
-                name = pos[pos.len() - 1];
+                let full_name = pos[pos.len() - 1];
+                // 去掉后缀名
+                if let Some(last_dot) = full_name.rfind('.') {
+                    name = &full_name[..last_dot];
+                } else {
+                    name = full_name;
+                }
             }
             let a: u32 = 1;
             let c: u32 = num.clone();
             let mut d = a + c;
             *num = d;
             let b: bool = regexUtil::validate(r#"(?:md)$"#, name);
-            let path=String::from(path_dir_entry.as_os_str().to_str().expect(""));
+            let path = String::from(path_dir_entry.as_os_str().to_str().expect(""));
             let folder = get_directory_path(&path).unwrap();
             let mut children_dir_and_file_info_3 = DirAndFileInfo::create(
                 String::from(name),

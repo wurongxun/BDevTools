@@ -44,9 +44,9 @@ pub async fn get_note_list(
 #[tauri::command]
 pub async fn read_note_file(
     app_handle: tauri::AppHandle,
-    current_notebook: String,
+    path: String,
 ) -> Result<ResData<String>, String> {
-    let contents = tokio::fs::read_to_string(current_notebook).await;
+    let contents = tokio::fs::read_to_string(path).await;
     match contents {
         Ok(_contents) => {
             return Ok(ResData {
@@ -167,6 +167,8 @@ pub async fn save_note(
     md_title: String,
     md_text: String,
 ) -> Result<ResData<String>, String> {
+    format!("save_note1 {}", path);
+    println!("save_note1 {}", path);
     // 克隆path以避免所有权问题
     let path_clone = path.clone();
     //判断文件是否存在
@@ -175,7 +177,6 @@ pub async fn save_note(
             let wres = std::fs::write(&path, md_text);
             match wres {
                 Ok(_) => {
-                    //tokio::fs::rename(from, to)
                     let mut _filename = String::new();
                     let path_ = PathBuf::from(&path);
                     if path_.is_file() {
@@ -185,6 +186,11 @@ pub async fn save_note(
                     }
                     if (_filename.to_lowercase() != md_title.to_lowercase()) {
                         //将文件或目录重命名为新名称，如果 to 已存在，则替换原始文件。如果新名称位于不同的挂载点，这将不起作用。
+                        format!("save_note2 {}", path);
+                        println!(
+                            "save_note2 {}  md_title {} _filename {}",
+                            path, md_title, _filename
+                        );
                         let new_name_res = tokio::fs::rename(path, md_title).await;
                         match new_name_res {
                             Ok(_) => {
