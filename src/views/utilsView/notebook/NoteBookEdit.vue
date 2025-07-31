@@ -29,10 +29,10 @@
       <!-- <div v-if="showMdEditor"> -->
       <a-form layout="inline">
         <a-form-item style="width: 99.5%; margin: 0 auto; padding: 1px 0">
-          <a-input class="mdtitle-input" :bordered="false" v-model:value="data.mdTitle" placeholder="文章标题"></a-input>
+          <a-input class="mdtitle-input" :bordered="false" v-model:value="data.title_md" placeholder="文章标题"></a-input>
         </a-form-item>
       </a-form>
-      <MdEditor v-model="data.mdText" @onSave="saveMdText" style="height: 100%" @onError="onError" />
+      <MdEditor v-model="data.editedMdtext_md" @onSave="saveMdText" style="height: 100%" @onError="onError" />
       <!-- </div> -->
     </el-col>
   </el-row>
@@ -59,11 +59,11 @@
     <v-contextmenu-item @click="reFresh">刷新</v-contextmenu-item>
   </v-contextmenu>
 
-  <el-dialog v-model:visible="addFolderModalFormVisible" @close="handleCancelByAddFolderModal" title="添加文件夹"
+  <el-dialog v-model:visible="data.addFolderModalFormVisible" @close="handleCancelByAddFolderModal" title="添加文件夹"
     width="500">
     <el-form>
-      <el-form-item label="文件夹名称" :label-width="formLabelWidth">
-        <el-input v-model="newFolderName" autocomplete="off" />
+      <el-form-item label="文件夹名称" :label-width="data.formLabelWidth">
+        <el-input v-model="data.newFolderName" autocomplete="off" />
       </el-form-item>
     </el-form>
     <template #footer>
@@ -74,11 +74,11 @@
     </template>
   </el-dialog>
   <!-- 添加笔记本弹出表单 -->
-  <el-dialog v-model:visible="addFolderModalFormVisible" @close="handleCancelByAddNotebookModal" title="添加笔记"
+  <el-dialog v-model:visible="data.addFileModalFormVisible" @close="handleCancelByAddNotebookModal" title="添加笔记"
     width="500">
     <el-form>
-      <el-form-item label="笔记名称" :label-width="formLabelWidth">
-        <el-input v-model="newNoteMdFileName" autocomplete="off" />
+      <el-form-item label="笔记名称" :label-width="data.formLabelWidth">
+        <el-input v-model="data.newFileName" autocomplete="off" />
       </el-form-item>
     </el-form>
     <template #footer>
@@ -143,12 +143,12 @@ const data = reactive({
   title_md: "", // 文章标题
   lastTimeTitle_md: "", //旧标题
   showMdEditor: false, // 是否显示编辑器
-  newFolderName: "", // 新建问价夹的名称
-  addNotebookModalFormVisible: false, // 是否显示添加笔记本表单
+  newFolderName: "", // 新建文件夹夹的名称
+  newFileName: "", // 新建的笔记文件名
+  addFileModalFormVisible: false, // 是否显示添加笔记本表单
   addFolderModalFormVisible: false,
   confirmLoading: false, // 添加笔记表单等待状态（是否转圈圈）
-  newNoteMdFileName: "", // 新建的笔记文件名
-
+  formLabelWidth: "40%",
   loading: false,
   map: new Map(),
   spinning: false,
@@ -178,7 +178,7 @@ let get_document_notebooks = () => {
       NotificationUtil.error("获取数据失败 ：" + err);
     });
 };
-const onError = (err) => {
+const onError = (err: { message: string; }) => {
   NotificationUtil.error(err.message);
 };
 /**
@@ -206,17 +206,17 @@ const state = reactive({
  * SubMenu 展开/关闭的回调
  * @param {*当前展开的 SubMenu 菜单项 key 数组} openKeys
  */
-const onOpenChange = function (openKeys) {
-  const latestOpenKey = openKeys.find(
-    (key) => state.openKeys.indexOf(key) === -1
-  );
-  if (state.rootSubmenuKeys.indexOf(latestOpenKey) === -1) {
-    state.openKeys = openKeys;
-  } else {
-    state.openKeys = latestOpenKey ? [latestOpenKey] : [];
-  }
-  data.currentNote = latestOpenKey;
-};
+// const onOpenChange = function (openKeys) {
+//   const latestOpenKey = openKeys.find(
+//     (key) => state.openKeys.indexOf(key) === -1
+//   );
+//   if (state.rootSubmenuKeys.indexOf(latestOpenKey) === -1) {
+//     state.openKeys = openKeys;
+//   } else {
+//     state.openKeys = latestOpenKey ? [latestOpenKey] : [];
+//   }
+//   data.currentNote = latestOpenKey;
+// };
 
 /**
  * 被选中时调用
@@ -238,7 +238,7 @@ const selectHandle = function (node: NotebookInfo) {
   //旧比较文件处理 
   // 保存原来编辑笔记
   if (
-    (data.showMdEditor && data.notEditedMdtext_md != data.EditedMdtext_md) || (data.title_md != node.name &&
+    (data.showMdEditor && data.notEditedMdtext_md != data.editedMdtext_md) || (data.title_md != node.name &&
       StringUtil.isNotNullAndEmpty(data.title_md) &&
       StringUtil.isNotNullAndEmpty(data.lastTimeTitle_md))
   ) {
@@ -569,13 +569,13 @@ const showAddNotebookModalForm = () => {
     NotificationUtil.error(`请选择文件夹`);
     return;
   }
-  data.addNotebookModalFormVisible = true;
+  data.addFileModalFormVisible = true;
 };
 /**
  * 添加笔记
  */
 let addNotebook = async function () {
-  let newNoteMdFileName = data.newNoteMdFileName.trim();
+  let newNoteMdFileName = data.newFileName.trim();
   if (
     newNoteMdFileName == null ||
     newNoteMdFileName == undefined ||
@@ -596,13 +596,13 @@ let addNotebook = async function () {
 
   var regex = /.*[/\\:*?|].*/;
   //存在返回true，不存在返回false
-  if (regex.test(data.newNoteMdFileName)) {
+  if (regex.test(newNoteMdFileName)) {
     NotificationUtil.error(
       '笔记名称命名不规范，不能包含\\ / : * ? " < > |请检查！'
     );
     return;
   }
-  if (/^\d+$/.test(data.newNoteMdFileName)) {
+  if (/^\d+$/.test(newNoteMdFileName)) {
     NotificationUtil.error("笔记名称命名不规范，不能为纯数字！");
     return;
   }
@@ -612,7 +612,7 @@ let addNotebook = async function () {
     new_note_md_file_name: newNoteMdFileName,
   })
   if (create_note_file && create_note_file.code == 200) {
-    data.addNotebookModalFormVisible = false; // 隐藏模态表单
+    data.addFileModalFormVisible = false; // 隐藏模态表单
     NotificationUtil.success("笔记创建成功");
     get_document_notebooks();
   } else {
@@ -712,8 +712,8 @@ const handleCancelByAddFolderModal = () => {
  * 关闭添加笔记模态框
  */
 const handleCancelByAddNotebookModal = () => {
-  data.addNotebookModalFormVisible = false;
-  data.newNoteMdFileName = "";
+  data.addFileModalFormVisible = false;
+  data.newFileName = "";
 };
 /**
  * 刷新笔记信息
