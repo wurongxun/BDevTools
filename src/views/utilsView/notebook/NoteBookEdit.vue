@@ -524,7 +524,7 @@ let addFile = async function () {
  * 删文件
  */
 let removeNote = async function () {
-  if (StringUtil.isNullAndEmpty(data.currentChooseNoteAllPath_md) && data.selectIsFile) {
+  if (StringUtil.isNotNullOrEmpty(data.currentChooseNoteAllPath_md) && data.selectIsFile) {
     NotificationUtil.warn("请选择笔记");
     return;
   }
