@@ -105,12 +105,13 @@ let _: DirFileMenuUtils = {
    */
   getFolderNameSet: (children_data:NotebookInfo) => {
     let data = new Set();
-    for (var i in children_data) {
-      let name = children_data[i].name;
-      if (name != null && name != "" && name != undefined) {
-        data.add(name);
-      }
-    }
+    // let children= children_data.children;
+    // for (var i in children) {
+    //   let name = children[i].name;
+    //   if (name != null && name != "" && name != undefined) {
+    //     data.add(name);
+    //   }
+    // }
     return data;
   },
 };

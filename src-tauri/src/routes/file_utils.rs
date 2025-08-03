@@ -5,13 +5,16 @@ use crate::{
 };
 use std::error::Error;
 use tauri::{AppHandle, Manager};
+use md5::{Digest};
+use hex;
+
 #[tauri::command]
 pub async fn my_read_file(path: std::path::PathBuf) -> String {
     // 读取文件内容，以文本字符串形式返回
     std::fs::read_to_string(path).unwrap()
 }
 
-// 获取本地笔记本列表
+// 获取本地笔记本列表  未使用
 #[tauri::command]
 pub async fn get_home_notebooks(
     app_handle: tauri::AppHandle,
@@ -83,7 +86,7 @@ pub async fn get_home_notebooks(
 pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<String> {
     let app_dir = app_handle.path().document_dir();
     let mut children_dir_and_file_info_1 = DirAndFileInfo::create(
-        "".to_string(),
+        "notebooks".to_string(),
         "".to_string(),
         "notebooks".to_string(),
         "".to_string(),
@@ -135,6 +138,12 @@ pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<Str
         msg: "读取文档目录失败".to_string(),
         data: serde_json::to_string(&children_dir_and_file_info_1).unwrap(),
     }
+}
+
+// 生成字符串的MD5哈希值
+pub fn generate_md5_hash(input: &str) -> String {
+    let digest = md5::compute(input);
+    hex::encode(digest.as_ref())
 }
 // 读取用户选择的目录内容
 // #[tauri::command]

@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     entity::structs::DirAndFileInfo,
-    response::{resp_data::ResData, response::Response},
+    response::{resp_data::ResData, response::Response}, routes::file_utils::generate_md5_hash,
 };
 
 use super::regexUtil;
@@ -144,8 +144,9 @@ pub fn get_dir_and_file(
             let b: bool = regexUtil::validate(r#"(?:md)$"#, name);
             let path = String::from(path_dir_entry.as_os_str().to_str().expect(""));
             let folder = get_directory_path(&path).unwrap();
+            let md5=generate_md5_hash(&path);
             let mut children_dir_and_file_info_3 = DirAndFileInfo::create(
-                String::from(name),
+                String::from(md5),
                 children_dirAndFileInfo.get_id(),
                 path,
                 folder,

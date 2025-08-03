@@ -1,12 +1,7 @@
 <template>
   <el-row style="height: 100%">
     <el-col :span="5" style="height: 100%; background-color: #d9d9d9" v-contextmenu:contextmenu>
-      <!-- <a-spin :spinning="spinning"> </a-spin> -->
-      <div class="wrapper" v-if="show_notebooks_data.length > 0">
-        <!-- <a-menu v-model:selectedKeys="state.selectedKeys" mode="inline" :open-keys="state.openKeys"
-          @select="selectHandle" :items="show_notebooks_data" @openChange="onOpenChange"
-          style="max-height: 100%; overflow: hidden auto"></a-menu> -->
-
+      <div class="wrapper" v-if="show_notebooks_data">
         <el-menu default-active="2" class="el-menu-vertical-demo">
           <TreeNode v-if="notebooks_data" :node="notebooks_data" v-model="state.selectedNodeId"
             @node-click="selectHandle" />
@@ -185,8 +180,9 @@ const onError = (err: { message: string; }) => {
  * 文件夹及文件夹下笔记信息
  */
 let show_notebooks_data = computed(() => {
-  if (!notebooks_data.value) return [];
-  return DirFileMenu.dir_file(notebooks_data.value.children);
+  let f = notebooks_data.value != null && notebooks_data.value != undefined;
+
+  return f;
 });
 
 /**
@@ -224,7 +220,7 @@ const state = reactive({
  * @param {*} param0
  */
 const selectHandle = function (node: NotebookInfo) {
-  //console.log("selectedKeys {:?}", selectedKeys)
+  console.log("node {:?}", node)
   data.selectIsFile = node.isfile;
   if (!node.isfile) {
     data.selectFolderPath = node.folder;
@@ -257,7 +253,7 @@ const selectHandle = function (node: NotebookInfo) {
               //String 数组集合 所属文件夹下全部文件名 查看是否有重复
               var tem = res.data;
               tem.map((n) => {
-                if (n == data.title_md&& data.title_md != data.lastTimeTitle_md) {
+                if (n == data.title_md && data.title_md != data.lastTimeTitle_md) {
                   same_file_name = true;
                 }
               });
@@ -617,22 +613,20 @@ const handleCancelByAddNotebookModal = () => {
 /**
  * 刷新笔记信息
  */
-const reFresh = () => {
-  invoke<ResponseData<NotebookInfo>>("get_document_notebooks")
-    .then((res: ResponseData<NotebookInfo>) => {
-      if (res && res.code == 200) {
-        let data_ = res.data;
-        console.log("\===========================", data_);
-        notebooks_data.value = data_;
-        state.rootSubmenuKeys = DirFileMenu.getRootSubmenuKeys(
-          notebooks_data.value.children
-        );
-        NotificationUtil.success("刷新完成");
-      }
-    })
-    .catch((err) => {
-      NotificationUtil.error("获取数据失败 ：" + err);
-    });
+const reFresh = async () => {
+  let res = await tauri_request<ResponseData<NotebookInfo>>("get_document_notebooks", {});
+  console.log("res===============", res);
+  if (res && typeof res === "object" && "code" in res && res.code == 200) {
+    //值 返回ResponseData 对象，包含data、code、msg参数 例如：data {"id":"1752761254929","parent_id":"","path":"C:\\Users\\kun15\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[]}
+    let data_: NotebookInfo =
+      typeof res.data === "string" ? JSON.parse(res.data) : res.data;
+    notebooks_data.value = data_;
+    state.rootSubmenuKeys = DirFileMenu.getRootSubmenuKeys(
+      notebooks_data.value.children
+    );
+    NotificationUtil.success("刷新完成");
+  }
+
 };
 
 /**
