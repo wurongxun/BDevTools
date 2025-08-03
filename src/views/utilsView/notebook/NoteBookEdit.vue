@@ -32,7 +32,7 @@
     </el-col>
   </el-row>
   <v-contextmenu ref="contextmenu" v-if="data_not_null">
-    <v-contextmenu-item @click="showAddNotebookModalForm">
+    <v-contextmenu-item @click="showAddFileModalForm">
       添加笔记
     </v-contextmenu-item>
     <v-contextmenu-divider />
@@ -53,8 +53,8 @@
     <v-contextmenu-divider />
     <v-contextmenu-item @click="reFresh">刷新</v-contextmenu-item>
   </v-contextmenu>
-
-  <el-dialog v-model:visible="data.addFolderModalFormVisible" @close="handleCancelByAddFolderModal" title="添加文件夹"
+   <!-- 添加文件夹表单 -->
+  <el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal"  title="添加文件夹"
     width="500">
     <el-form>
       <el-form-item label="文件夹名称" :label-width="data.formLabelWidth">
@@ -69,17 +69,17 @@
     </template>
   </el-dialog>
   <!-- 添加笔记本弹出表单 -->
-  <el-dialog v-model:visible="data.addFileModalFormVisible" @close="handleCancelByAddNotebookModal" title="添加笔记"
+  <el-dialog v-model="data.addFileModalFormVisible"  :before-close="handleCancelByAddNotebookModal" title="添加笔记"
     width="500">
     <el-form>
-      <el-form-item label="笔记名称" :label-width="data.formLabelWidth">
+      <el-form-item label="文件名称" :label-width="data.formLabelWidth">
         <el-input v-model="data.newFileName" autocomplete="off" />
       </el-form-item>
     </el-form>
     <template #footer>
       <div class="dialog-footer">
         <el-button @click="handleCancelByAddNotebookModal">取消</el-button>
-        <el-button type="primary" @click="addNodeFolder"> 确认 </el-button>
+        <el-button type="primary" @click="addFile"> 确认 </el-button>
       </div>
     </template>
   </el-dialog>
@@ -180,16 +180,14 @@ const onError = (err: { message: string; }) => {
  * 文件夹及文件夹下笔记信息
  */
 let show_notebooks_data = computed(() => {
-  let f = notebooks_data.value != null && notebooks_data.value != undefined;
-
-  return f;
+  return notebooks_data.value != null && notebooks_data.value != undefined;
 });
 
 /**
  * 判断数是否为空
  */
 let data_not_null = computed(() => {
-  return Array.isArray(notebooks_data.value) && notebooks_data.value.length > 0;
+  return notebooks_data.value != null && notebooks_data.value != undefined&&Array.isArray(notebooks_data.value.children) && notebooks_data.value.children.length > 0;
 });
 
 const state = reactive({
@@ -221,15 +219,17 @@ const state = reactive({
  */
 const selectHandle = function (node: NotebookInfo) {
   console.log("node {:?}", node)
-  data.selectIsFile = node.isfile;
+ 
   if (!node.isfile) {
     data.selectFolderPath = node.folder;
+    console.log("data.selectFolderPath {:?}", data.selectFolderPath)
     return;
   }
   //重复点击自己 路径相同
   if (node.path == data.currentChooseFolderPath_md) {
     return;
   }
+   data.selectIsFile = node.isfile;
   // 
   //处理原来编辑笔记
   if ((data.notEditedMdtext_md != data.editedMdtext_md) || (data.title_md != data.lastTimeTitle_md &&
@@ -420,6 +420,12 @@ let addNodeFolder = async function () {
     NotificationUtil.error("创建文件夹失败，请填写文件夹名称！");
     return;
   }
+  let selectFolderPath = data.selectFolderPath.trim();
+  if (selectFolderPath == null || selectFolderPath == undefined || selectFolderPath == "") {
+    NotificationUtil.error("未选择文件夹！");
+    return;
+  }
+  
   // 创建笔记本
   let childrenFoldersAndFiles = await tauri_request<ResponseData<string[]>>("get_path_childrenFoldersAndFiles", { path: data.selectFolderPath });
   childrenFoldersAndFiles.data.map((n) => {
@@ -445,22 +451,21 @@ let addNodeFolder = async function () {
   data.confirmLoading = true;
   data.loading = true;
   // 创建文件夹
-  let create_folder_ = await tauri_request<ResponseData<string>>("create_folder", { father_path: data.selectFolderPath, new_folder_name: newFolderName })
+  let create_folder_ = await tauri_request<ResponseData<string>>("create_folder", { fatherPath: data.selectFolderPath, newFolderName: newFolderName })
   if (create_folder_ && create_folder_.code == 200) {
     NotificationUtil.success("文件夹创建成功");
+    data.addFolderModalFormVisible=false;
+    data.newFolderName="";
+    data.loading = false;
     get_document_notebooks();
   } else {
     NotificationUtil.error("笔记本创建失败：" + create_folder_.msg);
   }
 };
 // 显示添加笔记对话框
-const showAddNotebookModalForm = () => {
-  let openkeys_ = state.openKeys;
-  let openkey = "";
-  if (openkeys_.length > 0) {
-    openkey = openkeys_[openkeys_.length - 1];
-  }
-  if (StringUtil.isNullAndEmpty(openkey)) {
+const showAddFileModalForm = () => {
+  console.log("showAddFileModalForm ",data.selectFolderPath);
+  if (StringUtil.isNotNullOrEmpty(data.selectFolderPath)) {
     NotificationUtil.error(`请选择文件夹`);
     return;
   }
@@ -469,7 +474,7 @@ const showAddNotebookModalForm = () => {
 /**
  * 添加笔记
  */
-let addNotebook = async function () {
+let addFile = async function () {
   let newNoteMdFileName = data.newFileName.trim();
   if (
     newNoteMdFileName == null ||
@@ -503,8 +508,8 @@ let addNotebook = async function () {
   }
 
   let create_note_file = await tauri_request<ResponseData<string>>("create_note_file", {
-    father_path: data.selectFolderPath,
-    new_note_md_file_name: newNoteMdFileName,
+    fatherPath: data.selectFolderPath,
+    newNoteMdFileName: newNoteMdFileName,
   })
   if (create_note_file && create_note_file.code == 200) {
     data.addFileModalFormVisible = false; // 隐藏模态表单

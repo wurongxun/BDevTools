@@ -1,5 +1,5 @@
 let _ = {
-    isNullAndEmpty: function (obj: string | null) {
+    isNotNullOrEmpty: function (obj: string | null) {
     if (typeof obj == "undefined" || obj == null || obj == "") {
         return true;
     } else {

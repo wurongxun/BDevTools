@@ -131,12 +131,12 @@ pub fn get_dir_and_file(
             if pos.len() > 0 {
                name = pos[pos.len() - 1];
             }
-             let mut full_name = "";
-             if let Some(last_dot) = name.rfind('.') {
-                    full_name = &name[..last_dot];
-                } else {
-                    full_name = name;
-                }
+            //  let mut full_name = "";
+            //  if let Some(last_dot) = name.rfind('.') {
+            //         full_name = &name[..last_dot];
+            //     } else {
+            //         full_name = name;
+            //     }
             let a: u32 = 1;
             let c: u32 = num.clone();
             let mut d = a + c;
@@ -150,7 +150,7 @@ pub fn get_dir_and_file(
                 children_dirAndFileInfo.get_id(),
                 path,
                 folder,
-                String::from(full_name),
+                String::from(name),
                 path_dir_entry.is_file(),
             );
             if (!path_1.is_file()) {

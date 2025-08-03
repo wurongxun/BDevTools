@@ -206,7 +206,14 @@ pub async fn save_note(
                     let bb: bool = _filename.to_lowercase() != md_title.to_lowercase();
 
                     if bb {
-                        let new_name_res = tokio::fs::rename(path, md_title).await;
+                        let mut full_name = "";
+                        if let Some(last_dot) = md_title.rfind('.') {
+                            full_name = &md_title[..last_dot];
+                        } else {
+                            full_name = &md_title;
+                        }
+
+                        let new_name_res = tokio::fs::rename(path, full_name).await;
                         match new_name_res {
                             Ok(_) => {
                                 return Ok(ResData {
