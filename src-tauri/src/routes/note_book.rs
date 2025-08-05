@@ -265,11 +265,17 @@ pub async fn save_note(
         }
     }
 }
+
+/**
+ * 更新文件名
+ */
+#[tauri::command]
 pub async fn up_file_name(
     app_handle: tauri::AppHandle,
     path: String,
     up_file_name: String,
 ) -> Result<ResData<String>, String> {
+     println!("up_file_name {},--------{}",path,up_file_name);
     //检查路径是否存在
     if !Path::new(&path).exists() {
         return Ok(ResData {
@@ -279,7 +285,7 @@ pub async fn up_file_name(
         });
     }
 
-    let new_name_res = tokio::fs::rename(path, up_file_name).await;
+    let new_name_res = tokio::fs::rename(&path, &up_file_name).await;
     match new_name_res {
         Ok(_) => {
             return Ok(ResData {
