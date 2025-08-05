@@ -265,7 +265,38 @@ pub async fn save_note(
         }
     }
 }
+pub async fn up_file_name(
+    app_handle: tauri::AppHandle,
+    path: String,
+    up_file_name: String,
+) -> Result<ResData<String>, String> {
+    //检查路径是否存在
+    if !Path::new(&path).exists() {
+        return Ok(ResData {
+            code: 500,
+            msg: "选择文件不存在！".to_string(),
+            data: String::new(),
+        });
+    }
 
+    let new_name_res = tokio::fs::rename(path, up_file_name).await;
+    match new_name_res {
+        Ok(_) => {
+            return Ok(ResData {
+                code: 200,
+                msg: "操作成功".to_string(),
+                data: String::new(),
+            });
+        }
+        Err(e) => {
+            return Ok(ResData {
+                code: 500,
+                msg: e.to_string(),
+                data: String::new(),
+            });
+        }
+    }
+}
 /**
  * 删除本地文件夹
  * @param app_handle

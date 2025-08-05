@@ -1,19 +1,11 @@
 let _ = {
-    isNotNullOrEmpty: function (obj: string | null) {
+  isNotNullOrEmpty: function (obj: string | null) {
     if (typeof obj == "undefined" || obj == null || obj == "") {
-        return true;
+      return true;
     } else {
-        return false;
+      return false;
     }
-},
-isNotNullAndEmpty: function (obj: string | null) {
-    if (typeof obj == "undefined" || obj == null || obj == "") {
-        return false;
-    } else {
-        return true;
-    }
-}
-}
-
+  },
+};
 
 export default _;

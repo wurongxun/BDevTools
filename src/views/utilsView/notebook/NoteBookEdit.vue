@@ -43,6 +43,8 @@
     <v-contextmenu-item @click="reFresh">刷新</v-contextmenu-item>
     <v-contextmenu-divider />
     <v-contextmenu-item @click="removeNote">删除笔记</v-contextmenu-item>
+    <v-contextmenu-divider v-show="data.selectIsFile" />
+    <v-contextmenu-item v-show="data.selectIsFile" @click="upFileNameMenu">修改文件名称</v-contextmenu-item>
     <v-contextmenu-divider />
     <v-contextmenu-item @click="removeFolder">删除文件夹</v-contextmenu-item>
   </v-contextmenu>
@@ -53,8 +55,8 @@
     <v-contextmenu-divider />
     <v-contextmenu-item @click="reFresh">刷新</v-contextmenu-item>
   </v-contextmenu>
-   <!-- 添加文件夹表单 -->
-  <el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal"  title="添加文件夹"
+  <!-- 添加文件夹表单 -->
+  <el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal" title="添加文件夹"
     width="500">
     <el-form>
       <el-form-item label="文件夹名称" :label-width="data.formLabelWidth">
@@ -69,7 +71,7 @@
     </template>
   </el-dialog>
   <!-- 添加笔记本弹出表单 -->
-  <el-dialog v-model="data.addFileModalFormVisible"  :before-close="handleCancelByAddNotebookModal" title="添加笔记"
+  <el-dialog v-model="data.addFileModalFormVisible" :before-close="handleCancelByAddNotebookModal" title="添加文件"
     width="500">
     <el-form>
       <el-form-item label="文件名称" :label-width="data.formLabelWidth">
@@ -80,6 +82,22 @@
       <div class="dialog-footer">
         <el-button @click="handleCancelByAddNotebookModal">取消</el-button>
         <el-button type="primary" @click="addFile"> 确认 </el-button>
+      </div>
+    </template>
+  </el-dialog>
+
+  <!-- 修改文件名称弹出表单 -->
+  <el-dialog v-model="data.upFileNameModalFormVisible" :before-close="handleCancelByUpFileNameModal" title="修改文件名"
+    width="500">
+    <el-form>
+      <el-form-item label="文件名称" :label-width="data.formLabelWidth">
+        <el-input v-model="data.upFileName" autocomplete="off" />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="handleCancelByUpFileNameModal">取消</el-button>
+        <el-button type="primary" @click="upFileName">修改</el-button>
       </div>
     </template>
   </el-dialog>
@@ -140,8 +158,10 @@ const data = reactive({
   showMdEditor: false, // 是否显示编辑器
   newFolderName: "", // 新建文件夹夹的名称
   newFileName: "", // 新建的笔记文件名
+  upFileName: "",
   addFileModalFormVisible: false, // 是否显示添加笔记本表单
   addFolderModalFormVisible: false,
+  upFileNameModalFormVisible: false,
   confirmLoading: false, // 添加笔记表单等待状态（是否转圈圈）
   formLabelWidth: "40%",
   loading: false,
@@ -187,7 +207,7 @@ let show_notebooks_data = computed(() => {
  * 判断数是否为空
  */
 let data_not_null = computed(() => {
-  return notebooks_data.value != null && notebooks_data.value != undefined&&Array.isArray(notebooks_data.value.children) && notebooks_data.value.children.length > 0;
+  return notebooks_data.value != null && notebooks_data.value != undefined && Array.isArray(notebooks_data.value.children) && notebooks_data.value.children.length > 0;
 });
 
 const state = reactive({
@@ -219,7 +239,7 @@ const state = reactive({
  */
 const selectHandle = function (node: NotebookInfo) {
   console.log("node {:?}", node)
- 
+
   if (!node.isfile) {
     data.selectFolderPath = node.folder;
     console.log("data.selectFolderPath {:?}", data.selectFolderPath)
@@ -229,12 +249,12 @@ const selectHandle = function (node: NotebookInfo) {
   if (node.path == data.currentChooseFolderPath_md) {
     return;
   }
-   data.selectIsFile = node.isfile;
+  data.selectIsFile = node.isfile;
   // 
   //处理原来编辑笔记
   if ((data.notEditedMdtext_md != data.editedMdtext_md) || (data.title_md != data.lastTimeTitle_md &&
-    StringUtil.isNotNullAndEmpty(data.title_md) &&
-    StringUtil.isNotNullAndEmpty(data.lastTimeTitle_md))
+    StringUtil.isNotNullOrEmpty(data.title_md) &&
+    StringUtil.isNotNullOrEmpty(data.lastTimeTitle_md))
   ) {
     ElMessageBox.confirm("上一份笔记未保存，需要保存吗?", "保存笔记", {
       confirmButtonText: "保存",
@@ -425,7 +445,7 @@ let addNodeFolder = async function () {
     NotificationUtil.error("未选择文件夹！");
     return;
   }
-  
+
   // 创建笔记本
   let childrenFoldersAndFiles = await tauri_request<ResponseData<string[]>>("get_path_childrenFoldersAndFiles", { path: data.selectFolderPath });
   childrenFoldersAndFiles.data.map((n) => {
@@ -454,8 +474,8 @@ let addNodeFolder = async function () {
   let create_folder_ = await tauri_request<ResponseData<string>>("create_folder", { fatherPath: data.selectFolderPath, newFolderName: newFolderName })
   if (create_folder_ && create_folder_.code == 200) {
     NotificationUtil.success("文件夹创建成功");
-    data.addFolderModalFormVisible=false;
-    data.newFolderName="";
+    data.addFolderModalFormVisible = false;
+    data.newFolderName = "";
     data.loading = false;
     get_document_notebooks();
   } else {
@@ -464,7 +484,7 @@ let addNodeFolder = async function () {
 };
 // 显示添加笔记对话框
 const showAddFileModalForm = () => {
-  console.log("showAddFileModalForm ",data.selectFolderPath);
+  console.log("showAddFileModalForm ", data.selectFolderPath);
   if (StringUtil.isNotNullOrEmpty(data.selectFolderPath)) {
     NotificationUtil.error(`请选择文件夹`);
     return;
@@ -520,6 +540,30 @@ let addFile = async function () {
   }
 };
 
+let upFileNameMenu = async function () {
+  if (StringUtil.isNotNullOrEmpty(data.currentChooseNoteAllPath_md) && data.selectIsFile) {
+    NotificationUtil.warn("请选择笔记");
+    return;
+  }
+  data.upFileNameModalFormVisible = true;
+}
+let handleCancelByUpFileNameModal = async function () {
+  data.upFileNameModalFormVisible = false;
+  data.upFileName = "";
+}
+let upFileName = async function () {
+  let upFileName_re = await tauri_request<ResponseData<string>>("up_file_name", {
+    path: data.currentChooseNoteAllPath_md,
+    upFileName: data.upFileName
+  });
+  if (upFileName_re && upFileName_re.code == 200) {
+    data.upFileNameModalFormVisible = false; // 隐藏模态表单
+    NotificationUtil.success("修改文件名成功！");
+    get_document_notebooks();
+  } else {
+    NotificationUtil.error("修改文件名失败：" + upFileName_re.msg);
+  }
+}
 /**
  * 删文件
  */
@@ -564,7 +608,7 @@ let removeNote = async function () {
  * 删除文件夹
  */
 let removeFolder = async function () {
-  if (StringUtil.isNullAndEmpty(data.selectFolderPath) && !data.selectIsFile) {
+  if (StringUtil.isNotNullOrEmpty(data.selectFolderPath) && !data.selectIsFile) {
     NotificationUtil.error("请选择文件夹！");
     return;
   }
@@ -613,6 +657,13 @@ const handleCancelByAddFolderModal = () => {
  */
 const handleCancelByAddNotebookModal = () => {
   data.addFileModalFormVisible = false;
+  data.newFileName = "";
+};
+/**
+ * 关闭修改文件名模态框
+ */
+const handleCancelByUpFileModal = () => {
+  data.upFileNameModalFormVisible = false;
   data.newFileName = "";
 };
 /**

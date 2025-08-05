@@ -85,11 +85,6 @@ pub fn read_dir_info<P: AsRef<Path>>(local_data_dir: P) -> Result<ResData<Vec<St
         }
         Err(_) => return Err("读取目录失败".to_string()),
     }
-    Ok(ResData {
-        code: 500,
-        msg: "读取文档目录失败".to_string(),
-        data: Vec::new(),
-    })
 }
 
 /**
