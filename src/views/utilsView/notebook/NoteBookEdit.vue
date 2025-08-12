@@ -42,11 +42,11 @@
     <v-contextmenu-divider />
     <v-contextmenu-item @click="reFresh">刷新</v-contextmenu-item>
     <v-contextmenu-divider />
-    <v-contextmenu-item @click="removeNote">删除笔记</v-contextmenu-item>
+    <v-contextmenu-item v-show="data.selectIsFile" @click="removeNote">删除笔记</v-contextmenu-item>
     <v-contextmenu-divider v-show="data.selectIsFile" />
     <v-contextmenu-item v-show="data.selectIsFile" @click="upFileNameMenu">修改文件名称</v-contextmenu-item>
-    <v-contextmenu-divider />
-    <v-contextmenu-item @click="removeFolder">删除文件夹</v-contextmenu-item>
+    <v-contextmenu-divider v-show="!(data.selectIsFile)" />
+    <v-contextmenu-item v-show="!(data.selectIsFile)" @click="removeFolder">删除文件夹</v-contextmenu-item>
   </v-contextmenu>
   <v-contextmenu ref="contextmenu" v-else>
     <v-contextmenu-item @click="showAddFolderModalForm">
@@ -239,7 +239,7 @@ const state = reactive({
  */
 const selectHandle = function (node: NotebookInfo) {
   console.log("node {:?}", node)
-
+  data.selectIsFile = node.isfile;
   if (!node.isfile) {
     data.selectFolderPath = node.folder;
     console.log("data.selectFolderPath {:?}", data.selectFolderPath)
@@ -249,7 +249,7 @@ const selectHandle = function (node: NotebookInfo) {
   if (node.path == data.currentChooseFolderPath_md) {
     return;
   }
-  data.selectIsFile = node.isfile;
+  
   // 
   //处理原来编辑笔记
   if ((data.notEditedMdtext_md != data.editedMdtext_md) || (data.title_md != data.lastTimeTitle_md &&
