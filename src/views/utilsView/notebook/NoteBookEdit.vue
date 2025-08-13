@@ -1082,7 +1082,7 @@ const startResize = (e: MouseEvent) => {
 }
 
 .left {
-  width: calc(32% - 10px);
+  width: calc(20% - 10px);
   height: 100%;
   background: #c01a1a;
   float: left;
@@ -1110,7 +1110,7 @@ const startResize = (e: MouseEvent) => {
 
 .mid {
   float: left;
-  width: 68%;
+  width: 80%;
   height: 100%;
   background: #1812c8;
   box-shadow: -1px 4px 5px 3px rgba(0, 0, 0, 0.11);
