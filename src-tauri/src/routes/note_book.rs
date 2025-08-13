@@ -212,8 +212,8 @@ pub async fn save_note(
                         } else {
                             full_name = &md_title;
                         }
-
-                        let new_name_res = tokio::fs::rename(path, full_name).await;
+                        let new_file_path = rename_file_path(&path, full_name, ".md");
+                        let new_name_res = tokio::fs::rename(path, new_file_path).await;
                         match new_name_res {
                             Ok(_) => {
                                 return Ok(ResData {
