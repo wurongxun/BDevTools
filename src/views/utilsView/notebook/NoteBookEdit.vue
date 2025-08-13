@@ -1,12 +1,164 @@
 <template>
   <div class="box" ref="box">
     <div class="left">
-      左侧内容
+      <div class="sidebar-content">
+          <div class="sidebar-header">
+            <h3 class="sidebar-title">文件浏览器</h3>
+            <div class="sidebar-controls">
+              <el-button :icon="Refresh" circle size="small" @click="reFresh" title="刷新" />
+            </div>
+          </div>
+          <div class="wrapper" v-if="show_notebooks_data" v-contextmenu:contextmenu >
+            <el-menu default-active="2" class="folder-menu">
+              <TreeNode v-if="notebooks_data" :node="notebooks_data" v-model="state.selectedNodeId"
+                @node-click="selectHandle" />
+            </el-menu>
+          </div>
+          <div class="empty-state" v-else>
+            <el-empty description="暂无数据" :image-size="80">
+              <el-button type="primary" @click="showAddFolderModalForm">创建文件夹</el-button>
+            </el-empty>
+          </div>
+        </div>
     </div>
     <div class="resize" title="收缩侧边栏">⋮</div>
     <div class="mid">
-      右侧内容
+     <div v-if="data.showMdEditor" class="editor-wrapper">
+          <!-- <a-form layout="inline" class="editor-header">
+          <a-form-item class="title-form-item">
+            <a-input class="mdtitle-input" :bordered="false" v-model:value="data.title_md" placeholder="文章标题"
+              size="large" />
+          </a-form-item>
+        </a-form> -->
+          <MdEditor v-model="data.editedMdtext_md" @onSave="saveMdText" class="md-editor" @onError="onError" />
+        </div>
+        <div v-else class="editor-placeholder">
+          <div class="placeholder-content">
+            <el-icon :size="48" color="#909399">
+              <Document />
+            </el-icon>
+            <p class="placeholder-text">选择或创建一个笔记开始编辑</p>
+            <el-button v-if="notebooks_data && notebooks_data.children && notebooks_data.children.length > 0"
+              type="primary" @click="showAddFileModalForm" class="create-note-button">
+              创建新笔记
+            </el-button>
+          </div>
+        </div>
     </div>
+     <v-contextmenu ref="contextmenu" class="context-menu" v-if="data_not_null">
+      <v-contextmenu-item @click="showAddFileModalForm">
+        <el-icon>
+          <DocumentAdd />
+        </el-icon>
+        添加文件
+      </v-contextmenu-item>
+      <v-contextmenu-divider />
+      <v-contextmenu-item @click="showAddFolderModalForm">
+        <el-icon>
+          <FolderAdd />
+        </el-icon>
+        添加文件夹
+      </v-contextmenu-item>
+      <v-contextmenu-divider />
+      <v-contextmenu-item @click="reFresh">
+        <el-icon>
+          <Refresh />
+        </el-icon>
+        刷新
+      </v-contextmenu-item>
+      <v-contextmenu-divider />
+      <v-contextmenu-item v-show="data.selectIsFile" @click="removeNote">
+        <el-icon>
+          <Delete />
+        </el-icon>
+        删除笔记
+      </v-contextmenu-item>
+      <v-contextmenu-divider v-show="data.selectIsFile" />
+      <v-contextmenu-item v-show="data.selectIsFile" @click="upFileNameMenu">
+        <el-icon>
+          <Edit />
+        </el-icon>
+        修改文件名称
+      </v-contextmenu-item>
+      <v-contextmenu-divider v-show="!(data.selectIsFile)" />
+      <v-contextmenu-item v-show="!(data.selectIsFile)" @click="removeFolder">
+        <el-icon>
+          <Delete />
+        </el-icon>
+        删除文件夹
+      </v-contextmenu-item>
+      <v-contextmenu-divider />
+      <v-contextmenu-item @click="fileManagerOpenPath">
+        <el-icon>
+          <FolderOpened />
+        </el-icon>
+        在文件资源管理器中显示
+      </v-contextmenu-item>
+    </v-contextmenu>
+    <v-contextmenu ref="contextmenu" class="context-menu" v-else>
+      <v-contextmenu-item @click="showAddFolderModalForm">
+        <el-icon>
+          <FolderAdd />
+        </el-icon>
+        添加文件夹
+      </v-contextmenu-item>
+      <v-contextmenu-divider />
+      <v-contextmenu-item @click="reFresh">
+        <el-icon>
+          <Refresh />
+        </el-icon>
+        刷新
+      </v-contextmenu-item>
+    </v-contextmenu>
+
+    <!-- 添加文件夹表单 -->
+    <el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal" title="添加文件夹"
+      width="500" class="custom-dialog">
+      <el-form>
+        <el-form-item label="文件夹名称" :label-width="data.formLabelWidth">
+          <el-input v-model="data.newFolderName" autocomplete="off" placeholder="请输入文件夹名称"
+            @keyup.enter="addNodeFolder" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="handleCancelByAddFolderModal">取消</el-button>
+          <el-button type="primary" @click="addNodeFolder"> 确认 </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 添加笔记本弹出表单 -->
+    <el-dialog v-model="data.addFileModalFormVisible" :before-close="handleCancelByAddNotebookModal" title="添加文件"
+      width="500" class="custom-dialog">
+      <el-form>
+        <el-form-item label="文件名称" :label-width="data.formLabelWidth">
+          <el-input v-model="data.newFileName" autocomplete="off" placeholder="请输入文件名称" @keyup.enter="addFile" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="handleCancelByAddNotebookModal">取消</el-button>
+          <el-button type="primary" @click="addFile"> 确认 </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 修改文件名称弹出表单 -->
+    <el-dialog v-model="data.upFileNameModalFormVisible" :before-close="handleCancelByUpFileNameModal" title="修改文件名"
+      width="500" class="custom-dialog">
+      <el-form>
+        <el-form-item label="文件名称" :label-width="data.formLabelWidth">
+          <el-input v-model="data.upFileName" autocomplete="off" placeholder="请输入新的文件名称" @keyup.enter="upFileName" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="handleCancelByUpFileNameModal">取消</el-button>
+          <el-button type="primary" @click="upFileName">修改</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 <script setup lang="ts">
@@ -932,7 +1084,7 @@ const startResize = (e: MouseEvent) => {
 .left {
   width: calc(32% - 10px);
   height: 100%;
-  background: #FFFFFF;
+  background: #c01a1a;
   float: left;
 }
 
@@ -960,7 +1112,7 @@ const startResize = (e: MouseEvent) => {
   float: left;
   width: 68%;
   height: 100%;
-  background: #fff;
+  background: #1812c8;
   box-shadow: -1px 4px 5px 3px rgba(0, 0, 0, 0.11);
 }
 </style>
