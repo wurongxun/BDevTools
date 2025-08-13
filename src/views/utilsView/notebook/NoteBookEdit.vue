@@ -1,70 +1,128 @@
 <template>
-  <el-row style="height: 100%">
-    <el-col :span="5" style="height: 100%; background-color: #d9d9d9" v-contextmenu:contextmenu>
-      <div>
+  <el-row class="notebook-container">
+    <el-col :span="data.sidebarSpan" class="sidebar-container" v-contextmenu:contextmenu ref="sidebarContainer">
+      <div class="sidebar-content">
+        <div class="sidebar-header">
+          <h3 class="sidebar-title">文件浏览器</h3>
+          <div class="sidebar-controls">
+            <el-button :icon="Refresh" circle size="small" @click="reFresh" title="刷新" />
+          </div>
+        </div>
         <div class="wrapper" v-if="show_notebooks_data">
-          <el-menu default-active="2">
+          <el-menu default-active="2" class="folder-menu">
             <TreeNode v-if="notebooks_data" :node="notebooks_data" v-model="state.selectedNodeId"
               @node-click="selectHandle" />
           </el-menu>
         </div>
-        <div style="height: 100%; position: relative" v-else>
-          <span style="
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translateX(-50%) translateY(-50%);
-            color: rgb(165 164 164);
-          ">
-            右击添加文件夹
-          </span>
+        <div class="empty-state" v-else>
+          <el-empty description="暂无数据" :image-size="80">
+            <el-button type="primary" @click="showAddFolderModalForm">创建文件夹</el-button>
+          </el-empty>
         </div>
       </div>
     </el-col>
+
+    <!-- 调整宽度的手柄 -->
+    <div class="resize-handle" @mousedown="startResize"></div>
+
     <!-- 编辑器栏 -->
-    <el-col :span="19">
-      <div v-if="data.showMdEditor">
-        <a-form layout="inline">
-          <a-form-item style="width: 99.5%; margin: 0 auto; padding: 1px 0">
-            <a-input class="mdtitle-input" :bordered="false" v-model:value="data.title_md" placeholder="文章标题"></a-input>
+    <el-col :span="24 - data.sidebarSpan" class="editor-container">
+      <div v-if="data.showMdEditor" class="editor-wrapper">
+        <a-form layout="inline" class="editor-header">
+          <a-form-item class="title-form-item">
+            <a-input class="mdtitle-input" :bordered="false" v-model:value="data.title_md" placeholder="文章标题"
+              size="large" />
           </a-form-item>
         </a-form>
-        <MdEditor v-model="data.editedMdtext_md" @onSave="saveMdText" style="height: 100%" @onError="onError" />
+        <MdEditor v-model="data.editedMdtext_md" @onSave="saveMdText" class="md-editor" @onError="onError" />
+      </div>
+      <div v-else class="editor-placeholder">
+        <div class="placeholder-content">
+          <el-icon :size="48" color="#909399">
+            <Document />
+          </el-icon>
+          <p class="placeholder-text">选择或创建一个笔记开始编辑</p>
+          <el-button v-if="notebooks_data && notebooks_data.children && notebooks_data.children.length > 0"
+            type="primary" @click="showAddFileModalForm" class="create-note-button">
+            创建新笔记
+          </el-button>
+        </div>
       </div>
     </el-col>
   </el-row>
-  <v-contextmenu ref="contextmenu" v-if="data_not_null">
+
+  <v-contextmenu ref="contextmenu" class="context-menu" v-if="data_not_null">
     <v-contextmenu-item @click="showAddFileModalForm">
+      <el-icon>
+        <DocumentAdd />
+      </el-icon>
       添加笔记
     </v-contextmenu-item>
     <v-contextmenu-divider />
     <v-contextmenu-item @click="showAddFolderModalForm">
+      <el-icon>
+        <FolderAdd />
+      </el-icon>
       添加文件夹
     </v-contextmenu-item>
     <v-contextmenu-divider />
-    <v-contextmenu-item @click="reFresh">刷新</v-contextmenu-item>
+    <v-contextmenu-item @click="reFresh">
+      <el-icon>
+        <Refresh />
+      </el-icon>
+      刷新
+    </v-contextmenu-item>
     <v-contextmenu-divider />
-    <v-contextmenu-item v-show="data.selectIsFile" @click="removeNote">删除笔记</v-contextmenu-item>
+    <v-contextmenu-item v-show="data.selectIsFile" @click="removeNote">
+      <el-icon>
+        <Delete />
+      </el-icon>
+      删除笔记
+    </v-contextmenu-item>
     <v-contextmenu-divider v-show="data.selectIsFile" />
-    <v-contextmenu-item v-show="data.selectIsFile" @click="upFileNameMenu">修改文件名称</v-contextmenu-item>
+    <v-contextmenu-item v-show="data.selectIsFile" @click="upFileNameMenu">
+      <el-icon>
+        <Edit />
+      </el-icon>
+      修改文件名称
+    </v-contextmenu-item>
     <v-contextmenu-divider v-show="!(data.selectIsFile)" />
-    <v-contextmenu-item v-show="!(data.selectIsFile)" @click="removeFolder">删除文件夹</v-contextmenu-item>
+    <v-contextmenu-item v-show="!(data.selectIsFile)" @click="removeFolder">
+      <el-icon>
+        <Delete />
+      </el-icon>
+      删除文件夹
+    </v-contextmenu-item>
     <v-contextmenu-divider />
-    <v-contextmenu-item @click="fileManagerOpenPath">在文件资源管理器中显示</v-contextmenu-item>
+    <v-contextmenu-item @click="fileManagerOpenPath">
+      <el-icon>
+        <FolderOpened />
+      </el-icon>
+      在文件资源管理器中显示
+    </v-contextmenu-item>
   </v-contextmenu>
-  <v-contextmenu ref="contextmenu" v-else>
+  <v-contextmenu ref="contextmenu" class="context-menu" v-else>
     <v-contextmenu-item @click="showAddFolderModalForm">
+      <el-icon>
+        <FolderAdd />
+      </el-icon>
       添加文件夹
     </v-contextmenu-item>
     <v-contextmenu-divider />
-    <v-contextmenu-item @click="reFresh">刷新</v-contextmenu-item>
+    <v-contextmenu-item @click="reFresh">
+      <el-icon>
+        <Refresh />
+      </el-icon>
+      刷新
+    </v-contextmenu-item>
   </v-contextmenu>
+
   <!-- 添加文件夹表单 -->
   <el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal" title="添加文件夹"
-    width="500">
+    width="500" class="custom-dialog">
     <el-form>
       <el-form-item label="文件夹名称" :label-width="data.formLabelWidth">
-        <el-input v-model="data.newFolderName" autocomplete="off" />
+        <el-input v-model="data.newFolderName" autocomplete="off" placeholder="请输入文件夹名称" @keyup.enter="addNodeFolder" />
       </el-form-item>
     </el-form>
     <template #footer>
@@ -74,12 +132,13 @@
       </div>
     </template>
   </el-dialog>
+
   <!-- 添加笔记本弹出表单 -->
   <el-dialog v-model="data.addFileModalFormVisible" :before-close="handleCancelByAddNotebookModal" title="添加文件"
-    width="500">
+    width="500" class="custom-dialog">
     <el-form>
       <el-form-item label="文件名称" :label-width="data.formLabelWidth">
-        <el-input v-model="data.newFileName" autocomplete="off" />
+        <el-input v-model="data.newFileName" autocomplete="off" placeholder="请输入文件名称" @keyup.enter="addFile" />
       </el-form-item>
     </el-form>
     <template #footer>
@@ -92,10 +151,10 @@
 
   <!-- 修改文件名称弹出表单 -->
   <el-dialog v-model="data.upFileNameModalFormVisible" :before-close="handleCancelByUpFileNameModal" title="修改文件名"
-    width="500">
+    width="500" class="custom-dialog">
     <el-form>
       <el-form-item label="文件名称" :label-width="data.formLabelWidth">
-        <el-input v-model="data.upFileName" autocomplete="off" />
+        <el-input v-model="data.upFileName" autocomplete="off" placeholder="请输入新的文件名称" @keyup.enter="upFileName" />
       </el-form-item>
     </el-form>
     <template #footer>
@@ -116,7 +175,6 @@ import {
   ref,
   toRefs,
   createVNode,
-  PropType,
   toRaw,
 } from "vue";
 //import { notification, Modal } from 'ant-design-vue';
@@ -131,7 +189,15 @@ import "md-editor-v3/lib/style.css";
 import { NotebookInfo, ResponseData } from "@/entity/entitys";
 import TreeNode from "@/components/tsx/menu/TreeNode";
 import { tauri_request } from "@/utils/request";
-
+import {
+  Document,
+  Refresh,
+  DocumentAdd,
+  FolderAdd,
+  Delete,
+  Edit,
+  FolderOpened
+} from '@element-plus/icons-vue';
 // 处理节点点击事件
 const handleNodeClick = (node: NotebookInfo) => {
   console.log("节点被点击:", node);
@@ -144,6 +210,14 @@ const handleNodeClick = (node: NotebookInfo) => {
 
 onMounted(() => {
   get_document_notebooks();
+  // 从本地存储恢复侧边栏宽度
+  const savedSidebarWidth = localStorage.getItem('mdnote-sidebar-width');
+  if (savedSidebarWidth) {
+    const width = parseInt(savedSidebarWidth, 10);
+    if (width >= 4 && width <= 12) {
+      data.sidebarSpan = width;
+    }
+  }
 });
 
 const data = reactive({
@@ -172,9 +246,12 @@ const data = reactive({
   loading: false,
   map: new Map(),
   spinning: false,
+  sidebarSpan: 6, // 默认侧边栏宽度 (6/24 = 25%)
+  isResizing: false,
 });
 
 let notebooks_data = ref<NotebookInfo>();
+const sidebarContainer = ref<HTMLElement | null>(null);
 
 /**
  *  获取笔记本数据
@@ -743,12 +820,217 @@ const read_note_file = async function (node: NotebookInfo) {
   }
 };
 
+// 调整侧边栏宽度功能
+const startResize = (e: MouseEvent) => {
+  data.isResizing = true;
+  const startX = e.clientX;
+  const startWidth = data.sidebarSpan;
+
+  const doResize = (moveEvent: MouseEvent) => {
+    if (!data.isResizing) return;
+
+    const diffX = moveEvent.clientX - startX;
+    const containerWidth = (sidebarContainer.value?.parentElement?.offsetWidth || window.innerWidth);
+    const percentChange = (diffX / containerWidth) * 24;
+
+    let newSpan = startWidth + percentChange;
+    newSpan = Math.max(4, Math.min(12, newSpan)); // 限制在4-12之间 (1/6到1/2的宽度)
+    data.sidebarSpan = Math.round(newSpan);
+  };
+  const stopResize = () => {
+    data.isResizing = false;
+    document.removeEventListener('mousemove', doResize);
+    document.removeEventListener('mouseup', stopResize);
+
+    // 保存宽度设置到本地存储
+    localStorage.setItem('mdnote-sidebar-width', data.sidebarSpan.toString());
+  };
+
+  document.addEventListener('mousemove', doResize);
+  document.addEventListener('mouseup', stopResize);
+};
 </script>
-<style>
+
+<style scoped>
+.notebook-container {
+  height: 100%;
+  min-height: 500px;
+  display: flex;
+  position: relative;
+}
+
+.sidebar-container {
+  height: 100%;
+  background-color: #f5f5f5;
+  border-right: 1px solid #dcdfe6;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  position: relative;
+}
+
+.sidebar-content {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom: 1px solid #e4e7ed;
+  background-color: #fff;
+}
+
+.sidebar-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.sidebar-controls {
+  display: flex;
+  gap: 5px;
+}
+
+.folder-menu {
+  border: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 5px 0;
+}
+
 .wrapper {
   height: 100%;
-  background-color: #e0e0e0;
-  border: solid #cbcbcb;
-  border-width: 0px 1px 0px 0px;
+  display: flex;
+  flex-direction: column;
+}
+
+.empty-state {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fafafa;
+}
+
+.editor-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+}
+
+.editor-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-header {
+  padding: 10px 15px;
+  border-bottom: 1px solid #ebeef5;
+  background-color: #f8f9fa;
+}
+
+.title-form-item {
+  width: 100%;
+}
+
+.mdtitle-input {
+  font-size: 18px;
+  font-weight: 500;
+  padding: 8px 0;
+}
+
+.md-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.editor-placeholder {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fafafa;
+}
+
+.placeholder-content {
+  text-align: center;
+  color: #909399;
+}
+
+.placeholder-text {
+  margin-top: 16px;
+  font-size: 16px;
+}
+
+.create-note-button {
+  margin-top: 20px;
+}
+
+.context-menu {
+  border-radius: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.context-menu :deep(.v-contextmenu-item) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.custom-dialog :deep(.el-dialog__body) {
+  padding: 20px 20px 10px;
+}
+
+.dialog-footer {
+  text-align: right;
+}
+
+/* 调整手柄 */
+.resize-handle {
+  width: 5px;
+  height: 100%;
+  background-color: #dcdfe6;
+  cursor: col-resize;
+  position: relative;
+  transition: background-color 0.2s;
+  z-index: 10;
+}
+
+.resize-handle:hover {
+  background-color: #409eff;
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+  .notebook-container {
+    flex-direction: column;
+  }
+
+  .sidebar-container,
+  .editor-container {
+    width: 100%;
+  }
+
+  .sidebar-container {
+    height: 40%;
+    border-right: none;
+    border-bottom: 1px solid #dcdfe6;
+  }
+
+  .editor-container {
+    height: 60%;
+  }
+
+  .resize-handle {
+    display: none;
+  }
 }
 </style>
