@@ -3,10 +3,11 @@ use crate::{
     response::resp_data::ResData,
     utils::fileUtil::{all_path, get_document_notebooks_data, read_dir_info},
 };
+use hex;
+use md5::Digest;
 use std::error::Error;
 use tauri::{AppHandle, Manager};
-use md5::{Digest};
-use hex;
+use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
 pub async fn my_read_file(path: std::path::PathBuf) -> String {
@@ -80,7 +81,27 @@ pub async fn get_home_notebooks(
         data: Vec::new(),
     })
 }
-
+// 打开目录
+#[tauri::command]
+pub async fn file_manager_open_path(app_handle: tauri::AppHandle, path: String) -> ResData<String> {
+    let re = app_handle.opener().open_path(path, None::<String>);
+    match re {
+        Ok(_) => {
+            return ResData {
+                code: 200,
+                msg: "打开目录成功".to_string(),
+                data: "".to_string(),
+            };
+        }
+        Err(e) => {
+            return ResData {
+                code: 500,
+                msg: e.to_string(),
+                data: "".to_string(),
+            };
+        }
+    }
+}
 // 获取本地笔记本列表
 #[tauri::command]
 pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<String> {

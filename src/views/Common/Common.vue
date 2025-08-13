@@ -51,12 +51,12 @@ onMounted(() => {
     </el-header>
     <el-container style="height: calc(100vh - 35px);  ">
       <el-container style="width:100vw;">
-        <el-main mode="out-in" enter-active-class="animate__animated animate__fadeIn"
-          style="overflow: auto;scrollbar-width: none;" leave-active-class="animate__animated animate__fadeOut">
-          <keep-alive>
-            <router-view />
-          </keep-alive>
-        </el-main>
+        <!-- <el-main mode="out-in" enter-active-class="animate__animated animate__fadeIn"
+          style="overflow: auto;scrollbar-width: none;" leave-active-class="animate__animated animate__fadeOut"> -->
+        <keep-alive>
+          <router-view />
+        </keep-alive>
+        <!-- </el-main> -->
       </el-container>
     </el-container>
   </el-container>
@@ -73,11 +73,13 @@ onMounted(() => {
   scrollbar-width: none;
   /* Firefox 64+ */
 }
+
 .header {
   background-color: #f8f8f8;
   border-bottom: 1px solid #eaeaea;
   padding: 1rem 1.5rem;
 }
+
 .title {
   font-size: 1.25rem;
   font-weight: 600;

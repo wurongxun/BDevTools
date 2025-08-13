@@ -275,7 +275,7 @@ pub async fn up_file_name(
     path: String,
     up_file_name: String,
 ) -> Result<ResData<String>, String> {
-     println!("up_file_name {},--------{}",path,up_file_name);
+    println!("up_file_name {},--------{}", path, up_file_name);
     //检查路径是否存在
     if !Path::new(&path).exists() {
         return Ok(ResData {
@@ -284,8 +284,9 @@ pub async fn up_file_name(
             data: String::new(),
         });
     }
-
-    let new_name_res = tokio::fs::rename(&path, &up_file_name).await;
+    let new_file_path = rename_file_path(&path, &up_file_name, ".md");
+    println!("new_file_path {}", new_file_path);
+    let new_name_res = tokio::fs::rename(&path, &new_file_path).await;
     match new_name_res {
         Ok(_) => {
             return Ok(ResData {
@@ -424,4 +425,13 @@ pub async fn get_path_childrenFoldersAndFiles(
             data: Vec::new(),
         }),
     }
+}
+fn rename_file_path(original_path: &str, new_filename: &str, suffix: &str) -> String {
+    let path = Path::new(original_path);
+    let mut new_path = path.to_path_buf();
+    // 获取目录部分
+    let parent = new_path.parent().unwrap_or_else(|| Path::new(""));
+    // 添加新的文件名
+    let new_file_path = parent.join(format!("{}{}", new_filename, suffix));
+    new_file_path.to_string_lossy().to_string()
 }

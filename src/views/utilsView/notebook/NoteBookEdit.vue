@@ -1,34 +1,36 @@
 <template>
   <el-row style="height: 100%">
     <el-col :span="5" style="height: 100%; background-color: #d9d9d9" v-contextmenu:contextmenu>
-      <div class="wrapper" v-if="show_notebooks_data">
-        <el-menu default-active="2" class="el-menu-vertical-demo">
-          <TreeNode v-if="notebooks_data" :node="notebooks_data" v-model="state.selectedNodeId"
-            @node-click="selectHandle" />
-        </el-menu>
-      </div>
-      <div style="height: 100%; position: relative" v-else>
-        <span style="
+      <div>
+        <div class="wrapper" v-if="show_notebooks_data">
+          <el-menu default-active="2">
+            <TreeNode v-if="notebooks_data" :node="notebooks_data" v-model="state.selectedNodeId"
+              @node-click="selectHandle" />
+          </el-menu>
+        </div>
+        <div style="height: 100%; position: relative" v-else>
+          <span style="
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translateX(-50%) translateY(-50%);
             color: rgb(165 164 164);
           ">
-          右击添加文件夹
-        </span>
+            右击添加文件夹
+          </span>
+        </div>
       </div>
     </el-col>
     <!-- 编辑器栏 -->
     <el-col :span="19">
-      <!-- <div v-if="showMdEditor"> -->
-      <a-form layout="inline">
-        <a-form-item style="width: 99.5%; margin: 0 auto; padding: 1px 0">
-          <a-input class="mdtitle-input" :bordered="false" v-model:value="data.title_md" placeholder="文章标题"></a-input>
-        </a-form-item>
-      </a-form>
-      <MdEditor v-model="data.editedMdtext_md" @onSave="saveMdText" style="height: 100%" @onError="onError" />
-      <!-- </div> -->
+      <div v-if="data.showMdEditor">
+        <a-form layout="inline">
+          <a-form-item style="width: 99.5%; margin: 0 auto; padding: 1px 0">
+            <a-input class="mdtitle-input" :bordered="false" v-model:value="data.title_md" placeholder="文章标题"></a-input>
+          </a-form-item>
+        </a-form>
+        <MdEditor v-model="data.editedMdtext_md" @onSave="saveMdText" style="height: 100%" @onError="onError" />
+      </div>
     </el-col>
   </el-row>
   <v-contextmenu ref="contextmenu" v-if="data_not_null">
@@ -47,6 +49,8 @@
     <v-contextmenu-item v-show="data.selectIsFile" @click="upFileNameMenu">修改文件名称</v-contextmenu-item>
     <v-contextmenu-divider v-show="!(data.selectIsFile)" />
     <v-contextmenu-item v-show="!(data.selectIsFile)" @click="removeFolder">删除文件夹</v-contextmenu-item>
+    <v-contextmenu-divider />
+    <v-contextmenu-item @click="fileManagerOpenPath">在文件资源管理器中显示</v-contextmenu-item>
   </v-contextmenu>
   <v-contextmenu ref="contextmenu" v-else>
     <v-contextmenu-item @click="showAddFolderModalForm">
@@ -121,6 +125,7 @@ import DirFileMenu from "@/utils/DirFileMenu";
 import StringUtil from "@/utils/StringUtil";
 import NotificationUtil from "@/utils/NotificationUtil";
 import { invoke } from "@tauri-apps/api/core";
+import { openPath } from '@tauri-apps/plugin-opener';
 import { MdEditor } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
 import { NotebookInfo, ResponseData } from "@/entity/entitys";
@@ -249,7 +254,7 @@ const selectHandle = function (node: NotebookInfo) {
   if (node.path == data.currentChooseFolderPath_md) {
     return;
   }
-  
+
   // 
   //处理原来编辑笔记
   if ((data.notEditedMdtext_md != data.editedMdtext_md) || (data.title_md != data.lastTimeTitle_md &&
@@ -644,6 +649,14 @@ let removeFolder = async function () {
     NotificationUtil.error("操作失败：" + err);
   });
 };
+let fileManagerOpenPath = async function () {
+  //await openPath(data.selectFolderPath);
+
+  let res = await tauri_request<ResponseData<string>>("file_manager_open_path", { path: data.selectFolderPath });
+  if (res && res.code != 200) {
+    NotificationUtil.error(res.msg);
+  }
+}
 
 /**
  * 关闭添加文件夹模态框

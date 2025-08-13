@@ -10,10 +10,15 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-    ],
+    "windows": [],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": ["$DOCUMENT/**", "$HOME/**", "**"]
+        }
+      }
     }
   },
   "bundle": {

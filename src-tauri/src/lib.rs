@@ -16,7 +16,7 @@ use crate::app_setup::setup::setup_windows;
 use crate::routes::app_window::{
     about, loding_window_close, windows_close, windows_hide, windows_maximize, windows_minimize,
 };
-use crate::routes::file_utils::get_document_notebooks;
+use crate::routes::file_utils::{get_document_notebooks,file_manager_open_path};
 use crate::routes::note_book::{
     create_folder, create_note_file, get_note_list, get_path_childrenFoldersAndFiles,
     read_note_file, remove_file, remove_folder, save_note, up_file_name,
@@ -33,6 +33,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             get_document_notebooks,
+            file_manager_open_path,
             get_note_list,
             read_note_file,
             create_folder,
@@ -52,7 +53,7 @@ pub fn run() {
         .setup(move |app: &mut App| {
             let mut main_window = match WebviewWindowBuilder::new(
                 app,
-                "main-window".to_string(),
+                "main".to_string(),
                 tauri::WebviewUrl::App("index.html".into()),
             )
             .title("MdNote")
