@@ -451,6 +451,7 @@ const saveMd = (mdText: string, mdTitle: string, path: string,) => {
       })
         .then((res: ResponseData<string>) => {
           if (res && res.code == 200) {
+            data.notEditedMdtext_md = mdText;
             NotificationUtil.success("笔记保存成功");
           } else {
             NotificationUtil.error("笔记保存失败：" + res.msg);
@@ -477,71 +478,7 @@ const saveMdText = (mdText: string) => {
     NotificationUtil.error("请输入标题");
     return;
   }
-  invoke<ResponseData<string[]>>("get_note_list", {
-    notebook: data.currentChooseFolderPath_md,
-  })
-    .then((res: ResponseData<string[]>) => {
-      let same_file_name = false;
-      if (res && res.code == 200) {
-        var tem = res.data;
-        tem.map((n) => {
-          if (n == data.title_md) {
-            same_file_name = true;
-          }
-        });
-        if (!same_file_name) {
-          if (data.currentChooseNoteAllPath_md) {
-            // 不为空
-            // 调用保存笔记方法
-            invoke<ResponseData<string>>("save_note", {
-              path: data.currentChooseNoteAllPath_md,
-              mdTitle: data.title_md,
-              mdText: mdText,
-            })
-              .then((res: ResponseData<string>) => {
-                if (res && res.code == 200) {
-                  NotificationUtil.success("笔记保存成功");
-                } else {
-                  NotificationUtil.error("笔记保存失败：" + res.msg);
-                }
-              })
-              .then((err) => {
-                console.log(err);
-              });
-          } else {
-            // 存在为空情况
-            NotificationUtil.error("请选定笔记本和笔记");
-          }
-        } else {
-          NotificationUtil.warn("已有相同文件名，文件名将无法更改！");
-          if (data.currentChooseNoteAllPath_md) {
-            // 调用保存笔记方法 保存新文件
-            invoke<ResponseData<string>>("save_note", {
-              currentNote: data.currentChooseNoteAllPath_md,
-              mdTitle: data.title_md,
-              mdText: mdText,
-            }).then((res: ResponseData<string>) => {
-              if (res && res.code == 200) {
-                data.lastTimeTitle_md = data.title_md;
-                data.notEditedMdtext_md = mdText;
-              } else {
-                NotificationUtil.error("笔记保存失败：" + res.msg);
-              }
-            });
-          } else {
-            // 存在为空情况
-            NotificationUtil.error("请选定笔记本和笔记");
-          }
-        }
-      } else {
-        NotificationUtil.error("获取笔记列表数据失败：" + res.msg);
-      }
-    })
-    .catch((err) => {
-      console.log(err);
-      NotificationUtil.error("获取文件信息异常！");
-      return;
-    });
+  saveMd(data.editedMdtext_md, data.title_md, data.currentChooseNoteAllPath_md)
 };
 
 /**
