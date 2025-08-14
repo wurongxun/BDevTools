@@ -2,50 +2,50 @@
   <div class="box" ref="box">
     <div class="left">
       <div class="sidebar-content">
-          <div class="sidebar-header">
-            <h3 class="sidebar-title">文件浏览器</h3>
-            <div class="sidebar-controls">
-              <el-button :icon="Refresh" circle size="small" @click="reFresh" title="刷新" />
-            </div>
-          </div>
-          <div class="wrapper" v-if="show_notebooks_data" v-contextmenu:contextmenu >
-            <el-menu default-active="2" class="folder-menu">
-              <TreeNode v-if="notebooks_data" :node="notebooks_data" v-model="state.selectedNodeId"
-                @node-click="selectHandle" />
-            </el-menu>
-          </div>
-          <div class="empty-state" v-else>
-            <el-empty description="暂无数据" :image-size="80">
-              <el-button type="primary" @click="showAddFolderModalForm">创建文件夹</el-button>
-            </el-empty>
+        <div class="sidebar-header">
+          <h3 class="sidebar-title">文件浏览器</h3>
+          <div class="sidebar-controls">
+            <el-button :icon="Refresh" circle size="small" @click="reFresh" title="刷新" />
           </div>
         </div>
+        <div class="wrapper" v-if="show_notebooks_data" v-contextmenu:contextmenu>
+          <el-menu default-active="2" class="folder-menu">
+            <TreeNode v-if="notebooks_data" :node="notebooks_data" v-model="state.selectedNodeId"
+              @node-click="selectHandle" />
+          </el-menu>
+        </div>
+        <div class="empty-state" v-else>
+          <el-empty description="暂无数据" :image-size="80">
+            <el-button type="primary" @click="showAddFolderModalForm">创建文件夹</el-button>
+          </el-empty>
+        </div>
+      </div>
     </div>
     <div class="resize" title="收缩侧边栏">⋮</div>
     <div class="mid">
-     <div v-if="data.showMdEditor" class="editor-wrapper">
-          <!-- <a-form layout="inline" class="editor-header">
+      <div v-if="data.showMdEditor" class="editor-wrapper">
+        <!-- <a-form layout="inline" class="editor-header">
           <a-form-item class="title-form-item">
             <a-input class="mdtitle-input" :bordered="false" v-model:value="data.title_md" placeholder="文章标题"
               size="large" />
           </a-form-item>
         </a-form> -->
-          <MdEditor v-model="data.editedMdtext_md" @onSave="saveMdText" class="md-editor" @onError="onError" />
+        <MdEditor v-model="data.editedMdtext_md" @onSave="saveMdText" class="md-editor" @onError="onError" />
+      </div>
+      <div v-else class="editor-placeholder">
+        <div class="placeholder-content">
+          <el-icon :size="48" color="#909399">
+            <Document />
+          </el-icon>
+          <p class="placeholder-text">选择或创建一个笔记开始编辑</p>
+          <el-button v-if="notebooks_data && notebooks_data.children && notebooks_data.children.length > 0"
+            type="primary" @click="showAddFileModalForm" class="create-note-button">
+            创建新笔记
+          </el-button>
         </div>
-        <div v-else class="editor-placeholder">
-          <div class="placeholder-content">
-            <el-icon :size="48" color="#909399">
-              <Document />
-            </el-icon>
-            <p class="placeholder-text">选择或创建一个笔记开始编辑</p>
-            <el-button v-if="notebooks_data && notebooks_data.children && notebooks_data.children.length > 0"
-              type="primary" @click="showAddFileModalForm" class="create-note-button">
-              创建新笔记
-            </el-button>
-          </div>
-        </div>
+      </div>
     </div>
-     <v-contextmenu ref="contextmenu" class="context-menu" v-if="data_not_null">
+    <v-contextmenu ref="contextmenu" class="context-menu" v-if="data_not_null">
       <v-contextmenu-item @click="showAddFileModalForm">
         <el-icon>
           <DocumentAdd />
@@ -71,10 +71,10 @@
         <el-icon>
           <Delete />
         </el-icon>
-        删除笔记
+        删除文件
       </v-contextmenu-item>
       <v-contextmenu-divider v-show="data.selectIsFile" />
-      <v-contextmenu-item v-show="data.selectIsFile" @click="upFileNameMenu">
+      <v-contextmenu-item v-show="data.selectIsFile" @click="removeFile">
         <el-icon>
           <Edit />
         </el-icon>
@@ -723,6 +723,49 @@ let removeNote = async function () {
     })
     .catch((e) => { NotificationUtil.error("操作失败：" + e.msg); });
 };
+
+let removeFile = async function () {
+  if (StringUtil.isNotNullOrEmpty(data.currentChooseNoteAllPath_md) && data.selectIsFile) {
+    NotificationUtil.error("请选择文件！");
+    return;
+  }
+  ElMessageBox({
+    title: "删除文件",
+    message: h("div", {}, [
+      h("br"),
+      h("br"),
+      h(
+        "p",
+        { style: "color:red;" },
+        `删除文件 "${data.title_md}" 吗?`
+      ),
+      h("br"),
+      h("br"),
+    ]),
+    showCancelButton: true,
+    confirmButtonText: "删除",
+    cancelButtonText: "取消",
+  }).then(async (action) => {
+    // 点击了确定，开始删除
+    let remove_file = await tauri_request<ResponseData<string>>("remove_file", {
+      path: data.currentChooseNoteAllPath_md
+    });
+    if (remove_file && remove_file.code == 200) {
+      NotificationUtil.success("操作成功");
+      data.currentChooseNoteAllPath_md = "";
+      data.editedMdtext_md = "";
+      data.showMdEditor = false;
+      data.title_md = "";
+      data.selectIsFile = false;
+      get_document_notebooks();
+    } else {
+      NotificationUtil.error("操作失败：" + remove_file.msg);
+    }
+
+  }).catch((err) => {
+    NotificationUtil.error("操作失败：" + err);
+  });
+}
 /**
  * 删除文件夹
  */
@@ -1076,7 +1119,7 @@ const startResize = (e: MouseEvent) => {
 .box {
   width: 100%;
   height: 100%;
-  margin: 1% 0;
+  margin: 0 0;
   overflow: hidden;
   box-shadow: -1px 9px 10px 3px rgba(0, 0, 0, 0.11);
 }
