@@ -43,6 +43,13 @@ const routes = <Readonly<RouteRecordRaw[]>>[
         name: "NoteBook",
         component: () => import("@/views/utilsView/notebook/NoteBookEdit.vue"),
       },
+       {
+        // 当 /user/:id/profile 匹配成功
+        // UserProfile 将被渲染到 User 的 <router-view> 内部
+        path: "Calendar",
+        name: "Calendar",
+        component: () => import("@/views/utilsView/calendar/Calendar.vue"),
+      },
     ],
   },
   {
@@ -55,6 +62,20 @@ const routes = <Readonly<RouteRecordRaw[]>>[
         path: "MainView",
         component: () => import("@/views/mainView/mainView.vue"),
       },
+    ],
+  },
+  ,
+  {
+    path: "/App",
+    component: () => import("@/views/common/Common.vue"),
+
+    children: [
+      {
+        path: "AppSetting",
+        name: "AppSetting",
+        component: () => import("@/views/app/AppSetting.vue"),
+      }
+     
     ],
   },
   {

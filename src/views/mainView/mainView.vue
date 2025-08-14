@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router';
 import 'animate.css';
 import router from '@/router';
 import CommandIcon from "@/components/Icon/CommandIcon.vue";
-import SSHIcon from "@/components/Icon/SSHIcon.vue";
+import Calendar from "@/components/Icon/Calendar.vue";
 import HelpIcon from "@/components/Icon/HelpIcon.vue";
 import SettingsIcon from "@/components/Icon/SettingsIcon.vue";
 import GitIcon from "@/components/Icon/GitIcon.vue";
@@ -42,6 +42,13 @@ const navigateTo = async function (routeUrl: string) {
           <el-tooltip effect="dark" :content="$t('md.name')" placement="right">
             <el-icon size="30">
               <MarkDown />
+            </el-icon>
+          </el-tooltip>
+        </div>
+        <div class="icon-wrapper" @click="navigateTo('/MainWindows/Calendar')">
+          <el-tooltip effect="dark" :content="$t('md.name')" placement="right">
+            <el-icon size="30">
+              <Calendar />
             </el-icon>
           </el-tooltip>
         </div>
