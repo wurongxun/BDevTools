@@ -1076,11 +1076,11 @@ const startResize = (e: MouseEvent) => {
   background-color: #d6d6d6;
   border-radius: 5px;
   margin-top: -10px;
-  width: 10px;
+  width: 8px;
   height: 50px;
   background-size: cover;
   background-position: center;
-  font-size: 32px;
+  font-size: 26px;
   color: white;
 }
 
