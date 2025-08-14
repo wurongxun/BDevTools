@@ -9,6 +9,7 @@ import SSHIcon from "@/components/Icon/SSHIcon.vue";
 import HelpIcon from "@/components/Icon/HelpIcon.vue";
 import SettingsIcon from "@/components/Icon/SettingsIcon.vue";
 import GitIcon from "@/components/Icon/GitIcon.vue";
+import MarkDown from "@/components/Icon/MarkDown.vue";
 
 const { t } = useI18n();
 const route = useRoute();
@@ -28,15 +29,6 @@ const navigateTo = async function (routeUrl: string) {
 <template>
 
     <el-aside class="sidebar">
-      <div class="sidebar-header">
-        <div class="icon-wrapper">
-          <el-tooltip effect="dark" :content="$t('command.name')" placement="right">
-            <el-icon size="30">
-              <CommandIcon />
-            </el-icon>
-          </el-tooltip>
-        </div>
-      </div>
       
       <div class="sidebar-main">
         <div class="icon-wrapper">
@@ -46,10 +38,10 @@ const navigateTo = async function (routeUrl: string) {
             </el-icon>
           </el-tooltip>
         </div>
-        <div class="icon-wrapper" @click="navigateTo('/Business/Ssh')">
-          <el-tooltip effect="dark" :content="$t('ssh.name')" placement="right">
+        <div class="icon-wrapper" @click="navigateTo('/MainWindows/NoteBook')">
+          <el-tooltip effect="dark" :content="$t('md.name')" placement="right">
             <el-icon size="30">
-              <SSHIcon />
+              <MarkDown />
             </el-icon>
           </el-tooltip>
         </div>

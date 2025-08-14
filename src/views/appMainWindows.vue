@@ -1,6 +1,6 @@
 <template>
   <el-container class="app-layout">
-    <el-header class="app-header">
+    <el-header class="app-header" data-tauri-drag-region>
       <MainHeader />
     </el-header>
     <el-main class="app-main">

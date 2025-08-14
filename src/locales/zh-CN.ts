@@ -666,5 +666,8 @@ export default {
     delete_notebook_success: "删除笔记成功",
     delete_notebook_fail: "删除笔记失败",
     add_notebook_success: "添加笔记成功",
-  }
+  },
+    md: {
+    name: "Markdown",
+  },
 };
