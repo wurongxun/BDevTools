@@ -59,86 +59,57 @@ onMounted(() => {
 </script>
 <template>
   <el-container style="width: 100vw;">
-    <!--  <el-container style="height: calc(100vh - 35px);"> -->
-    <el-aside class="aside" style="width: 50px;">
-      <div class="aside_header">
-        <div>
-          <el-tooltip class="box-item" effect="dark" content="资源管理" placement="top-start">
-            <el-icon size="30">
-              <CopyIcon />
-            </el-icon>
-          </el-tooltip>
+    <el-container style="height: calc(100vh - 35px);">
+      <el-aside class="aside" style="width: 50px;">
+        <div class="aside_header">
+          <div>
+            <el-tooltip class="box-item" effect="dark" :content="$t('command.name')" placement="top-start">
+              <el-icon size="30">
+                <CommandIcon />
+              </el-icon>
+            </el-tooltip>
+          </div>
         </div>
-        <div>
-          <el-tooltip class="box-item" effect="dark" content="搜索" placement="top-start">
-            <el-icon size="30">
-              <Search />
-            </el-icon>
-          </el-tooltip>
+        <div class="aside_main">
+          <div>
+            <el-tooltip class="box-item" effect="dark" :content="$t('git.name')" placement="top-start">
+              <el-icon size="30">
+                <GitIcon />
+              </el-icon>
+            </el-tooltip>
+          </div>
+          <div @click="navigateTo('/Business/Ssh')">
+            <el-tooltip class="box-item" effect="dark" :content="$t('ssh.name')" placement="top-start">
+              <el-icon size="30">
+                <SSHIcon />
+              </el-icon>
+            </el-tooltip>
+          </div>
         </div>
-        <div>
-          <el-tooltip class="box-item" effect="dark" :content="$t('command.name')" placement="top-start">
-            <el-icon size="30">
-              <CommandIcon />
-            </el-icon>
-          </el-tooltip>
+        <div class="aside_footer">
+          <div class="HelpIcon" @click="navigateTo('/App/Help')">
+            <el-tooltip class="box-item" :content="$t('help.name')" placement="top-start">
+              <el-icon size="30">
+                <HelpIcon />
+              </el-icon>
+            </el-tooltip>
+          </div>
+          <div class="SettingsIcon" @click="navigateTo('/App/AppSetting')">
+            <el-tooltip class="box-item" :content="$t('settings.name')" placement="top-start" hide-after="100">
+              <el-icon size="30">
+                <SettingsIcon />
+              </el-icon>
+            </el-tooltip>
+          </div>
         </div>
-      </div>
-      <div class="aside_main">
-        <div>
-          <el-tooltip class="box-item" effect="dark" :content="$t('git.name')" placement="top-start">
-            <el-icon size="30">
-              <GitIcon />
-            </el-icon>
-          </el-tooltip>
-        </div>
-        <div @click="navigateTo('/Business/Ssh')">
-          <el-tooltip class="box-item" effect="dark" :content="$t('ssh.name')" placement="top-start">
-            <el-icon size="30">
-              <SSHIcon />
-            </el-icon>
-          </el-tooltip>
-        </div>
-        <div @click="navigateTo('/index/BasicFunction')">
-          <el-tooltip class="box-item" effect="dark" :content="$t('tools.name')" placement="top-start">
-            <el-icon size="30">
-              <BasicFunctionIcon />
-            </el-icon>
-          </el-tooltip>
-        </div>
-      </div>
-      <div class="aside_footer">
-        <div class="HelpIcon" @click="navigateTo('/App/Calendar')">
-          <el-tooltip class="box-item" effect="dark" :content="$t('calendar.name')" placement="top-start">
-            <el-icon size="30">
-              <Calendar />
-            </el-icon>
-          </el-tooltip>
-        </div>
-        <div class="HelpIcon" @click="navigateTo('/App/Help')">
-          <el-tooltip class="box-item" effect="dark" :content="$t('help.name')" placement="top-start">
-            <el-icon size="30">
-              <HelpIcon />
-            </el-icon>
-          </el-tooltip>
-        </div>
-        <div class="SettingsIcon" @click="navigateTo('/App/AppSetting')">
-          <el-tooltip class="box-item" effect="dark" :content="$t('settings.name')" placement="top-start"
-            hide-after="100">
-            <el-icon size="30">
-              <SettingsIcon />
-            </el-icon>
-          </el-tooltip>
-        </div>
-      </div>
-    </el-aside>
-    <el-container style="width: calc(100vw - 50px);">
-      <el-main mode="out-in" enter-active-class="animate__animated animate__fadeIn"
-        style="overflow: auto;scrollbar-width: none;" leave-active-class="animate__animated animate__fadeOut">
-        <router-view />
-      </el-main>
+      </el-aside>
+      <el-container style="width: calc(100vw - 50px);">
+        <el-main mode="out-in" enter-active-class="animate__animated animate__fadeIn"
+          style="overflow: auto;scrollbar-width: none;" leave-active-class="animate__animated animate__fadeOut">
+          <router-view />
+        </el-main>
+      </el-container>
     </el-container>
-    <!-- </el-container> -->
   </el-container>
 </template>
 <style lang="scss" scoped>

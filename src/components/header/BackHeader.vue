@@ -82,7 +82,7 @@ const windowHide = async () => {
 <template>
     <div class="back_header" data-tauri-drag-region>
         <div class="back_left">
-            <el-row style="height: 35px;text-align: center;" justify>
+            <el-row style="height: 35px;text-align: center;">
                 <el-col :span="12">
                     <div class="demo-type" style="position: relative;height: 100%;">
                         <div @click="back">
@@ -104,11 +104,11 @@ const windowHide = async () => {
                 </el-col>
             </el-row>
         </div>
-        <div class="back_center" >
+        <div class="back_center">
             {{ title }}
         </div>
-        <div class="back_right" >
-            <el-row style="height: 35px;text-align: center;" justify>
+        <div class="back_right">
+            <el-row style="height: 35px;text-align: center;">
                 <el-col :span="12">
                 </el-col>
                 <el-col :span="12">
@@ -150,17 +150,20 @@ const windowHide = async () => {
     </div>
 </template>
 <style lang="scss" scoped>
-.back_left,.back_right {
+.back_left,
+.back_right {
     width: 250px;
 }
+
 .back_center {
     width: calc(100vw - 500px);
     display: flex;
     justify-content: center;
     text-align: center;
-    height: 35px; 
-    align-items: center; 
+    height: 35px;
+    align-items: center;
 }
+
 .back_header {
     height: 35px;
     text-align: center;
@@ -168,16 +171,19 @@ const windowHide = async () => {
     display: flex;
     background-color: var(--main--header--bg-color);
 }
+
 .demo-type-1 {
     position: relative;
     height: 100%;
     display: flex;
     flex-wrap: wrap-reverse;
-    justify-content: flex-end; /* 让子元素靠右对齐 */
+    justify-content: flex-end;
+    /* 让子元素靠右对齐 */
     align-items: center;
 }
-.demo-type-1>div{
-    flex-basis: calc(33.33%); 
+
+.demo-type-1>div {
+    flex-basis: calc(33.33%);
     justify-content: center;
     align-items: center;
     height: 100%;
@@ -198,7 +204,8 @@ const windowHide = async () => {
     justify-content: center;
     align-items: center;
 }
-.demo-type>div{
+
+.demo-type>div {
     height: 100%;
     flex: 1;
     text-align: center;
@@ -223,6 +230,4 @@ const windowHide = async () => {
 //     backdrop-filter: blur(10px);
 //     box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 //     border-radius: 1px;
-// }
-
-</style>
+// }</style>

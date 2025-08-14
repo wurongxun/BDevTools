@@ -3,7 +3,7 @@
     <div class="left">
       <div class="sidebar-content">
         <div class="sidebar-header">
-          <h3 class="sidebar-title">文件浏览器</h3>
+          <h5 class="sidebar-title">资源管理器</h5>
           <div class="sidebar-controls">
             <el-button :icon="Refresh" circle size="small" @click="reFresh" title="刷新" />
           </div>
@@ -220,11 +220,9 @@ const dragControllerDiv = () => {
         let moveLen = originalLeft + (endX - startX); // 使用变量代替resize[i].left
         const maxT = box[i].clientWidth - resize[i].offsetWidth;
 
-        if (moveLen < 32) moveLen = 32;
-        if (moveLen > maxT - 150) moveLen = maxT - 150;
-
+        if (moveLen < 126) moveLen = 126;
+        if (moveLen > maxT - 500) moveLen = maxT - 500;
         //resize[i].style.left = moveLen + 'px';
-
         for (let j = 0; j < left.length; j++) {
           left[j].style.width = moveLen + 'px';
           mid[j].style.width = (box[i].clientWidth - moveLen - 10) + 'px';
@@ -837,35 +835,6 @@ const read_note_file = async function (node: NotebookInfo) {
   }
 };
 
-// 调整侧边栏宽度功能
-const startResize = (e: MouseEvent) => {
-  data.isResizing = true;
-  const startX = e.clientX;
-  const startWidth = data.sidebarSpan;
-
-  const doResize = (moveEvent: MouseEvent) => {
-    if (!data.isResizing) return;
-
-    const diffX = moveEvent.clientX - startX;
-    const containerWidth = (sidebarContainer.value?.parentElement?.offsetWidth || window.innerWidth);
-    const percentChange = (diffX / containerWidth) * 24;
-
-    let newSpan = startWidth + percentChange;
-    newSpan = Math.max(4, Math.min(12, newSpan)); // 限制在4-12之间 (1/6到1/2的宽度)
-    data.sidebarSpan = Math.round(newSpan);
-  };
-  const stopResize = () => {
-    data.isResizing = false;
-    document.removeEventListener('mousemove', doResize);
-    document.removeEventListener('mouseup', stopResize);
-
-    // 保存宽度设置到本地存储
-    localStorage.setItem('mdnote-sidebar-width', data.sidebarSpan.toString());
-  };
-
-  document.addEventListener('mousemove', doResize);
-  document.addEventListener('mouseup', stopResize);
-};
 </script>
 
 <style scoped>
