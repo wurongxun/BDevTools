@@ -16,7 +16,7 @@ use crate::app_setup::setup::setup_windows;
 use crate::routes::app_window::{
     about, loding_window_close, windows_close, windows_hide, windows_maximize, windows_minimize,
 };
-use crate::routes::file_utils::{get_document_notebooks,file_manager_open_path};
+use crate::routes::file_utils::{file_manager_open_path, get_document_notebooks};
 use crate::routes::note_book::{
     create_folder, create_note_file, get_note_list, get_path_childrenFoldersAndFiles,
     read_note_file, remove_file, remove_folder, save_note, up_file_name,
@@ -58,7 +58,7 @@ pub fn run() {
             )
             .title("MdNote")
             .decorations(true)
-            .inner_size(720.0, 640.0)
+            .inner_size(960.0, 640.0)
             .center()
             .visible(true)
             // .menu(system_menu(&context))//窗口菜单
