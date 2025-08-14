@@ -1,77 +1,69 @@
 <template>
-  <div class="common-layout">
-    <el-container style="width: 100vw;">
-      <el-header :height=header_height style="width: 100vw;padding: 0%;display: flex;">
-        <MainHeader></MainHeader>
-      </el-header>
-      <el-container style="height: calc(100vh - 35px);">
-        <el-main><router-view /></el-main>
-      </el-container>
-    </el-container>
-  </div>
+  <el-container class="app-layout">
+    <el-header class="app-header">
+      <MainHeader />
+    </el-header>
+    <el-main class="app-main">
+      <router-view />
+    </el-main>
+  </el-container>
 </template>
-<script>
 
-import router from '@/router';
-import AppHeader from '@/components/main_header/AppHeader.vue';
-import { defineComponent, ref, onMounted, computed } from 'vue';
-import MainHeader from '@/components/header/MainHeader.vue';
-export default defineComponent({
-  components: {
-    AppHeader,
-    MainHeader,
-    //IconFont,
-    //LikeOutlined,
-    //CommentOutlined,
-    //FileOutlined,
-    //EditFilled
-  },
-  setup() {
-    const header_height = '35px';
-    const height_content = computed(() => {
-      // 回调函数必须return，结果就是计算的结果
-      // 如果计算属性依赖的数据发生变化，那么会重新计算
-      return document.documentElement.clientHeight - 30
-    })
-    const goto_router = (url) => {
-      router.push(url)
-    };
-    onMounted(() => {
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import router from '@/router'
+import MainHeader from '@/components/header/MainHeader.vue'
 
+// 计算主内容区域高度
+const mainHeight = computed(() => {
+  return `calc(100vh - ${headerHeight.value})`
+})
 
-    });
-    const headerStyle = {
-      textAlign: 'center',
-      color: '#fff',
-      height: 64,
-      paddingInline: 50,
-      lineHeight: '64px',
-      backgroundColor: '#7dbcea',
-    };
-    return {
-      height_content,
-      goto_router,
-      selectedKeys1: ref(['2']),
-      selectedKeys2: ref(['1']),
-      collapsed: ref(false),
-      openKeys: ref(['sub1']),
-      headerStyle,
-    };
-  },
-});
+// 头部高度
+const headerHeight = ref('35px')
+
+// 路由跳转方法
+const gotoRouter = (url) => {
+  router.push(url)
+}
+
+onMounted(() => {
+  // 可以在这里添加初始化逻辑
+})
 </script>
-<style scoped>
-a-layout-sider::before {
-  content: "";
-  display: block;
+
+<script>
+// 兼容选项式 API 的部分
+export default {
+  name: 'AppMainWindows',
+  components: {
+    MainHeader
+  }
+}
+</script>
+
+<style scoped lang="scss">
+.app-layout {
+  width: 100vw;
+  height: 100vh;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-a-layout-sider::after {
-  content: "";
-  display: block;
+.app-header {
+  height: 35px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--el-border-color);
 }
 
-span {
-  /* margin-top: 10px; */
+.app-main {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  height: v-bind(mainHeight);
 }
 </style>
