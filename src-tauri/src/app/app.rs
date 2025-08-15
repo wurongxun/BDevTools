@@ -32,23 +32,25 @@ pub fn app_settings(app: &tauri::AppHandle) {
     let store_ = app.store("settings.json");
     match store_ {
         Ok(store) => {
-            let current_theme = store
-                .get("current_theme");
+            let current_theme = store.get("current_theme");
             match current_theme {
-                Some(_) => todo!(),
+                Some(val) => {
+                    println!("current_theme {:?}", val);
+                }
                 None => {
                     store.set("current_theme", json!({ "value": "light" }));
-                },
+                }
             };
-            
-            let autostart_value = store
-                .get("auto_start");
+
+            let autostart_value = store.get("auto_start");
 
             match autostart_value {
-                Some(_) => todo!(),
+                Some(val) => {
+                    println!("auto_start_value {:?}", val);
+                }
                 None => {
                     store.set(" auto_start", json!({ "value": "false" }));
-                },
+                }
             };
         }
         Err(err) => {
