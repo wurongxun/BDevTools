@@ -17,13 +17,9 @@ pub fn setup_windows(app: &mut App) -> Result<(), Box<dyn std::error::Error + Se
     let save_menu_item = MenuItem::new(handle, "Save", true, None::<&str>).unwrap();
     let menu = Menu::with_items(
         handle,
-        &[&Submenu::with_items(
-            handle,
-            "File",
-            true,
-            &[&save_menu_item, &world_item],
-        ).unwrap()],
-    ).unwrap();
+        &[&Submenu::with_items(handle, "File", true, &[&save_menu_item, &world_item]).unwrap()],
+    )
+    .unwrap();
     let mut webview_window = match WebviewWindowBuilder::new(
         app,
         "main-window".to_string(),

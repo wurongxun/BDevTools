@@ -8,10 +8,6 @@ pub fn validate(pattern: &str, content: &str) -> bool {
     re.is_match(content)
 }
 #[test]
-fn test(){
-    println!(
-        "test-- {}",
-        validate(r#"(?:md)$"#, "44.jpg.33.JPEG.md")
-    );
-
+fn test() {
+    println!("test-- {}", validate(r#"(?:md)$"#, "44.jpg.33.JPEG.md"));
 }

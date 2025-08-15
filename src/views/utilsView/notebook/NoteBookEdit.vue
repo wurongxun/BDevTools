@@ -8,13 +8,13 @@
             <el-button :icon="Refresh" circle size="small" @click="reFresh" title="刷新" />
           </div>
         </div>
-        <div class="wrapper" v-if="show_notebooks_data" v-contextmenu:contextmenu>
+        <div class="wrapper" v-show="show_notebooks_data" v-contextmenu:contextmenu>
           <el-menu default-active="2" class="folder-menu">
             <TreeNode v-if="notebooks_data" :node="notebooks_data" v-model="state.selectedNodeId"
               @node-click="selectHandle" />
           </el-menu>
         </div>
-        <div class="empty-state" v-else>
+        <div class="empty-state" v-show="!show_notebooks_data">
           <el-empty description="暂无数据" :image-size="80">
             <el-button type="primary" @click="showAddFolderModalForm">创建文件夹</el-button>
           </el-empty>
@@ -30,11 +30,12 @@
               size="large" />
           </a-form-item>
         </a-form> -->
-        <MdEditor v-model="data.editedMdtext_md" @onSave="saveMdText" class="md-editor" @onError="onError" />
+        <MdEditor v-model="data.editedMdtext_md" @onSave="saveMdText" :theme="editorTheme" class="md-editor"
+          @onError="onError" />
       </div>
       <div v-else class="editor-placeholder">
         <div class="placeholder-content">
-          <el-icon :size="48" color="#909399">
+          <el-icon :size="48">
             <Document />
           </el-icon>
           <p class="placeholder-text">选择或创建一个笔记开始编辑</p>
@@ -194,6 +195,22 @@ import {
   Edit,
   FolderOpened
 } from '@element-plus/icons-vue';
+
+// 引入VueUse暗黑模式核心
+import { useDark, useToggle } from '@vueuse/core'
+
+// 初始化暗黑模式检测器
+// 初始化暗黑模式检测器，配置持久化选项
+const isDark = useDark({
+  storageKey: 'theme-appearance', // 自定义localStorage存储名称
+  valueDark: 'dark', // 类名暗黑模式下值是dark
+  valueLight: 'light' // 类名亮色模式下值是light
+})
+
+// 根据主题状态动态设置编辑器主题
+const editorTheme = computed(() => {
+  return isDark.value ? 'dark' : 'light';
+});
 // 处理节点点击事件
 const handleNodeClick = (node: NotebookInfo) => {
   console.log("节点被点击:", node);
@@ -220,7 +237,7 @@ const dragControllerDiv = () => {
         let moveLen = originalLeft + (endX - startX); // 使用变量代替resize[i].left
         const maxT = box[i].clientWidth - resize[i].offsetWidth;
 
-        if (moveLen < 126) moveLen = 126;
+        if (moveLen < 135) moveLen = 135;
         if (moveLen > maxT - 500) moveLen = maxT - 500;
         //resize[i].style.left = moveLen + 'px';
         for (let j = 0; j < left.length; j++) {
@@ -838,27 +855,47 @@ const read_note_file = async function (node: NotebookInfo) {
 </script>
 
 <style scoped>
-.notebook-container {
-  height: 100%;
-  min-height: 500px;
-  display: flex;
-  position: relative;
+.box {
   width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  box-shadow: -1px 9px 10px 3px rgba(0, 0, 0, 0.11);
+  display: flex;
 }
 
-.sidebar-container {
+.left {
+  width: calc(15% - 10px);
   height: 100%;
-  background-color: #f5f5f5;
-  border-right: 1px solid #dcdfe6;
-  display: flex;
-  flex-direction: column;
-  min-width: 200px;
+}
+
+.resize {
+  cursor: col-resize;
+  width: 8px;
+  height: 50px;
   position: relative;
+  top: 45%;
+  margin-top: -10px;
+  border-radius: 5px;
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.resize:hover {
+  background-color: #c2c2c2;
+  color: #444444;
+}
+
+.mid {
+  flex: 1;
+  height: 100%;
+  box-shadow: -1px 4px 5px 3px rgba(0, 0, 0, 0.11);
 }
 
 .sidebar-content {
   height: 100%;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -866,22 +903,21 @@ const read_note_file = async function (node: NotebookInfo) {
 .sidebar-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 10px 15px;
+  padding: 7px 8px;
   border-bottom: 1px solid #e4e7ed;
-  background-color: #fff;
 }
 
 .sidebar-title {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
 }
 
 .sidebar-controls {
   display: flex;
   gap: 5px;
+  margin-left: 5px;
+  /* 增加左侧间距 */
 }
 
 .folder-menu {
@@ -889,12 +925,14 @@ const read_note_file = async function (node: NotebookInfo) {
   flex: 1;
   overflow-y: auto;
   padding: 5px 0;
+  margin: 0;
 }
 
 .wrapper {
   height: 100%;
   display: flex;
   flex-direction: column;
+  flex: 1;
 }
 
 .empty-state {
@@ -902,36 +940,12 @@ const read_note_file = async function (node: NotebookInfo) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #fafafa;
-}
-
-.editor-container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background-color: #ffffff;
 }
 
 .editor-wrapper {
   height: 100%;
   display: flex;
   flex-direction: column;
-}
-
-.editor-header {
-  padding: 10px 15px;
-  border-bottom: 1px solid #ebeef5;
-  background-color: #f8f9fa;
-}
-
-.title-form-item {
-  width: 100%;
-}
-
-.mdtitle-input {
-  font-size: 18px;
-  font-weight: 500;
-  padding: 8px 0;
 }
 
 .md-editor {
@@ -944,7 +958,6 @@ const read_note_file = async function (node: NotebookInfo) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #fafafa;
 }
 
 .placeholder-content {
@@ -961,11 +974,6 @@ const read_note_file = async function (node: NotebookInfo) {
   margin-top: 20px;
 }
 
-.context-menu {
-  border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-}
-
 .context-menu :deep(.v-contextmenu-item) {
   display: flex;
   align-items: center;
@@ -980,88 +988,24 @@ const read_note_file = async function (node: NotebookInfo) {
   text-align: right;
 }
 
-/* 调整手柄 */
-.resize-handle {
-  width: 5px;
-  height: 100%;
-  background-color: #dcdfe6;
-  cursor: col-resize;
-  position: relative;
-  transition: background-color 0.2s;
-  z-index: 10;
-}
-
-.resize-handle:hover {
-  background-color: #409eff;
-}
-
 /* 响应式优化 */
 @media (max-width: 768px) {
-  .notebook-container {
+  .box {
     flex-direction: column;
   }
 
-  .sidebar-container,
-  .editor-container {
+  .left {
     width: 100%;
-  }
-
-  .sidebar-container {
     height: 40%;
-    border-right: none;
-    border-bottom: 1px solid #dcdfe6;
   }
 
-  .editor-container {
+  .mid {
+    width: 100%;
     height: 60%;
   }
 
-  .resize-handle {
+  .resize {
     display: none;
   }
-}
-
-
-.box {
-  width: 100%;
-  height: 100%;
-  margin: 0 0;
-  overflow: hidden;
-  box-shadow: -1px 9px 10px 3px rgba(0, 0, 0, 0.11);
-}
-
-.left {
-  width: calc(15% - 10px);
-  height: 100%;
-  background: #c01a1a;
-  float: left;
-}
-
-.resize {
-  cursor: col-resize;
-  float: left;
-  position: relative;
-  top: 45%;
-  background-color: #d6d6d6;
-  border-radius: 5px;
-  margin-top: -10px;
-  width: 8px;
-  height: 50px;
-  background-size: cover;
-  background-position: center;
-  font-size: 26px;
-  color: white;
-}
-
-.resize:hover {
-  color: #444444;
-}
-
-.mid {
-  float: left;
-  width: 85%;
-  height: 100%;
-  background: #1812c8;
-  box-shadow: -1px 4px 5px 3px rgba(0, 0, 0, 0.11);
 }
 </style>

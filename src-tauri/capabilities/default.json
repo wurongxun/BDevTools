@@ -7,6 +7,17 @@
     "core:default",
     "opener:default",
     "fs:default",
-    "opener:allow-open-path"
+    "opener:allow-open-path",
+    "core:window:allow-is-decorated",
+    "core:window:allow-is-resizable",
+    "core:window:allow-is-maximized",
+    "core:window:allow-is-minimized",
+    "core:window:allow-is-fullscreen",
+    "core:window:allow-is-visible",
+    "core:window:deny-set-shadow",
+    "core:window:allow-maximize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-minimize",
+    "store:default"
   ]
 }

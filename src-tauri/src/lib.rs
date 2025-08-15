@@ -1,9 +1,10 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
+use serde_json::json;
 use tauri::App;
 use tauri::AppHandle;
 use tauri::{WebviewUrl, WebviewWindowBuilder};
-
+use tauri_plugin_store::StoreExt;
 mod app;
 mod app_setup;
 mod entity;
@@ -12,6 +13,7 @@ mod routes;
 mod system_menu;
 mod utils;
 
+use crate::app::app::app_settings;
 use crate::app_setup::setup::setup_windows;
 use crate::routes::app_window::{
     about, loding_window_close, windows_close, windows_hide, windows_maximize, windows_minimize,
@@ -29,6 +31,7 @@ struct Payload {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -86,10 +89,7 @@ pub fn run() {
             //     Ok(it) => it,
             //     Err(err) => return Err(Box::new(err)),
             // };
-            //窗口阴影功能
-            // #[cfg(any(target_os = "windows", target_os = "macos"))]
-            // set_shadow(&loding_window, true).expect("Unsupported platform!");
-
+            app_settings(&app.handle());
             Ok(())
         })
         .run(tauri::generate_context!())
