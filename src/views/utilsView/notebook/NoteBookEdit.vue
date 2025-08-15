@@ -3,7 +3,7 @@
     <div class="left">
       <div class="sidebar-content">
         <div class="sidebar-header">
-          <h5 class="sidebar-title">资源管理器</h5>
+          <h4 class="sidebar-title">资源管理器</h4>
           <div class="sidebar-controls">
             <el-button :icon="Refresh" circle size="small" @click="reFresh" title="刷新" />
           </div>
@@ -903,7 +903,7 @@ const read_note_file = async function (node: NotebookInfo) {
 .sidebar-header {
   display: flex;
   justify-content: space-between;
-  padding: 7px 8px;
+  padding: 10px 8px;
   border-bottom: 1px solid #e4e7ed;
 }
 
