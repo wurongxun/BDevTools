@@ -68,19 +68,23 @@ const routes = <Readonly<RouteRecordRaw[]>>[
   {
     path: "/App",
     component: () => import("@/views/common/Common.vue"),
-
     children: [
       {
         path: "AppSetting",
         name: "AppSetting",
         component: () => import("@/views/app/AppSetting.vue"),
-      }
-     
+      },
+      {
+        path: "AppAbout",
+        name: "AppAbout",
+        component: () => import("@/views/app/AppAbout.vue"),
+      },
+     {
+        path: "AppHelp",
+        name: "AppHelp",
+        component: () => import("@/views/app/AppHelp.vue"),
+      },
     ],
-  },
-  {
-    path: "/Windows/About",
-    component: () => import("@/views/windows/appAbout.vue"),
   },
   {
     path: "/Windows/Loding",

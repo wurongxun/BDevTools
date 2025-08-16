@@ -23,13 +23,19 @@ const { t, locale } = useI18n();
 const route = useRoute()
 const visible = ref(false);
 const dark_mode_icon = ref("black")
+const dark = ref(false);
 //路由名称
 const routeName = computed(() => route.path.match('/[^/]+')?.[0] ?? '');
 // 应用标题，动态切换不同标题
 const input3 = ref('')
 const darkModeChange = async function () {
     toggleDark();
+    dark.value = isDark.value
     dark_mode_icon.value = isDark.value ? "black" : "white"
+    // const el = document.documentElement;
+    // console.log(getComputedStyle(el).getPropertyValue(`--el-color-primary`))
+    let el_color_primary=isDark.value ? "black" : ""
+    document.documentElement.style.setProperty('--el-color-primary', el_color_primary);
 }
 const windowChange = async function () {
     await getCurrentWindow().toggleMaximize();
@@ -78,8 +84,8 @@ onMounted(() => {
                 </el-tooltip>
 
                 <el-tooltip content="暗黑模式" placement="bottom">
-                    <el-icon class="control-icon" @click="darkModeChange">
-                        <BlackModeIcon v-if="dark_mode_icon == 'black'" />
+                    <el-icon class="control-icon" @click="darkModeChange()">
+                        <BlackModeIcon v-if="dark" />
                         <WhiteModeIcon v-else />
                     </el-icon>
                 </el-tooltip>

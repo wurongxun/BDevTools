@@ -4,13 +4,13 @@ export default {
     name: "設置",
   },
   about: {
-    name: "关于",
+    name: "關於",
   },
   home: {
-    name: "首页",
+    name: "首頁",
   },
   category: {
-    name: "分类",
+    name: "分類",
   },
   update: {
     name: "更新",
@@ -659,5 +659,8 @@ export default {
   },
     md: {
     name: "Markdown",
+  },
+  excel: { 
+    name: "表格",
   },
 };

@@ -670,4 +670,7 @@ export default {
     md: {
     name: "Markdown",
   },
+  excel: { 
+    name: "表格",
+  },
 };

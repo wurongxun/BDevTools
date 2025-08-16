@@ -1,88 +1,82 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, Ref, unref, watchEffect } from 'vue';
+import { computed, onMounted, ref, unref } from 'vue';
 import { useI18n } from "vue-i18n";
-import { SystemInfo } from "@/entity/entitys";
-import { listen } from "@tauri-apps/api/event";
-import { useRoute, useRouter } from 'vue-router';
-import { UserFilled, Close, Minus, CopyDocument, Share, Search, More } from "@element-plus/icons-vue"
-import { invoke } from '@tauri-apps/api/core'
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import BoxLogoIcon from "@/components/Icon/BoxLogoIcon.vue";
+import { useRoute } from 'vue-router';
 import BackHeader from "@/components/header/BackHeader.vue";
 import { useHomeNavigation } from '@/events/navigation.ts';
-const { pages, activePagePosition, isBackOtherPage, isInMainView } = useHomeNavigation()
 
-import 'animate.css';
-const { t, locale } = useI18n();
-const route = useRoute()
-const drawer = ref(true);
-const rail = ref(true);
-const visible = ref(false);
-const value6 = ref(true)
-const dark_mode_icon = ref("black")
-//路由名称
-const routeName = computed(() => route.path.match('/[^/]+')?.[0] ?? '');
+const { pages } = useHomeNavigation();
+const { t } = useI18n();
+const route = useRoute();
+
 const header_height = '35px';
-// 应用标题，动态切换不同标题
 const appName = ref<string>(t('appName'));
-const input3 = ref('')
-let greetMsg = ref<SystemInfo>({ memory_total: 0, memory_used: 0, cpu_used: '0', hostname: '', cpus: 0 })
-async function listen_to_greet() {
-  const unlisten = await listen('hello', (event: any) => {
-    // event.payload 才是实际的结构体
-    greetMsg.value = event.payload;
-  });
+</script>
+
+<template>
+  <div class="common-layout">
+    <header class="app-header">
+      <template v-for="item in pages" :key="item.name">
+        <BackHeader 
+          v-if="$route.name === item.name" 
+          :showTitle="item.showTitle" 
+          :title="unref(item.title)"
+          :showWinMin="item.showWinMin" 
+          :showWinChange="item.showWinChange"
+          :showWinHide="item.showWinHide"
+        />
+      </template>
+    </header>
+    
+    <main class="app-container">
+      <keep-alive>
+        <router-view />
+      </keep-alive>
+    </main>
+  </div>
+</template>
+
+<style lang="scss" scoped>
+.common-layout {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
+.app-header {
+  height: v-bind(header_height);
+  width: 100%;
+  display: flex;
+  border-bottom: 1px solid var(--el-border-color);
+  background-color: var(--main--header--bg-color);
+  flex-shrink: 0;
+}
 
-onMounted(() => {
-  // listen_to_greet()
-})
+.app-container {
+  flex: 1;
+  overflow: auto;
+  scrollbar-width: none; // Firefox
+  -ms-overflow-style: none; // IE 10+
+  
+  // WebKit browsers
+  &::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    background: transparent;
+  }
+}
 
-</script>
-<template>
-  <!-- <div class="common-layout"> -->
-  <el-container style="width: 100vw;">
-    <el-header :height=header_height style="width: 100vw;padding: 0%;display: flex;">
-      <template v-for="item in pages">
-        <BackHeader v-if="$route.name === item.name" :showTitle=item.showTitle :title=unref(item.title)
-          :showWinMin=item.showWinMin :showWinChange=item.showWinChange></BackHeader>
-      </template>
-    </el-header>
-    <el-container style="height: calc(100vh - 35px);  ">
-      <el-container style="width:100vw;">
-        <!-- <el-main mode="out-in" enter-active-class="animate__animated animate__fadeIn"
-          style="overflow: auto;scrollbar-width: none;" leave-active-class="animate__animated animate__fadeOut"> -->
-        <keep-alive>
-          <router-view />
-        </keep-alive>
-        <!-- </el-main> -->
-      </el-container>
-    </el-container>
-  </el-container>
-</template>
-<style lang="scss" scoped>
-/* 针对 WebKit 内核的浏览器（如 Chrome 和 Safari） */
-.element::-webkit-scrollbar {
+// 全局滚动条隐藏样式
+::-webkit-scrollbar {
   width: 0;
   height: 0;
+  background: transparent;
 }
 
-/* 针对 Firefox */
-.element {
-  scrollbar-width: none;
-  /* Firefox 64+ */
-}
-
-.header {
-  background-color: #f8f8f8;
-  border-bottom: 1px solid #eaeaea;
-  padding: 1rem 1.5rem;
-}
-
-.title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #333;
+// 动画效果
+.router-view {
+  transition: all 0.3s ease;
 }
 </style>

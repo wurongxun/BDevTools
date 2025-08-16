@@ -157,7 +157,7 @@ export default {
     name: "help",
   },
   calendar: {
-    name: "calendar",
+    name: "Calendar",
   },
   tools: {
     name: "Tools",
@@ -670,5 +670,8 @@ export default {
   },
   md: {
     name: "Markdown",
+  },
+  excel: { 
+    name: "Excel",
   },
 };

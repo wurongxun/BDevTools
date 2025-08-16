@@ -31,6 +31,7 @@ struct Payload {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
@@ -60,8 +61,9 @@ pub fn run() {
                 tauri::WebviewUrl::App("index.html".into()),
             )
             .title("MdNote")
-            .decorations(true)
+            .decorations(false)
             .inner_size(960.0, 640.0)
+            .min_inner_size(960.0, 640.0)
             .center()
             .visible(true)
             // .menu(system_menu(&context))//窗口菜单

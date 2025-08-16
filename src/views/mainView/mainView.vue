@@ -4,11 +4,11 @@ import { useI18n } from "vue-i18n";
 import { useRoute } from 'vue-router';
 import 'animate.css';
 import router from '@/router';
-import CommandIcon from "@/components/Icon/CommandIcon.vue";
+import Excel from "@/components/Icon/Excel.vue";
 import Calendar from "@/components/Icon/Calendar.vue";
 import HelpIcon from "@/components/Icon/HelpIcon.vue";
 import SettingsIcon from "@/components/Icon/SettingsIcon.vue";
-import GitIcon from "@/components/Icon/GitIcon.vue";
+import About from "@/components/Icon/About.vue";
 import MarkDown from "@/components/Icon/MarkDown.vue";
 
 const { t } = useI18n();
@@ -29,12 +29,11 @@ const navigateTo = async function (routeUrl: string) {
 <template>
 
     <el-aside class="sidebar">
-      
       <div class="sidebar-main">
         <div class="icon-wrapper">
-          <el-tooltip effect="dark" :content="$t('git.name')" placement="right">
+          <el-tooltip effect="dark" :content="$t('excel.name')" placement="right">
             <el-icon size="30">
-              <GitIcon />
+              <Excel />
             </el-icon>
           </el-tooltip>
         </div>
@@ -46,7 +45,7 @@ const navigateTo = async function (routeUrl: string) {
           </el-tooltip>
         </div>
         <div class="icon-wrapper" @click="navigateTo('/MainWindows/Calendar')">
-          <el-tooltip effect="dark" :content="$t('md.name')" placement="right">
+          <el-tooltip effect="dark" :content="$t('calendar.name')" placement="right">
             <el-icon size="30">
               <Calendar />
             </el-icon>
@@ -55,7 +54,14 @@ const navigateTo = async function (routeUrl: string) {
       </div>
       
       <div class="sidebar-footer">
-        <div class="icon-wrapper help-icon" @click="navigateTo('/App/Help')">
+         <div class="wrapper about-icon" @click="navigateTo('/App/AppAbout')">
+            <el-tooltip class="box-item"  :content="$t('about.name')" placement="top-start">
+              <el-icon size="30">
+                <About />
+              </el-icon>
+            </el-tooltip>
+          </div>
+        <div class="icon-wrapper help-icon" @click="navigateTo('/App/AppHelp')">
           <el-tooltip :content="$t('help.name')" placement="right">
             <el-icon size="30">
               <HelpIcon />
