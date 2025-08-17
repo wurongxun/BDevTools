@@ -35,7 +35,7 @@ const navigateTo = async function (routeUrl: string) {
 const newWebViewNotebook = async function () {
   const win = await WebviewWindow.getByLabel("note_book");
   if (win) {
-     win.setShadow(true);
+     //win.setShadow(true);
      console.log("isFocused",win.isFocused())
     await win.setFocus();
     await win.show();
