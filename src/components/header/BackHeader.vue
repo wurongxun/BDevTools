@@ -66,7 +66,7 @@ const handleWinMin = async () => {
 
 // 隐藏窗口
 const windowHide = async () => {
-  await getCurrentWindow().hide();
+  await getCurrentWindow().close();
 };
 
 const appWindow = getCurrentWindow();
@@ -104,7 +104,7 @@ const balancedWidth = computed(() => {
 <template>
   <div class="back_header">
     <div class="back_left" :style="{ width: rightWidth + 'px' }">
-      <div v-if="showWinBack" class="nav-button" @click="back">
+      <div v-if="showWinBack" class="control-button" @click="back">
         <el-icon size="20">
           <Back />
         </el-icon>

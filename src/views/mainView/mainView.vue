@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { appWindow } from '@tauri-apps/api/window';
 import { getAllWebviewWindows } from '@tauri-apps/api/webviewWindow';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+//import {  } from '@tauri-apps/api/window';
 import { computed, ref } from 'vue';
 import { useI18n } from "vue-i18n";
 import { useRoute } from 'vue-router';
@@ -32,21 +33,19 @@ const navigateTo = async function (routeUrl: string) {
 };
 
 const newWebViewNotebook = async function () {
-  let all_Label =await getAllWebviewWindows();
-  for (let i = 0; i < all_Label.length; i++) {
-    let window_ = all_Label[i];
-    if ("note_book" == window_.label) {
-      // 有窗口，聚焦并显示在最顶层
-      const win = await WebviewWindow.getByLabel("note_book");
-      if (win) {
-        await win.setFocus();
-      }
-      return;
-    }
+  const win = await WebviewWindow.getByLabel("note_book");
+  if (win) {
+     win.setShadow(true);
+     console.log("isFocused",win.isFocused())
+    await win.setFocus();
+    await win.show();
+    return;
+  } else {
+    invoke('note_book_window').then((res) => {
+      console.log(res)
+    });
   }
-  invoke('note_book_window').then((res) => {
-    console.log(res)
-  });
+
 };
 </script>
 
