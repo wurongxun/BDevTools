@@ -118,7 +118,6 @@ const balancedWidth = computed(() => {
     </div>
 
     <div class="back_right" :style="{ width: rightWidth + 'px' }">
-      <div class="window-controls">
         <div v-if="showWinMin" class="control-button" @click="handleWinMin" :title="$t('minimize')">
           <el-icon size="16">
             <Minus />
@@ -139,11 +138,9 @@ const balancedWidth = computed(() => {
         <!-- 占位元素 -->
         <div v-if="!showWinMin && !showWinChange && !showWinHide" 
              style="width: 105px; height: 35px;"></div>
-      </div>
     </div>
   </div>
 </template>
-
 <style lang="scss" scoped>
 .back_header {
   height: 35px;
@@ -152,6 +149,7 @@ const balancedWidth = computed(() => {
   align-items: center;
   background-color: var(--main--header--bg-color);
   user-select: none;
+  margin: 0 10px;
 }
 
 .back_left,
@@ -188,14 +186,6 @@ const balancedWidth = computed(() => {
   }
 }
 
-.window-controls {
-  display: flex;
-  height: 100%;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 5px;
-}
-
 .control-button {
   width: 35px;
   height: 25px;
@@ -218,11 +208,6 @@ const balancedWidth = computed(() => {
 }
 
 @media (max-width: 768px) {
-  .back_left,
-  .back_right {
-    width: 100px;
-  }
-
   .back_center {
     font-size: 14px;
   }

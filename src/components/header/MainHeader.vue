@@ -35,7 +35,7 @@ const darkModeChange = async function () {
     dark_mode_icon.value = isDark.value ? "black" : "white"
     // const el = document.documentElement;
     // console.log(getComputedStyle(el).getPropertyValue(`--el-color-primary`))
-    let el_color_primary=isDark.value ? "black" : ""
+    let el_color_primary = isDark.value ? "black" : ""
     document.documentElement.style.setProperty('--el-color-primary', el_color_primary);
 }
 const windowChange = async function () {
@@ -62,8 +62,8 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="main_header" data-tauri-drag-region>
-        <div class="header-section header-left">
+    <div class="back_header" data-tauri-drag-region>
+        <div class="back_left">
             <div class="logo-container">
                 <el-icon size="30" class="app-logo">
                     <BoxLogoIcon />
@@ -76,157 +76,131 @@ onMounted(() => {
                 :prefix-icon="Search" clearable>
             </el-input>
         </div> -->
+          <div id="titlebar" class="back_center">
+      
+    </div>
 
-        <div class="header-section header-right">
-            <div class="control-group action-controls">
+        <div class="back_right">
+            <!-- <div class="control-group action-controls"> -->
                 <el-tooltip content="分享" placement="bottom">
+                    <div  class="control-button ">
                     <el-icon class="control-icon">
                         <Share />
                     </el-icon>
+                    </div>
                 </el-tooltip>
 
                 <el-tooltip content="暗黑模式" placement="bottom">
-                    <el-icon class="control-icon" @click="darkModeChange()">
+                     <div  @click="darkModeChange()" class="control-button ">
+                    <el-icon class="control-icon" >
                         <BlackModeIcon v-if="dark" />
                         <WhiteModeIcon v-else />
-                    </el-icon>
+                    </el-icon></div>
                 </el-tooltip>
 
                 <el-tooltip content="更多" placement="bottom">
+                     <div  class="control-button ">
                     <el-icon class="control-icon">
                         <More />
                     </el-icon>
+                    </div>
                 </el-tooltip>
-            </div>
+            <!-- </div>
 
-            <div class="control-group window-controls">
+            <div class="control-group window-controls"> -->
                 <el-tooltip content="最小化" placement="bottom">
-                    <el-icon class="control-icon" @click="handleWinMin">
+                     <div @click="handleWinMin" class="control-button ">
+                    <el-icon class="control-icon" >
                         <Minus />
                     </el-icon>
+                    </div>
                 </el-tooltip>
 
                 <el-tooltip :content="visible ? '还原' : '最大化'" placement="bottom">
-                    <el-icon class="control-icon" @click="windowChange">
-                        <WindowRestoreIcon v-if="visible" />
-                        <WindowMaximizationIcon v-else />
-                    </el-icon>
+                    <div @click="windowChange" class="control-button ">
+                        <el-icon class="control-icon">
+                            <WindowRestoreIcon v-if="visible" />
+                            <WindowMaximizationIcon v-else />
+                        </el-icon>
+                    </div>
                 </el-tooltip>
 
                 <el-tooltip content="关闭" placement="bottom">
-                    <el-icon class="control-icon close-icon" @click="windowHide">
-                        <Close />
-                    </el-icon>
+                    <div @click="windowHide" class="control-button close-button">
+
+                        <el-icon class="control-icon close-icon" >
+                            <Close />
+                        </el-icon>
+                    </div>
                 </el-tooltip>
-            </div>
+
+            <!-- </div> -->
         </div>
     </div>
 </template>
-
 <style lang="scss" scoped>
-.main_header {
+.control-button {
+    width: 35px;
+    height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-left: 5px;
+    transition: background-color 0.2s;
+
+    &:hover {
+        background-color: rgba(128, 128, 128, 0.2);
+    }
+
+    &.close-button:hover {
+        background-color: #e81123;
+        color: white;
+    }
+}
+
+.back_header {
     height: 35px;
     width: 100vw;
     display: flex;
     align-items: center;
-    justify-content: space-between;
     background-color: var(--main--header--bg-color);
+    user-select: none;
+    margin: 0 10px;
+}
+
+.back_left,
+.back_right {
+    display: flex;
+    align-items: center;
+}
+
+.back_center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 500;
     padding: 0 10px;
-    box-sizing: border-box;
-    -webkit-app-region: drag;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
-    .header-section {
-        display: flex;
-        align-items: center;
-        height: 100%;
-        -webkit-app-region: no-drag;
-    }
+.logo-container {
+    display: flex;
+    align-items: center;
+    height: 100%;
 
-    .header-left {
-        flex: 0 0 auto;
-        min-width: 100px;
-    }
-
-    .header-center {
-        flex: 1 1 auto;
-        display: flex;
-        justify-content: center;
-        padding: 0 20px;
-
-        .search-input {
-            min-width: 240px;
-            max-width: 500px;
-            width: 100%;
-        }
-    }
-
-    .header-right {
-        flex: 0 0 auto;
-        display: flex;
-        min-width: 200px;
-        justify-content: flex-end;
-    }
-
-    .control-group {
-        display: flex;
-        height: 100%;
-        margin: 0 5px;
-
-        .control-icon {
-            width: 32px;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 4px;
-            margin: 0 2px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            color: var(--el-text-color-primary);
-
-            &:hover {
-                background-color: rgba(124, 124, 124, 0.479);
-                backdrop-filter: blur(10px);
-                box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-            }
-
-            &.close-icon:hover {
-                background-color: #ff5f56;
-                color: white;
-            }
-        }
-    }
-
-    .logo-container {
-        display: flex;
-        align-items: center;
-        height: 100%;
-
-        .app-logo {
-            padding: 2px;
-        }
+    .app-logo {
+        padding: 2px;
     }
 }
 
-// 响应式优化
 @media (max-width: 768px) {
-    .main_header {
-        .header-center {
-            padding: 0 10px;
-
-            .search-input {
-                min-width: 150px;
-            }
-        }
-
-        .control-group {
-            margin: 0 2px;
-
-            .control-icon {
-                width: 28px;
-                margin: 0 1px;
-            }
-        }
+    .back_center {
+        font-size: 14px;
     }
 }
 </style>
