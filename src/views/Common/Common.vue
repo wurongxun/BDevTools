@@ -24,6 +24,7 @@ const appName = ref<string>(t('appName'));
           :showWinMin="item.showWinMin" 
           :showWinChange="item.showWinChange"
           :showWinHide="item.showWinHide"
+          :showWinBack="item.showWinBack"
         />
       </template>
     </header>

@@ -15,6 +15,7 @@ import zhCn from "element-plus/es/locale/lang/zh-cn";
 import "dayjs/locale/zh-cn"; //日期和时间本地化
 import "dayjs/locale/zh-tw"; //日期和时间本地化
 import contextmenu from "v-contextmenu";
+// import "v-contextmenu/dist/index.css"
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
 // Types

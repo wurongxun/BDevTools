@@ -40,13 +40,13 @@
           </el-icon>
           <p class="placeholder-text">选择或创建一个笔记开始编辑</p>
           <el-button v-if="notebooks_data && notebooks_data.children && notebooks_data.children.length > 0"
-            type="primary" @click="showAddFileModalForm" class="create-note-button">
+             @click="showAddFileModalForm" class="create-note-button">
             创建新笔记
           </el-button>
         </div>
       </div>
     </div>
-    <v-contextmenu ref="contextmenu" class="context-menu" v-if="data_not_null">
+    <v-contextmenu :theme="isDark ? 'dark' : 'light'" ref="contextmenu" class="context-menu" v-if="data_not_null">
       <v-contextmenu-item @click="showAddFileModalForm">
         <el-icon>
           <DocumentAdd />
@@ -96,7 +96,7 @@
         在文件资源管理器中显示
       </v-contextmenu-item>
     </v-contextmenu>
-    <v-contextmenu ref="contextmenu" class="context-menu" v-else>
+    <v-contextmenu :theme="isDark ? 'dark' : 'light'" ref="contextmenu" class="context-menu" v-else>
       <v-contextmenu-item @click="showAddFolderModalForm">
         <el-icon>
           <FolderAdd />
