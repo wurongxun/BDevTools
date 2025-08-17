@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router';
 import 'animate.css';
 import { Close, Minus, Share, Search, More } from "@element-plus/icons-vue"
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { saveWindowState, StateFlags } from '@tauri-apps/plugin-window-state';
 
 import WindowMaximizationIcon from "@/components//Icon/WindowMaximizationIcon.vue"
 import WindowRestoreIcon from "@/components/Icon/WindowRestoreIcon.vue"
@@ -51,6 +52,7 @@ const handleWinMin = async () => {
     await getCurrentWindow().minimize();
 };
 const windowHide = async () => {
+    saveWindowState(StateFlags.ALL);
     await getCurrentWindow().hide();
 };
 

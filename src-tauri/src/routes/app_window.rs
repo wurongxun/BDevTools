@@ -45,6 +45,29 @@ pub async fn about(handle: tauri::AppHandle, window: tauri::Window) {
 }
 
 /**
+ * 关于窗口
+ * @param handle
+ * @param window
+ */
+#[tauri::command]
+pub async fn note_book_window(handle: tauri::AppHandle, window: tauri::Window) {
+    let about_window = tauri::WebviewWindowBuilder::new(
+        &handle,
+        "note_book", /* the unique window label */
+        tauri::WebviewUrl::App("#/MainWindows/NoteBook".into()),
+    )
+    .title("NoteBook")
+    .inner_size(720.0, 440.0)
+    .decorations(false)
+    .center()
+    .resizable(true) //是否可调整大小
+    .build()
+    .unwrap();
+
+    // #[cfg(any(target_os = "windows", target_os = "macos"))]
+    // set_shadow(&about_window, true).expect("Unsupported platform!");
+}
+/**
  * 最小化
  * @param handle
  * @param window

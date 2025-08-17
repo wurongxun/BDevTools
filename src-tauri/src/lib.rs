@@ -5,6 +5,8 @@ use tauri::App;
 use tauri::AppHandle;
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
+use tauri_plugin_window_state::{WindowExt, StateFlags};
+
 mod app;
 mod app_setup;
 mod entity;
@@ -16,7 +18,7 @@ mod utils;
 use crate::app::app::app_settings;
 use crate::app_setup::setup::setup_windows;
 use crate::routes::app_window::{
-    about, loding_window_close, windows_close, windows_hide, windows_maximize, windows_minimize,
+    about,note_book_window, loding_window_close, windows_close, windows_hide, windows_maximize, windows_minimize,
 };
 use crate::routes::file_utils::{file_manager_open_path, get_document_notebooks};
 use crate::routes::note_book::{
@@ -31,6 +33,7 @@ struct Payload {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
@@ -49,6 +52,7 @@ pub fn run() {
             remove_file,
             loding_window_close,
             about,
+            note_book_window,
             windows_hide,
             windows_minimize,
             windows_maximize,
@@ -65,7 +69,7 @@ pub fn run() {
             .inner_size(960.0, 640.0)
             .min_inner_size(960.0, 640.0)
             .center()
-            .visible(true)
+            .visible(false)
             // .menu(system_menu(&context))//窗口菜单
             .build()
             {
@@ -91,7 +95,9 @@ pub fn run() {
             //     Ok(it) => it,
             //     Err(err) => return Err(Box::new(err)),
             // };
+            main_window.restore_state(StateFlags::all()); // will restore the window's state from disk
             app_settings(&app.handle());
+            main_window.show().unwrap();
             Ok(())
         })
         .run(tauri::generate_context!())

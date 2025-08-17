@@ -113,53 +113,55 @@
     </v-contextmenu>
 
     <!-- 添加文件夹表单 -->
-    <el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal" title="添加文件夹"
-      width="500" class="custom-dialog">
-      <el-form>
-        <el-form-item label="文件夹名称" :label-width="data.formLabelWidth">
-          <el-input v-model="data.newFolderName" autocomplete="off" placeholder="请输入文件夹名称"
-            @keyup.enter="addNodeFolder" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="handleCancelByAddFolderModal">取消</el-button>
-          <el-button type="primary" @click="addNodeFolder"> 确认 </el-button>
-        </div>
-      </template>
-    </el-dialog>
+<el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal" title="添加文件夹"
+  width="500px" class="custom-dialog" align-center>
+  <el-form class="dialog-form">
+    <el-form-item label="文件夹名称" :label-width="data.formLabelWidth">
+      <el-input v-model="data.newFolderName" autocomplete="off" placeholder="请输入文件夹名称"
+        @keyup.enter="addNodeFolder" clearable />
+    </el-form-item>
+  </el-form>
+  <template #footer>
+    <div class="dialog-footer">
+      <el-button @click="handleCancelByAddFolderModal">取消</el-button>
+      <el-button type="primary" @click="addNodeFolder" :loading="data.loading">确认</el-button>
+    </div>
+  </template>
+</el-dialog>
 
-    <!-- 添加笔记本弹出表单 -->
-    <el-dialog v-model="data.addFileModalFormVisible" :before-close="handleCancelByAddNotebookModal" title="添加文件"
-      width="500" class="custom-dialog">
-      <el-form>
-        <el-form-item label="文件名称" :label-width="data.formLabelWidth">
-          <el-input v-model="data.newFileName" autocomplete="off" placeholder="请输入文件名称" @keyup.enter="addFile" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="handleCancelByAddNotebookModal">取消</el-button>
-          <el-button type="primary" @click="addFile"> 确认 </el-button>
-        </div>
-      </template>
-    </el-dialog>
+<!-- 添加笔记本弹出表单 -->
+<el-dialog v-model="data.addFileModalFormVisible" :before-close="handleCancelByAddNotebookModal" title="添加文件"
+  width="500px" class="custom-dialog" align-center>
+  <el-form class="dialog-form">
+    <el-form-item label="文件名称" :label-width="data.formLabelWidth">
+      <el-input v-model="data.newFileName" autocomplete="off" placeholder="请输入文件名称" @keyup.enter="addFile"
+        clearable />
+    </el-form-item>
+  </el-form>
+  <template #footer>
+    <div class="dialog-footer">
+      <el-button @click="handleCancelByAddNotebookModal">取消</el-button>
+      <el-button type="primary" @click="addFile">确认</el-button>
+    </div>
+  </template>
+</el-dialog>
 
-    <!-- 修改文件名称弹出表单 -->
-    <el-dialog v-model="data.upFileNameModalFormVisible" :before-close="handleCancelByUpFileNameModal" title="修改文件名"
-      width="500" class="custom-dialog">
-      <el-form>
-        <el-form-item label="文件名称" :label-width="data.formLabelWidth">
-          <el-input v-model="data.upFileName" autocomplete="off" placeholder="请输入新的文件名称" @keyup.enter="upFileName" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="handleCancelByUpFileNameModal">取消</el-button>
-          <el-button type="primary" @click="upFileName">修改</el-button>
-        </div>
-      </template>
-    </el-dialog>
+<!-- 修改文件名称弹出表单 -->
+<el-dialog v-model="data.upFileNameModalFormVisible" :before-close="handleCancelByUpFileNameModal" title="修改文件名"
+  width="500px" class="custom-dialog" align-center>
+  <el-form class="dialog-form">
+    <el-form-item label="文件名称" :label-width="data.formLabelWidth">
+      <el-input v-model="data.upFileName" autocomplete="off" placeholder="请输入新的文件名称" @keyup.enter="upFileName"
+        clearable />
+    </el-form-item>
+  </el-form>
+  <template #footer>
+    <div class="dialog-footer">
+      <el-button @click="handleCancelByUpFileNameModal">取消</el-button>
+      <el-button type="primary" @click="upFileName">修改</el-button>
+    </div>
+  </template>
+</el-dialog>
   </div>
 </template>
 <script setup lang="ts">
@@ -1007,5 +1009,56 @@ const read_note_file = async function (node: NotebookInfo) {
   .resize {
     display: none;
   }
+}
+/* 在已有样式部分添加以下内容 */
+
+.custom-dialog {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.custom-dialog :deep(.el-dialog__header) {
+  padding: 20px 20px 10px;
+  border-bottom: 1px solid var(--el-border-color-light);
+}
+
+.custom-dialog :deep(.el-dialog__title) {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.custom-dialog :deep(.el-dialog__body) {
+  padding: 20px;
+}
+
+.custom-dialog :deep(.el-dialog__footer) {
+  padding: 15px 20px 20px;
+  border-top: 1px solid var(--el-border-color-light);
+}
+
+.dialog-form {
+  margin-right: 20px;
+}
+
+.dialog-form :deep(.el-form-item) {
+  margin-bottom: 20px;
+}
+
+.dialog-form :deep(.el-form-item__label) {
+  font-weight: 500;
+}
+
+.dialog-form :deep(.el-input__wrapper) {
+  width: 100%;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.dialog-footer .el-button {
+  padding: 8px 20px;
 }
 </style>

@@ -42,6 +42,10 @@ const routes = <Readonly<RouteRecordRaw[]>>[
         path: "NoteBook",
         name: "NoteBook",
         component: () => import("@/views/utilsView/notebook/NoteBookEdit.vue"),
+        meta: {
+          transition: "scroll-x-transition",
+          keepAlive: true
+        },
       },
        {
         // 当 /user/:id/profile 匹配成功
@@ -73,16 +77,28 @@ const routes = <Readonly<RouteRecordRaw[]>>[
         path: "AppSetting",
         name: "AppSetting",
         component: () => import("@/views/app/AppSetting.vue"),
+         meta: {
+          transition: "scroll-x-transition",
+          keepAlive: true
+        },
       },
       {
         path: "AppAbout",
         name: "AppAbout",
         component: () => import("@/views/app/AppAbout.vue"),
+         meta: {
+          transition: "scroll-x-transition",
+          keepAlive: true
+        },
       },
      {
         path: "AppHelp",
         name: "AppHelp",
         component: () => import("@/views/app/AppHelp.vue"),
+         meta: {
+          transition: "scroll-x-transition",
+          keepAlive: true
+        },
       },
     ],
   },

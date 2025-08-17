@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import { Window } from "@tauri-apps/api/window"
+import { Webview } from "@tauri-apps/api/webview"
+import { invoke } from '@tauri-apps/api/core';
+import { appWindow } from '@tauri-apps/api/window';
+import { getAllWebviewWindows } from '@tauri-apps/api/webviewWindow';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { computed, ref } from 'vue';
 import { useI18n } from "vue-i18n";
 import { useRoute } from 'vue-router';
@@ -24,70 +30,84 @@ const navigateTo = async function (routeUrl: string) {
   console.log("navigateTo", routeUrl);
   router.push(routeUrl);
 };
+
+const newWebViewNotebook = async function () {
+  let all_Label =await getAllWebviewWindows();
+  for (let i = 0; i < all_Label.length; i++) {
+    let window_ = all_Label[i];
+    if ("note_book" == window_.label) {
+      // 有窗口，聚焦并显示在最顶层
+      const win = await WebviewWindow.getByLabel("note_book");
+      if (win) {
+        await win.setFocus();
+      }
+      return;
+    }
+  }
+  invoke('note_book_window').then((res) => {
+    console.log(res)
+  });
+};
 </script>
 
 <template>
 
-    <el-aside class="sidebar">
-      <div class="sidebar-main">
-        <div class="icon-wrapper">
-          <el-tooltip effect="dark" :content="$t('excel.name')" placement="right">
-            <el-icon size="30">
-              <Excel />
-            </el-icon>
-          </el-tooltip>
-        </div>
-        <div class="icon-wrapper" @click="navigateTo('/MainWindows/NoteBook')">
-          <el-tooltip effect="dark" :content="$t('md.name')" placement="right">
-            <el-icon size="30">
-              <MarkDown />
-            </el-icon>
-          </el-tooltip>
-        </div>
-        <div class="icon-wrapper" @click="navigateTo('/MainWindows/Calendar')">
-          <el-tooltip effect="dark" :content="$t('calendar.name')" placement="right">
-            <el-icon size="30">
-              <Calendar />
-            </el-icon>
-          </el-tooltip>
-        </div>
+  <el-aside class="sidebar">
+    <div class="sidebar-main">
+      <div class="icon-wrapper">
+        <el-tooltip effect="dark" :content="$t('excel.name')" placement="right">
+          <el-icon size="30">
+            <Excel />
+          </el-icon>
+        </el-tooltip>
       </div>
-      
-      <div class="sidebar-footer">
-         <div class="wrapper about-icon" @click="navigateTo('/App/AppAbout')">
-            <el-tooltip class="box-item"  :content="$t('about.name')" placement="top-start">
-              <el-icon size="30">
-                <About />
-              </el-icon>
-            </el-tooltip>
-          </div>
-        <div class="icon-wrapper help-icon" @click="navigateTo('/App/AppHelp')">
-          <el-tooltip :content="$t('help.name')" placement="right">
-            <el-icon size="30">
-              <HelpIcon />
-            </el-icon>
-          </el-tooltip>
-        </div>
-        <div class="icon-wrapper settings-icon" @click="navigateTo('/App/AppSetting')">
-          <el-tooltip :content="$t('settings.name')" placement="right" :hide-after="100">
-            <el-icon size="30">
-              <SettingsIcon />
-            </el-icon>
-          </el-tooltip>
-        </div>
+      <div class="icon-wrapper" @click="newWebViewNotebook">
+        <el-tooltip effect="dark" :content="$t('md.name')" placement="right">
+          <el-icon size="30">
+            <MarkDown />
+          </el-icon>
+        </el-tooltip>
       </div>
-    </el-aside>
-    
-    <!-- <el-container class="content-wrapper"> -->
-      <el-main 
-        mode="out-in" 
-        enter-active-class="animate__animated animate__fadeIn"
-        leave-active-class="animate__animated animate__fadeOut"
-        class="main-content"
-      >
-        <router-view />
-      </el-main>
-    <!-- </el-container> -->
+      <div class="icon-wrapper" @click="navigateTo('/MainWindows/Calendar')">
+        <el-tooltip effect="dark" :content="$t('calendar.name')" placement="right">
+          <el-icon size="30">
+            <Calendar />
+          </el-icon>
+        </el-tooltip>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="wrapper about-icon" @click="navigateTo('/App/AppAbout')">
+        <el-tooltip class="box-item" :content="$t('about.name')" placement="top-start">
+          <el-icon size="30">
+            <About />
+          </el-icon>
+        </el-tooltip>
+      </div>
+      <div class="icon-wrapper help-icon" @click="navigateTo('/App/AppHelp')">
+        <el-tooltip :content="$t('help.name')" placement="right">
+          <el-icon size="30">
+            <HelpIcon />
+          </el-icon>
+        </el-tooltip>
+      </div>
+      <div class="icon-wrapper settings-icon" @click="navigateTo('/App/AppSetting')">
+        <el-tooltip :content="$t('settings.name')" placement="right" :hide-after="100">
+          <el-icon size="30">
+            <SettingsIcon />
+          </el-icon>
+        </el-tooltip>
+      </div>
+    </div>
+  </el-aside>
+
+  <!-- <el-container class="content-wrapper"> -->
+  <el-main mode="out-in" enter-active-class="animate__animated animate__fadeIn"
+    leave-active-class="animate__animated animate__fadeOut" class="main-content">
+    <router-view />
+  </el-main>
+  <!-- </el-container> -->
 </template>
 
 <style lang="scss" scoped>
@@ -151,7 +171,7 @@ const navigateTo = async function (routeUrl: string) {
   height: 40px;
   cursor: pointer;
   transition: all 0.3s ease;
-  
+
   &:hover {
     box-shadow: 0 0 10px rgba(128, 126, 126, 0.5);
     transform: scale(1.1);
