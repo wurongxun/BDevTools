@@ -58,15 +58,6 @@ pub fn app_settings(app: &tauri::AppHandle) {
                     println!("language_value {:?}", val);
                 }
                 None => {
-                    store.set("language", json!({ "value": "CN" }));
-                }
-            };
-            let language_value = store.get("language");
-            match language_value {
-                Some(val) => {
-                    println!("language_value {:?}", val);
-                }
-                None => {
                     store.set("language", json!({ "value": "zh-CN" }));
                 }
             };

@@ -8,7 +8,7 @@ import { appConfigInfo } from "@/store/appConfigInfo";
 import { load } from '@tauri-apps/plugin-store';
 const { t, locale } = useI18n()
 const userStore = appConfigInfo();
-const store = await load('settings.json', { autoSave: false });
+let store = undefined;
 let autostart = ref<boolean>(false)
 let update_reminder = ref<boolean>(false)
 let language = ref<string>('')
@@ -22,6 +22,8 @@ onMounted(async () => {
   if (userStore.appConfig.length > 1) {
     show_setting()
   }
+   store = await load('settings.json',{});
+
   let val_auto_start = await store.get<{ value: boolean }>('auto_start');
   if (val_auto_start !== undefined) {
     autostart.value = val_auto_start.value;
@@ -56,7 +58,7 @@ function setting_change() {
 }
 
 function language_change() {
-  // locale.value = language;
+   locale.value = language.value;
   // invoke('updatate_setting', { id: language, appSettingItemValue: String(language), appSettingtemName: 'language' }).then((res): void => {
   //   console.log(res);
   //   query_setting_list()
@@ -75,7 +77,7 @@ const language_options = [
     disabled: false,
   },
   {
-    value: 'zh_HK',
+    value: 'zh_TW',
     label: '繁体中文（中国香港）',
     disabled: false,
   },
@@ -153,9 +155,10 @@ const language_options = [
           <div class="setting-info">
             <span class="setting-label">MarkDown编辑器</span>
             <span class="setting-description">MarkDown编辑器工作目录</span>
+            <span class="setting-working-directory">{{ md_working_directory }}</span>
           </div>
           <div class="setting-control">
-            <el-input v-model="md_working_directory" style="width: 240px" placeholder="Please input" />
+            <el-button type="danger" plain>更换工作目录</el-button>
           </div>
         </div>
 
@@ -253,7 +256,11 @@ const language_options = [
   font-size: 0.85rem;
   color: var(--el-text-color-secondary);
 }
-
+.setting-working-directory{
+   display: block;
+  font-size: 0.7rem;
+  color: var(--el-text-color-secondary);
+}
 .setting-control {
   flex-shrink: 0;
   margin-left: 20px;
