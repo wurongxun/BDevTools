@@ -4,10 +4,11 @@ import { useRoute } from 'vue-router';
 import { Back, Minus, Close } from "@element-plus/icons-vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { saveWindowState, StateFlags } from '@tauri-apps/plugin-window-state';
-
+import { emitTo } from '@tauri-apps/api/event';
 import WindowMaximizationIcon from "@/components/Icon/WindowMaximizationIcon.vue";
 import WindowRestoreIcon from "@/components/Icon/WindowRestoreIcon.vue";
 import router from '@/router';
+import { listen } from '@tauri-apps/api/event';
 
 const route = useRoute();
 const visible = ref(false);
@@ -65,8 +66,13 @@ const handleWinMin = async () => {
 };
 
 // 隐藏窗口
-const windowHide = async () => {
-  await getCurrentWindow().close();
+const windowClose = async () => {
+  let currentWindow = await getCurrentWindow();
+  if (currentWindow) {
+    console.log('windowClose', currentWindow.label);
+    await emitTo(currentWindow.label, 'close', { loggedIn: true, token: 'authToken' });
+  }
+  //await getCurrentWindow().close();
 };
 
 const appWindow = getCurrentWindow();
@@ -118,26 +124,25 @@ const balancedWidth = computed(() => {
     </div>
 
     <div class="back_right" :style="{ width: rightWidth + 'px' }">
-        <div v-if="showWinMin" class="control-button" @click="handleWinMin" :title="$t('minimize')">
-          <el-icon size="16">
-            <Minus />
-          </el-icon>
-        </div>
-        <div v-if="showWinChange" class="control-button" @click="windowChange"
-             :title="visible ? $t('restore') : $t('maximize')">
-          <el-icon size="16">
-            <WindowRestoreIcon v-if="visible" />
-            <WindowMaximizationIcon v-else />
-          </el-icon>
-        </div>
-        <div v-if="showWinHide" class="control-button close-button" @click="windowHide" :title="$t('close')">
-          <el-icon size="16">
-            <Close />
-          </el-icon>
-        </div>
-        <!-- 占位元素 -->
-        <div v-if="!showWinMin && !showWinChange && !showWinHide" 
-             style="width: 105px; height: 35px;"></div>
+      <div v-if="showWinMin" class="control-button" @click="handleWinMin" :title="$t('minimize')">
+        <el-icon size="16">
+          <Minus />
+        </el-icon>
+      </div>
+      <div v-if="showWinChange" class="control-button" @click="windowChange"
+        :title="visible ? $t('restore') : $t('maximize')">
+        <el-icon size="16">
+          <WindowRestoreIcon v-if="visible" />
+          <WindowMaximizationIcon v-else />
+        </el-icon>
+      </div>
+      <div v-if="showWinHide" class="control-button close-button" @click="windowClose" :title="$t('close')">
+        <el-icon size="16">
+          <Close />
+        </el-icon>
+      </div>
+      <!-- 占位元素 -->
+      <div v-if="!showWinMin && !showWinChange && !showWinHide" style="width: 105px; height: 35px;"></div>
     </div>
   </div>
 </template>

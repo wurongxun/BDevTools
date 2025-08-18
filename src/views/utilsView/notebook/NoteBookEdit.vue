@@ -40,7 +40,7 @@
           </el-icon>
           <p class="placeholder-text">选择或创建一个笔记开始编辑</p>
           <el-button v-if="notebooks_data && notebooks_data.children && notebooks_data.children.length > 0"
-             @click="showAddFileModalForm" class="create-note-button">
+            @click="showAddFileModalForm" class="create-note-button">
             创建新笔记
           </el-button>
         </div>
@@ -113,55 +113,55 @@
     </v-contextmenu>
 
     <!-- 添加文件夹表单 -->
-<el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal" title="添加文件夹"
-  width="500px" class="custom-dialog" align-center>
-  <el-form class="dialog-form">
-    <el-form-item label="文件夹名称" :label-width="data.formLabelWidth">
-      <el-input v-model="data.newFolderName" autocomplete="off" placeholder="请输入文件夹名称"
-        @keyup.enter="addNodeFolder" clearable />
-    </el-form-item>
-  </el-form>
-  <template #footer>
-    <div class="dialog-footer">
-      <el-button @click="handleCancelByAddFolderModal">取消</el-button>
-      <el-button type="primary" @click="addNodeFolder" :loading="data.loading">确认</el-button>
-    </div>
-  </template>
-</el-dialog>
+    <el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal" title="添加文件夹"
+      width="500px" class="custom-dialog" align-center>
+      <el-form class="dialog-form">
+        <el-form-item label="文件夹名称" :label-width="data.formLabelWidth">
+          <el-input v-model="data.newFolderName" autocomplete="off" placeholder="请输入文件夹名称" @keyup.enter="addNodeFolder"
+            clearable />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="handleCancelByAddFolderModal">取消</el-button>
+          <el-button type="primary" @click="addNodeFolder" :loading="data.loading">确认</el-button>
+        </div>
+      </template>
+    </el-dialog>
 
-<!-- 添加笔记本弹出表单 -->
-<el-dialog v-model="data.addFileModalFormVisible" :before-close="handleCancelByAddNotebookModal" title="添加文件"
-  width="500px" class="custom-dialog" align-center>
-  <el-form class="dialog-form">
-    <el-form-item label="文件名称" :label-width="data.formLabelWidth">
-      <el-input v-model="data.newFileName" autocomplete="off" placeholder="请输入文件名称" @keyup.enter="addFile"
-        clearable />
-    </el-form-item>
-  </el-form>
-  <template #footer>
-    <div class="dialog-footer">
-      <el-button @click="handleCancelByAddNotebookModal">取消</el-button>
-      <el-button type="primary" @click="addFile">确认</el-button>
-    </div>
-  </template>
-</el-dialog>
+    <!-- 添加笔记本弹出表单 -->
+    <el-dialog v-model="data.addFileModalFormVisible" :before-close="handleCancelByAddNotebookModal" title="添加文件"
+      width="500px" class="custom-dialog" align-center>
+      <el-form class="dialog-form">
+        <el-form-item label="文件名称" :label-width="data.formLabelWidth">
+          <el-input v-model="data.newFileName" autocomplete="off" placeholder="请输入文件名称" @keyup.enter="addFile"
+            clearable />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="handleCancelByAddNotebookModal">取消</el-button>
+          <el-button type="primary" @click="addFile">确认</el-button>
+        </div>
+      </template>
+    </el-dialog>
 
-<!-- 修改文件名称弹出表单 -->
-<el-dialog v-model="data.upFileNameModalFormVisible" :before-close="handleCancelByUpFileNameModal" title="修改文件名"
-  width="500px" class="custom-dialog" align-center>
-  <el-form class="dialog-form">
-    <el-form-item label="文件名称" :label-width="data.formLabelWidth">
-      <el-input v-model="data.upFileName" autocomplete="off" placeholder="请输入新的文件名称" @keyup.enter="upFileName"
-        clearable />
-    </el-form-item>
-  </el-form>
-  <template #footer>
-    <div class="dialog-footer">
-      <el-button @click="handleCancelByUpFileNameModal">取消</el-button>
-      <el-button type="primary" @click="upFileName">修改</el-button>
-    </div>
-  </template>
-</el-dialog>
+    <!-- 修改文件名称弹出表单 -->
+    <el-dialog v-model="data.upFileNameModalFormVisible" :before-close="handleCancelByUpFileNameModal" title="修改文件名"
+      width="500px" class="custom-dialog" align-center>
+      <el-form class="dialog-form">
+        <el-form-item label="文件名称" :label-width="data.formLabelWidth">
+          <el-input v-model="data.upFileName" autocomplete="off" placeholder="请输入新的文件名称" @keyup.enter="upFileName"
+            clearable />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="handleCancelByUpFileNameModal">取消</el-button>
+          <el-button type="primary" @click="upFileName">修改</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 <script setup lang="ts">
@@ -183,6 +183,7 @@ import StringUtil from "@/utils/StringUtil";
 import NotificationUtil from "@/utils/NotificationUtil";
 import { invoke } from "@tauri-apps/api/core";
 import { openPath } from '@tauri-apps/plugin-opener';
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MdEditor } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
 import { NotebookInfo, ResponseData } from "@/entity/entitys";
@@ -197,9 +198,10 @@ import {
   Edit,
   FolderOpened
 } from '@element-plus/icons-vue';
-
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 // 引入VueUse暗黑模式核心
 import { useDark, useToggle } from '@vueuse/core'
+import { listen } from "@tauri-apps/api/event";
 
 // 初始化暗黑模式检测器
 // 初始化暗黑模式检测器，配置持久化选项
@@ -213,15 +215,72 @@ const isDark = useDark({
 const editorTheme = computed(() => {
   return isDark.value ? 'dark' : 'light';
 });
-// 处理节点点击事件
-const handleNodeClick = (node: NotebookInfo) => {
-  console.log("节点被点击:", node);
-  console.log("节点被点击 electedNodeId:", state.selectedNodeId);
-  // 这里可以添加自定义逻辑，比如：
-  // - 加载节点内容
-  // - 更新UI状态
-  // - 执行特定操作
-};
+
+const data = reactive({
+  folders: [], // 文件夹列表
+  files: [] as { title: string }[], // 文件列表
+  selectedKeys: [], // 笔记本选中项key
+  selectFolderPath: "", // 当前选中文件夹 用于建文件和子文件夹
+  selectIsFile: false,// 当前选中文件还是文件夹
+  currentChooseFolderPath_md: "", // 当前选中文件的文件夹
+  //lastTimeChooseFolderPath_md: "", //上次选中文件的文件夹
+  currentChooseNoteAllPath_md: "", // 当前选中笔记 全路径
+  //lastTimeChooseNoteAllPath_md: "", // 上次选中笔记 全路径
+  notEditedMdtext_md: "", // 未编辑的文件内容
+  editedMdtext_md: "", // 文章内容Markdown格式
+  title_md: "", // 文章标题
+  lastTimeTitle_md: "", //旧标题
+  showMdEditor: false, // 是否显示编辑器
+  newFolderName: "", // 新建文件夹夹的名称
+  newFileName: "", // 新建的笔记文件名
+  upFileName: "",
+  addFileModalFormVisible: false, // 是否显示添加笔记本表单
+  addFolderModalFormVisible: false,
+  upFileNameModalFormVisible: false,
+  confirmLoading: false, // 添加笔记表单等待状态（是否转圈圈）
+  formLabelWidth: "40%",
+  loading: false,
+  map: new Map(),
+  spinning: false,
+  sidebarSpan: 6, // 默认侧边栏宽度 (6/24 = 25%)
+  isResizing: false,
+});
+
+let notebooks_data = ref<NotebookInfo>();
+const sidebarContainer = ref<HTMLElement | null>(null);
+
+onMounted(async () => {
+  //页面布局
+  dragControllerDiv();
+  //获取文件列表
+  get_document_notebooks();
+  //关闭窗口保存
+  listenClose();
+  // 从本地存储恢复侧边栏宽度
+  const savedSidebarWidth = localStorage.getItem('mdnote-sidebar-width');
+  if (savedSidebarWidth) {
+    const width = parseInt(savedSidebarWidth, 10);
+    if (width >= 4 && width <= 12) {
+      data.sidebarSpan = width;
+    }
+  }
+});
+
+const listenClose = async () => {
+
+  //持续监听关闭事件
+  const listenClose_ = await listen('close', async (event) => {
+    //关闭前保存
+    if (data.currentChooseNoteAllPath_md != "" && data.editedMdtext_md != data.notEditedMdtext_md && data.title_md != "") {
+      saveMd(data.editedMdtext_md, data.title_md, data.currentChooseNoteAllPath_md)
+    }
+    await getCurrentWindow().close();
+  });
+}
+
+/**
+ * 页面布局
+ */
 const dragControllerDiv = () => {
   const resize = document.getElementsByClassName('resize') as HTMLCollectionOf<HTMLElement>;
   const left = document.getElementsByClassName('left') as HTMLCollectionOf<HTMLElement>;
@@ -261,51 +320,6 @@ const dragControllerDiv = () => {
   }
 }
 
-onMounted(() => {
-  dragControllerDiv();
-  get_document_notebooks();
-  // 从本地存储恢复侧边栏宽度
-  const savedSidebarWidth = localStorage.getItem('mdnote-sidebar-width');
-  if (savedSidebarWidth) {
-    const width = parseInt(savedSidebarWidth, 10);
-    if (width >= 4 && width <= 12) {
-      data.sidebarSpan = width;
-    }
-  }
-});
-
-const data = reactive({
-  folders: [], // 文件夹列表
-  files: [] as { title: string }[], // 文件列表
-  selectedKeys: [], // 笔记本选中项key
-  selectFolderPath: "", // 当前选中文件夹 用于建文件和子文件夹
-  selectIsFile: false,// 当前选中文件还是文件夹
-  currentChooseFolderPath_md: "", // 当前选中文件的文件夹
-  //lastTimeChooseFolderPath_md: "", //上次选中文件的文件夹
-  currentChooseNoteAllPath_md: "", // 当前选中笔记 全路径
-  //lastTimeChooseNoteAllPath_md: "", // 上次选中笔记 全路径
-  notEditedMdtext_md: "", // 未编辑的文件内容
-  editedMdtext_md: "", // 文章内容Markdown格式
-  title_md: "", // 文章标题
-  lastTimeTitle_md: "", //旧标题
-  showMdEditor: false, // 是否显示编辑器
-  newFolderName: "", // 新建文件夹夹的名称
-  newFileName: "", // 新建的笔记文件名
-  upFileName: "",
-  addFileModalFormVisible: false, // 是否显示添加笔记本表单
-  addFolderModalFormVisible: false,
-  upFileNameModalFormVisible: false,
-  confirmLoading: false, // 添加笔记表单等待状态（是否转圈圈）
-  formLabelWidth: "40%",
-  loading: false,
-  map: new Map(),
-  spinning: false,
-  sidebarSpan: 6, // 默认侧边栏宽度 (6/24 = 25%)
-  isResizing: false,
-});
-
-let notebooks_data = ref<NotebookInfo>();
-const sidebarContainer = ref<HTMLElement | null>(null);
 
 /**
  *  获取笔记本数据
@@ -1010,6 +1024,7 @@ const read_note_file = async function (node: NotebookInfo) {
     display: none;
   }
 }
+
 /* 在已有样式部分添加以下内容 */
 
 .custom-dialog {
