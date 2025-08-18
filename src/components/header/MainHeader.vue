@@ -160,7 +160,7 @@ onMounted(() => {
 }
 
 .back_header {
-    height: 35px;
+    height: 20px;
     width: 100vw;
     display: flex;
     align-items: center;

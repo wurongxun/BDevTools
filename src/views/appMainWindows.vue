@@ -6,6 +6,11 @@
     <el-main class="app-main">
       <router-view />
     </el-main>
+     <el-footer class="app-footer">
+      <div class="footer-content">
+        <span class="copyright">© 2024 Your App Name. All rights reserved.</span>
+      </div>
+    </el-footer>
   </el-container>
 </template>
 
@@ -16,11 +21,12 @@ import MainHeader from '@/components/header/MainHeader.vue'
 
 // 计算主内容区域高度
 const mainHeight = computed(() => {
-  return `calc(100vh - ${headerHeight.value})`
+  return `calc(100vh - ${headerHeight.value}-${footerHeight.value})`
 })
 
 // 头部高度
-const headerHeight = ref('35px')
+const headerHeight = ref('20px')
+const footerHeight = ref('20px')
 
 // 路由跳转方法
 const gotoRouter = (url) => {
@@ -51,7 +57,7 @@ export default {
 }
 
 .app-header {
-  height: 35px;
+  height: 25px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -65,5 +71,28 @@ export default {
   padding: 0;
   overflow: hidden;
   height: v-bind(mainHeight);
+}
+.app-footer {
+  height: v-bind(footerHeight);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--el-bg-color-page);
+  border-top: 1px solid var(--el-border-color);
+  flex-shrink: 0;
+  
+  .footer-content {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+  
+  .copyright {
+    margin: 0;
+  }
 }
 </style>

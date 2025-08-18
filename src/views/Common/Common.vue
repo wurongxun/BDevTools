@@ -9,7 +9,7 @@ const { pages } = useHomeNavigation();
 const { t } = useI18n();
 const route = useRoute();
 
-const header_height = '35px';
+const header_height = '25px';
 const appName = ref<string>(t('appName'));
 </script>
 

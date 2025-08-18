@@ -148,7 +148,7 @@ const balancedWidth = computed(() => {
 </template>
 <style lang="scss" scoped>
 .back_header {
-  height: 35px;
+  height: 25px;
   width: 100vw;
   display: flex;
   align-items: center;
@@ -176,7 +176,7 @@ const balancedWidth = computed(() => {
 }
 
 .nav-button {
-  width: 35px;
+  width: 25px;
   height: 35px;
   display: flex;
   align-items: center;

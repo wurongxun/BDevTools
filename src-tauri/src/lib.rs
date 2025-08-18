@@ -5,7 +5,7 @@ use tauri::App;
 use tauri::AppHandle;
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
-use tauri_plugin_window_state::{WindowExt, StateFlags};
+use tauri_plugin_window_state::{StateFlags, WindowExt};
 
 mod app;
 mod app_setup;
@@ -18,7 +18,8 @@ mod utils;
 use crate::app::app::app_settings;
 use crate::app_setup::setup::setup_windows;
 use crate::routes::app_window::{
-    about,note_book_window, loding_window_close, windows_close, windows_hide, windows_maximize, windows_minimize,
+    about, loding_window_close, note_book_window, windows_close, windows_hide, windows_maximize,
+    windows_minimize,
 };
 use crate::routes::file_utils::{file_manager_open_path, get_document_notebooks};
 use crate::routes::note_book::{
@@ -33,6 +34,7 @@ struct Payload {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_store::Builder::new().build())

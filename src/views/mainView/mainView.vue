@@ -49,63 +49,60 @@ const newWebViewNotebook = async function () {
 </script>
 
 <template>
+  <el-container class="content-wrapper">
+    <el-aside class="sidebar">
+      <div class="sidebar-main">
+        <div class="icon-wrapper">
+          <el-tooltip effect="dark" :content="$t('excel.name')" placement="right">
+            <el-icon size="30">
+              <Excel />
+            </el-icon>
+          </el-tooltip>
+        </div>
+        <div class="icon-wrapper" @click="newWebViewNotebook">
+          <el-tooltip effect="dark" :content="$t('md.name')" placement="right">
+            <el-icon size="30">
+              <MarkDown />
+            </el-icon>
+          </el-tooltip>
+        </div>
+        <div class="icon-wrapper" @click="navigateTo('/MainWindows/Calendar')">
+          <el-tooltip effect="dark" :content="$t('calendar.name')" placement="right">
+            <el-icon size="30">
+              <Calendar />
+            </el-icon>
+          </el-tooltip>
+        </div>
+      </div>
 
-  <el-aside class="sidebar">
-    <div class="sidebar-main">
-      <div class="icon-wrapper">
-        <el-tooltip effect="dark" :content="$t('excel.name')" placement="right">
-          <el-icon size="30">
-            <Excel />
-          </el-icon>
-        </el-tooltip>
+      <div class="sidebar-footer">
+        <div class="wrapper about-icon" @click="navigateTo('/App/AppAbout')">
+          <el-tooltip class="box-item" :content="$t('about.name')" placement="top-start">
+            <el-icon size="30">
+              <About />
+            </el-icon>
+          </el-tooltip>
+        </div>
+        <div class="icon-wrapper help-icon" @click="navigateTo('/App/AppHelp')">
+          <el-tooltip :content="$t('help.name')" placement="right">
+            <el-icon size="30">
+              <HelpIcon />
+            </el-icon>
+          </el-tooltip>
+        </div>
+        <div class="icon-wrapper settings-icon" @click="navigateTo('/App/AppSetting')">
+          <el-tooltip :content="$t('settings.name')" placement="right" :hide-after="100">
+            <el-icon size="30">
+              <SettingsIcon />
+            </el-icon>
+          </el-tooltip>
+        </div>
       </div>
-      <div class="icon-wrapper" @click="newWebViewNotebook">
-        <el-tooltip effect="dark" :content="$t('md.name')" placement="right">
-          <el-icon size="30">
-            <MarkDown />
-          </el-icon>
-        </el-tooltip>
-      </div>
-      <div class="icon-wrapper" @click="navigateTo('/MainWindows/Calendar')">
-        <el-tooltip effect="dark" :content="$t('calendar.name')" placement="right">
-          <el-icon size="30">
-            <Calendar />
-          </el-icon>
-        </el-tooltip>
-      </div>
-    </div>
-
-    <div class="sidebar-footer">
-      <div class="wrapper about-icon" @click="navigateTo('/App/AppAbout')">
-        <el-tooltip class="box-item" :content="$t('about.name')" placement="top-start">
-          <el-icon size="30">
-            <About />
-          </el-icon>
-        </el-tooltip>
-      </div>
-      <div class="icon-wrapper help-icon" @click="navigateTo('/App/AppHelp')">
-        <el-tooltip :content="$t('help.name')" placement="right">
-          <el-icon size="30">
-            <HelpIcon />
-          </el-icon>
-        </el-tooltip>
-      </div>
-      <div class="icon-wrapper settings-icon" @click="navigateTo('/App/AppSetting')">
-        <el-tooltip :content="$t('settings.name')" placement="right" :hide-after="100">
-          <el-icon size="30">
-            <SettingsIcon />
-          </el-icon>
-        </el-tooltip>
-      </div>
-    </div>
-  </el-aside>
-
-  <!-- <el-container class="content-wrapper"> -->
-  <el-main mode="out-in" enter-active-class="animate__animated animate__fadeIn"
-    leave-active-class="animate__animated animate__fadeOut" class="main-content">
-    <router-view />
-  </el-main>
-  <!-- </el-container> -->
+    </el-aside>
+    <el-main class="main-content">
+      <router-view />
+    </el-main>
+  </el-container>
 </template>
 
 <style lang="scss" scoped>
@@ -115,7 +112,8 @@ const newWebViewNotebook = async function () {
 }
 
 .content-wrapper {
-  width: calc(100vw - 50px);
+  width: 100%;
+  height: 100%;
 }
 
 .main-content {
