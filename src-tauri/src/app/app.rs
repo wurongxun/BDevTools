@@ -43,13 +43,41 @@ pub fn app_settings(app: &tauri::AppHandle) {
             };
 
             let autostart_value = store.get("auto_start");
-
             match autostart_value {
                 Some(val) => {
                     println!("auto_start_value {:?}", val);
                 }
                 None => {
-                    store.set(" auto_start", json!({ "value": "false" }));
+                    store.set("auto_start", json!({ "value": false }));
+                }
+            };
+
+            let language_value = store.get("language");
+            match language_value {
+                Some(val) => {
+                    println!("language_value {:?}", val);
+                }
+                None => {
+                    store.set("language", json!({ "value": "CN" }));
+                }
+            };
+            let language_value = store.get("language");
+            match language_value {
+                Some(val) => {
+                    println!("language_value {:?}", val);
+                }
+                None => {
+                    store.set("language", json!({ "value": "zh-CN" }));
+                }
+            };
+
+            let md_working_directory_value = store.get("md_working_directory");
+            match md_working_directory_value {
+                Some(val) => {
+                    println!("md_working_directory_value {:?}", val);
+                }
+                None => {
+                    store.set("md_working_directory", json!({ "value": "Documents" }));
                 }
             };
         }

@@ -1,5 +1,5 @@
 export default {
-  appName: "F-OH",
+  appName: "ExcelAssemblyline",
   settings: {
     name: "Settings",
   },
@@ -67,10 +67,6 @@ export default {
       name: "{'@'}Eddie",
       description: "PWA Application Developer",
     },
-    westinyang: {
-      name: "{'@'}westinyang",
-      description: "F-OH Founder",
-    },
     jesse205: {
       name: "{'@'}Jesse205",
     },
@@ -81,19 +77,6 @@ export default {
   },
   id: {
     name: "ID",
-  },
-  link: {
-    related: "Related links",
-    foh: {
-      title: "F-OH",
-      description:
-        "F-OH is an application center for FOSS (Free and Open Source Software) on the OpenHarmony platform, with support for download and installation.",
-    },
-    organization: {
-      title: "OHOS Dev",
-      description:
-        "OpenHarmony Developer Community (unofficial position created for the future of OpenHarmony, Peace & Love)",
-    },
   },
   details: {
     name: "Details",
@@ -671,7 +654,7 @@ export default {
   md: {
     name: "Markdown",
   },
-  excel: { 
+  excel: {
     name: "Excel",
   },
 };

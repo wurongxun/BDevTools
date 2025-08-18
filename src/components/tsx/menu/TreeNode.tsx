@@ -53,7 +53,7 @@ const TreeNode = defineComponent({
             v-slots={{
               title: () => (
                 <span
-                  onClick={(e) => {
+                  onClick={(e: any) => {
                     e.stopPropagation();
                     handleClick(node);
                   }}

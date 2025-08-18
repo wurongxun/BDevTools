@@ -2,7 +2,6 @@
 import { Window } from "@tauri-apps/api/window"
 import { Webview } from "@tauri-apps/api/webview"
 import { invoke } from '@tauri-apps/api/core';
-import { appWindow } from '@tauri-apps/api/window';
 import { getAllWebviewWindows } from '@tauri-apps/api/webviewWindow';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 //import {  } from '@tauri-apps/api/window';
@@ -35,8 +34,8 @@ const navigateTo = async function (routeUrl: string) {
 const newWebViewNotebook = async function () {
   const win = await WebviewWindow.getByLabel("note_book");
   if (win) {
-     //win.setShadow(true);
-     console.log("isFocused",win.isFocused())
+    //win.setShadow(true);
+    console.log("isFocused", win.isFocused())
     await win.setFocus();
     await win.show();
     return;

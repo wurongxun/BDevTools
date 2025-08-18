@@ -57,7 +57,7 @@ pub async fn note_book_window(handle: tauri::AppHandle, window: tauri::Window) {
         tauri::WebviewUrl::App("#/MainWindows/NoteBook".into()),
     )
     .title("NoteBook")
-    .inner_size(720.0, 440.0)
+    .inner_size(720.0, 640.0)
     .decorations(false)
     .center()
     .resizable(true) //是否可调整大小

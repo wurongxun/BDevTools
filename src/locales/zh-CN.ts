@@ -3,7 +3,7 @@
 import { Notebook } from "@element-plus/icons-vue";
 
 export default {
-  appName: "F-OH",
+  appName: "ExcelAssemblyline",
   settings: {
     name: "设置",
   },
@@ -70,11 +70,7 @@ export default {
     eddie: {
       name: "{'@'}Eddie",
       description: "PWA 应用开发者",
-    },
-    westinyang: {
-      name: "{'@'}westinyang",
-      description: "F-OH 创始人",
-    },
+    }
   },
   release: {
     name: "发行",
@@ -82,19 +78,6 @@ export default {
   },
   id: {
     name: "编号",
-  },
-  link: {
-    related: "相关链接",
-    foh: {
-      title: "F-OH",
-      description:
-        "F-OH 是一个 OpenHarmony 平台上 FOSS（Free and Open Source Software，自由开源软件）的应用中心，并提供下载安装支持",
-    },
-    organization: {
-      title: "OHOS Dev",
-      description:
-        "OpenHarmony开发者社区（非官方阵地，为OpenHarmony的未来而创建，Peace & Love）",
-    },
   },
   details: {
     name: "详情信息",

@@ -33,8 +33,6 @@ const darkModeChange = async function () {
     toggleDark();
     dark.value = isDark.value
     dark_mode_icon.value = isDark.value ? "black" : "white"
-    // const el = document.documentElement;
-    // console.log(getComputedStyle(el).getPropertyValue(`--el-color-primary`))
     let el_color_primary = isDark.value ? "black" : ""
     document.documentElement.style.setProperty('--el-color-primary', el_color_primary);
 }
@@ -76,63 +74,64 @@ onMounted(() => {
                 :prefix-icon="Search" clearable>
             </el-input>
         </div> -->
-          <div id="titlebar" class="back_center">
-      
-    </div>
+        <div id="titlebar" class="back_center">
+
+        </div>
 
         <div class="back_right">
             <!-- <div class="control-group action-controls"> -->
-                <el-tooltip content="分享" placement="bottom">
-                    <div  class="control-button ">
+            <el-tooltip content="分享" placement="bottom">
+                <div class="control-button ">
                     <el-icon class="control-icon">
                         <Share />
                     </el-icon>
-                    </div>
-                </el-tooltip>
+                </div>
+            </el-tooltip>
 
-                <el-tooltip content="暗黑模式" placement="bottom">
-                     <div  @click="darkModeChange()" class="control-button ">
-                    <el-icon class="control-icon" >
+            <el-tooltip content="暗黑模式" placement="bottom">
+                <div @click="darkModeChange()" class="control-button ">
+                    <el-icon class="control-icon">
                         <BlackModeIcon v-if="dark" />
                         <WhiteModeIcon v-else />
-                    </el-icon></div>
-                </el-tooltip>
+                    </el-icon>
+                </div>
+            </el-tooltip>
 
-                <el-tooltip content="更多" placement="bottom">
-                     <div  class="control-button ">
+            <el-tooltip content="更多" placement="bottom">
+                <div class="control-button ">
                     <el-icon class="control-icon">
                         <More />
                     </el-icon>
-                    </div>
-                </el-tooltip>
+                </div>
+            </el-tooltip>
             <!-- </div>
 
             <div class="control-group window-controls"> -->
-                <el-tooltip content="最小化" placement="bottom">
-                     <div @click="handleWinMin" class="control-button ">
-                    <el-icon class="control-icon" >
+            <el-tooltip content="最小化" placement="bottom">
+                <div @click="handleWinMin" class="control-button ">
+                    <el-icon class="control-icon">
                         <Minus />
                     </el-icon>
-                    </div>
-                </el-tooltip>
+                </div>
+            </el-tooltip>
 
-                <el-tooltip :content="visible ? '还原' : '最大化'" placement="bottom">
-                    <div @click="windowChange" class="control-button ">
-                        <el-icon class="control-icon">
-                            <WindowRestoreIcon v-if="visible" />
-                            <WindowMaximizationIcon v-else />
-                        </el-icon>
-                    </div>
-                </el-tooltip>
+            <el-tooltip :content="visible ? '还原' : '最大化'" placement="bottom">
+                <div @click="windowChange" class="control-button ">
+                    <el-icon class="control-icon">
+                        <WindowRestoreIcon v-if="visible" />
+                        <WindowMaximizationIcon v-else />
+                    </el-icon>
+                </div>
+            </el-tooltip>
 
-                <el-tooltip content="关闭" placement="bottom">
-                    <div @click="windowHide" class="control-button close-button">
+            <el-tooltip content="关闭" placement="bottom">
+                <div @click="windowHide" class="control-button close-button">
 
-                        <el-icon class="control-icon close-icon" >
-                            <Close />
-                        </el-icon>
-                    </div>
-                </el-tooltip>
+                    <el-icon class="control-icon close-icon">
+                        <Close />
+                    </el-icon>
+                </div>
+            </el-tooltip>
 
             <!-- </div> -->
         </div>

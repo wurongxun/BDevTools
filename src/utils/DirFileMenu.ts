@@ -59,7 +59,7 @@ let _: DirFileMenuUtils = {
     type
   ) {
     let name = "";
-    if (StringUtil.isNotNullAndEmpty(label)) {
+    if (StringUtil.isNotNullOrEmpty(label)) {
       let arr = label.split(".");
       if (arr.length > 1) {
         name = arr[0];
@@ -103,7 +103,7 @@ let _: DirFileMenuUtils = {
    * 获取文件夹名称
    * @returns
    */
-  getFolderNameSet: (children_data:NotebookInfo) => {
+  getFolderNameSet: (children_data: NotebookInfo) => {
     let data = new Set();
     // let children= children_data.children;
     // for (var i in children) {
