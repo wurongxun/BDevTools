@@ -63,11 +63,12 @@ onMounted(() => {
 <template>
     <div class="back_header" data-tauri-drag-region>
         <div class="back_left">
-            <div class="logo-container">
+            <!-- <div class="logo-container">
                 <el-icon size="30" class="app-logo">
                     <BoxLogoIcon />
                 </el-icon>
-            </div>
+            </div> -->
+            {{ t('appName') }}
         </div>
 
         <!-- <div class="header-section header-center">
@@ -167,7 +168,7 @@ onMounted(() => {
     align-items: center;
     background-color: var(--main--header--bg-color);
     user-select: none;
-    margin: 0 10px;
+    margin: 0 5px;
 }
 
 .back_left,

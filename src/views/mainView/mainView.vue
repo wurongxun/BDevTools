@@ -162,7 +162,7 @@ const newWebViewNotebook = async function () {
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 5px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   transition: all 0.3s ease;
 

@@ -155,7 +155,7 @@ const balancedWidth = computed(() => {
   align-items: center;
   background-color: var(--main--header--bg-color);
   user-select: none;
-  margin: 0 10px;
+  margin: 0 5px;
 }
 
 .back_left,

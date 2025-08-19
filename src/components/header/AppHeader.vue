@@ -2,17 +2,18 @@
     <!-- <a-layout-header> -->
     <div class="header" data-tauri-drag-region>
         <div class="left">
-            <span v-if="WinIcon" ><icon-font :style="{ color: '#08c', fontSize: '20px', }" type="iconType" /></span>
+            <span v-if="WinIcon"><icon-font :style="{ color: '#08c', fontSize: '20px', }" type="iconType" /></span>
         </div>
         <div class="center" data-tauri-drag-region>
             <span>{{ title }}</span>
         </div>
         <div class="right" data-tauri-drag-region>
-            <span v-if="WinMin" ><icon-font :style="{ color: '#08c', fontSize: '16px', }" @click="handleWinMin"
+            <span v-if="WinMin"><icon-font :style="{ color: '#08c', fontSize: '16px', }" @click="handleWinMin"
                     type="icon-window-min" /></span>
-            <span v-if="WinMax" ><icon-font :style="{ color: '#08c', fontSize: '16px', }" @click="handleWinMax2Min"
+            <span v-if="WinMax"><icon-font :style="{ color: '#08c', fontSize: '16px', }" @click="handleWinMax2Min"
                     type="icon-zuidahua" /></span>
-            <span v-if="WinClose"><icon-font :style="{ color: '#08c', fontSize: '16px', }" @click="handleWinClose" type="icon-guanbi" /></span>
+            <span v-if="WinClose"><icon-font :style="{ color: '#08c', fontSize: '16px', }" @click="handleWinClose"
+                    type="icon-guanbi" /></span>
         </div>
 
     </div>
@@ -22,35 +23,35 @@
 // const IconFont = createFromIconfontCN({
 //     scriptUrl: '../../assets/iconfont/iconfont',
 // });
-import { defineComponent} from 'vue';
+import { defineComponent } from 'vue';
 export default defineComponent({
     components: {
-    
+
     },
-    props:{
-        title:{
-            type:String,
-            default:"",
+    props: {
+        title: {
+            type: String,
+            default: "",
         },
-        WinMin:{
-            type:Boolean,
-            default:false,
+        WinMin: {
+            type: Boolean,
+            default: false,
         },
-        WinClose:{
-            type:Boolean,
-            default:true,
+        WinClose: {
+            type: Boolean,
+            default: true,
         },
-        WinMax:{
-            type:Boolean,
-            default:false,
+        WinMax: {
+            type: Boolean,
+            default: false,
         },
-        WinIcon:{
-            type:Boolean,
-            default:false,
+        WinIcon: {
+            type: Boolean,
+            default: false,
         },
-        iconType:{
-            type:String,
-            default:"",
+        iconType: {
+            type: String,
+            default: "",
         }
 
     },
@@ -72,14 +73,14 @@ export default defineComponent({
         const handleWinClose = async () => {
             emit('handleWinClose')
         }
-        
-     
+
+
         return {
             handleWinClose,
             handleWinMin,
             handleWinMax2Min,
             handleCancel,
-        
+
         }
     }
 })
@@ -105,18 +106,21 @@ export default defineComponent({
     margin-right: 5px;
     -webkit-app-region: no-drag;
 }
-.left{
+
+.left {
     width: 30%;
     display: flex;
-    justify-content:left;
+    justify-content: left;
 }
-.center{
+
+.center {
     width: 40%;
     display: flex;
     justify-content: center;
 }
-.right{
-    width: 30%; 
+
+.right {
+    width: 30%;
     display: flex;
     justify-content: right;
 }

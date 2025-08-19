@@ -8,7 +8,7 @@
     </el-main>
     <el-footer class="app-footer">
       <div class="footer-content">
-        <span class="copyright">© 2024 Your App Name. All rights reserved.</span>
+        <span class="copyright"> </span>
       </div>
     </el-footer>
   </el-container>
