@@ -9,7 +9,6 @@ const { pages } = useHomeNavigation();
 const { t } = useI18n();
 const route = useRoute();
 
-const header_height = '25px';
 const appName = ref<string>(t('appName'));
 </script>
 
@@ -17,19 +16,13 @@ const appName = ref<string>(t('appName'));
   <div class="common-layout">
     <header class="app-header">
       <template v-for="item in pages" :key="item.name">
-        <BackHeader 
-          v-if="$route.name === item.name" 
-          :showTitle="item.showTitle" 
-          :title="unref(item.title)"
-          :showWinMin="item.showWinMin" 
-          :showWinChange="item.showWinChange"
-          :showWinHide="item.showWinHide"
-          :showWinBack="item.showWinBack"
-        />
+        <BackHeader v-if="$route.name === item.name" :showTitle="item.showTitle" :title="unref(item.title)"
+          :showWinMin="item.showWinMin" :showWinChange="item.showWinChange" :showWinHide="item.showWinHide"
+          :showWinBack="item.showWinBack" />
       </template>
     </header>
     <main class="app-container">
-        <!-- 根据路由元信息决定是否缓存 -->
+      <!-- 根据路由元信息决定是否缓存 -->
       <keep-alive>
         <router-view v-if="$route.meta.keepAlive" :key="$route.fullPath" />
         <router-view v-else :key="'normal-' + $route.fullPath" />
@@ -48,7 +41,7 @@ const appName = ref<string>(t('appName'));
 }
 
 .app-header {
-  height: v-bind(header_height);
+  height: var(--header-height);
   width: 100%;
   display: flex;
   border-bottom: 1px solid var(--el-border-color);
@@ -61,7 +54,7 @@ const appName = ref<string>(t('appName'));
   overflow: auto;
   scrollbar-width: none; // Firefox
   -ms-overflow-style: none; // IE 10+
-  
+
   // WebKit browsers
   &::-webkit-scrollbar {
     width: 0;

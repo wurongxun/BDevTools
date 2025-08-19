@@ -7,17 +7,8 @@
             <span>Excel文件处理</span>
           </div>
         </template>
-        <el-upload 
-          class="upload-demo" 
-          drag 
-          action="#" 
-          multiple 
-          ref="upload" 
-          :http-request="uploads" 
-          :limit="1"
-          :on-exceed="handleExceed" 
-          accept=".xlsx"
-        >
+        <el-upload class="upload-demo" drag action="#" multiple ref="upload" :http-request="uploads" :limit="1"
+          :on-exceed="handleExceed" accept=".xlsx">
           <el-icon class="el-icon--upload"><upload-filled /></el-icon>
           <div class="el-upload__text">
             将文件拖到此处，或<em>点击选择文件</em>
@@ -31,17 +22,8 @@
             <span>其他文件处理</span>
           </div>
         </template>
-        <el-upload 
-          class="upload-demo" 
-          drag 
-          action="#" 
-          multiple 
-          ref="upload2" 
-          :http-request="uploads" 
-          :limit="1"
-          :on-exceed="handleExceed" 
-          accept=".xlsx"
-        >
+        <el-upload class="upload-demo" drag action="#" multiple ref="upload2" :http-request="uploads" :limit="1"
+          :on-exceed="handleExceed" accept=".xlsx">
           <el-icon class="el-icon--upload"><upload-filled /></el-icon>
           <div class="el-upload__text">
             将文件拖到此处，或<em>点击选择文件</em>
@@ -55,17 +37,8 @@
             <span>数据导入</span>
           </div>
         </template>
-        <el-upload 
-          class="upload-demo" 
-          drag 
-          action="#" 
-          multiple 
-          ref="upload3" 
-          :http-request="uploads" 
-          :limit="1"
-          :on-exceed="handleExceed" 
-          accept=".xlsx"
-        >
+        <el-upload class="upload-demo" drag action="#" multiple ref="upload3" :http-request="uploads" :limit="1"
+          :on-exceed="handleExceed" accept=".xlsx">
           <el-icon class="el-icon--upload"><upload-filled /></el-icon>
           <div class="el-upload__text">
             将文件拖到此处，或<em>点击选择文件</em>
@@ -79,17 +52,8 @@
             <span>数据导出</span>
           </div>
         </template>
-        <el-upload 
-          class="upload-demo" 
-          drag 
-          action="#" 
-          multiple 
-          ref="upload4" 
-          :http-request="uploads" 
-          :limit="1"
-          :on-exceed="handleExceed" 
-          accept=".xlsx"
-        >
+        <el-upload class="upload-demo" drag action="#" multiple ref="upload4" :http-request="uploads" :limit="1"
+          :on-exceed="handleExceed" accept=".xlsx">
           <el-icon class="el-icon--upload"><upload-filled /></el-icon>
           <div class="el-upload__text">
             将文件拖到此处，或<em>点击选择文件</em>
@@ -170,7 +134,7 @@ const fileHandle = async (file: ExcelJS.Buffer) => {
 .excel-container {
   width: 100%;
   height: 100%;
-  padding: 4px;
+  padding: 2px;
   box-sizing: border-box;
 }
 
@@ -237,14 +201,14 @@ const fileHandle = async (file: ExcelJS.Buffer) => {
 
 @media (max-width: 768px) {
   .excel-container {
-    padding: 10px;
+    padding: 2px;
   }
-  
+
   .cards-grid {
     grid-template-columns: 1fr;
     gap: 15px;
   }
-  
+
   :deep(.el-upload-dragger) {
     padding: 20px 10px;
   }

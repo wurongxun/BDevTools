@@ -54,21 +54,21 @@ const newWebViewNotebook = async function () {
       <div class="sidebar-main">
         <div class="icon-wrapper">
           <el-tooltip effect="dark" :content="$t('excel.name')" placement="right">
-            <el-icon size="30">
+            <el-icon size="25">
               <Excel />
             </el-icon>
           </el-tooltip>
         </div>
         <div class="icon-wrapper" @click="newWebViewNotebook">
           <el-tooltip effect="dark" :content="$t('md.name')" placement="right">
-            <el-icon size="30">
+            <el-icon size="25">
               <MarkDown />
             </el-icon>
           </el-tooltip>
         </div>
         <div class="icon-wrapper" @click="navigateTo('/MainWindows/Calendar')">
           <el-tooltip effect="dark" :content="$t('calendar.name')" placement="right">
-            <el-icon size="30">
+            <el-icon size="25">
               <Calendar />
             </el-icon>
           </el-tooltip>
@@ -78,21 +78,21 @@ const newWebViewNotebook = async function () {
       <div class="sidebar-footer">
         <div class="wrapper about-icon" @click="navigateTo('/App/AppAbout')">
           <el-tooltip class="box-item" :content="$t('about.name')" placement="top-start">
-            <el-icon size="30">
+            <el-icon size="25">
               <About />
             </el-icon>
           </el-tooltip>
         </div>
         <div class="icon-wrapper help-icon" @click="navigateTo('/App/AppHelp')">
           <el-tooltip :content="$t('help.name')" placement="right">
-            <el-icon size="30">
+            <el-icon size="25">
               <HelpIcon />
             </el-icon>
           </el-tooltip>
         </div>
         <div class="icon-wrapper settings-icon" @click="navigateTo('/App/AppSetting')">
           <el-tooltip :content="$t('settings.name')" placement="right" :hide-after="100">
-            <el-icon size="30">
+            <el-icon size="25">
               <SettingsIcon />
             </el-icon>
           </el-tooltip>
@@ -124,7 +124,7 @@ const newWebViewNotebook = async function () {
 }
 
 .sidebar {
-  width: 50px;
+  width: var(--sidebar-width);
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -163,8 +163,6 @@ const newWebViewNotebook = async function () {
   justify-content: center;
   align-items: center;
   border-radius: 5px;
-  width: 40px;
-  height: 40px;
   cursor: pointer;
   transition: all 0.3s ease;
 

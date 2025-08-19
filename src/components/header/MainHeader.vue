@@ -25,6 +25,7 @@ const route = useRoute()
 const visible = ref(false);
 const dark_mode_icon = ref("black")
 const dark = ref(false);
+
 //路由名称
 const routeName = computed(() => route.path.match('/[^/]+')?.[0] ?? '');
 // 应用标题，动态切换不同标题
@@ -160,7 +161,7 @@ onMounted(() => {
 }
 
 .back_header {
-    height: 20px;
+    height: var(--header-height);
     width: 100vw;
     display: flex;
     align-items: center;

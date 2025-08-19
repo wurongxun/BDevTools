@@ -6,7 +6,7 @@
     <el-main class="app-main">
       <router-view />
     </el-main>
-     <el-footer class="app-footer">
+    <el-footer class="app-footer">
       <div class="footer-content">
         <span class="copyright">© 2024 Your App Name. All rights reserved.</span>
       </div>
@@ -25,7 +25,7 @@ const mainHeight = computed(() => {
 })
 
 // 头部高度
-const headerHeight = ref('20px')
+const headerHeight = ref('30px')
 const footerHeight = ref('20px')
 
 // 路由跳转方法
@@ -57,7 +57,7 @@ export default {
 }
 
 .app-header {
-  height: 25px;
+  height: var(--header-height);
   padding: 0;
   display: flex;
   align-items: center;
@@ -72,6 +72,7 @@ export default {
   overflow: hidden;
   height: v-bind(mainHeight);
 }
+
 .app-footer {
   height: v-bind(footerHeight);
   padding: 0 20px;
@@ -81,7 +82,7 @@ export default {
   background-color: var(--el-bg-color-page);
   border-top: 1px solid var(--el-border-color);
   flex-shrink: 0;
-  
+
   .footer-content {
     width: 100%;
     display: flex;
@@ -90,7 +91,7 @@ export default {
     font-size: 12px;
     color: var(--el-text-color-secondary);
   }
-  
+
   .copyright {
     margin: 0;
   }

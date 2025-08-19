@@ -13,6 +13,7 @@ import { listen } from '@tauri-apps/api/event';
 const route = useRoute();
 const visible = ref(false);
 
+
 // Props定义
 const props = defineProps({
   showWinMin: {
@@ -148,7 +149,7 @@ const balancedWidth = computed(() => {
 </template>
 <style lang="scss" scoped>
 .back_header {
-  height: 25px;
+  height: var(--header-height);
   width: 100vw;
   display: flex;
   align-items: center;
