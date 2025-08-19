@@ -58,7 +58,7 @@ pub fn app_settings(app: &tauri::AppHandle) {
                     println!("language_value {:?}", val);
                 }
                 None => {
-                    store.set("language", json!({ "value": "zh-CN" }));
+                    store.set("language", json!({ "value": "zh_CN" }));
                 }
             };
 
@@ -68,7 +68,7 @@ pub fn app_settings(app: &tauri::AppHandle) {
                     println!("md_working_directory_value {:?}", val);
                 }
                 None => {
-                    store.set("md_working_directory", json!({ "value": "Documents" }));
+                    // store.set("md_working_directory", json!({ "value": "" }));
                 }
             };
         }
