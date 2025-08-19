@@ -45,7 +45,7 @@ pub async fn about(handle: tauri::AppHandle, window: tauri::Window) {
 }
 
 /**
- * 关于窗口
+ * note_book_window窗口
  * @param handle
  * @param window
  */

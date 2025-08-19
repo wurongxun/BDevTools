@@ -44,10 +44,10 @@ const routes = <Readonly<RouteRecordRaw[]>>[
         component: () => import("@/views/utilsView/notebook/NoteBookEdit.vue"),
         meta: {
           transition: "scroll-x-transition",
-          keepAlive: true
+          keepAlive: true,
         },
       },
-       {
+      {
         // 当 /user/:id/profile 匹配成功
         // UserProfile 将被渲染到 User 的 <router-view> 内部
         path: "Calendar",
@@ -83,27 +83,24 @@ const routes = <Readonly<RouteRecordRaw[]>>[
         path: "AppSetting",
         name: "AppSetting",
         component: () => import("@/views/app/AppSetting.vue"),
-         meta: {
+        meta: {
           transition: "scroll-x-transition",
-          keepAlive: true
         },
       },
       {
         path: "AppAbout",
         name: "AppAbout",
         component: () => import("@/views/app/AppAbout.vue"),
-         meta: {
+        meta: {
           transition: "scroll-x-transition",
-          keepAlive: true
         },
       },
-     {
+      {
         path: "AppHelp",
         name: "AppHelp",
         component: () => import("@/views/app/AppHelp.vue"),
-         meta: {
+        meta: {
           transition: "scroll-x-transition",
-          keepAlive: true
         },
       },
     ],

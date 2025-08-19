@@ -3,14 +3,11 @@
  *
  * 框架文档: https://vue-i18n.intlify.dev/
  */
-import { Locale, createI18n } from 'vue-i18n'
+import { Locale, createI18n } from "vue-i18n";
 
-import EN from '@/locales/en'
-import ZH_CN from '@/locales/zh-CN'
-import ZH_TW from '@/locales/zh-TW'
-export const APP_NAME_DEFAULT = 'F-OH Lite'
-export const APP_NAME_PWA = 'F-OH PWA'
-export const APP_NAME_TAURI = 'F-OH Tauri'
+import EN from "@/locales/en";
+import ZH_CN from "@/locales/zh-CN";
+import ZH_TW from "@/locales/zh-TW";
 
 const i18n = createI18n({
   legacy: false,
@@ -20,10 +17,10 @@ const i18n = createI18n({
   fallbackLocale: navigator.languages as Locale[],
   messages: {
     en: EN,
-    'zh_CN': ZH_CN,
-    'zh_TW': ZH_TW,
-    'zh_HK': ZH_TW
-  }
-})
+    zh_CN: ZH_CN,
+    zh_TW: ZH_TW,
+    zh_HK: ZH_TW,
+  },
+});
 
-export default i18n
+export default i18n;

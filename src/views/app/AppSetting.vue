@@ -5,66 +5,15 @@ import { invoke } from '@tauri-apps/api/core'
 import { ResponseData, SettingIdValueName, SettingMap } from '@/entity/entitys';
 import { useI18n } from "vue-i18n";
 import { appConfigInfo } from "@/store/appConfigInfo";
-import { load } from '@tauri-apps/plugin-store';
+import { load, Store } from '@tauri-apps/plugin-store';
+import { open } from '@tauri-apps/plugin-dialog';
 const { t, locale } = useI18n()
 const userStore = appConfigInfo();
-let store = undefined;
+let store: Store | undefined = undefined;
 let autostart = ref<boolean>(false)
 let update_reminder = ref<boolean>(false)
 let language = ref<string>('')
 let md_working_directory = ref<string>('Documents')
-
-
-onMounted(async () => {
-  if (userStore.appConfig.length < 1) {
-    query_setting_list();
-  }
-  if (userStore.appConfig.length > 1) {
-    show_setting()
-  }
-   store = await load('settings.json',{});
-
-  let val_auto_start = await store.get<{ value: boolean }>('auto_start');
-  if (val_auto_start !== undefined) {
-    autostart.value = val_auto_start.value;
-  }
-  let val_language = await store.get<{ value: string }>('auto_start');
-  if (val_language !== undefined) {
-    language.value = val_language.value;
-  }
-  let md_working_directory_val = await store.get<{ value: string }>('md_working_directory');
-  if (md_working_directory_val !== undefined) {
-    md_working_directory.value = md_working_directory_val.value;
-  }
-})
-
-function show_setting() {
-
-}
-
-function query_setting_list() {
-  invoke('query_setting_list').then((res): void => {
-    let res_ = res as ResponseData<Array<SettingMap>>
-    let data = res_.data as Array<SettingMap>;
-    userStore.setAppConfig(data);
-  })
-}
-
-function setting_change() {
-  // invoke('updatate_setting', { id: id, appSettingItemValue: String(val), appSettingtemName: '' }).then((res): void => {
-  //   console.log(res);
-  //   query_setting_list()
-  // })
-}
-
-function language_change() {
-   locale.value = language.value;
-  // invoke('updatate_setting', { id: language, appSettingItemValue: String(language), appSettingtemName: 'language' }).then((res): void => {
-  //   console.log(res);
-  //   query_setting_list()
-  // })
-}
-
 const language_options = [
   {
     value: 'zh_CN',
@@ -87,6 +36,96 @@ const language_options = [
     disabled: false,
   }
 ]
+
+onMounted(async () => {
+  if (userStore.appConfig.length < 1) {
+    query_setting_list();
+  }
+  if (userStore.appConfig.length > 1) {
+    show_setting()
+  }
+  store = await load('settings.json', { autoSave: false });
+
+  let val_auto_start = await store.get<{ value: boolean }>('auto_start');
+  if (val_auto_start !== undefined) {
+    autostart.value = val_auto_start.value;
+  }
+  let language_val = await store.get<{ value: string }>('language');
+  if (language_val !== undefined) {
+    language.value = language_val.value;
+  }
+  let md_working_directory_val = await store.get<{ value: string }>('md_working_directory');
+  if (md_working_directory_val !== undefined) {
+    md_working_directory.value = md_working_directory_val.value;
+  }
+  let update_reminder_val = await store.get<{ value: boolean }>('update_reminder');
+  if (update_reminder_val !== undefined) {
+    update_reminder.value = update_reminder_val.value;
+  }
+})
+
+function show_setting() {
+
+}
+
+function query_setting_list() {
+  invoke('query_setting_list').then((res): void => {
+    let res_ = res as ResponseData<Array<SettingMap>>
+    let data = res_.data as Array<SettingMap>;
+    userStore.setAppConfig(data);
+  })
+}
+
+function setting_change() {
+  // invoke('updatate_setting', { id: id, appSettingItemValue: String(val), appSettingtemName: '' }).then((res): void => {
+  //   console.log(res);
+  //   query_setting_list()
+  // })
+}
+
+async function language_change() {
+  locale.value = language.value;
+  if (store) {
+    await store.set('language', { value: language.value });
+    await store.save();
+  }
+}
+async function autostart_change() {
+  if (store) {
+    await store.set('auto_start', { value: autostart.value });
+    await store.save();
+  }
+}
+async function software_change() {
+  if (store) {
+    await store.set('update_reminder', { value: update_reminder.value });
+    await store.save();
+  }
+}
+async function md_working_directory_change() {
+  const file = await open({
+    multiple: false,
+    directory: true,
+  });
+  if (file) {
+    md_working_directory.value = file;
+    if (store) {
+      store.set('md_working_directory', { value: file });
+      store.save();
+    }
+  }
+}
+// 添加清除缓存和浏览器缓存的函数
+const clear_cache = () => {
+  // 实现清除缓存的逻辑
+  console.log('清除缓存')
+}
+
+const clear_browser_cache = () => {
+  // 实现清除浏览器缓存的逻辑
+  console.log('清除浏览器缓存')
+}
+
 </script>
 
 <template>
@@ -102,7 +141,7 @@ const language_options = [
             <span class="setting-description">可能影响开机速度</span>
           </div>
           <div class="setting-control">
-            <el-switch v-model="autostart" @change="setting_change()" inline-prompt :active-icon="Check"
+            <el-switch v-model="autostart" @change="autostart_change()" inline-prompt :active-icon="Check"
               :inactive-icon="Close" />
           </div>
         </div>
@@ -113,7 +152,7 @@ const language_options = [
             <span class="setting-description">及时获取新功能和安全更新</span>
           </div>
           <div class="setting-control">
-            <el-switch v-model="update_reminder" @change="setting_change()" inline-prompt :active-icon="Check"
+            <el-switch v-model="update_reminder" @change="software_change()" inline-prompt :active-icon="Check"
               :inactive-icon="Close" />
           </div>
         </div>
@@ -153,12 +192,24 @@ const language_options = [
 
         <div class="settings-item">
           <div class="setting-info">
-            <span class="setting-label">MarkDown编辑器</span>
-            <span class="setting-description">MarkDown编辑器工作目录</span>
-            <span class="setting-working-directory">{{ md_working_directory }}</span>
+            <div class="setting-header">
+              <span class="setting-label">MarkDown编辑器</span>
+              <span class="setting-description">MarkDown编辑器工作目录</span>
+            </div>
+            <div class="directory-display">
+              <el-icon class="folder-icon">
+                <Folder />
+              </el-icon>
+              <span class="setting-working-directory">{{ md_working_directory }}</span>
+            </div>
           </div>
           <div class="setting-control">
-            <el-button type="danger" plain>更换工作目录</el-button>
+            <el-button type="primary" @click="md_working_directory_change()" plain>
+              <el-icon>
+                <FolderChecked />
+              </el-icon>
+              更换工作目录
+            </el-button>
           </div>
         </div>
 
@@ -185,7 +236,6 @@ const language_options = [
     </div>
   </div>
 </template>
-
 <style lang="scss" scoped>
 .settings-container {
   width: 100%;
@@ -241,14 +291,22 @@ const language_options = [
 
 .setting-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .setting-label {
   display: block;
   font-size: 1rem;
   color: var(--el-text-color-primary);
-  margin-bottom: 5px;
-  font-weight: 400;
+  font-weight: 500;
 }
 
 .setting-description {
@@ -256,11 +314,28 @@ const language_options = [
   font-size: 0.85rem;
   color: var(--el-text-color-secondary);
 }
-.setting-working-directory{
-   display: block;
-  font-size: 0.7rem;
-  color: var(--el-text-color-secondary);
+
+.directory-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  background-color: var(--el-fill-color-light);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9rem;
 }
+
+.folder-icon {
+  color: var(--el-color-primary);
+}
+
+.setting-working-directory {
+  color: var(--el-text-color-primary);
+  word-break: break-all;
+}
+
 .setting-control {
   flex-shrink: 0;
   margin-left: 20px;

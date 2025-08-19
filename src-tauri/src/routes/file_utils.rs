@@ -8,7 +8,7 @@ use md5::Digest;
 use std::error::Error;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
-
+use tauri_plugin_store::StoreExt;
 #[tauri::command]
 pub async fn my_read_file(path: std::path::PathBuf) -> String {
     // 读取文件内容，以文本字符串形式返回
@@ -105,7 +105,7 @@ pub async fn file_manager_open_path(app_handle: tauri::AppHandle, path: String) 
 // 获取本地笔记本列表
 #[tauri::command]
 pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<String> {
-    let app_dir = app_handle.path().document_dir();
+    let app_dir = app_handle.path().document_dir().unwrap();
     let mut children_dir_and_file_info_1 = DirAndFileInfo::create(
         "notebooks".to_string(),
         "".to_string(),
@@ -114,6 +114,17 @@ pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<Str
         "notebooks".to_string(),
         false,
     );
+    let store_ = app_handle.store("settings.json").unwrap();
+
+    match store_.get("md_working_directory") {
+        Some(value) => {
+            // 处理获取到的值
+        }
+        None => {
+            // 未配置目录或获取值失败
+        }
+    }
+
     match app_dir {
         Ok(dir) => {
             // 本地文件目录
