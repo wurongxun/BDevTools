@@ -125,46 +125,46 @@ pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<Str
         }
     }
 
-    match app_dir {
-        Ok(dir) => {
-            // 本地文件目录
-            let local_data_dir = dir.as_path().join("notebooks");
-            let local_data_dir_ = local_data_dir.clone();
-            // println!("{:?}", local_data_dir);
-            // 文件夹是否存在
-            if local_data_dir.exists() {
-                return get_document_notebooks_data(
-                    &local_data_dir.as_os_str().to_str().unwrap().to_string(),
-                );
-            }
+    // match app_dir {
+    //     Ok(dir) => {
+    //         // 本地文件目录
+    //         let local_data_dir = dir.as_path().join("notebooks");
+    //         let local_data_dir_ = local_data_dir.clone();
+    //         // println!("{:?}", local_data_dir);
+    //         // 文件夹是否存在
+    //         if local_data_dir.exists() {
+    //             return get_document_notebooks_data(
+    //                 &local_data_dir.as_os_str().to_str().unwrap().to_string(),
+    //             );
+    //         }
 
-            // 目录不存在则创建
-            let a = std::fs::create_dir_all(local_data_dir);
-            match a {
-                Ok(_) => {
-                    return get_document_notebooks_data(
-                        &local_data_dir_.as_os_str().to_str().unwrap().to_string(),
-                    )
-                }
-                Err(_) => {
-                    let j = serde_json::to_string(&children_dir_and_file_info_1).unwrap();
-                    return ResData {
-                        code: 500,
-                        msg: "读取文档目录失败".to_string(),
-                        data: j,
-                    };
-                }
-            }
-        }
-        Err(e) => {
-            return ResData {
-                code: 500,
-                msg: "读取文档目录失败".to_string(),
-                data: serde_json::to_string(&children_dir_and_file_info_1).unwrap(),
-            }
-        }
-        _ => {}
-    }
+    //         // 目录不存在则创建
+    //         let a = std::fs::create_dir_all(local_data_dir);
+    //         match a {
+    //             Ok(_) => {
+    //                 return get_document_notebooks_data(
+    //                     &local_data_dir_.as_os_str().to_str().unwrap().to_string(),
+    //                 )
+    //             }
+    //             Err(_) => {
+    //                 let j = serde_json::to_string(&children_dir_and_file_info_1).unwrap();
+    //                 return ResData {
+    //                     code: 500,
+    //                     msg: "读取文档目录失败".to_string(),
+    //                     data: j,
+    //                 };
+    //             }
+    //         }
+    //     }
+    //     Err(e) => {
+    //         return ResData {
+    //             code: 500,
+    //             msg: "读取文档目录失败".to_string(),
+    //             data: serde_json::to_string(&children_dir_and_file_info_1).unwrap(),
+    //         }
+    //     }
+    //     _ => {}
+    // }
     ResData {
         code: 500,
         msg: "读取文档目录失败".to_string(),
