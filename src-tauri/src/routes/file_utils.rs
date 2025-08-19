@@ -1,11 +1,14 @@
 use crate::{
     entity::structs::DirAndFileInfo,
     response::resp_data::ResData,
-    utils::fileUtil::{all_path, get_document_notebooks_data, read_dir_info},
+    utils::{
+        fileUtil::{all_path, get_document_notebooks_data, read_dir_info},
+        regexUtil,
+    },
 };
 use hex;
 use md5::Digest;
-use std::error::Error;
+use std::{error::Error, path::{Path, PathBuf}};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_store::StoreExt;
@@ -105,7 +108,8 @@ pub async fn file_manager_open_path(app_handle: tauri::AppHandle, path: String) 
 // 获取本地笔记本列表
 #[tauri::command]
 pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<String> {
-    let app_dir = app_handle.path().document_dir().unwrap();
+    let app_dir = app_handle.path().document_dir();
+    let store_ = app_handle.store("settings.json");
     let mut children_dir_and_file_info_1 = DirAndFileInfo::create(
         "notebooks".to_string(),
         "".to_string(),
@@ -114,48 +118,112 @@ pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<Str
         "notebooks".to_string(),
         false,
     );
-    let store_ = app_handle.store("settings.json").unwrap();
-
-    match store_.get("md_working_directory") {
-        Some(value) => {
-            // 处理获取到的值
-        }
-        None => {
-            // 未配置目录或获取值失败
-        }
+    match store_ {
+        Ok(store) => match store.get("md_working_directory") {
+            Some(value) => {
+                let md_working_directory = value.as_str().unwrap();
+                return notebooks(&app_handle, md_working_directory);
+            }
+            None => match app_dir {
+                Ok(app_dir_) => {
+                    let path_op = app_dir_.to_str();
+                    match path_op {
+                        Some(path) => {
+                            return notebooks(&app_handle, path);
+                        }
+                        None => {
+                            return ResData {
+                                code: 500,
+                                msg: "读取文档目录失败".to_string(),
+                                data: serde_json::to_string(&children_dir_and_file_info_1).unwrap(),
+                            };
+                        }
+                    }
+                }
+                Err(err) => {
+                    return ResData {
+                        code: 500,
+                        msg: "读取文档目录失败".to_string(),
+                        data: serde_json::to_string(&children_dir_and_file_info_1).unwrap(),
+                    };
+                }
+            },
+        },
+        Err(err) => match app_dir {
+            Ok(app_dir_) => {
+                let path_op = app_dir_.to_str();
+                match path_op {
+                    Some(path) => {
+                        return notebooks(&app_handle, path);
+                    }
+                    None => {
+                        return ResData {
+                            code: 500,
+                            msg: "读取文档目录失败".to_string(),
+                            data: serde_json::to_string(&children_dir_and_file_info_1).unwrap(),
+                        };
+                    }
+                }
+            }
+            Err(err) => {
+                return ResData {
+                    code: 500,
+                    msg: "读取文档目录失败".to_string(),
+                    data: serde_json::to_string(&children_dir_and_file_info_1).unwrap(),
+                };
+            }
+        },
     }
 
+    ResData {
+        code: 500,
+        msg: "读取文档目录失败".to_string(),
+        data: serde_json::to_string(&children_dir_and_file_info_1).unwrap(),
+    }
+}
+
+pub fn notebooks(app: &AppHandle, path_parameter: &str) -> ResData<String>  {
+    let mut children_dir_and_file_info_1 = DirAndFileInfo::create(
+        "notebooks".to_string(),
+        "".to_string(),
+        "notebooks".to_string(),
+        "".to_string(),
+        "notebooks".to_string(),
+        false,
+    );
+    let dir = PathBuf::from(path_parameter);
+    //let dir: &Path = Path::new(path_parameter);
     // match app_dir {
     //     Ok(dir) => {
     //         // 本地文件目录
-    //         let local_data_dir = dir.as_path().join("notebooks");
-    //         let local_data_dir_ = local_data_dir.clone();
-    //         // println!("{:?}", local_data_dir);
-    //         // 文件夹是否存在
-    //         if local_data_dir.exists() {
-    //             return get_document_notebooks_data(
-    //                 &local_data_dir.as_os_str().to_str().unwrap().to_string(),
-    //             );
-    //         }
+            let local_data_dir = dir.as_path().join("notebooks");
+            let local_data_dir_ = local_data_dir.clone();
+            // println!("{:?}", local_data_dir);
+            // 文件夹是否存在
+            if local_data_dir.exists() {
+                return get_document_notebooks_data(
+                    &local_data_dir.as_os_str().to_str().unwrap().to_string(),
+                );
+            }
 
-    //         // 目录不存在则创建
-    //         let a = std::fs::create_dir_all(local_data_dir);
-    //         match a {
-    //             Ok(_) => {
-    //                 return get_document_notebooks_data(
-    //                     &local_data_dir_.as_os_str().to_str().unwrap().to_string(),
-    //                 )
-    //             }
-    //             Err(_) => {
-    //                 let j = serde_json::to_string(&children_dir_and_file_info_1).unwrap();
-    //                 return ResData {
-    //                     code: 500,
-    //                     msg: "读取文档目录失败".to_string(),
-    //                     data: j,
-    //                 };
-    //             }
-    //         }
-    //     }
+            // 目录不存在则创建
+            let a = std::fs::create_dir_all(local_data_dir);
+            match a {
+                Ok(_) => {
+                    return get_document_notebooks_data(
+                        &local_data_dir_.as_os_str().to_str().unwrap().to_string(),
+                    )
+                }
+                Err(_) => {
+                    let j = serde_json::to_string(&children_dir_and_file_info_1).unwrap();
+                    return ResData {
+                        code: 500,
+                        msg: "读取文档目录失败".to_string(),
+                        data: j,
+                    };
+                }
+            }
+        // }
     //     Err(e) => {
     //         return ResData {
     //             code: 500,
@@ -165,13 +233,7 @@ pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<Str
     //     }
     //     _ => {}
     // }
-    ResData {
-        code: 500,
-        msg: "读取文档目录失败".to_string(),
-        data: serde_json::to_string(&children_dir_and_file_info_1).unwrap(),
-    }
 }
-
 // 生成字符串的MD5哈希值
 pub fn generate_md5_hash(input: &str) -> String {
     let digest = md5::compute(input);
