@@ -337,6 +337,8 @@ let get_document_notebooks = () => {
         state.rootSubmenuKeys = DirFileMenu.getRootSubmenuKeys(
           notebooks_data.value.children
         );
+      } else {
+        NotificationUtil.error(res.msg);
       }
     })
     .catch((err) => {
@@ -819,6 +821,8 @@ const reFresh = async () => {
       notebooks_data.value.children
     );
     NotificationUtil.success("刷新完成");
+  } else {
+    NotificationUtil.error(res.msg);
   }
 
 };
