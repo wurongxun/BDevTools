@@ -32,13 +32,13 @@ pub fn app_settings(app: &tauri::AppHandle) {
     let store_ = app.store("settings.json");
     match store_ {
         Ok(store) => {
-            let current_theme = store.get("current_theme");
-            match current_theme {
+            let theme = store.get("theme");
+            match theme {
                 Some(val) => {
-                    println!("current_theme {:?}", val);
+                    println!("theme {:?}", val);
                 }
                 None => {
-                    store.set("current_theme", json!({ "value": "light" }));
+                    store.set("theme", json!({ "value": "light" }));
                 }
             };
 

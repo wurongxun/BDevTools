@@ -90,14 +90,14 @@ onMounted(() => {
                 </div>
             </el-tooltip>
 
-            <el-tooltip content="暗黑模式" placement="bottom">
+            <!-- <el-tooltip content="暗黑模式" placement="bottom">
                 <div @click="darkModeChange()" class="control-button ">
                     <el-icon class="control-icon">
                         <BlackModeIcon v-if="dark" />
                         <WhiteModeIcon v-else />
                     </el-icon>
                 </div>
-            </el-tooltip>
+            </el-tooltip> -->
 
             <el-tooltip content="更多" placement="bottom">
                 <div class="control-button ">

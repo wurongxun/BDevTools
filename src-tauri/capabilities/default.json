@@ -27,6 +27,7 @@
     "core:window:allow-show",
     "core:window:allow-center",
     "store:default",
-    "os:default"
+    "os:default",
+    "window-state:default"
   ]
 }

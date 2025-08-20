@@ -1,4 +1,5 @@
 use tauri::{App, Context, Manager};
+use tauri_plugin_window_state::{StateFlags, WindowExt};
 use window_shadows::set_shadow;
 /**
  * 关闭加载窗口  显示主窗口
@@ -51,7 +52,7 @@ pub async fn about(handle: tauri::AppHandle, window: tauri::Window) {
  */
 #[tauri::command]
 pub async fn note_book_window(handle: tauri::AppHandle, window: tauri::Window) {
-    let about_window = tauri::WebviewWindowBuilder::new(
+    let note_book_window = tauri::WebviewWindowBuilder::new(
         &handle,
         "note_book", /* the unique window label */
         tauri::WebviewUrl::App("#/MainWindows/NoteBook".into()),
@@ -60,13 +61,14 @@ pub async fn note_book_window(handle: tauri::AppHandle, window: tauri::Window) {
     .inner_size(720.0, 640.0)
     .min_inner_size(640.0, 480.0)
     .decorations(false)
-    .center()
     .resizable(true) //是否可调整大小
+    .center()
     .build()
     .unwrap();
-
     // #[cfg(any(target_os = "windows", target_os = "macos"))]
     // set_shadow(&about_window, true).expect("Unsupported platform!");
+    ///let _ = note_book_window.restore_state(StateFlags::all()); // will restore the window's state from disk
+    note_book_window.show().unwrap();
 }
 /**
  * 最小化

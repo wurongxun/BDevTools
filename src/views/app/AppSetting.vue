@@ -7,13 +7,23 @@ import { useI18n } from "vue-i18n";
 import { appConfigInfo } from "@/store/appConfigInfo";
 import { load, Store } from '@tauri-apps/plugin-store';
 import { open } from '@tauri-apps/plugin-dialog';
+import { useDark, useToggle } from '@vueuse/core'
+const isDark = useDark({
+  storageKey: 'theme-appearance', //自定义localStorage存储名称
+  valueDark: 'dark', //类名暗黑模式下值是dark
+  valueLight: 'light', // 类名亮色模式下值是light
+})
+const toggleDark = useToggle(isDark)
+
 const { t, locale } = useI18n()
 const userStore = appConfigInfo();
 let store: Store | undefined = undefined;
 let autostart = ref<boolean>(false)
 let update_reminder = ref<boolean>(false)
+let dark = ref<boolean>(false)
+let theme = ref<string>('white')
 let language = ref<string>('')
-let md_working_directory = ref<string>('Documents')
+let md_working_directory = ref<string>('')
 const language_options = [
   {
     value: 'zh_CN',
@@ -33,6 +43,18 @@ const language_options = [
   {
     value: 'en',
     label: 'English',
+    disabled: false,
+  }
+]
+const theme_options = [
+  {
+    value: 'white',
+    label: '亮色',
+    disabled: false,
+  },
+  {
+    value: 'black',
+    label: '黑色',
     disabled: false,
   }
 ]
@@ -61,6 +83,14 @@ onMounted(async () => {
   let update_reminder_val = await store.get<{ value: boolean }>('update_reminder');
   if (update_reminder_val !== undefined) {
     update_reminder.value = update_reminder_val.value;
+  }
+  let theme_val = await store.get<{ value: string }>('theme');
+  if (theme_val !== undefined) {
+    theme.value = theme_val.value;
+  }
+  let dark_val = await store.get<{ value: boolean }>('dark');
+  if (dark_val !== undefined) {
+    dark.value = dark_val.value;
   }
 })
 
@@ -100,6 +130,25 @@ async function software_change() {
   if (store) {
     await store.set('update_reminder', { value: update_reminder.value });
     await store.save();
+  }
+}
+async function theme_change() {
+  if (store) {
+    await store.set('theme', { value: theme.value });
+    await store.save();
+    let el_color_primary = isDark.value ? "black" : ""
+    document.documentElement.style.setProperty('--el-color-primary', el_color_primary);
+  }
+}
+async function dark_change() {
+  if (store) {
+    await store.set('dark', { value: dark.value });
+    await store.save();
+    if (!isDark.value && dark.value) {
+      toggleDark()
+    } else if (isDark.value && !dark.value) {
+      toggleDark()
+    }
   }
 }
 async function md_working_directory_change() {
@@ -156,7 +205,28 @@ const clear_browser_cache = () => {
               :inactive-icon="Close" />
           </div>
         </div>
-
+        <div class="settings-item">
+          <div class="setting-info">
+            <span class="setting-label">主题</span>
+            <span class="setting-description">切换主题</span>
+          </div>
+          <div class="setting-control">
+            <el-select v-model="theme" @change="theme_change" placeholder="选择主题" style="width: 180px">
+              <el-option v-for="item in theme_options" :key="item.value" :label="item.label" :value="item.value"
+                :disabled="item.disabled" />
+            </el-select>
+          </div>
+        </div>
+        <div class="settings-item">
+          <div class="setting-info">
+            <span class="setting-label">暗黑模式</span>
+            <span class="setting-description"></span>
+          </div>
+          <div class="setting-control">
+            <el-switch v-model="dark" @change="dark_change()" inline-prompt :active-icon="Check"
+              :inactive-icon="Close" />
+          </div>
+        </div>
         <div class="settings-item">
           <div class="setting-info">
             <span class="setting-label">切换语言</span>

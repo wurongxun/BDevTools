@@ -1,16 +1,15 @@
 use std::{
     error::Error,
     fs::{metadata, read_dir},
-    path::Path,
-};
-
-use crate::{
-    entity::structs::DirAndFileInfo,
-    response::{resp_data::ResData, response::Response},
-    routes::file_utils::generate_md5_hash,
+    path::{Path, PathBuf},
 };
 
 use super::regexUtil;
+use crate::{
+    entity::structs::DirAndFileInfo,
+    response::{resp_data::ResData, response::Response},
+};
+use tauri::{AppHandle, Manager};
 
 pub fn all_path(root_path: &String) -> Result<Vec<String>, Box<dyn Error>> {
     let id = chrono::prelude::Local::now().timestamp_millis().to_string();
@@ -100,7 +99,6 @@ pub fn get_dir_and_file(
 ) -> Result<ResData<String>, Box<dyn Error>> {
     let path_ = children_dirAndFileInfo.get_path();
     let path_2 = path_.clone();
-
     if metadata(path_)?.is_dir() {
         for child_dir in read_dir(&path_2)? {
             let path_dir_entry = child_dir?.path();
@@ -127,12 +125,6 @@ pub fn get_dir_and_file(
             if pos.len() > 0 {
                 name = pos[pos.len() - 1];
             }
-            //  let mut full_name = "";
-            //  if let Some(last_dot) = name.rfind('.') {
-            //         full_name = &name[..last_dot];
-            //     } else {
-            //         full_name = name;
-            //     }
             let a: u32 = 1;
             let c: u32 = num.clone();
             let mut d = a + c;
@@ -164,10 +156,13 @@ pub fn get_dir_and_file(
     })
 }
 
-pub fn get_document_notebooks_data(root_path: &String) -> ResData<String> {
+/**
+ * 获取目录下所有文件信息
+ */
+pub fn get_dir_notebooks_data(root_path: &String) -> ResData<String> {
     let id: String = chrono::prelude::Local::now().timestamp_millis().to_string();
     let folder = get_directory_path(root_path).unwrap();
-    let mut children_dir_and_file_info_1 = DirAndFileInfo::create(
+    let mut dir_info = DirAndFileInfo::create(
         id,
         "".to_string(),
         root_path.to_string(),
@@ -176,15 +171,15 @@ pub fn get_document_notebooks_data(root_path: &String) -> ResData<String> {
         false,
     );
     let mut i: u32 = 0;
-    get_dir_and_file(&mut i, &mut children_dir_and_file_info_1);
+    let _ = get_dir_and_file(&mut i, &mut dir_info);
     println!(
-        "get_document_notebooks_data {}",
-        serde_json::to_string(&children_dir_and_file_info_1).unwrap()
+        "get_dir_notebooks_data {}",
+        serde_json::to_string(&dir_info).unwrap()
     );
     ResData {
         code: 200,
         msg: "OK".to_string(),
-        data: serde_json::to_string(&children_dir_and_file_info_1).unwrap(),
+        data: serde_json::to_string(&dir_info).unwrap(),
     }
 }
 /**
@@ -210,4 +205,67 @@ pub fn get_directory_path(path: &str) -> Option<String> {
         }
         Err(_) => None,
     }
+}
+
+/**
+ * 获取默认文档目录数据
+ */
+pub fn default_document_data(app_handle: tauri::AppHandle) -> ResData<String> {
+    let app_dir = app_handle.path().document_dir();
+    match app_dir {
+        Ok(app_dir_) => {
+            let path_op = app_dir_.to_str();
+            match path_op {
+                Some(path) => {
+                    return md_notebooks(&app_handle, path);
+                }
+                None => {
+                    return ResData {
+                        code: 500,
+                        msg: "读取文档目录失败".to_string(),
+                        data: String::new(),
+                    };
+                }
+            }
+        }
+        Err(err) => {
+            return ResData {
+                code: 500,
+                msg: "读取文档目录失败".to_string(),
+                data: String::new(),
+            };
+        }
+    }
+}
+pub fn md_notebooks(app: &AppHandle, path_parameter: &str) -> ResData<String> {
+    let dir = PathBuf::from(path_parameter);
+    let local_data_dir = dir.as_path().join("notebooks");
+    let local_data_dir_ = local_data_dir.clone();
+
+    // 文件夹是否存在
+    if local_data_dir.exists() {
+        return get_dir_notebooks_data(&local_data_dir.as_os_str().to_str().unwrap().to_string());
+    }
+
+    // 目录不存在则创建
+    let _dir = std::fs::create_dir_all(local_data_dir);
+    match _dir {
+        Ok(_) => {
+            return get_dir_notebooks_data(
+                &local_data_dir_.as_os_str().to_str().unwrap().to_string(),
+            )
+        }
+        Err(_) => {
+            return ResData {
+                code: 500,
+                msg: "读取文档目录失败".to_string(),
+                data: String::new(),
+            };
+        }
+    }
+}
+// 生成字符串的MD5哈希值
+pub fn generate_md5_hash(input: &str) -> String {
+    let digest = md5::compute(input);
+    hex::encode(digest.as_ref())
 }

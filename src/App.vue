@@ -10,6 +10,13 @@ import { invoke } from '@tauri-apps/api/core';
 import { load, Store } from '@tauri-apps/plugin-store';
 import { onMounted } from 'vue';
 import { useI18n } from "vue-i18n";
+import { useDark, useToggle } from '@vueuse/core'
+const isDark = useDark({
+  storageKey: 'theme-appearance', //自定义localStorage存储名称
+  valueDark: 'dark', //类名暗黑模式下值是dark
+  valueLight: 'light', // 类名亮色模式下值是light
+})
+const toggleDark = useToggle(isDark)
 let store: Store | undefined = undefined;
 const { t, locale } = useI18n()
 onMounted(async () => {
@@ -18,6 +25,18 @@ onMounted(async () => {
     let language_val = await store.get<{ value: string }>('language');
     if (language_val !== undefined) {
       locale.value = language_val.value;
+    }
+    let theme_val = await store.get<{ value: string }>('theme');
+    if (theme_val !== undefined) {
+      let el_color_primary = isDark.value ? "black" : ""
+      document.documentElement.style.setProperty('--el-color-primary', el_color_primary);
+    }
+
+    let dark_val = await store.get<{ value: boolean }>('dark');
+    if (dark_val !== undefined) {
+      if (dark_val.value && !isDark.value) {
+        toggleDark();
+      }
     }
   }
 
