@@ -11,56 +11,75 @@ use crate::{
 };
 use tauri::{AppHandle, Manager};
 
-pub fn all_path(root_path: &String) -> Result<Vec<String>, Box<dyn Error>> {
-    let id = chrono::prelude::Local::now().timestamp_millis().to_string();
-    let folder = get_directory_path(&root_path).unwrap();
-    let mut children_dir_and_file_info_1 = DirAndFileInfo::create(
-        id,
-        "".to_string(),
-        root_path.to_string(),
-        folder,
-        "notebooks".to_string(),
-        false,
-    );
-    let mut i: u32 = 0;
-    get_dir_and_file(&mut i, &mut children_dir_and_file_info_1);
-    let sdata = serde_json::to_string(&children_dir_and_file_info_1);
-    if sdata.is_err() {
-        println!(
-            "Error, failed to serialize structure: {}",
-            sdata.unwrap_err()
-        );
-    } else {
-        let sdata2 = sdata.unwrap();
-        println!("Serialized data:\n{}", sdata2);
-    }
+// pub fn all_path(root_path: &String) -> Result<Vec<String>, Box<dyn Error>> {
+//     let id = chrono::prelude::Local::now().timestamp_millis().to_string();
+//     let folder = get_directory_path(&root_path).unwrap();
+//     let mut name = "";
+//     #[cfg(target_os = "windows")]
+//     let pos: Vec<&str> = Path::new(&folder)
+//         .as_os_str()
+//         .to_str()
+//         .expect("")
+//         .split("\\")
+//         .collect();
+//     #[cfg(any(target_os = "linux", target_os = "macos"))]
+//     let pos: Vec<&str> = Path::new(&folder)
+//         .as_os_str()
+//         .to_str()
+//         .expect("")
+//         .split("/")
+//         .collect();
+//     if pos.len() > 0 {
+//         name = pos[pos.len() - 1];
+//     }
 
-    println!("all_path:  {}", root_path);
-    let mut path_list = vec![String::from(root_path)];
-    let mut start_index = 0;
-    loop {
-        let list_len = path_list.len();
-        println!("all_path list_len  {}", list_len);
-        for index in start_index..path_list.len() {
-            let path = &path_list[index];
-            println!("all_path path {} - {}", index, path);
-            if metadata(path)?.is_dir() {
-                for child_dir in read_dir(&path)? {
-                    println!("all_path path child_dir - {:?}", child_dir);
-                    path_list.push(String::from(
-                        child_dir?.path().as_os_str().to_str().expect(""),
-                    ));
-                }
-            }
-        }
-        if list_len == start_index {
-            break;
-        }
-        start_index = list_len;
-    }
-    println!("all_path path path_list - {:?}", path_list);
-    return Ok(path_list);
-}
+//     let mut children_dir_and_file_info_1 = DirAndFileInfo::create(
+//         id,
+//         "".to_string(),
+//         root_path.to_string(),
+//         folder.clone(),
+//         name.to_string(),
+//         false,
+//     );
+//     let mut i: u32 = 0;
+//     get_dir_and_file(&mut i, &mut children_dir_and_file_info_1);
+//     let sdata = serde_json::to_string(&children_dir_and_file_info_1);
+//     if sdata.is_err() {
+//         println!(
+//             "Error, failed to serialize structure: {}",
+//             sdata.unwrap_err()
+//         );
+//     } else {
+//         let sdata2 = sdata.unwrap();
+//         println!("Serialized data:\n{}", sdata2);
+//     }
+
+//     println!("all_path:  {}", root_path);
+//     let mut path_list = vec![String::from(root_path)];
+//     let mut start_index = 0;
+//     loop {
+//         let list_len = path_list.len();
+//         println!("all_path list_len  {}", list_len);
+//         for index in start_index..path_list.len() {
+//             let path = &path_list[index];
+//             println!("all_path path {} - {}", index, path);
+//             if metadata(path)?.is_dir() {
+//                 for child_dir in read_dir(&path)? {
+//                     println!("all_path path child_dir - {:?}", child_dir);
+//                     path_list.push(String::from(
+//                         child_dir?.path().as_os_str().to_str().expect(""),
+//                     ));
+//                 }
+//             }
+//         }
+//         if list_len == start_index {
+//             break;
+//         }
+//         start_index = list_len;
+//     }
+//     println!("all_path path path_list - {:?}", path_list);
+//     return Ok(path_list);
+// }
 
 pub fn read_dir_info<P: AsRef<Path>>(local_data_dir: P) -> Result<ResData<Vec<String>>, String> {
     let mut notebooks: Vec<String> = vec![];
@@ -162,12 +181,31 @@ pub fn get_dir_and_file(
 pub fn get_dir_notebooks_data(root_path: &String) -> ResData<String> {
     let id: String = chrono::prelude::Local::now().timestamp_millis().to_string();
     let folder = get_directory_path(root_path).unwrap();
+    let mut name = "";
+    #[cfg(target_os = "windows")]
+    let pos: Vec<&str> = Path::new(&folder)
+        .as_os_str()
+        .to_str()
+        .expect("")
+        .split("\\")
+        .collect();
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    let pos: Vec<&str> = Path::new(&folder)
+        .as_os_str()
+        .to_str()
+        .expect("")
+        .split("/")
+        .collect();
+    if pos.len() > 0 {
+        name = pos[pos.len() - 1];
+    }
+
     let mut dir_info = DirAndFileInfo::create(
         id,
         "".to_string(),
         root_path.to_string(),
-        folder,
-        "notebooks".to_string(),
+        folder.clone(),
+        name.to_string(),
         false,
     );
     let mut i: u32 = 0;
@@ -239,8 +277,8 @@ pub fn default_document_data(app_handle: tauri::AppHandle) -> ResData<String> {
 }
 pub fn md_notebooks(app: &AppHandle, path_parameter: &str) -> ResData<String> {
     let dir = PathBuf::from(path_parameter);
-    let local_data_dir = dir.as_path().join("notebooks");
-    let local_data_dir_ = local_data_dir.clone();
+    let local_data_dir = dir.clone();
+    let local_data_dir_ = dir.clone();
 
     // 文件夹是否存在
     if local_data_dir.exists() {
