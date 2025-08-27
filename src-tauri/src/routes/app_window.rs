@@ -62,12 +62,13 @@ pub async fn note_book_window(handle: tauri::AppHandle, window: tauri::Window) {
     .min_inner_size(640.0, 480.0)
     .decorations(false)
     .resizable(true) //是否可调整大小
+    .visible(false)
     .center()
     .build()
     .unwrap();
     // #[cfg(any(target_os = "windows", target_os = "macos"))]
     // set_shadow(&about_window, true).expect("Unsupported platform!");
-    ///let _ = note_book_window.restore_state(StateFlags::all()); // will restore the window's state from disk
+    //let _ = note_book_window.restore_state(StateFlags::all()); // will restore the window's state from disk
     note_book_window.show().unwrap();
 }
 /**
