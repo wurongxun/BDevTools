@@ -16,6 +16,7 @@ mod system_menu;
 mod utils;
 
 use crate::app::app::app_settings;
+use crate::app::tray::create_tray;
 use crate::app_setup::setup::setup_windows;
 use crate::routes::app_window::{
     about, loding_window_close, note_book_window, windows_close, windows_hide, windows_maximize,
@@ -61,6 +62,12 @@ pub fn run() {
             windows_close
         ])
         .setup(move |app: &mut App| {
+            #[cfg(all(desktop))]
+            {
+                let handle = app.handle();
+                create_tray(handle)?;
+            }
+
             let mut main_window = match WebviewWindowBuilder::new(
                 app,
                 "main".to_string(),
