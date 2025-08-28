@@ -10,7 +10,8 @@ use std::{
     fs::create_dir_all,
     path::{Path, PathBuf},
 };
-
+use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_store::StoreExt;
 
 use tauri::{path::BaseDirectory, Manager};
@@ -69,6 +70,40 @@ pub fn app_settings(app: &tauri::AppHandle) {
                 }
                 None => {
                     // store.set("md_working_directory", json!({ "value": "" }));
+                }
+            };
+        }
+        Err(err) => {
+            println!("Error opening store: {}", err);
+        }
+    }
+}
+
+pub fn app_autostart(app: &tauri::AppHandle) {
+    // Get the autostart manager
+    let autostart_manager = app.autolaunch();
+    let store_ = app.store("settings.json");
+    match store_ {
+        Ok(store) => {
+            let autostart_value = store.get("auto_start");
+            match autostart_value {
+                Some(val) => {
+                    println!("auto_start_value {:?}", val);
+                    let v = val.get("value");
+                    match v {
+                        Some(value) => {
+                            if value.as_bool().unwrap() {
+                                let _ = autostart_manager.enable();
+                            } else {
+                                let _ = autostart_manager.disable();
+                            }
+                        }
+                        None => todo!(),
+                    }
+                }
+                None => {
+                    store.set("auto_start", json!({ "value": false }));
+                    let _ = autostart_manager.disable();
                 }
             };
         }
