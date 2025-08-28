@@ -10,6 +10,7 @@
     "note_book"
   ],
   "permissions": [
-    "window-state:default"
+    "window-state:default",
+    "autostart:default"
   ]
 }
