@@ -12,7 +12,10 @@ import WindowRestoreIcon from "@/components/Icon/WindowRestoreIcon.vue"
 import BlackModeIcon from "@/components/Icon/BlackModeIcon.vue"
 import WhiteModeIcon from "@/components/Icon/WhiteModeIcon.vue"
 import BoxLogoIcon from "@/components/Icon/BoxLogoIcon.vue"
+import logoImage from "@/assets/image/logo.png"
+
 import { useDark, useToggle } from '@vueuse/core'
+import router from "@/router";
 const isDark = useDark({
     storageKey: 'theme-appearance', //自定义localStorage存储名称
     valueDark: 'dark', //类名暗黑模式下值是dark
@@ -25,11 +28,14 @@ const route = useRoute()
 const visible = ref(false);
 const dark_mode_icon = ref("black")
 const dark = ref(false);
-
 //路由名称
 const routeName = computed(() => route.path.match('/[^/]+')?.[0] ?? '');
 // 应用标题，动态切换不同标题
 const input3 = ref('')
+const navigateTo = async function (routeUrl: string) {
+    console.log("navigateTo", routeUrl);
+    router.push(routeUrl);
+};
 const darkModeChange = async function () {
     toggleDark();
     dark.value = isDark.value
@@ -63,12 +69,11 @@ onMounted(() => {
 <template>
     <div class="back_header" data-tauri-drag-region>
         <div class="back_left">
-            <!-- <div class="logo-container">
-                <el-icon size="30" class="app-logo">
-                    <BoxLogoIcon />
-                </el-icon>
-            </div> -->
-            {{ t('appName') }}
+            <div class="logo-container">
+                <span class="logo-wrapper">
+                    <el-image :src="logoImage" :preview="false" fit="contain" />
+                </span>
+            </div>
         </div>
 
         <!-- <div class="header-section header-center">
@@ -90,17 +95,9 @@ onMounted(() => {
                 </div>
             </el-tooltip>
 
-            <!-- <el-tooltip content="暗黑模式" placement="bottom">
-                <div @click="darkModeChange()" class="control-button ">
-                    <el-icon class="control-icon">
-                        <BlackModeIcon v-if="dark" />
-                        <WhiteModeIcon v-else />
-                    </el-icon>
-                </div>
-            </el-tooltip> -->
 
             <el-tooltip content="更多" placement="bottom">
-                <div class="control-button ">
+                <div class="control-button " @click="navigateTo('/App/AppSetting')">
                     <el-icon class="control-icon">
                         <More />
                     </el-icon>
@@ -192,10 +189,29 @@ onMounted(() => {
 .logo-container {
     display: flex;
     align-items: center;
+    justify-content: center;
     height: 100%;
+    padding: 0 1px;
+    flex-shrink: 0; // 防止容器在空间不足时收缩
 
-    .app-logo {
-        padding: 2px;
+    .logo-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        overflow: hidden;
+    }
+
+    :deep(.el-image) {
+        width: 100%;
+        height: 100%;
+
+        img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
     }
 }
 
