@@ -6,10 +6,10 @@ use tauri::{
 
 pub fn create_tray<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
     let quit_i = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-    let set_i = MenuItem::with_id(app, "set", "设置", true, None::<&str>)?;
+    //let set_i = MenuItem::with_id(app, "set", "设置", true, None::<&str>)?;
     let show_i = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
     // 分割线
-    let menu = Menu::with_items(app, &[&show_i, &set_i, &quit_i])?;
+    let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
 
     let _ = TrayIconBuilder::with_id("tray")
         .icon(app.default_window_icon().unwrap().clone())
@@ -21,6 +21,8 @@ pub fn create_tray<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
                     println!(" show {}",key);
                     if key == "main" || key == "home" {
                         value.show().unwrap();
+                        value.unminimize().unwrap();
+                        value.set_focus().unwrap();
                     }
                 }
             }
