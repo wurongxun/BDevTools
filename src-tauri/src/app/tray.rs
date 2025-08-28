@@ -18,7 +18,7 @@ pub fn create_tray<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
         .on_menu_event(move |app, event| match event.id.as_ref() {
             "show" => {
                 for (key, value) in app.webview_windows() {
-                    println!(" show {}",key);
+                    println!(" show {}", key);
                     if key == "main" || key == "home" {
                         value.show().unwrap();
                         value.unminimize().unwrap();

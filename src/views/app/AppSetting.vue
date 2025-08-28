@@ -6,6 +6,7 @@ import { ResponseData, SettingIdValueName, SettingMap } from '@/entity/entitys';
 import { useI18n } from "vue-i18n";
 import { appConfigInfo } from "@/store/appConfigInfo";
 import { load, Store } from '@tauri-apps/plugin-store';
+import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useDark, useToggle } from '@vueuse/core'
 const isDark = useDark({
@@ -124,6 +125,11 @@ async function autostart_change() {
   if (store) {
     await store.set('auto_start', { value: autostart.value });
     await store.save();
+    if (autostart.value) {
+      await enable();
+    } else {
+      await disable();
+    }
   }
 }
 async function software_change() {
@@ -202,7 +208,7 @@ const clear_browser_cache = () => {
           </div>
           <div class="setting-control">
             <el-switch v-model="update_reminder" @change="software_change()" inline-prompt :active-icon="Check"
-              :inactive-icon="Close" />
+              :inactive-icon="Close" disabled />
           </div>
         </div>
         <div class="settings-item">
@@ -251,7 +257,7 @@ const clear_browser_cache = () => {
             <span class="setting-description">检测当前网络连接状态</span>
           </div>
           <div class="setting-control">
-            <el-button type="primary" plain>检测网络</el-button>
+            <el-button type="primary" disabled plain>检测网络</el-button>
           </div>
         </div>
       </div>
@@ -289,7 +295,7 @@ const clear_browser_cache = () => {
             <span class="setting-description">清理应用缓存文件</span>
           </div>
           <div class="setting-control">
-            <el-button type="danger" plain>清除缓存</el-button>
+            <el-button type="danger" disabled plain>清除缓存</el-button>
           </div>
         </div>
 
@@ -299,7 +305,7 @@ const clear_browser_cache = () => {
             <span class="setting-description">清理内置浏览器缓存数据</span>
           </div>
           <div class="setting-control">
-            <el-button type="danger" plain>清除浏览器缓存</el-button>
+            <el-button type="danger" disabled plain>清除浏览器缓存</el-button>
           </div>
         </div>
       </div>
