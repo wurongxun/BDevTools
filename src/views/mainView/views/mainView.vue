@@ -28,7 +28,7 @@
             <el-icon class="card-icon">
               <Files />
             </el-icon>
-            <span>其他文件处理</span>
+            <span>未出货成品订单PO抛转</span>
           </div>
         </template>
         <el-upload class="upload-demo" drag action="#" multiple ref="upload2" :http-request="uploads" :limit="1"
@@ -49,7 +49,7 @@
             <el-icon class="card-icon">
               <Upload />
             </el-icon>
-            <span>数据导入</span>
+            <span>预订单SO制作</span>
           </div>
         </template>
         <el-upload class="upload-demo" drag action="#" multiple ref="upload3" :http-request="uploads" :limit="1"
@@ -70,7 +70,27 @@
             <el-icon class="card-icon">
               <Download />
             </el-icon>
-            <span>数据导出</span>
+            <span>未清订单明细汇总</span>
+          </div>
+        </template>
+        <el-upload class="upload-demo" drag action="#" multiple ref="upload4" :http-request="uploads" :limit="1"
+          :on-exceed="handleExceed" accept=".xlsx">
+          <el-icon class="el-icon--upload">
+            <UploadFilled />
+          </el-icon>
+          <div class="el-upload__text">
+            将文件拖到此处，或<em>点击选择文件</em>
+          </div>
+          <div class="el-upload__tip">支持 .xlsx 格式文件</div>
+        </el-upload>
+      </el-card>
+        <el-card class="upload-card" shadow="hover">
+        <template #header>
+          <div class="card-header">
+            <el-icon class="card-icon">
+              <Download />
+            </el-icon>
+            <span>高价值产品分析</span>
           </div>
         </template>
         <el-upload class="upload-demo" drag action="#" multiple ref="upload4" :http-request="uploads" :limit="1"
