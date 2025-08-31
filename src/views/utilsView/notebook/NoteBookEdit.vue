@@ -324,26 +324,21 @@ const dragControllerDiv = () => {
 /**
  *  获取笔记本数据
  */
-let get_document_notebooks = () => {
-  // 获取笔记本数据
-  invoke<ResponseData<NotebookInfo>>("get_document_notebooks")
-    .then((res: ResponseData<NotebookInfo>) => {
-      console.log("res===============", res);
-      if (res && typeof res === "object" && "code" in res && res.code == 200) {
-        //值 返回ResponseData 对象，包含data、code、msg参数 例如：data {"id":"1752761254929","parent_id":"","path":"C:\\Users\\kun15\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[]}
-        let data_: NotebookInfo =
-          typeof res.data === "string" ? JSON.parse(res.data) : res.data;
-        notebooks_data.value = data_;
-        state.rootSubmenuKeys = DirFileMenu.getRootSubmenuKeys(
-          notebooks_data.value.children
-        );
-      } else {
-        NotificationUtil.error(res.msg);
-      }
-    })
-    .catch((err) => {
-      NotificationUtil.error("获取数据失败 ：" + err);
-    });
+let get_document_notebooks = async () => {
+
+  let res = await tauri_request<ResponseData<String[]>>("get_document_notebooks", {})
+  console.log("res===============", res);
+  if (res && typeof res === "object" && "code" in res && res.code == 200) {
+    //值 返回ResponseData 对象，包含data、code、msg参数 例如：data {"id":"1752761254929","parent_id":"","path":"C:\\Users\\kun15\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[]}
+    let data_: NotebookInfo =
+      typeof res.data === "string" ? JSON.parse(res.data) : res.data;
+    notebooks_data.value = data_;
+    state.rootSubmenuKeys = DirFileMenu.getRootSubmenuKeys(
+      notebooks_data.value.children
+    );
+  } else {
+    NotificationUtil.error(res.msg);
+  }
 };
 const onError = (err: { message: string; }) => {
   NotificationUtil.error(err.message);
@@ -389,7 +384,7 @@ const state = reactive({
  * selectedKeys(v-model)	当前选中的菜单项 key 数组
  * @param {*} param0
  */
-const selectHandle = function (node: NotebookInfo) {
+const selectHandle = async function (node: NotebookInfo) {
   console.log("node {:?}", node)
   data.selectIsFile = node.isfile;
   if (!node.isfile) {
@@ -401,58 +396,60 @@ const selectHandle = function (node: NotebookInfo) {
   if (node.path == data.currentChooseFolderPath_md) {
     return;
   }
+  console.log("selectHandle1 notEditedMdtext_md {:?}", data.notEditedMdtext_md)
+  console.log("selectHandle1 editedMdtext_md  {:?}", data.editedMdtext_md)
+  console.log("selectHandle title_md  {:?}", data.title_md)
+  console.log("selectHandle lastTimeTitle_md  {:?}", data.lastTimeTitle_md)
 
   // 
   //处理原来编辑笔记
   if ((data.notEditedMdtext_md != data.editedMdtext_md) || (data.title_md != data.lastTimeTitle_md &&
-    StringUtil.isNotNullOrEmpty(data.title_md) &&
-    StringUtil.isNotNullOrEmpty(data.lastTimeTitle_md))
+    StringUtil.isNullOrEmpty(data.title_md) &&
+    StringUtil.isNullOrEmpty(data.lastTimeTitle_md))
   ) {
     ElMessageBox.confirm("上一份笔记未保存，需要保存吗?", "保存笔记", {
       confirmButtonText: "保存",
       cancelButtonText: "不保存",
       type: "warning",
     })
-      .then(() => {
+      .then(async () => {
         //获取目录下笔记
-        invoke<ResponseData<String[]>>("get_note_list", {
+        let res = await tauri_request<ResponseData<String[]>>("get_note_list", {
           path: data.currentChooseFolderPath_md,
         })
-          .then((res: ResponseData<String[]>) => {
-            //获取旧笔记
-            let same_file_name = false;
-            if (res && res.code == 200) {
-              //String 数组集合 所属文件夹下全部文件名 查看是否有重复
-              var tem = res.data;
-              tem.map((n) => {
-                if (n == data.title_md && data.title_md != data.lastTimeTitle_md) {
-                  same_file_name = true;
-                }
-              });
-              //无重复
-              if (!same_file_name) {
-                //先保存数据
-                Promise.all([saveMd(data.editedMdtext_md, data.title_md, data.currentChooseNoteAllPath_md)]).then(() => {
-                  read_note_file(node);
-                })
-                  .catch((err) => {
-                    NotificationUtil.error("保存文件失败，" + err.getMessage());
-                  });
-              } else {
-                //有重复名称
-                NotificationUtil.warn("已有相同文件名，文件名将无法更改！");
-                //保存旧文件名称
-                Promise.all([saveMd(data.editedMdtext_md, data.title_md, data.currentChooseNoteAllPath_md)]).then(() => {
-                  read_note_file(node);
-                }).catch((err) => {
-                  NotificationUtil.error("保存文件失败，" + err.getMessage());
-                });
-              }
+        //获取旧笔记
+        let same_file_name = false;
+        if (res && res.code == 200) {
+
+          //String 数组集合 所属文件夹下全部文件名 查看是否有重复
+          var tem = res.data;
+          tem.map((n) => {
+            if (n == data.title_md && data.title_md != data.lastTimeTitle_md) {
+              same_file_name = true;
             }
-          })
-          .catch((err) => {
-            NotificationUtil.error("获取数据失败 ：" + err);
           });
+          //无重复
+          if (!same_file_name) {
+            //先保存数据
+            Promise.all([saveMd(data.editedMdtext_md, data.title_md, data.currentChooseNoteAllPath_md)]).then(() => {
+              read_note_file(node);
+            })
+              .catch((err) => {
+                NotificationUtil.error("保存文件失败，" + err.getMessage());
+              });
+          } else {
+            //有重复名称
+            NotificationUtil.warn("已有相同文件名，文件名将无法更改！");
+            //保存旧文件名称
+            Promise.all([saveMd(data.editedMdtext_md, data.title_md, data.currentChooseNoteAllPath_md)]).then(() => {
+              read_note_file(node);
+            }).catch((err) => {
+              NotificationUtil.error("保存文件失败，" + err.getMessage());
+            });
+          }
+        } else {
+          NotificationUtil.error(res.msg);
+        }
       })
       .catch(() => {
         read_note_file(node);
@@ -468,7 +465,7 @@ const selectHandle = function (node: NotebookInfo) {
  * @param {标题} mdTitle
  */
 const saveMd = (mdText: string, mdTitle: string, path: string,) => {
-  var p = new Promise(function () {
+  var p = new Promise(async function () {
     if (mdTitle == "") {
       // 标题为空
       NotificationUtil.error("请输入标题");
@@ -476,23 +473,17 @@ const saveMd = (mdText: string, mdTitle: string, path: string,) => {
     }
 
     if (mdText && mdTitle && path) {
-      // 调用保存笔记方法
-      invoke<ResponseData<string>>("save_note", {
+      let res = await tauri_request<ResponseData<String[]>>("save_note", {
         path: path,
         mdTitle: mdTitle,
         mdText: mdText,
       })
-        .then((res: ResponseData<string>) => {
-          if (res && res.code == 200) {
-            data.notEditedMdtext_md = mdText;
-            NotificationUtil.success("笔记保存成功");
-          } else {
-            NotificationUtil.error("笔记保存失败：" + res.msg);
-          }
-        })
-        .then((err) => {
-          console.log(err);
-        });
+      if (res && res.code == 200) {
+        data.notEditedMdtext_md = mdText;
+        NotificationUtil.success("笔记保存成功");
+      } else {
+        NotificationUtil.error("笔记保存失败：" + res.msg);
+      }
     } else {
       // 存在为空情况
       NotificationUtil.error("请选定笔记本和笔记");
@@ -574,7 +565,7 @@ let addNodeFolder = async function () {
 // 显示添加笔记对话框
 const showAddFileModalForm = () => {
   console.log("showAddFileModalForm ", data.selectFolderPath);
-  if (StringUtil.isNotNullOrEmpty(data.selectFolderPath)) {
+  if (StringUtil.isNullOrEmpty(data.selectFolderPath)) {
     NotificationUtil.error(`请选择文件夹`);
     return;
   }
@@ -630,7 +621,7 @@ let addFile = async function () {
 };
 
 let upFileNameMenu = async function () {
-  if (StringUtil.isNotNullOrEmpty(data.currentChooseNoteAllPath_md) && data.selectIsFile) {
+  if (StringUtil.isNullOrEmpty(data.currentChooseNoteAllPath_md) && data.selectIsFile) {
     NotificationUtil.warn("请选择笔记");
     return;
   }
@@ -657,7 +648,7 @@ let upFileName = async function () {
  * 删文件
  */
 let removeNote = async function () {
-  if (StringUtil.isNotNullOrEmpty(data.currentChooseNoteAllPath_md) && data.selectIsFile) {
+  if (StringUtil.isNullOrEmpty(data.currentChooseNoteAllPath_md) && data.selectIsFile) {
     NotificationUtil.warn("请选择笔记");
     return;
   }
@@ -695,7 +686,7 @@ let removeNote = async function () {
 };
 
 let removeFile = async function () {
-  if (StringUtil.isNotNullOrEmpty(data.currentChooseNoteAllPath_md) && data.selectIsFile) {
+  if (StringUtil.isNullOrEmpty(data.currentChooseNoteAllPath_md) && data.selectIsFile) {
     NotificationUtil.error("请选择文件！");
     return;
   }
@@ -740,7 +731,7 @@ let removeFile = async function () {
  * 删除文件夹
  */
 let removeFolder = async function () {
-  if (StringUtil.isNotNullOrEmpty(data.selectFolderPath) && !data.selectIsFile) {
+  if (StringUtil.isNullOrEmpty(data.selectFolderPath) && !data.selectIsFile) {
     NotificationUtil.error("请选择文件夹！");
     return;
   }
@@ -856,7 +847,11 @@ const read_note_file = async function (node: NotebookInfo) {
     });
     if (res && res.code == 200) {
       //重新赋值
+
       var tem = res.data;
+      console.log("read_note_file res===============", res);
+      console.log("read_note_file node===============", node);
+      console.log("read_note_file  node.name===============", node.name);
       data.editedMdtext_md = tem;
       data.notEditedMdtext_md = tem;
       data.title_md = node.name;
@@ -864,6 +859,8 @@ const read_note_file = async function (node: NotebookInfo) {
       data.currentChooseNoteAllPath_md = node.path;
       data.currentChooseFolderPath_md = node.folder;
       data.showMdEditor = true;
+       console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
+      console.log("read_note_file notEditedMdtext_md===============", data.notEditedMdtext_md);
     } else {
       NotificationUtil.error("读取失败：" + res.msg);
     }
