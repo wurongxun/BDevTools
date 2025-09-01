@@ -1,203 +1,97 @@
-// Composables
-import { nextTick } from "vue";
-import {
-  HistoryState,
-  RouteRecordRaw,
-  createRouter,
-  createWebHashHistory,
-} from "vue-router";
-//import { Layout } from "@/utils/routerHelper";
-const EL_SCROLL = ".v-main .mainScroll";
+import { createRouter, createWebHistory } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router'
+import Layout from '@/Layout/index.vue'
 
-declare module "vue-router" {
-  interface RouteMeta {
-    transition?: string;
-    savedPosition: ScrollToOptions;
-  }
-  interface HistoryState {
-    forward: string | null;
-    back: string | null;
-    current: string | null;
-    scroll: ScrollToOptions;
-    //基于单个元素和路径的滚动配置
-    scroll2: {
-      [index: string]: ScrollToOptions;
-    } | null;
-    [index: string]: ScrollToOptions;
-  }
-}
+import pages from './modules/pages'
+import components from './modules/components'
+import error from './modules/error'
+import universal from './modules/universal'
 
-const routes = <Readonly<RouteRecordRaw[]>>[
+/**
+ * @param path: 路由的访问路径
+ * @param component: 对应的映射文件
+ * @param redirect: 重定向地址,如果包含了children,那么这个路径是必填且对应children中的路径,否则会影响动态加载
+ * @param meta: {
+ *    @param icon: 图标
+ *    @param title: 标题，对应侧边栏显示和面包屑显示
+ *    @param noBreadCrumbs: 是否显示面包屑， 默认显示， 如果false则不会显示改路由的层级
+ *    @param keepAlive: 是否开始缓存，默认不缓存
+ *    @param noTagView: 是否不显示tagView， 默认为false， 即开启 tagview
+ *    @param affix: 是否固定在tagview, 设置 affix: true 则 noTagView 不能为 true
+ *    @param activeMenu: 接受一个路由路径，对应左侧激活的菜单栏， 同时也会影响到动态加载的路由
+ *    @param hidden: 是否在菜单栏显示
+ * }
+ * @param children: 子路由，多级路由通过children实现
+ */
+
+export const constantRoutes: Array<RouteRecordRaw> = [
   {
-    path: "/",
-    redirect: "/AppMainView/NoteBook",
-  },
-  {
-    path: "/MainWindows",
-    component: () => import("@/views/Common/Common.vue"),
+    path: '/',
+    component: Layout,
+    redirect: '/home/homePage',
+    meta: { icon: 'House', noBreadCrumbs: true },
     children: [
       {
-        // 当 /user/:id/profile 匹配成功
-        // UserProfile 将被渲染到 User 的 <router-view> 内部
-        path: "NoteBook",
-        name: "NoteBook",
-        component: () => import("@/views/utilsView/notebook/NoteBookEdit.vue"),
-        meta: {
-          transition: "scroll-x-transition",
-          keepAlive: true,
-        },
-      },
-      {
-        // 当 /user/:id/profile 匹配成功
-        // UserProfile 将被渲染到 User 的 <router-view> 内部
-        path: "Calendar",
-        name: "Calendar",
-        component: () => import("@/views/utilsView/calendar/Calendar.vue"),
-      },
-    ],
+        name: 'HomePage',
+        path: '/home/homePage',
+        meta: { title: '首页', icon: 'House', keepAlive: true, affix: true },
+        component: () => import('@/views/Home/index.vue')
+      }
+    ]
   },
   {
-    path: "/AppMainView",
-    component: () => import("@/views/appMainWindows.vue"),
+    path: '/bind',
+    meta: { icon: 'House', noBreadCrumbs: true, title: '外部链接' },
+    redirect: 'https://www.bing.com'
+  },
+  {
+    path: '/errorlog',
+    component: Layout,
+    redirect: '/errorlog/handle',
+    meta: { icon: 'error-handle', noBreadCrumbs: true },
     children: [
       {
-        // 当 /user/:id/profile 匹配成功
-        // UserProfile 将被渲染到 User 的 <router-view> 内部
-        path: "mainView",
-        component: () => import("@/views/mainView/mainView.vue"),
-        children: [
-          {
-            path: "mainView",
-            component: () => import("@/views/mainView/views/mainView.vue"),
-          },
-        ],
-      },
-      {
-        // 当 /user/:id/profile 匹配成功
-        // UserProfile 将被渲染到 User 的 <router-view> 内部
-        path: "NoteBook",
-        name: "NoteBook",
-        component: () => import("@/views/utilsView/notebook/NoteBookEdit.vue"),
-        meta: {
-          transition: "scroll-x-transition",
-          keepAlive: true,
-        },
-      },
-    ],
+        name: 'ErrorHandleDemo',
+        path: '/errorlog/handle',
+        meta: { title: 'errorHandle示例', icon: 'error-handle' },
+        component: () => import('@/views/pagesManage/error/index.vue')
+      }
+    ]
   },
-  ,
   {
-    path: "/App",
-    component: () => import("@/views/Common/Common.vue"),
+    path: '/userInfo',
+    component: Layout,
+    meta: { hidden: true },
     children: [
       {
-        path: "AppSetting",
-        name: "AppSetting",
-        component: () => import("@/views/app/AppSetting.vue"),
-        meta: {
-          transition: "scroll-x-transition",
-        },
+        name: 'UserInfo',
+        path: '/userInfo',
+        meta: { title: '个人中心', keepAlive: false },
+        component: () => import('@/views/user/UserInfo.vue')
       },
       {
-        path: "AppAbout",
-        name: "AppAbout",
-        component: () => import("@/views/app/AppAbout.vue"),
-        meta: {
-          transition: "scroll-x-transition",
-        },
-      },
-      {
-        path: "AppHelp",
-        name: "AppHelp",
-        component: () => import("@/views/app/AppHelp.vue"),
-        meta: {
-          transition: "scroll-x-transition",
-        },
-      },
-    ],
+        name: 'ChangePwd',
+        path: '/changePwd',
+        meta: { title: '修改密码', keepAlive: false },
+        component: () => import('@/views/user/ChangePwd.vue')
+      }
+    ]
   },
   {
-    path: "/Windows/Loding",
-    component: () => import("@/views/lodingWindows/AppLoding.vue"),
+    path: '/login',
+    meta: { title: '登录', hidden: true, noTagView: true },
+    component: () => import('@/views/login/index.vue')
   },
-];
-// ,
-// {
-//   path: "/Business",
-//   component: Layout,
-//   children: [
-//     {
-//       path: "Ssh",
-//       name: "Ssh",
-//       component: () => import("@/views/element/Business/ssh/index.vue"),
-//     },
-//   ],
-// },
-//const history = createWebHashHistory(process.env.BASE_URL);
-const history = createWebHashHistory("/");
+  components,
+  error,
+  universal
+]
+
+export const asyncRoutes: Array<RouteRecordRaw> = [pages]
 
 const router = createRouter({
-  history,
-  routes,
-});
+  history: createWebHistory(),
+  routes: constantRoutes
+})
 
-const scrollState2 = history.state.scroll2 ?? {};
-
-router.beforeEach((to, from) => {
-  // 用户在主页点击首页时自动返回，防止有重复的历史记录。
-  if (to.path === "/index/home" && to.path === history.state.back) {
-    history.go(-1);
-    console.warn(
-      `backing to ${to.path} because history.state.back=${history.state.back}, state may lost.`
-    );
-    return false;
-  }
-  // TODO: 使用更好的方法实现
-  const state = {
-    ...history.state,
-    scroll2: scrollState2,
-  } as HistoryState;
-  // 当前有一个bug，通过导航按钮切换的页面无法监听,因为current可能不等于from。这可能导致滚动状态无法被保存。此处使用内存泄漏掩盖部分bug
-
-  const scrollData = {
-    top: document.querySelector(EL_SCROLL)?.scrollTop ?? 0,
-    left: document.querySelector(EL_SCROLL)?.scrollLeft ?? 0,
-  };
-  scrollState2[from.fullPath] = scrollData;
-  console.debug("Saving scrollData:", scrollData);
-  console.debug("Saving state", state);
-  if (history.state.current !== from.fullPath) {
-    console.warn(
-      "history.state.current !== from.fullPath, state maybe not to be saved."
-    );
-  }
-  window.history.replaceState(state, document.title);
-  return true;
-});
-
-router.afterEach((to, from) => {
-  if (from.path !== "/") {
-    const name = history.state.forward
-      ? "scroll-x-transition"
-      : "scroll-x-reverse-transition";
-    to.meta.transition = name;
-    from.meta.transition = name;
-  } else {
-    const name = "fade-transition";
-    to.meta.transition = name;
-    from.meta.transition = name;
-  }
-
-  const state = window.history.state as HistoryState;
-  if (state.scroll2 && state.current) {
-    nextTick(() => {
-      //有动画，所以要选择第最后一个元素
-      if (state.scroll2 && state.current) {
-        const elements = document.querySelectorAll(EL_SCROLL);
-        elements[elements.length - 1]?.scrollTo(state.scroll2[state.current]);
-      }
-    });
-  }
-});
-
-export default router;
+export default router
