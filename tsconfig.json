@@ -1,20 +1,15 @@
 {
-  "extends": "@vue/tsconfig/tsconfig.web.json",
-  "include": [
-    "env.d.ts",
-    "window.d.ts",
-    "src/**/*",
-    "src/**/*.vue",
-    "mock"
-  ],
+  "include": ["env.d.ts", "window.d.ts", "src/**/*", "src/**/*.vue", "mock"],
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"]
     },
     "ignoreDeprecations": "5.0",
+    "target": "ES2020",
+    "jsx": "preserve",
+    "module": "ESNext",
+    "moduleResolution": "bundler"
   },
   "references": [
     {

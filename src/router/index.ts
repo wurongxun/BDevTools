@@ -6,7 +6,7 @@ import pages from './modules/pages'
 import components from './modules/components'
 import error from './modules/error'
 import universal from './modules/universal'
-
+import files from './modules/files'
 /**
  * @param path: 路由的访问路径
  * @param component: 对应的映射文件
@@ -23,6 +23,8 @@ import universal from './modules/universal'
  * }
  * @param children: 子路由，多级路由通过children实现
  */
+
+
 
 export const constantRoutes: Array<RouteRecordRaw> = [
   {
@@ -84,7 +86,8 @@ export const constantRoutes: Array<RouteRecordRaw> = [
   },
   components,
   error,
-  universal
+  universal,
+  files
 ]
 
 export const asyncRoutes: Array<RouteRecordRaw> = [pages]

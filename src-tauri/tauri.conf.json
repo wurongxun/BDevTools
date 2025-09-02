@@ -19,7 +19,8 @@
           "allow": ["$DOCUMENT/**", "$HOME/**", "**"]
         }
       }
-    }
+    },
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": true,

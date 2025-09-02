@@ -13,4 +13,10 @@ interface IRouteMeta {
   noBreadCrumbs?: Boolean /* 如果为true 则不显示在面包屑 */
   noTagView?: Boolean /* 如果为true 则不添加tag-view标签 */
   cache?: Boolean /* 是否缓存该标签 */
+  // 添加文件相关属性
+  isFile?: boolean // 是否为文件
+  isDirectory?: boolean // 是否为文件夹
+  filePath?: string // 文件路径
+  fileName?: string // 文件名
+  fileType?: string // 文件类型
 }

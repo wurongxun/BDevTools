@@ -12,5 +12,19 @@
         "path": "/manage/myDirectives"
       }
     ]
+  },
+  {
+    "path": "/file",
+    "children": [
+      {
+        "path": "/file/table/list"
+      },
+      {
+        "path": "/file/error/page"
+      },
+      {
+        "path": "/file/myDirectives"
+      }
+    ]
   }
 ]

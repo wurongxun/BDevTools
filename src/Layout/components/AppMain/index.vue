@@ -1,8 +1,8 @@
 <template>
   <div class="app-main">
-    <router-view v-slot="{ Component }">
+    <router-view v-slot="{ Component, route }">
       <keep-alive :include="cacheList">
-        <component :is="Component" />
+        <component :is="Component" :key="route.path" />
       </keep-alive>
     </router-view>
   </div>
