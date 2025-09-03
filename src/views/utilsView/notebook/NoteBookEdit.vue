@@ -175,6 +175,9 @@ import {
     toRefs,
     createVNode,
     toRaw,
+    onActivated,
+    onDeactivated,
+    watch,
 } from "vue";
 //import { notification, Modal } from 'ant-design-vue';
 import { ElMessage, ElMessageBox, ElSubMenu, ElMenuItem } from "element-plus";
@@ -298,7 +301,42 @@ onMounted(async () => {
         NotificationUtil.error("读取失败：" + res.msg);
     }
 });
+const fileName = ref('')
+// 根据路由参数加载文件
+const loadFile = async () => {
+    // 检查是否有动态路由参数
+    if (route.params.filePath) {
+        const filePath = decodeURIComponent(route.params.filePath as string)
+        fileName.value = filePath.split('\\').pop() || '未命名文件'
+        // 加载对应文件内容的逻辑
+        console.log('加载文件:', filePath)
+    }
+    // 如果没有参数，使用查询参数或meta信息
+    else if (route.query.file || route.meta.path) {
+        const filePath = (route.query.file as string) || (route.meta.path as string)
+        fileName.value = filePath?.split('\\').pop() || '未命名文件'
+        // 加载对应文件内容的逻辑
+        console.log('加载文件:', filePath)
+    }
+}
+// 监听路由参数变化
+watch(
+    () => route.params,
+    () => {
+        loadFile()
+    },
+    { immediate: true }
+)
+// 组件激活时的逻辑
+onActivated(() => {
+    console.log('NoteBookEdit 组件被激活')
+    //loadFile()
+})
 
+// 组件停用时的逻辑
+onDeactivated(() => {
+    console.log('NoteBookEdit 组件被停用')
+})
 const listenClose = async () => {
 
     //持续监听关闭事件

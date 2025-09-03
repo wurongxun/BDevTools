@@ -1,13 +1,8 @@
 <template>
   <div class="tab-control">
     <div class="tab-box">
-      <router-link
-        class="tag-item suspension"
-        :class="{ active: isActive(tag) }"
-        v-for="tag in tagViewList"
-        :key="tag.path"
-        :to="getToPath(tag)"
-      >
+      <router-link class="tag-item suspension" :class="{ active: isActive(tag) }" v-for="tag in tagViewList"
+        :key="tag.path" :to="getToPath(tag)">
         <span class="tag--title">{{ tag.title }}</span>
         <el-icon v-if="!tag.affix" class="close--icon" @click.prevent.stop="removeTab(tag)">
           <Close />
@@ -31,6 +26,26 @@ const router = useRouter()
 const { tagview } = useStore()
 
 watch(
+  // () => router.currentRoute.value,
+  // (newValue) => {
+  //   if (route.meta.keepAlive && route.name) {
+  //     tagview.addCacheList(route.name as string)
+  //   }
+  //   if (!route.meta.noTagView) {
+  //     let path = newValue.path
+  //     if (ToolUtils.notEmptyObject(newValue.params)) {
+  //       path = newValue.matched[newValue.matched.length - 1].path
+  //     }
+  //     tagview.addTagView({
+  //       name: newValue.name as string,
+  //       path,
+  //       title: newValue.meta.title as string,
+  //       query: newValue.query,
+  //       params: newValue.params
+  //     })
+  //   }
+  // },
+  // { immediate: true }
   () => router.currentRoute.value,
   (newValue) => {
     if (route.meta.keepAlive && route.name) {
@@ -41,13 +56,25 @@ watch(
       if (ToolUtils.notEmptyObject(newValue.params)) {
         path = newValue.matched[newValue.matched.length - 1].path
       }
-      tagview.addTagView({
+
+      // 创建标签信息
+      const tagInfo = {
         name: newValue.name as string,
         path,
         title: newValue.meta.title as string,
         query: newValue.query,
         params: newValue.params
-      })
+      }
+
+      // 如果是文件路由，特殊处理
+      if (newValue.meta.isfile && newValue.meta.path) {
+        // 使用文件路径作为参数
+        const encodedPath = encodeURIComponent(newValue.meta.path as string)
+        tagInfo.params = { filePath: encodedPath }
+        tagInfo.path = `/notebook/${encodedPath}`
+      }
+
+      tagview.addTagView(tagInfo)
     }
   },
   { immediate: true }
@@ -75,7 +102,7 @@ const isActive = (tag: ITagItem): boolean => {
   if (route.meta.noTagView && route.meta.activeMenu) {
     return route.meta.activeMenu === tag.path
   }
-  if(ToolUtils.notEmptyObject(tag)) {
+  if (ToolUtils.notEmptyObject(tag)) {
     let path = route.matched[route.matched.length - 1].path
     return path === tag.path
   }

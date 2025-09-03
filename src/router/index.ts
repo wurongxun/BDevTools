@@ -24,8 +24,6 @@ import files from './modules/files'
  * @param children: 子路由，多级路由通过children实现
  */
 
-
-
 export const constantRoutes: Array<RouteRecordRaw> = [
   {
     path: '/',
@@ -83,6 +81,22 @@ export const constantRoutes: Array<RouteRecordRaw> = [
     path: '/login',
     meta: { title: '登录', hidden: true, noTagView: true },
     component: () => import('@/views/login/index.vue')
+  },
+  {
+    path: '/notebook',
+    meta: { title: '笔记', icon: 'component', keepAlive: true },
+    component: Layout,
+    children: [
+      {
+        path: '/notebook/:filePath', // 动态路由参数
+        name: 'NoteBookEdit',
+        meta: {
+          title: '笔记编辑',
+          keepAlive: true
+        },
+        component: () => import('@/views/utilsView/notebook/NoteBookEdit.vue')
+      }
+    ]
   },
   components,
   error,
