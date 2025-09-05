@@ -82,22 +82,6 @@ export const constantRoutes: Array<RouteRecordRaw> = [
     meta: { title: '登录', hidden: true, noTagView: true },
     component: () => import('@/views/login/index.vue')
   },
-  {
-    path: '/notebook',
-    meta: { title: '笔记', icon: 'component', keepAlive: true },
-    component: Layout,
-    children: [
-      {
-        path: '/notebook/:filePath', // 动态路由参数
-        name: 'NoteBookEdit',
-        meta: {
-          title: '笔记编辑',
-          keepAlive: true
-        },
-        component: () => import('@/views/utilsView/notebook/NoteBookEdit.vue')
-      }
-    ]
-  },
   components,
   error,
   universal,

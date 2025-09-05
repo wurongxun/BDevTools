@@ -1,8 +1,11 @@
 <template>
   <el-menu :collapse="isCollapse" :default-active="currentOpenMenu()" class="el-menu-vertical">
     <logo></logo>
-    <el-menu-item v-for="item in onlyChildRoute" :index="getOnlyChildRoutePath(item)"
-      :key="getOnlyChildRoutePath(item)">
+    <el-menu-item
+      v-for="item in onlyChildRoute"
+      :index="getOnlyChildRoutePath(item)"
+      :key="getOnlyChildRoutePath(item)"
+    >
       <el-icon v-if="isElIcon(item.meta?.icon)" @click="handleToPath(item)">
         <component :is="item.meta?.icon" />
       </el-icon>
@@ -16,7 +19,7 @@
       </template>
     </el-menu-item>
 
-    <!-- <el-sub-menu v-for="item in childRoute" :index="item.redirect || item.path" :key="item.path">
+    <el-sub-menu v-for="item in childRoute" :index="item.redirect || item.path" :key="item.path">
       <template #title>
         <el-icon v-if="isElIcon(item.meta?.icon)">
           <component :is="item.meta?.icon" />
@@ -34,48 +37,19 @@
       >
         <app-link :to="childItem.path"> {{ getTitle(childItem) }} </app-link>
       </el-menu-item>
-    </el-sub-menu> -->
-    <template v-for="item in childRoute" :key="item.path">
-      <el-sub-menu v-if="hasShowChildren(item)" :index="item.redirect || item.path">
-        <template #title>
-          <el-icon v-if="isElIcon(item.meta?.icon)">
-            <component :is="item.meta?.icon" />
-          </el-icon>
-          <i v-else class="svg-box">
-            <svg-icon class-name="svg-icon" :icon-class="item.meta?.icon" />
-          </i>
-          <span>{{ item.meta?.title }}</span>
-        </template>
-        <sub-menu :menu-list="item.children || []" />
-      </el-sub-menu>
-      <el-menu-item v-else :index="item.redirect || item.path">
-        <el-icon v-if="isElIcon(item.meta?.icon)">
-          <component :is="item.meta?.icon" />
-        </el-icon>
-        <i v-else class="svg-box">
-          <svg-icon class-name="svg-icon" :icon-class="item.meta?.icon" />
-        </i>
-        <template #title>
-          <app-link :to="item.path" :redirect="item.redirect">
-            {{ item.meta?.title }}
-          </app-link>
-        </template>
-      </el-menu-item>
-    </template>
+    </el-sub-menu>
   </el-menu>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import useStore from '@/store'
 import AppLink from './AppLink.vue'
 import logo from './Logo.vue'
-import type { RouteRecordRaw, RouteRecordRedirectOption } from 'vue-router'
+import type { RouteRecordRaw, RouteRecordRedirectOption  } from 'vue-router'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-
-const SubMenu = defineAsyncComponent(() => import('./SubMenu.vue'))
 
 const { routeStore, system } = useStore()
 const route = useRoute()
@@ -93,12 +67,7 @@ const childRoute: any = computed(() =>
     (item) => !item.meta?.hidden && item.children && item.children?.length > 1
   )
 )
-// 判断是否有可见的子菜单
-const hasShowChildren = (item: RouteRecordRaw) => {
-  if (!item.children) return false
-  const showChildren = item.children.filter(child => !child.meta?.hidden)
-  return showChildren.length > 0
-}
+
 const currentOpenMenu = () => {
   if (route.meta?.activeMenu) {
     return route.meta?.activeMenu
@@ -131,7 +100,7 @@ const getOnlyChildRoutePath = (item: RouteRecordRaw): string => {
   return item.children && item.children.length ? item.children[0].path : item.path
 }
 
-const getOnlyChildRouteRedirect = (item: RouteRecordRaw): RouteRecordRedirectOption | undefined => {
+const getOnlyChildRouteRedirect = (item: RouteRecordRaw): RouteRecordRedirectOption  | undefined => {
   return item.children && item.children.length ? item.children[0].redirect : item.redirect
 }
 
@@ -161,7 +130,6 @@ const getOnlyChildRouteTitle = (item: RouteRecordRaw): string => {
 .el-menu-vertical {
   height: 100%;
 }
-
 .svg-box {
   margin-right: 5px;
   width: 24px;
@@ -171,7 +139,6 @@ const getOnlyChildRouteTitle = (item: RouteRecordRaw): string => {
   fill: currentColor;
   align-items: center;
   justify-content: center;
-
   .svg-icon {
     font-size: 18px;
   }
