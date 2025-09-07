@@ -13,7 +13,7 @@ const whiteList = ['/login', '/component/AMap'] // no redirect whitelist
 
 router.beforeEach(
   async (to: RouteLocationNormalized, from: RouteLocationNormalized, next: NavigationGuardNext) => {
-    NProgress.start()
+    //NProgress.start()
     if (user.hasToken()) {
       if (to.path === '/login') {
         next({ path: '/' })

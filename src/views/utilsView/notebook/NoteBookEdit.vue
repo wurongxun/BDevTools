@@ -310,6 +310,7 @@ const loadFile = async () => {
         fileName.value = filePath.split('\\').pop() || '未命名文件'
         // 加载对应文件内容的逻辑
         console.log('加载文件:', filePath)
+        read_note_file_bypath(filePath)
     }
     // 如果没有参数，使用查询参数或meta信息
     else if (route.query.file || route.meta.path) {
@@ -317,6 +318,7 @@ const loadFile = async () => {
         fileName.value = filePath?.split('\\').pop() || '未命名文件'
         // 加载对应文件内容的逻辑
         console.log('加载文件:', filePath)
+        read_note_file_bypath(filePath)
     }
 }
 // 监听路由参数变化
@@ -910,6 +912,34 @@ const get_note_list = () => {
             console.log(err);
         });
 };
+//读取文件
+const read_note_file_bypath = async function (path: string) {
+   
+        var res = await tauri_request<ResponseData<string>>("read_note_file", {
+            path: path
+        });
+        if (res && res.code == 200) {
+            //重新赋值
+
+            var tem = res.data;
+            console.log("read_note_file res===============", res);
+            // console.log("read_note_file node===============", node);
+            // console.log("read_note_file  node.name===============", node.name);
+            data.editedMdtext_md = tem;
+            data.notEditedMdtext_md = tem;
+            // data.title_md = node.name;
+            // data.lastTimeTitle_md = node.name;
+            // data.currentChooseNoteAllPath_md = node.path;
+            // data.currentChooseFolderPath_md = node.folder;
+            data.showMdEditor = true;
+            console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
+            console.log("read_note_file notEditedMdtext_md===============", data.notEditedMdtext_md);
+        } else {
+            NotificationUtil.error("读取失败：" + res.msg);
+        }
+    
+};
+
 //读取文件
 const read_note_file = async function (node: NotebookInfo) {
     if (node.isfile) {

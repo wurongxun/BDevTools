@@ -12,7 +12,7 @@ const route: RouteRecordRaw = {
       meta: {
         title: '副本.md',
         keepAlive: true,
-        path: 'F:\\MdNote\\notebooks\\你好\\副本.md',
+        path: 'C:\\Users\\kun15\\Documents\\notebooks\\notebooks\\笔记2025.md',
         folder: 'F:\\MdNote\\notebooks\\你好',
         name: '副本.md',
         isfile: true,
@@ -26,7 +26,7 @@ const route: RouteRecordRaw = {
       meta: {
         title: '哈哈哈.md',
         keepAlive: true,
-        path: 'F:\\MdNote\\notebooks\\你好\\哈哈哈.md',
+        path: 'C:\\Users\\kun15\\Documents\\notebooks\\notebooks\\GO啊.md',
         folder: 'F:\\MdNote\\notebooks\\你好',
         name: '哈哈哈.md',
         isfile: true,

@@ -5,6 +5,7 @@ import tagViewStore from './modules/tagView'
 import userStore from './modules/user'
 import permissionStore from './modules/permission'
 import errorInfoStore from './modules/errorInfo'
+import { appConfigInfo } from './modules/appConfigInfo'
 
 const pinia = createPinia()
 
@@ -15,6 +16,7 @@ export default function useStore() {
     tagview: tagViewStore(pinia),
     user: userStore(pinia),
     permission: permissionStore(pinia),
-    errorStore: errorInfoStore(pinia)
+    errorStore: errorInfoStore(pinia),
+    appConfig: appConfigInfo(pinia)
   }
 }
