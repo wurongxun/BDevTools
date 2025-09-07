@@ -85,3 +85,5 @@ export const useNoteStore = defineStore('note', {
     }
   }
 })
+
+export default useNoteStore

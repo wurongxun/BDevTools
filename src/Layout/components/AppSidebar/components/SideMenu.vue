@@ -19,7 +19,8 @@
       </template>
     </el-menu-item>
 
-    <el-sub-menu v-for="item in childRoute" :index="item.redirect || item.path" :key="item.path">
+    <SubMenu :menu-list="childRoute" ></SubMenu>
+    <!-- <el-sub-menu v-for="item in childRoute" :index="item.redirect || item.path" :key="item.path">
       <template #title>
         <el-icon v-if="isElIcon(item.meta?.icon)">
           <component :is="item.meta?.icon" />
@@ -37,7 +38,7 @@
       >
         <app-link :to="childItem.path"> {{ getTitle(childItem) }} </app-link>
       </el-menu-item>
-    </el-sub-menu>
+    </el-sub-menu> -->
   </el-menu>
 </template>
 
@@ -50,7 +51,7 @@ import AppLink from './AppLink.vue'
 import logo from './Logo.vue'
 import type { RouteRecordRaw, RouteRecordRedirectOption  } from 'vue-router'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-
+import SubMenu from './SubMenu.vue'
 const { routeStore, system } = useStore()
 const route = useRoute()
 const router = useRouter()

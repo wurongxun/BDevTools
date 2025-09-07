@@ -39,9 +39,18 @@ const route: RouteRecordRaw = {
       meta: { title: '嵌套菜单示例' },
       children: [
         {
-          path: 'level1',
-          meta: { title: 'Level 1' },
-          children: []
+          path: '/level22',
+          name: 'level22',
+          meta: {
+            title: '哈哈哈.md',
+            keepAlive: true,
+            path: 'C:\\Users\\kun15\\Documents\\notebooks\\notebooks\\GO啊.md',
+            folder: 'F:\\MdNote\\notebooks\\你好',
+            name: '哈哈哈.md',
+            isfile: true,
+            type: 'md'
+          },
+          component: () => import('@/views/utilsView/notebook/NoteBookEdit.vue')
         }
       ]
     }

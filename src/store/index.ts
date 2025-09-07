@@ -6,6 +6,7 @@ import userStore from './modules/user'
 import permissionStore from './modules/permission'
 import errorInfoStore from './modules/errorInfo'
 import { appConfigInfo } from './modules/appConfigInfo'
+import { useNoteStore } from './modules/noteTem'
 
 const pinia = createPinia()
 
@@ -17,6 +18,7 @@ export default function useStore() {
     user: userStore(pinia),
     permission: permissionStore(pinia),
     errorStore: errorInfoStore(pinia),
-    appConfig: appConfigInfo(pinia)
+    appConfig: appConfigInfo(pinia),
+    noteTem: useNoteStore(pinia)
   }
 }
