@@ -16,6 +16,7 @@ function handleTo() {
     window.open(props.redirect, '_blank')
     return
   }
+  console.log('handleTo', props.to)
   router.push({
     path: props.to
   })

@@ -25,8 +25,10 @@ router.beforeEach(
         } else {
           try {
             await user.getUserInfo()
+             const routerNote = await routerNoteStore.setRoutes()
             const router = await routeStore.setRoutes()
-            const routerNote = await routerNoteStore.setRoutes()
+           
+            console.log('beforeEach router ', router)
             await permission.getPermissions()
             tagview.initTagViewList(router)
             next({ ...to, replace: true })

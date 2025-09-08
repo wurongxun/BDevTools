@@ -74,7 +74,7 @@ const get_notebooks_tree_Api = (
         meta: {
           title: child.name,
           keepAlive: true,
-          path: child.path,
+          filePath: child.path,
           folder: child.folder,
           name: child.name,
           isfile: false,
@@ -122,9 +122,10 @@ const get_notebooks_tree_child = (
         meta: {
           title: child.name,
           keepAlive: true,
-          path: child.path,
+          filePath: child.path,
           folder: child.folder,
           name: child.name,
+          noTagView: child.isfile ? false : true,
           isfile: false,
           type: child.isfile ? 'md' : 'folder'
         },

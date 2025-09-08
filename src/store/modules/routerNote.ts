@@ -106,9 +106,9 @@ export const routerNoteStore = defineStore('routerNoteStore', {
       const red_note = await get_notebooks_Api()
       console.log('child_item setRoutes ', red_note)
       //const routes = filterRoutes(res.data)
-      // routes.map((item) => {
-      //   router.addRoute(item)
-      // })
+      red_note.map((item) => {
+        router.addRoute(item)
+      })
       //router.addRoute(red_note)
       this.routes = red_note
       return this.routes
