@@ -1,11 +1,8 @@
 <template>
   <el-menu :collapse="isCollapse" :default-active="currentOpenMenu()" class="el-menu-vertical">
     <logo></logo>
-    <el-menu-item
-      v-for="item in onlyChildRoute"
-      :index="getOnlyChildRoutePath(item)"
-      :key="getOnlyChildRoutePath(item)"
-    >
+    <el-menu-item v-for="item in onlyChildRoute" :index="getOnlyChildRoutePath(item)"
+      :key="getOnlyChildRoutePath(item)">
       <el-icon v-if="isElIcon(item.meta?.icon)" @click="handleToPath(item)">
         <component :is="item.meta?.icon" />
       </el-icon>
@@ -19,7 +16,8 @@
       </template>
     </el-menu-item>
 
-    <SubMenu :menu-list="childRoute" ></SubMenu>
+    <SubMenu :menu-list="childRoute"></SubMenu>
+    <SubMenu :menu-list="childRouteNote"></SubMenu>
     <!-- <el-sub-menu v-for="item in childRoute" :index="item.redirect || item.path" :key="item.path">
       <template #title>
         <el-icon v-if="isElIcon(item.meta?.icon)">
@@ -43,16 +41,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import useStore from '@/store'
 import AppLink from './AppLink.vue'
 import logo from './Logo.vue'
-import type { RouteRecordRaw, RouteRecordRedirectOption  } from 'vue-router'
+import type { RouteRecordRaw, RouteRecordRedirectOption } from 'vue-router'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import SubMenu from './SubMenu.vue'
-const { routeStore, system } = useStore()
+const { routeStore, system, routerNoteStore } = useStore()
 const route = useRoute()
 const router = useRouter()
 const { isCollapse } = storeToRefs(system)
@@ -69,6 +67,13 @@ const childRoute: any = computed(() =>
   )
 )
 
+const childRouteNote: any = computed(() =>
+  routerNoteStore.routes
+)
+onMounted(() => {
+  console.log(routeStore.routes)
+  console.log(routerNoteStore.routes)
+})
 const currentOpenMenu = () => {
   if (route.meta?.activeMenu) {
     return route.meta?.activeMenu
@@ -101,7 +106,7 @@ const getOnlyChildRoutePath = (item: RouteRecordRaw): string => {
   return item.children && item.children.length ? item.children[0].path : item.path
 }
 
-const getOnlyChildRouteRedirect = (item: RouteRecordRaw): RouteRecordRedirectOption  | undefined => {
+const getOnlyChildRouteRedirect = (item: RouteRecordRaw): RouteRecordRedirectOption | undefined => {
   return item.children && item.children.length ? item.children[0].redirect : item.redirect
 }
 
@@ -131,6 +136,7 @@ const getOnlyChildRouteTitle = (item: RouteRecordRaw): string => {
 .el-menu-vertical {
   height: 100%;
 }
+
 .svg-box {
   margin-right: 5px;
   width: 24px;
@@ -140,6 +146,7 @@ const getOnlyChildRouteTitle = (item: RouteRecordRaw): string => {
   fill: currentColor;
   align-items: center;
   justify-content: center;
+
   .svg-icon {
     font-size: 18px;
   }

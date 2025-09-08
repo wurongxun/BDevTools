@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import type { RouteRecordRaw } from 'vue-router'
 import { getMenu } from '@/api/user'
+import { get_notebooks_Api } from '@/api/file'
+
 import { constantRoutes, asyncRoutes } from '@/router/index'
 import router from '@/router/index'
 import VerifyUtils from '@/utils/VerifyUtils'
@@ -88,10 +90,10 @@ function filterRoutes(arrData: Array<any>): Array<RouteRecordRaw> {
   return result
 }
 
-const routerStore = defineStore('routerNoteStore', {
+export const routerNoteStore = defineStore('routerNoteStore', {
   state: () => {
     return {
-      routes: {}
+      routes: [] as RouteRecordRaw[]
     }
   },
   actions: {
@@ -100,28 +102,16 @@ const routerStore = defineStore('routerNoteStore', {
      * @returns RouteRecordRaw[]
      */
     async setRoutes() {
-      const res: any = await getMenu()
-      const routes = filterRoutes(res.data)
-      routes.map((item) => {
-        router.addRoute(item)
-      })
-      const item404 = {
-        name: 'error404',
-        path: '/:catchAll(.*)',
-        meta: { hidden: true },
-        component: () => import('@/views/error/404.vue')
-      }
-      router.addRoute(item404)
-      this.routes = constantRoutes.concat(routes)
-      this.setFlattenRouters()
+      //const res: any = await getMenu()
+      const red_note = await get_notebooks_Api()
+      console.log('child_item setRoutes ', red_note)
+      //const routes = filterRoutes(res.data)
+      // routes.map((item) => {
+      //   router.addRoute(item)
+      // })
+      //router.addRoute(red_note)
+      this.routes = red_note
       return this.routes
-    },
-
-    /**
-     * @description 设置顶部搜索用的扁平化数据
-     */
-    setFlattenRouters() {
-      this.flattenRouters = flattenRoutes(this.routes)
     },
 
     /**
@@ -132,5 +122,4 @@ const routerStore = defineStore('routerNoteStore', {
     }
   }
 })
-
-export default routerStore
+export default routerNoteStore

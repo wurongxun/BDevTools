@@ -7,7 +7,7 @@ import permissionStore from './modules/permission'
 import errorInfoStore from './modules/errorInfo'
 import { appConfigInfo } from './modules/appConfigInfo'
 import { useNoteStore } from './modules/noteTem'
-
+import { routerNoteStore } from './modules/routerNote'
 const pinia = createPinia()
 
 export default function useStore() {
@@ -19,6 +19,7 @@ export default function useStore() {
     permission: permissionStore(pinia),
     errorStore: errorInfoStore(pinia),
     appConfig: appConfigInfo(pinia),
-    noteTem: useNoteStore(pinia)
+    noteTem: useNoteStore(pinia),
+    routerNoteStore: routerNoteStore(pinia)
   }
 }
