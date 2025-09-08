@@ -77,10 +77,10 @@ const get_notebooks_tree_Api = (
           filePath: child.path,
           folder: child.folder,
           name: child.name,
-          isfile: false,
+          isfile: child.isfile ? true : false,
           type: 'folder'
         },
-        children: child_child_val
+        children:  child.isfile ? [] : child_child_val
       }
       children_val.push(route2)
     }
@@ -126,7 +126,7 @@ const get_notebooks_tree_child = (
           folder: child.folder,
           name: child.name,
           noTagView: child.isfile ? false : true,
-          isfile: false,
+          isfile: child.isfile ? true : false,
           type: child.isfile ? 'md' : 'folder'
         },
         children: child.isfile ? [] : child_child_val

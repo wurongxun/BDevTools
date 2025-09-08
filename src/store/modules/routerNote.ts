@@ -108,9 +108,10 @@ export const routerNoteStore = defineStore('routerNoteStore', {
       //const routes = filterRoutes(res.data)
       for (let i = 0; i < red_note.length; i++) {
         let item = red_note[i]
+        console.log('child_item setRoutes item ', item)
         router.addRoute(item)
       }
-      //router.addRoute(red_note)
+      console.log('child_item setRoutes router ', router)
       this.routes = red_note
       return this.routes
     },
