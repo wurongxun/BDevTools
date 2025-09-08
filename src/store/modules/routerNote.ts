@@ -103,12 +103,13 @@ export const routerNoteStore = defineStore('routerNoteStore', {
      */
     async setRoutes() {
       //const res: any = await getMenu()
-      const red_note = await get_notebooks_Api()
+      const red_note: RouteRecordRaw[] = await get_notebooks_Api()
       console.log('child_item setRoutes ', red_note)
       //const routes = filterRoutes(res.data)
-      red_note.map((item) => {
+      for (let i = 0; i < red_note.length; i++) {
+        let item = red_note[i]
         router.addRoute(item)
-      })
+      }
       //router.addRoute(red_note)
       this.routes = red_note
       return this.routes
