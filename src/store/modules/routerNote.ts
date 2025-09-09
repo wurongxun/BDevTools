@@ -109,7 +109,7 @@ export const routerNoteStore = defineStore('routerNoteStore', {
       for (let i = 0; i < red_note.length; i++) {
         let item = red_note[i]
         console.log('child_item setRoutes item ', item)
-        router.addRoute(item)
+        router.addRoute('Layout', item)
       }
       console.log('child_item setRoutes router ', router)
       this.routes = red_note

@@ -314,7 +314,7 @@ const loadFile = async () => {
     }
     // 如果没有参数，使用查询参数或meta信息
     else if (route.query.file || route.meta.path) {
-        const filePath = (route.query.file as string) || (route.meta.path as string)
+        const filePath = (route.query.file as string) || (route.meta.filePath as string)
         fileName.value = filePath?.split('\\').pop() || '未命名文件'
         // 加载对应文件内容的逻辑
         console.log('加载文件:', filePath)
@@ -323,7 +323,7 @@ const loadFile = async () => {
 }
 // 监听路由参数变化
 watch(
-    () => route.params,
+    () => route.path,
     () => {
         loadFile()
     },
@@ -914,30 +914,30 @@ const get_note_list = () => {
 };
 //读取文件
 const read_note_file_bypath = async function (path: string) {
-   
-        var res = await tauri_request<ResponseData<string>>("read_note_file", {
-            path: path
-        });
-        if (res && res.code == 200) {
-            //重新赋值
 
-            var tem = res.data;
-            console.log("read_note_file res===============", res);
-            // console.log("read_note_file node===============", node);
-            // console.log("read_note_file  node.name===============", node.name);
-            data.editedMdtext_md = tem;
-            data.notEditedMdtext_md = tem;
-            // data.title_md = node.name;
-            // data.lastTimeTitle_md = node.name;
-            // data.currentChooseNoteAllPath_md = node.path;
-            // data.currentChooseFolderPath_md = node.folder;
-            data.showMdEditor = true;
-            console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
-            console.log("read_note_file notEditedMdtext_md===============", data.notEditedMdtext_md);
-        } else {
-            NotificationUtil.error("读取失败：" + res.msg);
-        }
-    
+    var res = await tauri_request<ResponseData<string>>("read_note_file", {
+        path: path
+    });
+    if (res && res.code == 200) {
+        //重新赋值
+
+        var tem = res.data;
+        console.log("read_note_file res===============", res);
+        // console.log("read_note_file node===============", node);
+        // console.log("read_note_file  node.name===============", node.name);
+        data.editedMdtext_md = tem;
+        data.notEditedMdtext_md = tem;
+        // data.title_md = node.name;
+        // data.lastTimeTitle_md = node.name;
+        // data.currentChooseNoteAllPath_md = node.path;
+        // data.currentChooseFolderPath_md = node.folder;
+        data.showMdEditor = true;
+        console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
+        console.log("read_note_file notEditedMdtext_md===============", data.notEditedMdtext_md);
+    } else {
+        NotificationUtil.error("读取失败：" + res.msg);
+    }
+
 };
 
 //读取文件

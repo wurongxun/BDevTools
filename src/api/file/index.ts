@@ -68,7 +68,7 @@ const get_notebooks_tree_Api = (
         }
       }
       let route2: RouteRecordRaw = {
-        path: child.path,
+        path: '/notebook2/' + child.id,
         name: child.name,
         redirect: '',
         meta: {
@@ -80,7 +80,8 @@ const get_notebooks_tree_Api = (
           isfile: child.isfile ? true : false,
           type: 'folder'
         },
-        children:  child.isfile ? [] : child_child_val
+        children: child.isfile ? [] : child_child_val,
+        component: () => import('@/views/utilsView/notebook/NoteBookEdit.vue')
       }
       children_val.push(route2)
     }
@@ -88,7 +89,7 @@ const get_notebooks_tree_Api = (
   console.log('get_notebooks_tree_Api children_val', children_val)
   let route = [
     {
-      path: '/notebook2',
+      path: '/notebook2/',
       name: '笔记2',
       meta: { title: '笔记2', icon: 'component', keepAlive: true, folder: notebooks_data.folder },
       component: Layout,
@@ -116,7 +117,7 @@ const get_notebooks_tree_child = (
         }
       }
       let route2: RouteRecordRaw = {
-        path: child.path,
+        path: '/notebook2/' + child.id,
         name: child.name,
         redirect: '',
         meta: {
