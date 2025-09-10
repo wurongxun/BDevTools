@@ -36,6 +36,7 @@
     "md-editor-v3": "^5.8.4",
     "normalize.css": "^8.0.1",
     "nprogress": "^0.2.0",
+    "pdfjs-dist": "^5.4.149",
     "pinia": "^2.3.1",
     "screenfull": "^6.0.2",
     "typeit": "^8.8.7",

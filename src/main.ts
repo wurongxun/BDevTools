@@ -15,6 +15,7 @@ import SvgIcon from '@/components/SvgIcon.vue'
 import registerDirectives from '@/directives/index'
 import errorHandler from './errorHandler'
 import VuePdfEmbed from 'vue-pdf-embed'
+import pdfjs from 'pdfjs-dist'
 const app = createApp(App)
 app.use(router)
 app.use(piniaStore)
