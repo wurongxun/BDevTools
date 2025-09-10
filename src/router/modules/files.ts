@@ -18,7 +18,7 @@ const route: RouteRecordRaw = {
         isfile: true,
         type: 'md'
       },
-      component: () => import('@/views/utilsView/notebook/NoteBookEdit.vue')
+      component: () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
     },
     {
       path: '/level22',
@@ -32,7 +32,7 @@ const route: RouteRecordRaw = {
         isfile: true,
         type: 'md'
       },
-      component: () => import('@/views/utilsView/notebook/NoteBookEdit.vue')
+      component: () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
     },
     {
       path: '/component/nested',
@@ -50,7 +50,7 @@ const route: RouteRecordRaw = {
             isfile: true,
             type: 'md'
           },
-          component: () => import('@/views/utilsView/notebook/NoteBookEdit.vue')
+          component: () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
         }
       ]
     }

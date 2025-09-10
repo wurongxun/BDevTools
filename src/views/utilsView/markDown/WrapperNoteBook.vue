@@ -1,18 +1,14 @@
 <!-- 创建一个新的组件 WrapperNoteBook.vue -->
 <template>
   <div class="notebook-wrapper">
-    <component 
-      :is="currentComponent" 
-      :ref="setCurrentRef"
-      v-bind="currentProps"
-    />
+    <component :is="currentComponent" :ref="setCurrentRef" v-bind="currentProps" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import NoteBookEdit from './NoteBookEdit.vue'
+import NoteBookEdit from './mdPreViewAndEdit.vue'
 
 const route = useRoute()
 
@@ -34,7 +30,7 @@ const setCurrentRef = (el) => {
 // 获取当前路由对应的组件实例
 const getCurrentInstance = () => {
   const key = route.path
-  
+
   if (!componentCache.has(key)) {
     // 创建新的组件实例配置
     const instanceData = {
@@ -47,7 +43,7 @@ const getCurrentInstance = () => {
     }
     componentCache.set(key, instanceData)
   }
-  
+
   return componentCache.get(key)
 }
 

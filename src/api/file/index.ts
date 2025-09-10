@@ -81,7 +81,7 @@ const get_notebooks_tree_Api = (
           type: 'folder'
         },
         children: child.isfile ? [] : child_child_val,
-        component: () => import('@/views/utilsView/notebook/NoteBookEdit.vue')
+        component: () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
       }
       children_val.push(route2)
     }

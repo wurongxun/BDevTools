@@ -14,13 +14,14 @@ import IndexUtils from './utils/Index'
 import SvgIcon from '@/components/SvgIcon.vue'
 import registerDirectives from '@/directives/index'
 import errorHandler from './errorHandler'
-
+import VuePdfEmbed from 'vue-pdf-embed'
 const app = createApp(App)
 app.use(router)
 app.use(piniaStore)
 app.use(ElementPlus, {
   locale: zhCn
 })
+app.component('vue-pdf-embed', VuePdfEmbed)
 app.component('svg-icon', SvgIcon)
 // 注册指令
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {

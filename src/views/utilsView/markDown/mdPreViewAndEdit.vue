@@ -304,8 +304,9 @@ onMounted(async () => {
 const fileName = ref('')
 // 根据路由参数加载文件
 const loadFile = async () => {
+    console.log('加载文件:')
     // 检查是否有动态路由参数
-    if (route.params.filePath) {
+    if (route.meta.filePath) {
         const filePath = decodeURIComponent(route.params.filePath as string)
         fileName.value = filePath.split('\\').pop() || '未命名文件'
         // 加载对应文件内容的逻辑
@@ -313,8 +314,8 @@ const loadFile = async () => {
         read_note_file_bypath(filePath)
     }
     // 如果没有参数，使用查询参数或meta信息
-    else if (route.query.file || route.meta.path) {
-        const filePath = (route.query.file as string) || (route.meta.filePath as string)
+    else if (route.query.file || route.meta.filePath) {
+        const filePath = (route.query.filePath as string) || (route.meta.filePath as string)
         fileName.value = filePath?.split('\\').pop() || '未命名文件'
         // 加载对应文件内容的逻辑
         console.log('加载文件:', filePath)
