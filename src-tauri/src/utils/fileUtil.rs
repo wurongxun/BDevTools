@@ -112,68 +112,84 @@ pub fn read_dir_info<P: AsRef<Path>>(local_data_dir: P) -> Result<ResData<Vec<St
  * num 编号
  * children_dirAndFileInfo 父文件夹信息
  */
+/**
+ *
+ * 获取目录下全部文件以及文件夹
+ * num 编号
+ * children_dirAndFileInfo 父文件夹信息
+ */
 pub fn get_dir_and_file(
     num: &mut u32,
     children_dirAndFileInfo: &mut DirAndFileInfo,
 ) -> Result<ResData<String>, Box<dyn Error>> {
     let path_ = children_dirAndFileInfo.get_path();
-    let path_2 = path_.clone();
-    if metadata(path_)?.is_dir() {
-        for child_dir in read_dir(&path_2)? {
+    if metadata(&path_)?.is_dir() {
+        for child_dir in read_dir(&path_)? {
             let path_dir_entry = child_dir?.path();
             let path_1 = path_dir_entry.clone();
-            let mut st: String = num.clone().to_string();
 
-            let id: String =
-                chrono::prelude::Local::now().timestamp_millis().to_string() + "-" + &st;
-            let mut name = "";
-            #[cfg(target_os = "windows")]
-            let pos: Vec<&str> = path_dir_entry
-                .as_os_str()
-                .to_str()
-                .expect("")
-                .split("\\")
-                .collect();
-            #[cfg(any(target_os = "linux", target_os = "macos"))]
-            let pos: Vec<&str> = path_dir_entry
-                .as_os_str()
-                .to_str()
-                .expect("")
-                .split("/")
-                .collect();
-            if pos.len() > 0 {
-                name = pos[pos.len() - 1];
-            }
-            let a: u32 = 1;
-            let c: u32 = num.clone();
-            let mut d = a + c;
-            *num = d;
-            let b: bool = regexUtil::validate(r#"(?:md)$"#, name);
-            let path = String::from(path_dir_entry.as_os_str().to_str().expect(""));
-            let folder = get_directory_path(&path).unwrap();
-            let md5 = generate_md5_hash(&path);
-            let mut children_dir_and_file_info_3 = DirAndFileInfo::create(
-                String::from(md5),
-                children_dirAndFileInfo.get_id(),
-                path,
-                folder,
-                String::from(name),
-                path_dir_entry.is_file(),
+            let id = format!(
+                "{}-{}",
+                chrono::prelude::Local::now().timestamp_millis(),
+                num
             );
-            if (!path_1.is_file()) {
-                get_dir_and_file(num, &mut children_dir_and_file_info_3);
-                children_dirAndFileInfo.set_children(children_dir_and_file_info_3);
-            } else if b && path_1.is_file() {
-                children_dirAndFileInfo.set_children(children_dir_and_file_info_3);
+            *num += 1;
+
+            // 获取文件或目录名
+            let name = path_dir_entry
+                .file_name()
+                .map_or(String::new(), |n| n.to_string_lossy().to_string());
+
+            // 判断文件后缀 是md或者是PDF 文件才加入
+            let is_md = regexUtil::validate(r#"(?:md)$"#, &name);
+            let is_pdf = regexUtil::validate(r#"(?:pdf)$"#, &name);
+
+            let path = path_dir_entry.to_string_lossy().to_string();
+            let folder = get_directory_path(&path).unwrap_or_default();
+            let md5 = generate_md5_hash(&path);
+
+            let data_type = if is_md {
+                "md".to_string()
+            } else if is_pdf {
+                "pdf".to_string()
+            } else {
+                "folder".to_string()
+            };
+
+            let mut children_dir_and_file_info = DirAndFileInfo::create(
+                md5,
+                children_dirAndFileInfo.get_id(),
+                path.clone(),
+                folder,
+                name,
+                path_dir_entry.is_file(),
+                data_type,
+            );
+
+            if !path_1.is_file() {
+                // 递归处理子目录
+                get_dir_and_file(num, &mut children_dir_and_file_info)?;
+                children_dirAndFileInfo.set_children(children_dir_and_file_info);
+            } else if (is_md || is_pdf) && path_1.is_file() {
+                // 只添加 md 或 pdf 文件
+                children_dirAndFileInfo.set_children(children_dir_and_file_info);
             }
         }
+
+        Ok(ResData {
+            code: 200,
+            msg: "成功".to_string(),
+            data: String::new(),
+        })
+    } else {
+        Ok(ResData {
+            code: 500,
+            msg: "文件夹不存在".to_string(),
+            data: String::new(),
+        })
     }
-    Ok(ResData {
-        code: 500,
-        msg: "文件夹不存在".to_string(),
-        data: String::new(),
-    })
 }
+
 
 /**
  * 获取目录下所有文件信息
@@ -207,6 +223,7 @@ pub fn get_dir_notebooks_data(root_path: &String) -> ResData<String> {
         folder.clone(),
         name.to_string(),
         false,
+        "folder".to_string(),
     );
     let mut i: u32 = 0;
     let _ = get_dir_and_file(&mut i, &mut dir_info);

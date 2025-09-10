@@ -14,14 +14,18 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, onMounted, computed } from "vue";
+import { convertFileSrc } from '@tauri-apps/api/core'
+import { reactive, onMounted, computed, watch } from "vue";
 import VuePdfEmbed from "vue-pdf-embed";
 import { ElMessage } from "element-plus";
 import { createLoadingTask } from "vue3-pdfjs"; // 获得总页数
-import pdfurl from "@/assets/altimate.pdf";
-
+import { useRoute, useRouter } from 'vue-router'
+// 获取当前路由信息
+const route = useRoute()
+//import pdfurl from "@/assets/altimate.pdf";
+//source: pdfurl, //预览pdf文件地址
 const state = reactive({
-    source: pdfurl, //预览pdf文件地址
+    source: '', //预览pdf文件地址
     pageNum: 1, //当前页面
     scale: 1, // 缩放比例
     numPages: 44, // 总页数
@@ -64,12 +68,36 @@ function pageZoomIn() {
         });
     }
 }
-
-onMounted(() => {
-    const loadingTask = createLoadingTask(state.source);
+// 根据路由参数加载文件
+const loadPdfFile = async () => {
+    console.log('加载文件 loadPdfFile:', route)
+    // 检查是否有动态路由参数
+    if (route.meta.filePath) {
+        state.source = decodeURIComponent(route.meta.filePath as string)
+    }
+    // 如果没有参数，使用查询参数或meta信息
+    else if (route.query.file || route.meta.filePath) {
+        state.source = (route.query.filePath as string) || (route.meta.filePath as string)
+    }
+    console.log('加载文件 loadPdfFile state.source:', state.source)
+    const url = convertFileSrc(state.source)
+    console.log('加载文件 loadPdfFile url:', url)
+    const loadingTask = createLoadingTask(url);
     loadingTask.promise.then((pdf: { numPages: number }) => {
         state.numPages = pdf.numPages;
     });
+}
+
+// 监听路由参数变化
+watch(
+    () => route.path,
+    () => {
+        loadPdfFile();
+    },
+    { immediate: true }
+)
+onMounted(() => {
+    loadPdfFile();
 });
 </script>
 

@@ -2,8 +2,8 @@ import { NotebookInfo, ResponseData } from '@/Types/entitys'
 import NotificationUtil from '@/utils/NotificationUtil'
 import request from '@/utils/request/index'
 import { tauri_request } from '@/utils/tauri_request'
-import { ref } from 'vue'
-import { RouteRecordRaw } from 'vue-router'
+import { defineAsyncComponent, ref } from 'vue'
+import { RouteRecordRaw, RouteComponent } from 'vue-router'
 import Layout from '@/Layout/index.vue'
 import { load, Store } from '@tauri-apps/plugin-store'
 
@@ -67,6 +67,14 @@ const get_notebooks_tree_Api = (
           child_child_val.push(child_item)
         }
       }
+      const loadComponent = (path) => () => import(`../views/${path}.vue`)
+
+      // let component_: RouteComponent | null | undefined = null
+      // if (child.data_type == 'md') {
+      //   component_ = () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
+      // } else if (child.data_type == 'pdf') {
+      //   component_ = () => import('@/views/utilsView/pdf/pdfPreview.vue')
+      // }
       let route2: RouteRecordRaw = {
         path: '/notebook2/' + child.id,
         name: child.name,
@@ -77,11 +85,14 @@ const get_notebooks_tree_Api = (
           filePath: child.path,
           folder: child.folder,
           name: child.name,
-          isfile: child.isfile ? true : false,
-          type: 'folder'
+          isfile: child.isfile,
+          type: child.data_type
         },
-        children: child.isfile ? [] : child_child_val,
-        component: () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
+        children: child.isfile ? [] : child_child_val
+      }
+      // 只有当是文件时才添加component属性
+      if (child.isfile) {
+        route2.component = get_component(child.data_type)
       }
       children_val.push(route2)
     }
@@ -127,10 +138,14 @@ const get_notebooks_tree_child = (
           folder: child.folder,
           name: child.name,
           noTagView: child.isfile ? false : true,
-          isfile: child.isfile ? true : false,
-          type: child.isfile ? 'md' : 'folder'
+          isfile: child.isfile,
+          type: child.data_type
         },
         children: child.isfile ? [] : child_child_val
+      }
+      // 只有当是文件时才添加component属性
+      if (child.isfile) {
+        route2.component = get_component(child.data_type)
       }
       children_val.push(route2)
     }
@@ -138,58 +153,13 @@ const get_notebooks_tree_child = (
 
   return children_val
 }
-// const route: RouteRecordRaw = {
-//   path: '/notebook',
-//   meta: { title: '笔记', icon: 'component', keepAlive: true },
-//   component: Layout,
-//   children: [
-//     {
-//       path: '/notebook/笔记2025.md',
-//       name: '笔记2025.md',
-//       meta: {
-//         title: '副本.md',
-//         keepAlive: true,
-//         path: 'C:\\Users\\kun15\\Documents\\notebooks\\notebooks\\笔记2025.md',
-//         folder: 'F:\\MdNote\\notebooks\\你好',
-//         name: '副本.md',
-//         isfile: true,
-//         type: 'md'
-//       },
-//       component: () => import('@/views/utilsView/notebook/NoteBookEdit.vue')
-//     },
-//     {
-//       path: '/level22',
-//       name: 'level22',
-//       meta: {
-//         title: '哈哈哈.md',
-//         keepAlive: true,
-//         path: 'C:\\Users\\kun15\\Documents\\notebooks\\notebooks\\GO啊.md',
-//         folder: 'F:\\MdNote\\notebooks\\你好',
-//         name: '哈哈哈.md',
-//         isfile: true,
-//         type: 'md'
-//       },
-//       component: () => import('@/views/utilsView/notebook/NoteBookEdit.vue')
-//     },
-//     {
-//       path: '/component/nested',
-//       meta: { title: '嵌套菜单示例' },
-//       children: [
-//         {
-//           path: '/level22',
-//           name: 'level22',
-//           meta: {
-//             title: '哈哈哈.md',
-//             keepAlive: true,
-//             path: 'C:\\Users\\kun15\\Documents\\notebooks\\notebooks\\GO啊.md',
-//             folder: 'F:\\MdNote\\notebooks\\你好',
-//             name: '哈哈哈.md',
-//             isfile: true,
-//             type: 'md'
-//           },
-//           component: () => import('@/views/utilsView/notebook/NoteBookEdit.vue')
-//         }
-//       ]
-//     }
-//   ]
-// }
+const get_component = (str: string): (() => Promise<any>) | null => {
+  if (str == 'md') {
+    return () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
+  } else if (str == 'pdf') {
+    return () => import('@/views/utilsView/pdf/pdfPreview.vue')
+  } else {
+    // 返回一个默认组件，避免返回null
+    return () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
+  }
+}

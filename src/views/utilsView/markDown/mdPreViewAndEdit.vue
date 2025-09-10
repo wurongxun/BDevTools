@@ -209,8 +209,6 @@ import { useRoute, useRouter } from 'vue-router'
 // 获取当前路由信息
 const route = useRoute()
 
-// 获取路由器实例
-const router = useRouter()
 // 初始化暗黑模式检测器
 // 初始化暗黑模式检测器，配置持久化选项
 const isDark = useDark({
@@ -301,13 +299,72 @@ onMounted(async () => {
         NotificationUtil.error("读取失败：" + res.msg);
     }
 });
+
+//读取文件
+const read_note_file_bypath = async function (path: string) {
+
+    var res = await tauri_request<ResponseData<string>>("read_note_file", {
+        path: path
+    });
+    if (res && res.code == 200) {
+        //重新赋值
+
+        var tem = res.data;
+        console.log("read_note_file res===============", res);
+        // console.log("read_note_file node===============", node);
+        // console.log("read_note_file  node.name===============", node.name);
+        data.editedMdtext_md = tem;
+        data.notEditedMdtext_md = tem;
+        // data.title_md = node.name;
+        // data.lastTimeTitle_md = node.name;
+        // data.currentChooseNoteAllPath_md = node.path;
+        // data.currentChooseFolderPath_md = node.folder;
+        data.showMdEditor = true;
+        console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
+        console.log("read_note_file notEditedMdtext_md===============", data.notEditedMdtext_md);
+    } else {
+        NotificationUtil.error("读取失败：" + res.msg);
+    }
+
+};
+
+//读取文件
+const read_note_file = async function (node: NotebookInfo) {
+    if (node.isfile) {
+        var res = await tauri_request<ResponseData<string>>("read_note_file", {
+            path: node.path
+        });
+        if (res && res.code == 200) {
+            //重新赋值
+
+            var tem = res.data;
+            console.log("read_note_file res===============", res);
+            console.log("read_note_file node===============", node);
+            console.log("read_note_file  node.name===============", node.name);
+            data.editedMdtext_md = tem;
+            data.notEditedMdtext_md = tem;
+            data.title_md = node.name;
+            data.lastTimeTitle_md = node.name;
+            data.currentChooseNoteAllPath_md = node.path;
+            data.currentChooseFolderPath_md = node.folder;
+            data.showMdEditor = true;
+            console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
+            console.log("read_note_file notEditedMdtext_md===============", data.notEditedMdtext_md);
+        } else {
+            NotificationUtil.error("读取失败：" + res.msg);
+        }
+    } else {
+        NotificationUtil.error("读取失败,不是文件!");
+    }
+};
+
 const fileName = ref('')
 // 根据路由参数加载文件
 const loadFile = async () => {
-    console.log('加载文件:')
+    console.log('加载文件:', route)
     // 检查是否有动态路由参数
     if (route.meta.filePath) {
-        const filePath = decodeURIComponent(route.params.filePath as string)
+        const filePath = decodeURIComponent(route.meta.filePath as string)
         fileName.value = filePath.split('\\').pop() || '未命名文件'
         // 加载对应文件内容的逻辑
         console.log('加载文件:', filePath)
@@ -913,63 +970,7 @@ const get_note_list = () => {
             console.log(err);
         });
 };
-//读取文件
-const read_note_file_bypath = async function (path: string) {
 
-    var res = await tauri_request<ResponseData<string>>("read_note_file", {
-        path: path
-    });
-    if (res && res.code == 200) {
-        //重新赋值
-
-        var tem = res.data;
-        console.log("read_note_file res===============", res);
-        // console.log("read_note_file node===============", node);
-        // console.log("read_note_file  node.name===============", node.name);
-        data.editedMdtext_md = tem;
-        data.notEditedMdtext_md = tem;
-        // data.title_md = node.name;
-        // data.lastTimeTitle_md = node.name;
-        // data.currentChooseNoteAllPath_md = node.path;
-        // data.currentChooseFolderPath_md = node.folder;
-        data.showMdEditor = true;
-        console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
-        console.log("read_note_file notEditedMdtext_md===============", data.notEditedMdtext_md);
-    } else {
-        NotificationUtil.error("读取失败：" + res.msg);
-    }
-
-};
-
-//读取文件
-const read_note_file = async function (node: NotebookInfo) {
-    if (node.isfile) {
-        var res = await tauri_request<ResponseData<string>>("read_note_file", {
-            path: node.path
-        });
-        if (res && res.code == 200) {
-            //重新赋值
-
-            var tem = res.data;
-            console.log("read_note_file res===============", res);
-            console.log("read_note_file node===============", node);
-            console.log("read_note_file  node.name===============", node.name);
-            data.editedMdtext_md = tem;
-            data.notEditedMdtext_md = tem;
-            data.title_md = node.name;
-            data.lastTimeTitle_md = node.name;
-            data.currentChooseNoteAllPath_md = node.path;
-            data.currentChooseFolderPath_md = node.folder;
-            data.showMdEditor = true;
-            console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
-            console.log("read_note_file notEditedMdtext_md===============", data.notEditedMdtext_md);
-        } else {
-            NotificationUtil.error("读取失败：" + res.msg);
-        }
-    } else {
-        NotificationUtil.error("读取失败,不是文件!");
-    }
-};
 
 </script>
 
