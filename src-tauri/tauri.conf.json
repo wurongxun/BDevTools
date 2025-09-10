@@ -16,7 +16,33 @@
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": ["$DOCUMENT/**", "$HOME/**", "**"]
+          "allow": [
+            "$AUDIO/**",
+            "$CACHE/**",
+            "$CONFIG/**",
+            "$DATA/**",
+            "$LOCALDATA/**",
+            "$DESKTOP/**",
+            "$DOCUMENT/**",
+            "$DOWNLOAD/**",
+            "$EXE/**",
+            "$FONT/**",
+            "$HOME/**",
+            "$PICTURE/**",
+            "$PUBLIC/**",
+            "$RUNTIME/**",
+            "$TEMPLATE/**",
+            "$VIDEO/**",
+            "$RESOURCE/**",
+            "$APP/**",
+            "$LOG/**",
+            "$TEMP/**",
+            "$APPCONFIG/**",
+            "$APPDATA/**",
+            "$APPLOCALDATA/**",
+            "$APPCACHE/**",
+            "$APPLOG/**"
+          ]
         }
       }
     },
