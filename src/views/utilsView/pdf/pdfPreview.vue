@@ -1,132 +1,119 @@
 <template>
-    <h1>PDF.js Previous/Next example</h1>
-    <p>Please use <a href="https://mozilla.github.io/pdf.js/getting_started/#download"><i>official releases</i></a> in
-        production environments.</p>
-    <div>
-        <button id="prev">Previous</button>
-        <button id="next">Next</button>
-        &nbsp; &nbsp;
-        <span>Page: <span id="page_num"></span> / <span id="page_count"></span></span>
+    <div class="pdf-container">
+        <canvas id="the-canvas"></canvas>
+        <div class="pdf-controls">
+            <button id="prev">Previous</button>
+            <button id="next">Next</button>
+            <span>Page: <span id="page_num"></span> / <span id="page_count"></span></span>
+        </div>
     </div>
-    <canvas id="the-canvas"></canvas>
 </template>
 
 <script setup lang="ts">
-import { convertFileSrc } from '@tauri-apps/api/core'
-import { reactive, onMounted, ref, computed, watch } from "vue";
-import * as pdfjsLib from "pdfjs-dist";  // 修改这一行
-import { useRoute, useRouter } from 'vue-router'
+import { onMounted } from "vue";
+import * as pdfjsLib from "pdfjs-dist";
+import { useRoute } from 'vue-router'
 // 引入本地 PDF.js worker
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url';
 import { ElMessage } from 'element-plus';
+import { convertFileSrc } from '@tauri-apps/api/core'
 
 // 获取当前路由信息
 const route = useRoute()
-var pdfDoc = null,
+
+var pdfDoc: any = null,
     pageNum = 1,
     pageRendering = false,
-    pageNumPending = null,
-    scale = 0.8,
-    canvas =null,
-    ctx = null;
-const state = reactive({
-    source: '', //预览pdf文件地址
-    pageNum: 1, //当前页面
-    scale: 1, // 缩放比例
-    numPages: 44, // 总页数
-});
+    pageNumPending: number | null = null,
+    scale = 3,
+    canvas: HTMLCanvasElement | null = null,
+    ctx: CanvasRenderingContext2D | null = null;
+
 // 设置 Worker 路径（必须！）
-// PDFJS.GlobalWorkerOptions.workerSrc =
-//   "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js";
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+pdfjsLib
 
 // 根据路由参数加载文件
 const loadPdfFile = async () => {
-    console.log('加载文件 loadPdfFile:', route)
-    let filePath = ""
-    // 检查是否有动态路由参数
-    if (route.meta.filePath) {
-        filePath = decodeURIComponent(route.meta.filePath as string)
+    try {
+        let filePath = ""
+        // 检查是否有动态路由参数
+        if (route.meta.filePath) {
+            filePath = decodeURIComponent(route.meta.filePath as string)
+        }
+        // 如果没有参数，使用查询参数
+        else if (route.query.file) {
+            filePath = route.query.file as string;
+        }
+
+        const url = convertFileSrc(filePath)
+        canvas = document.getElementById('the-canvas') as HTMLCanvasElement;
+        ctx = canvas.getContext('2d');
+
+        document.getElementById('prev')?.addEventListener('click', onPrevPage);
+        document.getElementById('next')?.addEventListener('click', onNextPage);
+
+        const loadingTask = pdfjsLib.getDocument(url);
+        loadingTask.promise.then(function (pdfDoc_) {
+            pdfDoc = pdfDoc_;
+            const pageCountElement = document.getElementById('page_count');
+            if (pageCountElement) {
+                pageCountElement.textContent = pdfDoc_.numPages.toString();
+            }
+            // Initial/first page rendering
+            renderPage(pageNum);
+        });
+    } catch (error: any) {
+        ElMessage.error(error.message)
     }
-    // 如果没有参数，使用查询参数或meta信息
-    else if (route.query.file || route.meta.filePath) {
-        filePath = (route.query.filePath as string) || (route.meta.filePath as string)
-    }
-    console.log('加载文件 loadPdfFile state.source:', state.source)
-    const url = convertFileSrc(filePath)
-    state.source = url;
-    console.log('加载文件 loadPdfFile url:', url)
-canvas = document.getElementById('the-canvas') as HTMLCanvasElement,
-    ctx = canvas.getContext('2d');
-
-    document.getElementById('prev').addEventListener('click', onPrevPage);
-    document.getElementById('next').addEventListener('click', onNextPage);
-
-    pdfjsLib.getDocument(url).promise.then(function (pdfDoc_) {
-        pdfDoc = pdfDoc_;
-        document.getElementById('page_count').textContent = pdfDoc.numPages;
-
-        // Initial/first page rendering
-        renderPage(pageNum);
-    });
-
-    // const loadingTask = createLoadingTask(url);
-    // loadingTask.promise.then((pdf: { numPages: number }) => {
-    //     state.numPages = pdf.numPages;
-    // });
-    //loadPdf();
 }
-// If absolute URL from the remote server is provided, configure the CORS
-// header on that server.
-//var url = 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf';
-
-// Loaded via <script> tag, create shortcut to access PDF.js exports.
-//   var { pdfjsLib } = globalThis;
-
-// The workerSrc property shall be specified.
-//pdfjsLib.GlobalWorkerOptions.workerSrc = '//mozilla.github.io/pdf.js/build/pdf.worker.mjs';
-
-
 
 /**
  * Get page info from document, resize canvas accordingly, and render page.
  * @param num Page number.
  */
-function renderPage(num) {
+function renderPage(num: number) {
+    if (!pdfDoc || !ctx || !canvas) return;
+
     pageRendering = true;
     // Using promise to fetch the page
-    pdfDoc.getPage(num).then(function (page) {
+    pdfDoc.getPage(num).then(function (page: any) {
         var viewport = page.getViewport({ scale: scale });
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
+        if (canvas && ctx) {
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
 
-        // Render PDF page into canvas context
-        var renderContext = {
-            canvasContext: ctx,
-            viewport: viewport
-        };
-        var renderTask = page.render(renderContext);
+            // Render PDF page into canvas context
+            var renderContext = {
+                canvasContext: ctx,
+                viewport: viewport
+            };
+            var renderTask = page.render(renderContext);
 
-        // Wait for rendering to finish
-        renderTask.promise.then(function () {
-            pageRendering = false;
-            if (pageNumPending !== null) {
-                // New page rendering is pending
-                renderPage(pageNumPending);
-                pageNumPending = null;
-            }
-        });
+            // Wait for rendering to finish
+            renderTask.promise.then(function () {
+                pageRendering = false;
+                if (pageNumPending !== null) {
+                    // New page rendering is pending
+                    renderPage(pageNumPending);
+                    pageNumPending = null;
+                }
+            });
+        }
     });
 
     // Update page counters
-    document.getElementById('page_num').textContent = num;
+    const pageNumElement = document.getElementById('page_num');
+    if (pageNumElement) {
+        pageNumElement.textContent = num.toString();
+    }
 }
 
 /**
  * If another page rendering in progress, waits until the rendering is
- * finised. Otherwise, executes rendering immediately.
+ * finished. Otherwise, executes rendering immediately.
  */
-function queueRenderPage(num) {
+function queueRenderPage(num: number) {
     if (pageRendering) {
         pageNumPending = num;
     } else {
@@ -138,7 +125,7 @@ function queueRenderPage(num) {
  * Displays previous page.
  */
 function onPrevPage() {
-    if (pageNum <= 1) {
+    if (pageNum <= 1 || !pdfDoc) {
         return;
     }
     pageNum--;
@@ -149,27 +136,62 @@ function onPrevPage() {
  * Displays next page.
  */
 function onNextPage() {
-    if (pageNum >= pdfDoc.numPages) {
+    if (!pdfDoc || pageNum >= pdfDoc.numPages) {
         return;
     }
     pageNum++;
     queueRenderPage(pageNum);
 }
 
-/**
- * Asynchronously downloads PDF.
- */
-
 onMounted(() => {
-
     loadPdfFile();
-
 });
 </script>
-
 <style scoped>
+.pdf-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    min-height: 100vh;
+}
+
 #the-canvas {
+    width: 100%;
     border: 1px solid black;
     direction: ltr;
+    max-width: 100%;
+    display: block;
+}
+
+.pdf-controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 10px 20px;
+    border-radius: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+}
+
+.pdf-controls button {
+    padding: 5px 10px;
+    border: 1px solid #ddd;
+    background-color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.pdf-controls button:hover {
+    background-color: #f5f5f5;
+}
+
+.pdf-controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 </style>

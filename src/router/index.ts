@@ -45,6 +45,20 @@ export const constantRoutes: Array<RouteRecordRaw> = [
     redirect: 'https://www.bing.com'
   },
   {
+    path: '/settings',
+    component: Layout,
+    redirect: '/errorlog/handle',
+    meta: { icon: 'error-handle', noBreadCrumbs: true },
+    children: [
+      {
+        name: 'Settings',
+        path: '/settings',
+        meta: { title: 'Settings', icon: 'error-handle' },
+        component: () => import('@/views/app/AppSetting.vue')
+      }
+    ]
+  },
+  {
     path: '/errorlog',
     component: Layout,
     redirect: '/errorlog/handle',

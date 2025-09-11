@@ -17,8 +17,8 @@ const isDark = useDark({
 const toggleDark = useToggle(isDark)
 const { appConfig } = useStore()
 
- 
-const { t, locale } = useI18n()
+
+// const { t, locale } = useI18n()
 const userStore = appConfig;
 let store: Store | undefined = undefined;
 let autostart = ref<boolean>(false)
@@ -70,8 +70,8 @@ onMounted(async () => {
     show_setting()
   }
   store = await load('settings.json', {
-      autoSave: false,
-      defaults: {}
+    autoSave: false,
+    defaults: {}
   });
 
   let val_auto_start = await store.get<{ value: boolean }>('auto_start');
@@ -285,7 +285,7 @@ const clear_browser_cache = () => {
             </div>
           </div>
           <div class="setting-control">
-            <el-button type="primary" @click="md_working_directory_change()" plain>
+            <el-button type="primary" @click="md_working_directory_change" plain>
               <el-icon>
                 <FolderChecked />
               </el-icon>
