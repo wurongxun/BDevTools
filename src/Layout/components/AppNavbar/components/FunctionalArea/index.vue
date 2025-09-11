@@ -2,9 +2,10 @@
   <div class="container">
     <search-menu />
     <theme-switcher />
-    <fullscreen />
+    <!-- <fullscreen /> -->
     <message />
     <error-handler />
+    <hide />
   </div>
 </template>
 
@@ -14,6 +15,7 @@ import Message from './Message.vue'
 import SearchMenu from './SearchMenu.vue'
 import ErrorHandler from './ErrorHandler.vue'
 import ThemeSwitcher from './ThemeSwitcher.vue'
+import Hide from './Hide.vue'
 </script>
 
 <style scoped lang="scss">

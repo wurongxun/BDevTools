@@ -5,7 +5,7 @@
       <bread-crumb></bread-crumb>
     </div>
     <functional-area></functional-area>
-    <avatar></avatar>
+    <!-- <avatar></avatar> -->
   </header>
   <tag-view></tag-view>
 </template>
