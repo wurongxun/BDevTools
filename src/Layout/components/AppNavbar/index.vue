@@ -1,5 +1,5 @@
 <template>
-  <header class="topbar-box">
+  <header class="topbar-box" data-tauri-drag-region>
     <toggle-switch></toggle-switch>
     <div class="bread-crumb-box">
       <bread-crumb></bread-crumb>

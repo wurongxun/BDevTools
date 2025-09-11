@@ -3,7 +3,7 @@
     <div class="side-box" :class="{ 'is-collapse': isCollapse }">
       <app-sidebar />
     </div>
-    <div class="app-content" :class="{ 'is-collapse': isCollapse }">
+    <div class="app-content" :class="{ 'is-collapse': isCollapse }" >
       <app-navbar></app-navbar>
       <app-main></app-main>
     </div>
