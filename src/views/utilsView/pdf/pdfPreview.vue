@@ -152,46 +152,70 @@ onMounted(() => {
     width: 100%;
     height: 100%;
     position: relative;
-    min-height: 100vh;
+    min-height: 100%;
+    /* background-color: #f5f5f5; */
+    padding: 20px 0;
+    box-sizing: border-box;
 }
 
 #the-canvas {
     width: 100%;
-    border: 1px solid black;
     direction: ltr;
     max-width: 100%;
     display: block;
+    margin: 0 auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    /* background-color: white; */
 }
 
 .pdf-controls {
     position: fixed;
     bottom: 20px;
     left: 50%;
-    transform: translateX(-50%);
+    /* transform: translateX(-50%); */
     display: flex;
     align-items: center;
-    gap: 10px;
-    background-color: rgba(255, 255, 255, 0.9);
-    padding: 10px 20px;
-    border-radius: 20px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    gap: 15px;
+    /* background-color: rgba(255, 255, 255, 0.95); */
+    padding: 6px 6px;
+    border-radius: 30px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
     z-index: 100;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .pdf-controls button {
-    padding: 5px 10px;
+    padding: 8px 16px;
     border: 1px solid #ddd;
     background-color: #fff;
-    border-radius: 4px;
+    border-radius: 20px;
     cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 80px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
-.pdf-controls button:hover {
-    background-color: #f5f5f5;
+.pdf-controls button:hover:not(:disabled) {
+    background-color: #409eff;
+    color: white;
+    border-color: #409eff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
 .pdf-controls button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.pdf-controls span {
+    font-weight: 500;
+    color: #333;
+    font-size: 14px;
+    min-width: 80px;
+    text-align: center;
 }
 </style>
