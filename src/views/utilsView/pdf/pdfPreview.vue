@@ -154,7 +154,7 @@ onMounted(() => {
     position: relative;
     min-height: 100%;
     /* background-color: #f5f5f5; */
-    padding: 20px 0;
+    padding: 10px 0;
     box-sizing: border-box;
 }
 
@@ -189,7 +189,7 @@ onMounted(() => {
 .pdf-controls button {
     padding: 8px 16px;
     border: 1px solid #ddd;
-    background-color: #fff;
+    /* background-color: #fff; */
     border-radius: 20px;
     cursor: pointer;
     font-weight: 500;
@@ -199,9 +199,9 @@ onMounted(() => {
 }
 
 .pdf-controls button:hover:not(:disabled) {
-    background-color: #409eff;
+    /* background-color: #409eff;
     color: white;
-    border-color: #409eff;
+    border-color: #409eff; */
     transform: translateY(-2px);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }

@@ -18,7 +18,7 @@ const toggleDark = useToggle(isDark)
 const { appConfig } = useStore()
 
 
-// const { t, locale } = useI18n()
+const { t, locale } = useI18n()
 const userStore = appConfig;
 let store: Store | undefined = undefined;
 let autostart = ref<boolean>(false)
