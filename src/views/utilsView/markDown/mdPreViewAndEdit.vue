@@ -274,18 +274,12 @@ onMounted(async () => {
     let name = route.name;
     let meta = route.meta;
     console.log(path, name, meta);
-
-
     var res = await tauri_request<ResponseData<string>>("read_note_file", {
         path: meta.path
     });
     if (res && res.code == 200) {
         //重新赋值
-
         var tem = res.data;
-        console.log("read_note_file res===============", res);
-        console.log("read_note_file node===============", name);
-        console.log("read_note_file  node.name===============", name);
         data.editedMdtext_md = tem;
         data.notEditedMdtext_md = tem;
         data.title_md = name as string;

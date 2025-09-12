@@ -6,7 +6,6 @@ import pages from './modules/pages'
 import components from './modules/components'
 import error from './modules/error'
 import universal from './modules/universal'
-import files from './modules/files'
 /**
  * @param path: 路由的访问路径
  * @param component: 对应的映射文件
@@ -62,7 +61,7 @@ export const constantRoutes: Array<RouteRecordRaw> = [
     path: '/errorlog',
     component: Layout,
     redirect: '/errorlog/handle',
-    meta: { icon: 'error-handle', noBreadCrumbs: true },
+    meta: { icon: 'error-handle', noBreadCrumbs: true, hidden: true },
     children: [
       {
         name: 'ErrorHandleDemo',
@@ -98,8 +97,7 @@ export const constantRoutes: Array<RouteRecordRaw> = [
   },
   components,
   error,
-  universal,
-  files
+  universal
 ]
 
 export const asyncRoutes: Array<RouteRecordRaw> = [pages]

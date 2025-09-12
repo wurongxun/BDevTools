@@ -67,14 +67,6 @@ const get_notebooks_tree_Api = (
           child_child_val.push(child_item)
         }
       }
-      const loadComponent = (path) => () => import(`../views/${path}.vue`)
-
-      // let component_: RouteComponent | null | undefined = null
-      // if (child.data_type == 'md') {
-      //   component_ = () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
-      // } else if (child.data_type == 'pdf') {
-      //   component_ = () => import('@/views/utilsView/pdf/pdfPreview.vue')
-      // }
       let route2: RouteRecordRaw = {
         path: '/notebook2/' + child.id,
         name: child.name,
@@ -86,7 +78,8 @@ const get_notebooks_tree_Api = (
           folder: child.folder,
           name: child.name,
           isfile: child.isfile,
-          type: child.data_type
+          type: child.data_type,
+          id: child.id
         },
         children: child.isfile ? [] : child_child_val
       }
@@ -139,7 +132,8 @@ const get_notebooks_tree_child = (
           name: child.name,
           noTagView: child.isfile ? false : true,
           isfile: child.isfile,
-          type: child.data_type
+          type: child.data_type,
+          id: child.id
         },
         children: child.isfile ? [] : child_child_val
       }
