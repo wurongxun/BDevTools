@@ -1,7 +1,7 @@
 <template>
   <logo></logo>
-  <div class="app-sidebar"> 
-      <side-menu></side-menu>
+  <div class="app-sidebar">
+    <side-menu></side-menu>
   </div>
 
 </template>
@@ -13,9 +13,9 @@ import logo from './components/Logo.vue'
 
 <style scoped lang="scss">
 .app-sidebar {
-overflow: auto;
-  height: calc(100vh - 60px); /* 减去 logo 高度 */
+  overflow: auto;
+  height: calc(100vh - 60px);
+  /* 减去 logo 高度 */
   max-height: 100vh;
 }
-
 </style>

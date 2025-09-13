@@ -6,6 +6,7 @@ import { defineAsyncComponent, ref } from 'vue'
 import { RouteRecordRaw, RouteComponent } from 'vue-router'
 import Layout from '@/Layout/index.vue'
 import { load, Store } from '@tauri-apps/plugin-store'
+import { note_comm_router } from '@/setting'
 
 /**
  * @description 获取控件权限
@@ -36,7 +37,7 @@ export const get_notebooks_Api = async () => {
       {
         path: '/notebook2',
         meta: {
-          title: '笔记2',
+          title: '笔记',
           icon: 'component',
           keepAlive: true,
           folder: md_working_directory.value
@@ -68,7 +69,7 @@ const get_notebooks_tree_Api = (
         }
       }
       let route2: RouteRecordRaw = {
-        path: '/notebook2/' + child.id,
+        path: note_comm_router + child.id,
         name: child.name,
         redirect: '',
         meta: {
@@ -94,8 +95,8 @@ const get_notebooks_tree_Api = (
   let route = [
     {
       path: '/notebook2/',
-      name: '笔记2',
-      meta: { title: '笔记2', icon: 'component', keepAlive: true, folder: notebooks_data.folder },
+      name: '笔记',
+      meta: { title: '笔记', icon: 'component', keepAlive: true, folder: notebooks_data.folder },
       component: Layout,
       children: children_val
     }
@@ -121,7 +122,7 @@ const get_notebooks_tree_child = (
         }
       }
       let route2: RouteRecordRaw = {
-        path: '/notebook2/' + child.id,
+        path: note_comm_router + child.id,
         name: child.name,
         redirect: '',
         meta: {

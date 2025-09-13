@@ -1,13 +1,8 @@
 <template>
   <div class="tab-control">
     <div class="tab-box">
-      <router-link
-        class="tag-item suspension"
-        :class="{ active: isActive(tag) }"
-        v-for="tag in tagViewList"
-        :key="tag.path"
-        :to="getToPath(tag)"
-      >
+      <router-link class="tag-item suspension" :class="{ active: isActive(tag) }" v-for="tag in tagViewList"
+        :key="tag.path" :to="getToPath(tag)">
         <span class="tag--title">{{ tag.title }}</span>
         <el-icon v-if="!tag.affix" class="close--icon" @click.prevent.stop="removeTab(tag)">
           <Close />
@@ -75,7 +70,7 @@ const isActive = (tag: ITagItem): boolean => {
   if (route.meta.noTagView && route.meta.activeMenu) {
     return route.meta.activeMenu === tag.path
   }
-  if(ToolUtils.notEmptyObject(tag)) {
+  if (ToolUtils.notEmptyObject(tag)) {
     let path = route.matched[route.matched.length - 1].path
     return path === tag.path
   }
@@ -113,6 +108,10 @@ const getToPath = (tag: ITagItem) => {
   padding: 2px 15px;
   border-radius: 3px;
   height: 46px;
+
+  @include useTheme {
+    border-bottom: 1px solid getVar('borderColor');
+  }
 
   .tab-box {
     white-space: nowrap;

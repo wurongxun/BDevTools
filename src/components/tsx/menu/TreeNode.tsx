@@ -5,6 +5,8 @@ import { ElMenuItem, ElSubMenu } from "element-plus";
 // 定义 NotebookInfo 接口
 import { defineComponent, PropType, h } from "vue";
 import styles from "./TreeNode.module.css";
+import { Folder } from '@element-plus/icons-vue'
+
 // 添加全局声明以解决JSX类型问题
 declare global {
   namespace JSX {
@@ -52,14 +54,19 @@ const TreeNode = defineComponent({
             class={itemClass}
             v-slots={{
               title: () => (
-                <span
-                  onClick={(e: any) => {
-                    e.stopPropagation();
-                    handleClick(node);
-                  }}
-                >
-                  {node.name}
-                </span>
+                <>
+        <el-icon>
+          <Folder />
+        </el-icon>
+        <span
+          onClick={(e: any) => {
+            e.stopPropagation();
+            handleClick(node);
+          }}
+        >
+          {node.name}
+        </span>
+      </>
               ),
               default: () =>
                 node.children!.map((child) => (

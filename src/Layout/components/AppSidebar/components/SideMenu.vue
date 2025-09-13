@@ -17,7 +17,18 @@
       </el-menu-item>
 
       <SubMenu :menu-list="childRoute"></SubMenu>
-      <SubMenu :menu-list="childRouteNote"></SubMenu>
+      <!-- <SubMenu :menu-list="childRouteNote"></SubMenu> -->
+      <!-- <el-sub-menu>
+        <template #title>
+          <el-icon >
+           <document />
+          </el-icon>
+          <span>笔记</span>
+        </template> -->
+        <NoteResources :menu-list="childRouteNote"></NoteResources>
+      <!-- </el-sub-menu> -->
+
+
       <!-- <el-sub-menu v-for="item in childRoute" :index="item.redirect || item.path" :key="item.path">
       <template #title>
         <el-icon v-if="isElIcon(item.meta?.icon)">
@@ -51,6 +62,8 @@ import AppLink from './AppLink.vue'
 import type { RouteRecordRaw, RouteRecordRedirectOption } from 'vue-router'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import SubMenu from './SubMenu.vue'
+import NoteResources from './NoteResources.vue'
+
 const { routeStore, system, routerNoteStore } = useStore()
 const route = useRoute()
 const router = useRouter()
@@ -137,9 +150,12 @@ const getOnlyChildRouteTitle = (item: RouteRecordRaw): string => {
 .el-menu-vertical {
   height: 100%;
 }
-.el-menu--collapse .el-menu .el-submenu, .el-menu--popup{
-min-width: 120px!important;
+
+.el-menu--collapse .el-menu .el-submenu,
+.el-menu--popup {
+  min-width: 120px !important;
 }
+
 .svg-box {
   margin-right: 5px;
   width: 24px;

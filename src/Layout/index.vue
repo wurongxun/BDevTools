@@ -37,6 +37,8 @@ const { isCollapse } = storeToRefs(system)
     width: $--menu-width;
     flex-shrink: 0;
     // overflow: auto;
+    border-right: 1px solid #e4e7ed;
+
     &.is-collapse {
       width: $--collapse-width;
     }
