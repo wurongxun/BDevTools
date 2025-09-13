@@ -2,15 +2,17 @@
     <div class="pdf-container">
         <canvas id="the-canvas"></canvas>
         <div class="pdf-controls">
+            <button @click="onMagnify">+</button>
+            <button @click="onReduce">-</button>
             <button id="prev">Previous</button>
             <button id="next">Next</button>
-            <span>Page: <span id="page_num"></span> / <span id="page_count"></span></span>
+            <span>Page: <span>{{ page_num }}</span> / <span>{{ page_count }}</span></span>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, reactive, ref, watch } from "vue";
 import * as pdfjsLib from "pdfjs-dist";
 import { useRoute } from 'vue-router'
 // 引入本地 PDF.js worker
@@ -18,21 +20,48 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url';
 import { ElMessage } from 'element-plus';
 import { convertFileSrc } from '@tauri-apps/api/core'
 
+
 // 获取当前路由信息
 const route = useRoute()
-
+let scale = ref<number>(1);
+let page_num = ref<string>("");
+let page_count = ref<string>("");
 var pdfDoc: any = null,
     pageNum = 1,
     pageRendering = false,
     pageNumPending: number | null = null,
-    scale = 3,
     canvas: HTMLCanvasElement | null = null,
     ctx: CanvasRenderingContext2D | null = null;
 
 // 设置 Worker 路径（必须！）
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-pdfjsLib
 
+const onMagnify = () => {
+    if (!pdfDoc || !ctx) return;
+    scale.value += 0.1;
+    renderPage(pageNum);
+    scrollToTop(); // 添加这行
+}
+const onReduce = () => {
+    if (!pdfDoc || !ctx) return;
+    if (scale.value > 0.2) {
+        scale.value -= 0.1;
+        renderPage(pageNum);
+        scrollToTop(); // 添加这行
+    }
+
+}
+// 添加新的滚动函数
+function scrollToTop() {
+    // 方法1: 滚动到指定元素顶部
+    //document.querySelector('.pdf-container')?.scrollIntoView();
+
+    // 或者方法2: 直接滚动到页面顶部
+    // window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // 或者方法3: 滚动容器内部滚动到顶部(如果容器有滚动条)
+    document.querySelector('.pdf-container')?.scrollTo({ top: 0, behavior: 'smooth' });
+}
 // 根据路由参数加载文件
 const loadPdfFile = async () => {
     try {
@@ -56,10 +85,9 @@ const loadPdfFile = async () => {
         const loadingTask = pdfjsLib.getDocument(url);
         loadingTask.promise.then(function (pdfDoc_) {
             pdfDoc = pdfDoc_;
-            const pageCountElement = document.getElementById('page_count');
-            if (pageCountElement) {
-                pageCountElement.textContent = pdfDoc_.numPages.toString();
-            }
+
+            page_count.value = pdfDoc_.numPages.toString();
+
             // Initial/first page rendering
             renderPage(pageNum);
         });
@@ -78,7 +106,7 @@ function renderPage(num: number) {
     pageRendering = true;
     // Using promise to fetch the page
     pdfDoc.getPage(num).then(function (page: any) {
-        var viewport = page.getViewport({ scale: scale });
+        var viewport = page.getViewport({ scale: scale.value });
         if (canvas && ctx) {
             canvas.height = viewport.height;
             canvas.width = viewport.width;
@@ -103,10 +131,8 @@ function renderPage(num: number) {
     });
 
     // Update page counters
-    const pageNumElement = document.getElementById('page_num');
-    if (pageNumElement) {
-        pageNumElement.textContent = num.toString();
-    }
+    page_num.value = num.toString();
+
 }
 
 /**
@@ -142,7 +168,14 @@ function onNextPage() {
     pageNum++;
     queueRenderPage(pageNum);
 }
-
+// 监听路由参数变化
+watch(
+    () => route.path,
+    () => {
+       loadPdfFile();
+    },
+    { immediate: true }
+)
 onMounted(() => {
     loadPdfFile();
 });
@@ -156,6 +189,7 @@ onMounted(() => {
     /* background-color: #f5f5f5; */
     padding: 10px 0;
     box-sizing: border-box;
+    /* overflow: scroll; */
 }
 
 #the-canvas {

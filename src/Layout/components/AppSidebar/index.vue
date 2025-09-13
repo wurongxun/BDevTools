@@ -1,9 +1,21 @@
 <template>
-  <side-menu></side-menu>
+  <logo></logo>
+  <div class="app-sidebar"> 
+      <side-menu></side-menu>
+  </div>
+
 </template>
 
 <script setup lang="ts" name="AppSidebar">
 import SideMenu from './components/SideMenu.vue'
+import logo from './components/Logo.vue'
 </script>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+.app-sidebar {
+overflow: auto;
+  height: calc(100vh - 60px); /* 减去 logo 高度 */
+  max-height: 100vh;
+}
+
+</style>

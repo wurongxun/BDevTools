@@ -3,7 +3,7 @@ import type { RouteRecordRaw } from 'vue-router'
 
 const route: RouteRecordRaw = {
   path: '/error',
-  meta: { title: '异常页', icon: 'Warning', keepAlive: false },
+  meta: { title: '异常页', hidden: true,icon: 'Warning', keepAlive: false },
   redirect: '/error/500',
   component: Layout,
   children: [

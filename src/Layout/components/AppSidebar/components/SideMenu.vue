@@ -1,24 +1,24 @@
 <template>
-  <el-menu :collapse="isCollapse" :default-active="currentOpenMenu()" class="el-menu-vertical">
-    <logo></logo>
-    <el-menu-item v-for="item in onlyChildRoute" :index="getOnlyChildRoutePath(item)"
-      :key="getOnlyChildRoutePath(item)">
-      <el-icon v-if="isElIcon(item.meta?.icon)" @click="handleToPath(item)">
-        <component :is="item.meta?.icon" />
-      </el-icon>
-      <i v-else class="svg-box" @click="handleToPath(item)">
-        <svg-icon class-name="svg-icon" :icon-class="item.meta?.icon" />
-      </i>
-      <template #title>
-        <app-link :to="getOnlyChildRoutePath(item)" :redirect="getOnlyChildRouteRedirect(item)">
-          {{ getOnlyChildRouteTitle(item) }}
-        </app-link>
-      </template>
-    </el-menu-item>
+  <div style="overflow: auto;height: 100%;">
+    <el-menu :collapse="isCollapse" :default-active="currentOpenMenu()" class="el-menu-vertical">
+      <el-menu-item v-for="item in onlyChildRoute" :index="getOnlyChildRoutePath(item)"
+        :key="getOnlyChildRoutePath(item)">
+        <el-icon v-if="isElIcon(item.meta?.icon)" @click="handleToPath(item)">
+          <component :is="item.meta?.icon" />
+        </el-icon>
+        <i v-else class="svg-box" @click="handleToPath(item)">
+          <svg-icon class-name="svg-icon" :icon-class="item.meta?.icon" />
+        </i>
+        <template #title>
+          <app-link :to="getOnlyChildRoutePath(item)" :redirect="getOnlyChildRouteRedirect(item)">
+            {{ getOnlyChildRouteTitle(item) }}
+          </app-link>
+        </template>
+      </el-menu-item>
 
-    <SubMenu :menu-list="childRoute"></SubMenu>
-    <SubMenu :menu-list="childRouteNote"></SubMenu>
-    <!-- <el-sub-menu v-for="item in childRoute" :index="item.redirect || item.path" :key="item.path">
+      <SubMenu :menu-list="childRoute"></SubMenu>
+      <SubMenu :menu-list="childRouteNote"></SubMenu>
+      <!-- <el-sub-menu v-for="item in childRoute" :index="item.redirect || item.path" :key="item.path">
       <template #title>
         <el-icon v-if="isElIcon(item.meta?.icon)">
           <component :is="item.meta?.icon" />
@@ -37,7 +37,8 @@
         <app-link :to="childItem.path"> {{ getTitle(childItem) }} </app-link>
       </el-menu-item>
     </el-sub-menu> -->
-  </el-menu>
+    </el-menu>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -46,7 +47,7 @@ import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import useStore from '@/store'
 import AppLink from './AppLink.vue'
-import logo from './Logo.vue'
+
 import type { RouteRecordRaw, RouteRecordRedirectOption } from 'vue-router'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import SubMenu from './SubMenu.vue'
@@ -136,7 +137,9 @@ const getOnlyChildRouteTitle = (item: RouteRecordRaw): string => {
 .el-menu-vertical {
   height: 100%;
 }
-
+.el-menu--collapse .el-menu .el-submenu, .el-menu--popup{
+min-width: 120px!important;
+}
 .svg-box {
   margin-right: 5px;
   width: 24px;

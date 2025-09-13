@@ -3,7 +3,7 @@ import type { RouteRecordRaw } from 'vue-router'
 
 const route: RouteRecordRaw = {
   path: '/universal',
-  meta: { title: '通用页面', icon: 'Warning', keepAlive: false },
+  meta: { title: '通用页面', hidden: true,icon: 'Warning', keepAlive: false },
   redirect: '/universal/success',
   component: Layout,
   children: [
