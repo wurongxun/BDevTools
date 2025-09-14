@@ -4,7 +4,8 @@
     <theme-switcher />
     <!-- <fullscreen /> -->
     <message />
-    <error-handler />
+    <!-- <error-handler /> -->
+     <app-setting />
     <hide />
   </div>
 </template>
@@ -16,6 +17,7 @@ import SearchMenu from './SearchMenu.vue'
 import ErrorHandler from './ErrorHandler.vue'
 import ThemeSwitcher from './ThemeSwitcher.vue'
 import Hide from './Hide.vue'
+import AppSetting from './AppSetting.vue'
 </script>
 
 <style scoped lang="scss">

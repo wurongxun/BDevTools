@@ -84,7 +84,7 @@ export const constantRoutes: Array<RouteRecordRaw> = [
   {
     path: "/App",
     component: () => import("@/views/Common/Common.vue"),
-    meta: { title: 'App',icon: 'error-handle', noBreadCrumbs: true },
+    meta: { title: 'App', icon: 'error-handle', noBreadCrumbs: true },
     children: [
       {
         path: "/AppSetting",
