@@ -7,6 +7,7 @@ import { RouteRecordRaw, RouteComponent } from 'vue-router'
 import Layout from '@/Layout/index.vue'
 import { load, Store } from '@tauri-apps/plugin-store'
 import { note_comm_router } from '@/setting'
+import { id } from 'element-plus/es/locales.mjs'
 
 /**
  * @description 获取控件权限
@@ -40,7 +41,9 @@ export const get_notebooks_Api = async () => {
           title: '笔记',
           icon: 'component',
           keepAlive: true,
-          folder: md_working_directory.value
+          id: 'notebook2',
+          folder: md_working_directory.value,
+          isFile: false
         },
         component: Layout,
         children: []
@@ -96,7 +99,8 @@ const get_notebooks_tree_Api = (
     {
       path: '/notebook2/',
       name: '笔记',
-      meta: { title: '笔记', icon: 'component', keepAlive: true, folder: notebooks_data.folder },
+      
+      meta: { id: 'notebook2',title: '笔记', icon: 'component', keepAlive: true, folder: notebooks_data.folder,isFile: false },
       component: Layout,
       children: children_val
     }

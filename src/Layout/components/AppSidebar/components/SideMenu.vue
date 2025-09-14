@@ -1,7 +1,7 @@
 <template>
   <div style="overflow: auto;height: 100%;">
     <el-menu :collapse="isCollapse" :default-active="currentOpenMenu()" class="el-menu-vertical">
-      <el-menu-item v-for="item in onlyChildRoute" :index="getOnlyChildRoutePath(item)"
+      <!-- <el-menu-item v-for="item in onlyChildRoute" :index="getOnlyChildRoutePath(item)"
         :key="getOnlyChildRoutePath(item)">
         <el-icon v-if="isElIcon(item.meta?.icon)" @click="handleToPath(item)">
           <component :is="item.meta?.icon" />
@@ -14,7 +14,7 @@
             {{ getOnlyChildRouteTitle(item) }}
           </app-link>
         </template>
-      </el-menu-item>
+      </el-menu-item> -->
 
       <SubMenu :menu-list="childRoute"></SubMenu>
       <!-- <SubMenu :menu-list="childRouteNote"></SubMenu> -->
@@ -86,7 +86,8 @@ const childRouteNote: any = computed(() =>
 )
 onMounted(() => {
   console.log(routeStore.routes)
-  console.log(routerNoteStore.routes)
+  console.log("=========routerNoteStore.routes",childRouteNote)
+  
 })
 const currentOpenMenu = () => {
   if (route.meta?.activeMenu) {

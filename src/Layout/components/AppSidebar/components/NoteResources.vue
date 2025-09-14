@@ -1,27 +1,33 @@
 <template>
   <!-- <div class="box" ref="box"> -->
-    <!-- <div class="left"> -->
-      <!-- <div class="sidebar-content"> -->
-        <!-- <div class="sidebar-header">
+  <!-- <div class="left"> -->
+  <!-- <div class="sidebar-content"> -->
+  <!-- <div class="sidebar-header">
           <h4 class="sidebar-title">资源管理器</h4>
           <div class="sidebar-controls">
             <el-button :icon="Refresh" circle size="small" @click="reFresh" title="刷新" />
           </div>
         </div> -->
-        <div class="wrapper" v-show="show_notebooks_data" v-contextmenu:contextmenu>
-          <el-menu default-active="2" class="folder-menu">
-            <TreeNode v-if="menuList" :node="notebooks_data" v-model="state.selectedNodeId"
-              @node-click="selectHandle" />
-          </el-menu>
-        </div>
-        <!-- <div class="empty-state" v-show="!show_notebooks_data">
+  <!-- <div class="wrapper" v-show="show_notebooks_data" v-contextmenu:contextmenu> -->
+   <!-- <el-menu 
+      :default-active="state.selectedNodeId" 
+      class="folder-menu"
+      
+    > -->
+      <template v-for="item in menuList" :key="item.path">
+        <TreeNode v-if="item" :node="item"  v-model="state.selectedNodeId" @node-click="selectHandle" />
+      </template>
+
+    <!-- </el-menu> -->
+  <!-- </div> -->
+  <!-- <div class="empty-state" v-show="!show_notebooks_data">
           <el-empty description="暂无数据" :image-size="80">
             <el-button type="primary" @click="showAddFolderModalForm">创建文件夹</el-button>
           </el-empty>
         </div> -->
-      <!-- </div> -->
-    <!-- </div> -->
-    <!-- <div class="resize" title="收缩侧边栏">⋮</div>
+  <!-- </div> -->
+  <!-- </div> -->
+  <!-- <div class="resize" title="收缩侧边栏">⋮</div>
     <div class="mid">
       <div v-if="data.showMdEditor" class="editor-wrapper">
         <MdEditor v-model="data.editedMdtext_md" @onSave="saveMdText" :theme="editorTheme" class="md-editor"
@@ -40,7 +46,7 @@
         </div>
       </div>
     </div> -->
-    <!-- <v-contextmenu :theme="isDark ? 'dark' : 'light'" ref="contextmenu" class="context-menu" v-if="data_not_null">
+  <!-- <v-contextmenu :theme="isDark ? 'dark' : 'light'" ref="contextmenu" class="context-menu" v-if="data_not_null">
       <v-contextmenu-item @click="showAddFileModalForm">
         <el-icon>
           <DocumentAdd />
@@ -106,56 +112,56 @@
       </v-contextmenu-item>
     </v-contextmenu> -->
 
-    <!-- 添加文件夹表单 -->
-    <el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal" title="添加文件夹"
-      width="500px" class="custom-dialog" align-center>
-      <el-form class="dialog-form">
-        <el-form-item label="文件夹名称" :label-width="data.formLabelWidth">
-          <el-input v-model="data.newFolderName" autocomplete="off" placeholder="请输入文件夹名称" @keyup.enter="addNodeFolder"
-            clearable />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="handleCancelByAddFolderModal">取消</el-button>
-          <el-button type="primary" @click="addNodeFolder" :loading="data.loading">确认</el-button>
-        </div>
-      </template>
-    </el-dialog>
+  <!-- 添加文件夹表单 -->
+  <el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal" title="添加文件夹"
+    width="500px" class="custom-dialog" align-center>
+    <el-form class="dialog-form">
+      <el-form-item label="文件夹名称" :label-width="data.formLabelWidth">
+        <el-input v-model="data.newFolderName" autocomplete="off" placeholder="请输入文件夹名称" @keyup.enter="addNodeFolder"
+          clearable />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="handleCancelByAddFolderModal">取消</el-button>
+        <el-button type="primary" @click="addNodeFolder" :loading="data.loading">确认</el-button>
+      </div>
+    </template>
+  </el-dialog>
 
-    <!-- 添加笔记本弹出表单 -->
-    <el-dialog v-model="data.addFileModalFormVisible" :before-close="handleCancelByAddNotebookModal" title="添加文件"
-      width="500px" class="custom-dialog" align-center>
-      <el-form class="dialog-form">
-        <el-form-item label="文件名称" :label-width="data.formLabelWidth">
-          <el-input v-model="data.newFileName" autocomplete="off" placeholder="请输入文件名称" @keyup.enter="addFile"
-            clearable />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="handleCancelByAddNotebookModal">取消</el-button>
-          <el-button type="primary" @click="addFile">确认</el-button>
-        </div>
-      </template>
-    </el-dialog>
+  <!-- 添加笔记本弹出表单 -->
+  <el-dialog v-model="data.addFileModalFormVisible" :before-close="handleCancelByAddNotebookModal" title="添加文件"
+    width="500px" class="custom-dialog" align-center>
+    <el-form class="dialog-form">
+      <el-form-item label="文件名称" :label-width="data.formLabelWidth">
+        <el-input v-model="data.newFileName" autocomplete="off" placeholder="请输入文件名称" @keyup.enter="addFile"
+          clearable />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="handleCancelByAddNotebookModal">取消</el-button>
+        <el-button type="primary" @click="addFile">确认</el-button>
+      </div>
+    </template>
+  </el-dialog>
 
-    <!-- 修改文件名称弹出表单 -->
-    <el-dialog v-model="data.upFileNameModalFormVisible" :before-close="handleCancelByUpFileNameModal" title="修改文件名"
-      width="500px" class="custom-dialog" align-center>
-      <el-form class="dialog-form">
-        <el-form-item label="文件名称" :label-width="data.formLabelWidth">
-          <el-input v-model="data.upFileName" autocomplete="off" placeholder="请输入新的文件名称" @keyup.enter="upFileName"
-            clearable />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="handleCancelByUpFileNameModal">取消</el-button>
-          <el-button type="primary" @click="upFileName">修改</el-button>
-        </div>
-      </template>
-    </el-dialog>
+  <!-- 修改文件名称弹出表单 -->
+  <el-dialog v-model="data.upFileNameModalFormVisible" :before-close="handleCancelByUpFileNameModal" title="修改文件名"
+    width="500px" class="custom-dialog" align-center>
+    <el-form class="dialog-form">
+      <el-form-item label="文件名称" :label-width="data.formLabelWidth">
+        <el-input v-model="data.upFileName" autocomplete="off" placeholder="请输入新的文件名称" @keyup.enter="upFileName"
+          clearable />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="handleCancelByUpFileNameModal">取消</el-button>
+        <el-button type="primary" @click="upFileName">修改</el-button>
+      </div>
+    </template>
+  </el-dialog>
   <!-- </div> -->
 </template>
 <script setup lang="ts">
@@ -214,7 +220,7 @@ const editorTheme = computed(() => {
   return isDark.value ? 'dark' : 'light';
 });
 const props = defineProps<{
-    menuList: RouteRecordRaw[]
+  menuList: RouteRecordRaw[]
 }>()
 const data = reactive({
   folders: [], // 文件夹列表
@@ -330,7 +336,7 @@ let get_document_notebooks = async () => {
   console.log("res===============", res);
   if (res && typeof res === "object" && "code" in res && res.code == 200) {
     //值 返回ResponseData 对象，包含data、code、msg参数 例如：data {"id":"1752761254929","parent_id":"","path":"C:\\Users\\kun15\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[]}
-    let data_: NotebookInfo =typeof res.data === "string" ? JSON.parse(res.data) : res.data;
+    let data_: NotebookInfo = typeof res.data === "string" ? JSON.parse(res.data) : res.data;
     console.log("get_document_notebooks data_", data_);
     data_.name = "我的笔记";
     notebooks_data.value = data_;
@@ -385,11 +391,11 @@ const state = reactive({
  * selectedKeys(v-model)	当前选中的菜单项 key 数组
  * @param {*} param0
  */
-const selectHandle = async function (node: NotebookInfo) {
+const selectHandle = async function (node: RouteRecordRaw) {
   console.log("node {:?}", node)
-  data.selectIsFile = node.isfile;
-  if (!node.isfile) {
-    data.selectFolderPath = node.folder;
+  data.selectIsFile = Boolean(node.meta?.isfile);
+  if (!node.meta.isfile) {
+    data.selectFolderPath = String(node.meta.folder);
     console.log("data.selectFolderPath {:?}", data.selectFolderPath)
     return;
   }
@@ -401,10 +407,10 @@ const selectHandle = async function (node: NotebookInfo) {
   console.log("selectHandle1 editedMdtext_md  {:?}", data.editedMdtext_md)
   console.log("selectHandle title_md  {:?}", data.title_md)
   console.log("selectHandle lastTimeTitle_md  {:?}", data.lastTimeTitle_md)
- router.push({
-    path: note_comm_router+node.id,
+  router.push({
+    path:  node.path,
   })
- 
+
 };
 
 /**
@@ -807,7 +813,7 @@ const read_note_file = async function (node: NotebookInfo) {
       data.currentChooseNoteAllPath_md = node.path;
       data.currentChooseFolderPath_md = node.folder;
       data.showMdEditor = true;
-       console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
+      console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
       console.log("read_note_file notEditedMdtext_md===============", data.notEditedMdtext_md);
     } else {
       NotificationUtil.error("读取失败：" + res.msg);
@@ -821,6 +827,7 @@ const read_note_file = async function (node: NotebookInfo) {
 
 <style lang="scss">
 @import '@/styles/variables.scss';
+
 .box {
   width: 100%;
   height: 100%;
@@ -872,7 +879,7 @@ const read_note_file = async function (node: NotebookInfo) {
   justify-content: space-between;
   padding: 10px 8px;
   height: 46px;
-  
+
   @include useTheme {
     border-bottom: 1px solid getVar('borderColor');
   }
