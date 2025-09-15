@@ -1,4 +1,4 @@
-import { NotebookInfo, ResponseData } from '@/Types/entitys'
+import { NotebookInfo, ResponseData, TreeNode } from '@/Types/entitys'
 import NotificationUtil from '@/utils/NotificationUtil'
 import request from '@/utils/request/index'
 import { tauri_request } from '@/utils/tauri_request'
@@ -8,6 +8,7 @@ import Layout from '@/Layout/index.vue'
 import { load, Store } from '@tauri-apps/plugin-store'
 import { note_comm_router } from '@/setting'
 import { id } from 'element-plus/es/locales.mjs'
+import useStore from '@/store/index'
 
 /**
  * @description 获取控件权限
@@ -31,6 +32,7 @@ export const get_notebooks_Api = async () => {
     notebooks_data.value = data_
     console.log('get_notebooks_Api', md_working_directory.value)
     console.log('get_notebooks_Api', data_)
+    FileTreeNodeHandler(data_)
     return get_notebooks_tree_Api(data_, md_working_directory.value)
   } else {
     NotificationUtil.error(res.msg)
@@ -99,8 +101,15 @@ const get_notebooks_tree_Api = (
     {
       path: '/notebook2/',
       name: '笔记',
-      
-      meta: { id: 'notebook2',title: '笔记', icon: 'component', keepAlive: true, folder: notebooks_data.folder,isFile: false },
+
+      meta: {
+        id: 'notebook2',
+        title: '笔记',
+        icon: 'component',
+        keepAlive: true,
+        folder: notebooks_data.folder,
+        isFile: false
+      },
       component: Layout,
       children: children_val
     }
@@ -161,4 +170,86 @@ const get_component = (str: string): (() => Promise<any>) | null => {
     // 返回一个默认组件，避免返回null
     return () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
   }
+}
+
+const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
+  let children_val: Array<TreeNode> = new Array<TreeNode>()
+  let notebooks_children: NotebookInfo[] = notebooks_data.children
+  if (notebooks_children && notebooks_children.length > 0) {
+    for (let i = 0; i < notebooks_children.length; i++) {
+      let child: NotebookInfo = notebooks_children[i]
+      let child_child: Array<NotebookInfo> = child.children
+      let child_child_val: Array<TreeNode> = new Array<TreeNode>()
+      if (child_child && child_child.length > 0) {
+        let children: Array<TreeNode> = File_treeNode_child(child_child)
+        for (let j = 0; j < children.length; j++) {
+          let child_item = children[j]
+          child_child_val.push(child_item)
+        }
+      }
+      let route2: TreeNode = {
+        id: child.id,
+        label: child.name,
+        isFolder: child.isfile ? false : true,
+        type: child.data_type as TreeNode['type'],
+        path: note_comm_router + child.id,
+        meta: {
+          title: child.name,
+          keepAlive: true,
+          filePath: child.path,
+          folder: child.folder,
+          name: child.name,
+          isfile: child.isfile,
+          type: child.data_type,
+          id: child.id
+        },
+        children: child.isfile ? [] : child_child_val
+      }
+
+      children_val.push(route2)
+    }
+  }
+  const { routerNoteStore } = useStore()
+  routerNoteStore.addTreeNode(children_val)
+  return children_val
+}
+
+const File_treeNode_child = (notebooks_children: Array<NotebookInfo>): Array<TreeNode> => {
+  let children_val: Array<TreeNode> = new Array<TreeNode>()
+  if (notebooks_children && notebooks_children.length > 0) {
+    console.log('get_notebooks_tree_child notebooks_children', notebooks_children)
+    for (let i = 0; i < notebooks_children.length; i++) {
+      let child: NotebookInfo = notebooks_children[i]
+      let child_child: Array<NotebookInfo> = child.children
+      let child_child_val: Array<TreeNode> = new Array<TreeNode>()
+      if (child_child && child_child.length > 0) {
+        let children: Array<TreeNode> = File_treeNode_child(child_child)
+        for (let j = 0; j < children.length; j++) {
+          let child_item = children[j]
+          child_child_val.push(child_item)
+        }
+      }
+      let route2: TreeNode = {
+        id: child.id,
+        label: child.name,
+        isFolder: child.isfile ? false : true,
+        type: child.data_type as TreeNode['type'],
+        path: note_comm_router + child.id,
+        meta: {
+          title: child.name,
+          keepAlive: true,
+          filePath: child.path,
+          folder: child.folder,
+          name: child.name,
+          isfile: child.isfile,
+          type: child.data_type,
+          id: child.id
+        },
+        children: child.isfile ? [] : child_child_val
+      }
+      children_val.push(route2)
+    }
+  }
+
+  return children_val
 }

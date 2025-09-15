@@ -92,7 +92,16 @@ class NotebookInfo {
   public children: Array<NotebookInfo> = []
   //添加get set 方法
 }
-
+// 定义节点数据结构
+interface TreeNode {
+  id: string
+  label: string
+  isFolder: boolean
+  type?: 'folder' | 'markdown' | 'pdf'
+  children?: TreeNode[]
+  path: string,
+  [key: string]: any
+}
 //  {"id":"1752831345744","parent_id":"","path":"C:\\Users\\rongxun.wu01\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[{"id":"Jabalpur","parent_id":"1752831345744","path":"C:\\Users\\rongxun.wu01\\Documents\\notebooks\\Jabalpur","name":"Jabalpur","isfile":false,"children":[{"id":"OA.md","parent_id":"Jabalpur","path":"C:\\Users\\rongxun.wu01\\Documents\\notebooks\\Jabalpur\\OA.md","name":"OA.md","isfile":true,"children":[]},{"id":"OA24.md","parent_id":"Jabalpur","path":"C:\\Users\\rongxun.wu01\\Documents\\notebooks\\Jabalpur\\OA24.md","name":"OA24.md","isfile":true,"children":[]}]}]}
 export {
   Message,
@@ -102,5 +111,6 @@ export {
   SettingIdValueName,
   SshLinkInfoTree,
   SshSubMenu,
-  NotebookInfo
+  NotebookInfo,
+  TreeNode
 }

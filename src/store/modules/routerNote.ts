@@ -2,11 +2,12 @@ import { defineStore } from 'pinia'
 import type { RouteRecordRaw } from 'vue-router'
 import { getMenu } from '@/api/user'
 import { get_notebooks_Api } from '@/api/file'
-
+import useStore from '@/store/index'
 import { constantRoutes, asyncRoutes } from '@/router/index'
 import router from '@/router/index'
 import VerifyUtils from '@/utils/VerifyUtils'
 import ToolUtils from '@/utils/ToolUtils'
+import { TreeNode } from '@/Types/entitys'
 
 /**
  *
@@ -93,7 +94,8 @@ function filterRoutes(arrData: Array<any>): Array<RouteRecordRaw> {
 export const routerNoteStore = defineStore('routerNoteStore', {
   state: () => {
     return {
-      routes: [] as RouteRecordRaw[]
+      routes: [] as RouteRecordRaw[],
+      tree_node: [] as TreeNode[]
     }
   },
   actions: {
@@ -115,7 +117,9 @@ export const routerNoteStore = defineStore('routerNoteStore', {
       this.routes = red_note
       return this.routes
     },
-
+    async addTreeNode(item: TreeNode[]) {
+      this.tree_node = item
+    },
     /**
      * @description 路由重置
      */
