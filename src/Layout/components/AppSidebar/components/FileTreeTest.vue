@@ -8,6 +8,9 @@ import { computed, onMounted } from 'vue'
 import FileInfoTree from '@/components/FileTree/FileInfoTree.vue'
 import { ref } from 'vue'
 import useStore from '@/store'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 const { routeStore, system, routerNoteStore } = useStore()
 const childRouteNote: any = computed(() =>
     routerNoteStore.routes
@@ -98,6 +101,12 @@ const treeData = ref([
 
 const handleNodeClick = (node) => {
     console.log('节点被点击:', node)
+    console.log('节点被点击 node.path:', node.path)
+    if (!node.isFolder) {
+        router.push({
+            path: node.path
+        })
+    }
 }
 
 const handleRefresh = () => {
