@@ -188,7 +188,7 @@ import { MdEditor } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
 import { NotebookInfo, ResponseData } from "@/entity/entitys";
 import TreeNode from "@/components/tsx/menu/TreeNode";
-import { tauri_request } from "@/utils/request";
+import { tauri_request } from "@/utils/tauri_request";
 import {
   Document,
   Refresh,

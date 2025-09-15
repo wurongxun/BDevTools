@@ -22,7 +22,7 @@ const { cacheList } = storeToRefs(tagview)
 
 .app-main {
   width: 100%;
-  height: calc(100vh - 51px - 40px);
+  height: calc(100vh - 51px - 46px);
   overflow: auto;
   box-sizing: border-box;
   @include scrollbar;

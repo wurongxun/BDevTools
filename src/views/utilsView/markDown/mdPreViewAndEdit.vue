@@ -46,74 +46,10 @@
                 </div>
             </div>
         </div>
-        <v-contextmenu :theme="isDark ? 'dark' : 'light'" ref="contextmenu" class="context-menu" v-if="data_not_null">
-            <v-contextmenu-item @click="showAddFileModalForm">
-                <el-icon>
-                    <DocumentAdd />
-                </el-icon>
-                添加文件
-            </v-contextmenu-item>
-            <v-contextmenu-divider />
-            <v-contextmenu-item @click="showAddFolderModalForm">
-                <el-icon>
-                    <FolderAdd />
-                </el-icon>
-                添加文件夹
-            </v-contextmenu-item>
-            <v-contextmenu-divider />
-            <v-contextmenu-item @click="reFresh">
-                <el-icon>
-                    <Refresh />
-                </el-icon>
-                刷新
-            </v-contextmenu-item>
-            <v-contextmenu-divider />
-            <v-contextmenu-item v-show="data.selectIsFile" @click="removeNote">
-                <el-icon>
-                    <Delete />
-                </el-icon>
-                删除文件
-            </v-contextmenu-item>
-            <v-contextmenu-divider v-show="data.selectIsFile" />
-            <v-contextmenu-item v-show="data.selectIsFile" @click="removeFile">
-                <el-icon>
-                    <Edit />
-                </el-icon>
-                修改文件名称
-            </v-contextmenu-item>
-            <v-contextmenu-divider v-show="!(data.selectIsFile)" />
-            <v-contextmenu-item v-show="!(data.selectIsFile)" @click="removeFolder">
-                <el-icon>
-                    <Delete />
-                </el-icon>
-                删除文件夹
-            </v-contextmenu-item>
-            <v-contextmenu-divider />
-            <v-contextmenu-item @click="fileManagerOpenPath">
-                <el-icon>
-                    <FolderOpened />
-                </el-icon>
-                在文件资源管理器中显示
-            </v-contextmenu-item>
-        </v-contextmenu>
-        <v-contextmenu :theme="isDark ? 'dark' : 'light'" ref="contextmenu" class="context-menu" v-else>
-            <v-contextmenu-item @click="showAddFolderModalForm">
-                <el-icon>
-                    <FolderAdd />
-                </el-icon>
-                添加文件夹
-            </v-contextmenu-item>
-            <v-contextmenu-divider />
-            <v-contextmenu-item @click="reFresh">
-                <el-icon>
-                    <Refresh />
-                </el-icon>
-                刷新
-            </v-contextmenu-item>
-        </v-contextmenu>
+
 
         <!-- 添加文件夹表单 -->
-        <el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal" title="添加文件夹"
+        <!-- <el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal" title="添加文件夹"
             width="500px" class="custom-dialog" align-center>
             <el-form class="dialog-form">
                 <el-form-item label="文件夹名称" :label-width="data.formLabelWidth">
@@ -127,10 +63,10 @@
                     <el-button type="primary" @click="addNodeFolder" :loading="data.loading">确认</el-button>
                 </div>
             </template>
-        </el-dialog>
+        </el-dialog> -->
 
         <!-- 添加笔记本弹出表单 -->
-        <el-dialog v-model="data.addFileModalFormVisible" :before-close="handleCancelByAddNotebookModal" title="添加文件"
+        <!-- <el-dialog v-model="data.addFileModalFormVisible" :before-close="handleCancelByAddNotebookModal" title="添加文件"
             width="500px" class="custom-dialog" align-center>
             <el-form class="dialog-form">
                 <el-form-item label="文件名称" :label-width="data.formLabelWidth">
@@ -144,10 +80,10 @@
                     <el-button type="primary" @click="addFile">确认</el-button>
                 </div>
             </template>
-        </el-dialog>
+        </el-dialog> -->
 
         <!-- 修改文件名称弹出表单 -->
-        <el-dialog v-model="data.upFileNameModalFormVisible" :before-close="handleCancelByUpFileNameModal" title="修改文件名"
+        <!-- <el-dialog v-model="data.upFileNameModalFormVisible" :before-close="handleCancelByUpFileNameModal" title="修改文件名"
             width="500px" class="custom-dialog" align-center>
             <el-form class="dialog-form">
                 <el-form-item label="文件名称" :label-width="data.formLabelWidth">
@@ -161,7 +97,7 @@
                     <el-button type="primary" @click="upFileName">修改</el-button>
                 </div>
             </template>
-        </el-dialog>
+        </el-dialog> -->
     </div>
 </template>
 <script setup lang="ts">

@@ -65,6 +65,9 @@ import MarkDownColorful from '@/components/Icon/MarkDownColorful.vue'
 import PDF from '@/components/Icon/PDF.vue'
 import FlodeColorful from '@/components/Icon/FlodeColorful.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import NotificationUtil from '@/utils/NotificationUtil'
+import { tauri_request } from '@/utils/tauri_request'
+import { ResponseData } from '@/entity/entitys'
 
 // 定义节点数据结构
 interface TreeNode {
@@ -195,12 +198,14 @@ const handleNodeContextMenu = (
     contextMenuItems.value = [
       { label: '新增子文件夹', command: 'add-folder', icon: 'FolderAdd' },
       { label: '新增子文件', command: 'add-file', icon: 'DocumentAdd' },
+      { label: '在文件管理器中显示', command: 'file-manager', icon: 'Edit' },
       { label: '重命名', command: 'rename', icon: 'Edit' },
       { label: '删除文件夹', command: 'delete', icon: 'Delete' },
       { label: '刷新', command: 'refresh', icon: 'Refresh' }
     ]
   } else {
     contextMenuItems.value = [
+      { label: '在文件管理器中显示', command: 'file-manager', icon: 'Edit' },
       { label: '重命名', command: 'rename', icon: 'Edit' },
       { label: '删除文件', command: 'delete', icon: 'Delete' }
     ]
@@ -317,6 +322,9 @@ const handleContextMenuCommand = (command: string) => {
     case 'add-folder':
       showCreateDialog('folder')
       break
+    case 'file-manager':
+      FileMmanagerOpen()
+      break
     case 'add-file':
       showCreateDialog('file')
       break
@@ -367,6 +375,19 @@ const showCreateDialog = (mode: 'file' | 'folder') => {
   nextTick(() => {
     createInputRef.value?.focus()
   })
+}
+// 显示创建对话框
+const FileMmanagerOpen = async () => {
+  try {
+    console.log("FileMmanagerOpen",currentContextNode.value);
+    let res = await tauri_request<ResponseData<string>>("file_manager_open_path", { path: currentContextNode.value.meta.folder });
+    if (res && res.code != 200) {
+      NotificationUtil.error(res.msg);
+    }
+  } catch (error) {
+    NotificationUtil.error(error);
+  }
+
 }
 
 // 确认创建
