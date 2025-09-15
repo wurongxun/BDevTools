@@ -1,11 +1,11 @@
 <template>
   <el-dropdown @command="handleCommand">
-    <!-- <el-badge :is-dot="errorStore.isNewError"> -->
-    <svg-icon class-name="svg-icon" style="height: 1rem;width: 1rem;" icon-class="setting" />
-    <!-- </el-badge> -->
+    <header class="avatar-box">
+      <svg-icon class-name="svg-icon" style="height: 1rem;width: 1rem;" icon-class="setting" />
+    </header>
     <template #dropdown>
       <el-dropdown-menu>
-        <div class="userinfo-name">{{ userInfo.nickName }}</div>
+        <!-- <div class="userinfo-name">{{ userInfo.nickName }}</div> -->
         <el-dropdown-item command="setting">设置</el-dropdown-item>
         <el-dropdown-item command="about">关于</el-dropdown-item>
         <el-dropdown-item command="help" divided>帮助</el-dropdown-item>
@@ -25,19 +25,19 @@ const { userInfo } = storeToRefs(user)
 
 const onStting = () => {
   router.push({
-    path: '/App/AppSetting'
+    path: '/AppSetting'
   })
 }
 
 const onAbout = () => {
   router.push({
-     path: '/App/AppAbout'
+    path: '/AppAbout'
   })
 }
 
 const onHelp = () => {
   router.push({
-     path: '/App/AppHelp'
+    path: '/AppHelp'
   })
 }
 
@@ -67,5 +67,24 @@ const handleCommand = (command: string | number | object) => {
   margin-right: 12px;
   // margin-bottom: 2px;
   cursor: pointer;
+}
+
+:deep(.el-dropdown:focus) {
+  outline: none !important;
+}
+
+:deep(.el-dropdown > header:focus-visible) {
+  outline: none !important;
+}
+
+.avatar-box {
+  // padding: 0 12px;
+  display: flex;
+  align-items: center;
+  // margin-right: 12px;
+
+  &:focus-visible {
+    outline: none !important;
+  }
 }
 </style>
