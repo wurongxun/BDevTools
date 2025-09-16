@@ -12,6 +12,7 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const { routeStore, system, routerNoteStore } = useStore()
+
 const childRouteNote: any = computed(() =>
     routerNoteStore.routes
 )
@@ -100,8 +101,6 @@ const treeData = ref([
 ])
 
 const handleNodeClick = (node) => {
-    console.log('节点被点击:', node)
-    console.log('节点被点击 node.path:', node.path)
     if (!node.isFolder) {
         router.push({
             path: node.path
@@ -112,6 +111,7 @@ const handleNodeClick = (node) => {
 const handleRefresh = () => {
     console.log('刷新树数据')
     // 重新加载数据逻辑
+    const routerNote = routerNoteStore.setRoutes();
 }
 
 const handleAddFile = (parent, name) => {

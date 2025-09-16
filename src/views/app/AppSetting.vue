@@ -15,8 +15,7 @@ const isDark = useDark({
   valueLight: 'light', // 类名亮色模式下值是light
 })
 const toggleDark = useToggle(isDark)
-const { appConfig } = useStore()
-
+const { appConfig, routerNoteStore } = useStore()
 
 const { t, locale } = useI18n()
 const userStore = appConfig;
@@ -82,7 +81,7 @@ onMounted(async () => {
   let language_val = await store.get<{ value: string }>('language');
   if (language_val !== undefined) {
     language.value = language_val.value;
-     userStore.setLanguage(language_val.value);
+    userStore.setLanguage(language_val.value);
   }
   let md_working_directory_val = await store.get<{ value: string }>('md_working_directory');
   if (md_working_directory_val !== undefined) {
@@ -96,7 +95,7 @@ onMounted(async () => {
   let theme_val = await store.get<{ value: string }>('theme');
   if (theme_val !== undefined) {
     theme.value = theme_val.value;
-     userStore.setTheme(theme_val.value);
+    userStore.setTheme(theme_val.value);
   }
   let dark_val = await store.get<{ value: boolean }>('dark');
   if (dark_val !== undefined) {
@@ -179,6 +178,8 @@ async function md_working_directory_change() {
       store.save();
     }
   }
+  // 重新加载数据逻辑
+  const routerNote = routerNoteStore.setRoutes();
 }
 // 添加清除缓存和浏览器缓存的函数
 const clear_cache = () => {

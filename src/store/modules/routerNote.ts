@@ -104,17 +104,17 @@ export const routerNoteStore = defineStore('routerNoteStore', {
      * @returns RouteRecordRaw[]
      */
     async setRoutes() {
-      //const res: any = await getMenu()
-      const red_note: RouteRecordRaw[] = await get_notebooks_Api()
-      console.log('child_item setRoutes ', red_note)
-      //const routes = filterRoutes(res.data)
-      for (let i = 0; i < red_note.length; i++) {
-        let item = red_note[i]
-        console.log('child_item setRoutes item ', item)
-        router.addRoute('Layout', item)
+      try {
+        const red_note: RouteRecordRaw[] = await get_notebooks_Api()
+        for (let i = 0; i < red_note.length; i++) {
+          let item = red_note[i]
+          router.addRoute('Layout', item)
+        }
+        console.log('child_item setRoutes router ', router)
+        this.routes = red_note
+      } catch (error) {
+        console.error('获取路由信息失败:', error)
       }
-      console.log('child_item setRoutes router ', router)
-      this.routes = red_note
       return this.routes
     },
     async addTreeNode(item: TreeNode[]) {
