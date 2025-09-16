@@ -77,14 +77,17 @@ onMounted(async () => {
   let val_auto_start = await store.get<{ value: boolean }>('auto_start');
   if (val_auto_start !== undefined) {
     autostart.value = val_auto_start.value;
+    userStore.setAutoStart(val_auto_start.value);
   }
   let language_val = await store.get<{ value: string }>('language');
   if (language_val !== undefined) {
     language.value = language_val.value;
+     userStore.setLanguage(language_val.value);
   }
   let md_working_directory_val = await store.get<{ value: string }>('md_working_directory');
   if (md_working_directory_val !== undefined) {
     md_working_directory.value = md_working_directory_val.value;
+    userStore.setMdWorkingDirectory(md_working_directory_val.value);
   }
   let update_reminder_val = await store.get<{ value: boolean }>('update_reminder');
   if (update_reminder_val !== undefined) {
@@ -93,10 +96,12 @@ onMounted(async () => {
   let theme_val = await store.get<{ value: string }>('theme');
   if (theme_val !== undefined) {
     theme.value = theme_val.value;
+     userStore.setTheme(theme_val.value);
   }
   let dark_val = await store.get<{ value: boolean }>('dark');
   if (dark_val !== undefined) {
     dark.value = dark_val.value;
+    userStore.setDark(dark.value);
   }
 })
 

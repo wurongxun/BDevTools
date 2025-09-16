@@ -1,7 +1,8 @@
 <template>
   <div class="file-tree-container">
-    <el-tree ref="treeRef" :data="treeData" node-key="id" :props="defaultProps" :expand-on-click-node="false"
-      highlight-current @node-contextmenu="handleNodeContextMenu" @node-click="handleNodeClick">
+    <el-tree v-if="treeData.length > 0" ref="treeRef" :data="treeData" node-key="id" :props="defaultProps"
+      :expand-on-click-node="false" highlight-current @node-contextmenu="handleNodeContextMenu"
+      @node-click="handleNodeClick">
       <template #default="{ node, data }">
         <div class="custom-tree-node" @mouseenter="onNodeMouseEnter(data)" @mouseleave="onNodeMouseLeave">
           <span class="node-label">
@@ -25,8 +26,24 @@
       </template>
     </el-tree>
 
+    <!-- 当 treeData 无数据时显示新增按钮 -->
+    <div v-else class="empty-tree-actions">
+      <el-card class="button-card" @click="handleAddRootFile">
+        <el-icon class="svg-icon">
+          <DocumentAdd />
+        </el-icon>
+        <!-- <span>新增文件</span> -->
+      </el-card>
+      <el-card class="button-card" @click="handleAddRootFolder">
+        <el-icon class="svg-icon">
+          <FolderAdd />
+        </el-icon>
+        <!-- <span>新增文件夹</span> -->
+      </el-card>
+    </div>
+
     <!-- 重命名对话框 -->
-    <el-dialog v-model="renameDialogVisible" title="重命名" width="400px" :modal="false" append-to-body>
+    <el-dialog v-model="renameDialogVisible" title="重命名" width="640px" :modal="false" append-to-body>
       <el-input v-model="renameInput" ref="renameInputRef" @keyup.enter="confirmRename" />
       <template #footer>
         <span class="dialog-footer">
@@ -37,7 +54,20 @@
     </el-dialog>
 
     <!-- 创建文件/文件夹对话框 -->
-    <el-dialog v-model="createDialogVisible" :title="createDialogTitle" width="400px" :modal="false" append-to-body>
+    <el-dialog v-model="createDialogVisible" :title="createDialogTitle" width="640px" :modal="false" append-to-body>
+      <div class="settings-item">
+        <div class="setting-info">
+          <div class="setting-header">
+            <span class="setting-description">工作目录</span>
+          </div>
+          <div class="directory-display">
+            <el-icon class="folder-icon">
+              <Folder />
+            </el-icon>
+            <span class="setting-working-directory">{{ md_working_directory }}</span>
+          </div>
+        </div>
+      </div>
       <el-input v-model="createInput" ref="createInputRef" @keyup.enter="confirmCreate" placeholder="请输入名称" />
       <template #footer>
         <span class="dialog-footer">
@@ -68,7 +98,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/entity/entitys'
+import useStore from '@/store/index'
+let md_working_directory = ref<string>('')
 
+const { appConfig } = useStore()
+const userStore = appConfig;
 // 定义节点数据结构
 interface TreeNode {
   id: string
@@ -135,7 +169,9 @@ const defaultProps = {
 watch(() => props.data, (newData) => {
   treeData.value = [...newData]
 }, { deep: true })
-
+onMounted(() => {
+  md_working_directory.value = userStore.getMdWorkingDirectory;
+})
 // 节点图标
 const getNodeIcon = (data: TreeNode) => {
   if (data.isFolder) {
@@ -379,7 +415,7 @@ const showCreateDialog = (mode: 'file' | 'folder') => {
 // 显示创建对话框
 const FileMmanagerOpen = async () => {
   try {
-    console.log("FileMmanagerOpen",currentContextNode.value);
+    console.log("FileMmanagerOpen", currentContextNode.value);
     let res = await tauri_request<ResponseData<string>>("file_manager_open_path", { path: currentContextNode.value.meta.folder });
     if (res && res.code != 200) {
       NotificationUtil.error(res.msg);
@@ -435,7 +471,31 @@ const handleAddFile = (data: TreeNode) => {
 const handleAddFolder = (data: TreeNode) => {
   showCreateDialog('folder')
 }
+// 处理新增根目录文件
+const handleAddRootFile = () => {
+  // 创建一个虚拟的根节点用于添加文件
+  const rootNode: TreeNode = {
+    id: 'root',
+    label: '根目录',
+    isFolder: true,
+    children: []
+  }
+  currentContextNode.value = rootNode
+  showCreateDialog('file')
+}
 
+// 处理新增根目录文件夹
+const handleAddRootFolder = () => {
+  // 创建一个虚拟的根节点用于添加文件夹
+  const rootNode: TreeNode = {
+    id: 'root',
+    label: '根目录',
+    isFolder: true,
+    children: []
+  }
+  currentContextNode.value = rootNode
+  showCreateDialog('folder')
+}
 // 组件卸载前移除菜单
 onBeforeUnmount(() => {
   removeContextMenu()
@@ -455,6 +515,33 @@ defineExpose({
   height: 100%;
   user-select: none;
 }
+
+.empty-tree-actions {
+  display: grid;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+
+  .button-card {
+    padding: 12px 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    .svg-icon {
+      font-size: 24px;
+      color: var(--el-color-primary);
+      transition: color 0.2s;
+
+      &:hover {
+        color: var(--el-color-primary-light-4);
+      }
+
+    }
+  }
+}
+
 
 .custom-tree-node {
   display: flex;
@@ -561,5 +648,63 @@ defineExpose({
   width: 1em;
   height: 1em;
   color: var(--el-text-color-regular);
+}
+
+.settings-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.setting-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-label {
+  display: block;
+  font-size: 1rem;
+  color: var(--el-text-color-primary);
+  font-weight: 500;
+}
+
+.setting-description {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--el-text-color-secondary);
+}
+
+.directory-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background-color: var(--el-fill-color-light);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9rem;
+}
+
+.folder-icon {
+  color: var(--el-color-primary);
+}
+
+.setting-working-directory {
+  color: var(--el-text-color-primary);
+  word-break: break-all;
 }
 </style>
