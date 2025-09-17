@@ -101,6 +101,12 @@ const treeData = ref([
 ])
 
 const handleNodeClick = (node) => {
+    // 打印初始路由配置
+    console.log("打印初始路由配置", router.options.routes)
+    // 打印所有已注册的路由
+    console.log("打印所有已注册的路由", router.getRoutes())
+    //打印当前点击的路由
+    console.log("打印当前点击的路由", node.path)
     if (!node.isFolder) {
         router.push({
             path: node.path

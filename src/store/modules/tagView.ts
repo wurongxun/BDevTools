@@ -8,6 +8,17 @@ interface IResult extends ITagItem {
   index: number
 }
 
+/**
+ * 具体逻辑：
+ *1. 遍历传入的标签数组arr
+ *2. 比较每个元素的path属性与目标项item的path属性
+ *3. 如果找到path相同的项，返回包含该项和其索引的对象
+ *4. 如果遍历完都没找到，返回false
+ *用于避免重复标签页。
+ * @param item
+ * @param arr
+ * @returns
+ */
 function hasIncludeTab(item: ITagItem, arr: Array<ITagItem>): boolean | IResult {
   for (let index = 0; index < arr.length; index++) {
     const element = arr[index]
@@ -15,7 +26,15 @@ function hasIncludeTab(item: ITagItem, arr: Array<ITagItem>): boolean | IResult 
   }
   return false
 }
-
+/**
+ * 代码的功能是递归遍历路由记录数组，筛选出带有[affix]标记的路由，并将它们转换为标签项格式添加到结果数组中。
+ * 具体逻辑：
+ * 1. 遍历路由数组中的每一项
+ * 2. 如果路由项有[affix]标记，则创建对应的标签项并加入结果数组
+ * 3. 如果路由项有子路由，则递归处理子路由
+ * 4. 返回包含所有affix标签的数组
+ * 这是用于生成固定标签页的功能。 
+ * */
 function getAffix(arr: RouteRecordRaw[], result: ITagItem[]): ITagItem[] {
   arr.map((item) => {
     if (item.meta?.affix) {

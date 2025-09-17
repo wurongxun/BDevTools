@@ -8,6 +8,7 @@ import router from '@/router/index'
 import VerifyUtils from '@/utils/VerifyUtils'
 import ToolUtils from '@/utils/ToolUtils'
 import { TreeNode } from '@/Types/entitys'
+import { routes } from 'vue-router/auto-routes'
 
 /**
  *
@@ -95,8 +96,14 @@ export const routerNoteStore = defineStore('routerNoteStore', {
   state: () => {
     return {
       routes: [] as RouteRecordRaw[],
-      tree_node: [] as TreeNode[]
+      tree_node: [] as TreeNode[],
+      routes_loading: false
     }
+  },
+  getters: {
+    getRoutes: (state) => state.routes,
+    getTreeNode: (state) => state.tree_node,
+    getRoutesLoading: (state) => state.routes_loading
   },
   actions: {
     /**
@@ -105,15 +112,27 @@ export const routerNoteStore = defineStore('routerNoteStore', {
      */
     async setRoutes() {
       try {
-        const red_note: RouteRecordRaw[] = await get_notebooks_Api()
-        for (let i = 0; i < red_note.length; i++) {
-          let item = red_note[i]
-          router.addRoute('Layout', item)
-        }
-        console.log('child_item setRoutes router ', router)
-        this.routes = red_note
+        this.routes_loading = true
+        this.routes = []
+        this.tree_node = []
+        // 异步调用接口，主线程无需等待
+        get_notebooks_Api()
+          .then((red_note: RouteRecordRaw[]) => {
+            // 处理获取到的路由数据
+            for (let i = 0; i < red_note.length; i++) {
+              let item = red_note[i]
+              router.addRoute('Layout', item)
+            }
+            console.log('child_item setRoutes router ', router)
+            this.routes = red_note
+          })
+          .catch((error) => {
+            console.error('获取路由信息失败:', error)
+          })
       } catch (error) {
         console.error('获取路由信息失败:', error)
+      } finally {
+        this.routes_loading = false
       }
       return this.routes
     },

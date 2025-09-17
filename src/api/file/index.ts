@@ -6,9 +6,10 @@ import { defineAsyncComponent, ref } from 'vue'
 import { RouteRecordRaw, RouteComponent } from 'vue-router'
 import Layout from '@/Layout/index.vue'
 import { load, Store } from '@tauri-apps/plugin-store'
-import { note_comm_router } from '@/setting'
+import { note_comm_router, note_comm_router_notebookMd } from '@/setting'
 import { id } from 'element-plus/es/locales.mjs'
 import useStore from '@/store/index'
+import router from '@/router/index'
 
 /**
  * @description 获取控件权限
@@ -33,7 +34,8 @@ export const get_notebooks_Api = async () => {
     console.log('get_notebooks_Api', md_working_directory.value)
     console.log('get_notebooks_Api', data_)
     FileTreeNodeHandler(data_)
-    return get_notebooks_tree_Api(data_, md_working_directory.value)
+    let data: RouteRecordRaw[] = get_notebooks_tree_Api(data_, md_working_directory.value)
+    return data
   } else {
     NotificationUtil.error(res.msg)
     return [
@@ -73,12 +75,19 @@ const get_notebooks_tree_Api = (
           child_child_val.push(child_item)
         }
       }
+      let path: string = '/notebook2/'
+      if (child.isfile && child.data_type == 'md') {
+        path = note_comm_router_notebookMd + child.id
+      } else if (child.isfile && child.data_type == 'pdf') {
+        path = note_comm_router + child.id
+      }
       let route2: RouteRecordRaw = {
         path: note_comm_router + child.id,
         name: child.name,
         redirect: '',
         meta: {
           title: child.name,
+          affix: child.isfile,
           keepAlive: true,
           filePath: child.path,
           folder: child.folder,
@@ -101,7 +110,6 @@ const get_notebooks_tree_Api = (
     {
       path: '/notebook2/',
       name: '笔记',
-
       meta: {
         id: 'notebook2',
         title: '笔记',
@@ -134,16 +142,23 @@ const get_notebooks_tree_child = (
           child_child_val.push(child_item)
         }
       }
+      let path: string = '/notebook2/'
+      if (child.isfile && child.data_type == 'md') {
+        path = note_comm_router_notebookMd + child.id
+      } else if (child.isfile && child.data_type == 'pdf') {
+        path = note_comm_router + child.id
+      }
       let route2: RouteRecordRaw = {
-        path: note_comm_router + child.id,
+        path: path,
         name: child.name,
         redirect: '',
         meta: {
-          title: child.name,
+          title: child.id + child.name,
+          affix: child.isfile,
           keepAlive: true,
           filePath: child.path,
           folder: child.folder,
-          name: child.name,
+          name: child.id + child.name,
           noTagView: child.isfile ? false : true,
           isfile: child.isfile,
           type: child.data_type,
@@ -187,18 +202,24 @@ const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
           child_child_val.push(child_item)
         }
       }
+      let path: string = '/notebook2/'
+      if (child.isfile && child.data_type == 'md') {
+        path = note_comm_router_notebookMd + child.id
+      } else if (child.isfile && child.data_type == 'pdf') {
+        path = note_comm_router + child.id
+      }
       let route2: TreeNode = {
         id: child.id,
         label: child.name,
         isFolder: child.isfile ? false : true,
         type: child.data_type as TreeNode['type'],
-        path: note_comm_router + child.id,
+        path: path,
         meta: {
-          title: child.name,
+          title: child.id + child.name,
           keepAlive: true,
           filePath: child.path,
           folder: child.folder,
-          name: child.name,
+          name: child.id + child.name,
           isfile: child.isfile,
           type: child.data_type,
           id: child.id
@@ -229,12 +250,18 @@ const File_treeNode_child = (notebooks_children: Array<NotebookInfo>): Array<Tre
           child_child_val.push(child_item)
         }
       }
+      let path: string = '/notebook2/'
+      if (child.isfile && child.data_type == 'md') {
+        path = note_comm_router_notebookMd + child.id
+      } else if (child.isfile && child.data_type == 'pdf') {
+        path = note_comm_router + child.id
+      }
       let route2: TreeNode = {
         id: child.id,
         label: child.name,
         isFolder: child.isfile ? false : true,
         type: child.data_type as TreeNode['type'],
-        path: note_comm_router + child.id,
+        path: path,
         meta: {
           title: child.name,
           keepAlive: true,

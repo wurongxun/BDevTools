@@ -25,7 +25,7 @@ router.beforeEach(
         } else {
           try {
             await user.getUserInfo()
-             const routerNote = await routerNoteStore.setRoutes()
+            const routerNote = await routerNoteStore.setRoutes()
             const router = await routeStore.setRoutes()
            
             console.log('beforeEach router ', router)

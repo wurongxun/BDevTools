@@ -24,12 +24,6 @@
     <div class="resize" title="收缩侧边栏">⋮</div> -->
         <div class="mid">
             <div v-if="data.showMdEditor" class="editor-wrapper">
-                <!-- <a-form layout="inline" class="editor-header">
-          <a-form-item class="title-form-item">
-            <a-input class="mdtitle-input" :bordered="false" v-model:value="data.title_md" placeholder="文章标题"
-              size="large" />
-          </a-form-item>
-        </a-form> -->
                 <MdEditor v-model="data.editedMdtext_md" @onSave="saveMdText" :theme="editorTheme" class="md-editor"
                     @onError="onError" />
             </div>
@@ -46,58 +40,6 @@
                 </div>
             </div>
         </div>
-
-
-        <!-- 添加文件夹表单 -->
-        <!-- <el-dialog v-model="data.addFolderModalFormVisible" :before-close="handleCancelByAddFolderModal" title="添加文件夹"
-            width="500px" class="custom-dialog" align-center>
-            <el-form class="dialog-form">
-                <el-form-item label="文件夹名称" :label-width="data.formLabelWidth">
-                    <el-input v-model="data.newFolderName" autocomplete="off" placeholder="请输入文件夹名称"
-                        @keyup.enter="addNodeFolder" clearable />
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <div class="dialog-footer">
-                    <el-button @click="handleCancelByAddFolderModal">取消</el-button>
-                    <el-button type="primary" @click="addNodeFolder" :loading="data.loading">确认</el-button>
-                </div>
-            </template>
-        </el-dialog> -->
-
-        <!-- 添加笔记本弹出表单 -->
-        <!-- <el-dialog v-model="data.addFileModalFormVisible" :before-close="handleCancelByAddNotebookModal" title="添加文件"
-            width="500px" class="custom-dialog" align-center>
-            <el-form class="dialog-form">
-                <el-form-item label="文件名称" :label-width="data.formLabelWidth">
-                    <el-input v-model="data.newFileName" autocomplete="off" placeholder="请输入文件名称" @keyup.enter="addFile"
-                        clearable />
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <div class="dialog-footer">
-                    <el-button @click="handleCancelByAddNotebookModal">取消</el-button>
-                    <el-button type="primary" @click="addFile">确认</el-button>
-                </div>
-            </template>
-        </el-dialog> -->
-
-        <!-- 修改文件名称弹出表单 -->
-        <!-- <el-dialog v-model="data.upFileNameModalFormVisible" :before-close="handleCancelByUpFileNameModal" title="修改文件名"
-            width="500px" class="custom-dialog" align-center>
-            <el-form class="dialog-form">
-                <el-form-item label="文件名称" :label-width="data.formLabelWidth">
-                    <el-input v-model="data.upFileName" autocomplete="off" placeholder="请输入新的文件名称"
-                        @keyup.enter="upFileName" clearable />
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <div class="dialog-footer">
-                    <el-button @click="handleCancelByUpFileNameModal">取消</el-button>
-                    <el-button type="primary" @click="upFileName">修改</el-button>
-                </div>
-            </template>
-        </el-dialog> -->
     </div>
 </template>
 <script setup lang="ts">
@@ -209,7 +151,8 @@ onMounted(async () => {
     let path = route.path;
     let name = route.name;
     let meta = route.meta;
-    console.log(path, name, meta);
+    console.log("onMounted ", path, name, meta);
+    console.log("onMounted meta", meta);
     var res = await tauri_request<ResponseData<string>>("read_note_file", {
         path: meta.path
     });
@@ -240,7 +183,7 @@ const read_note_file_bypath = async function (path: string) {
         //重新赋值
 
         var tem = res.data;
-        console.log("read_note_file res===============", res);
+        console.log("read_note_file_bypath res===============", res);
         // console.log("read_note_file node===============", node);
         // console.log("read_note_file  node.name===============", node.name);
         data.editedMdtext_md = tem;
@@ -250,8 +193,8 @@ const read_note_file_bypath = async function (path: string) {
         // data.currentChooseNoteAllPath_md = node.path;
         // data.currentChooseFolderPath_md = node.folder;
         data.showMdEditor = true;
-        console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
-        console.log("read_note_file notEditedMdtext_md===============", data.notEditedMdtext_md);
+        console.log("read_note_file_bypath editedMdtext_md===============", data.editedMdtext_md);
+        console.log("read_note_file_bypath notEditedMdtext_md===============", data.notEditedMdtext_md);
     } else {
         NotificationUtil.error("读取失败：" + res.msg);
     }

@@ -89,7 +89,7 @@ pub async fn create_folder(
     }
     let mut path_ = PathBuf::from(father_path);
     path_.push(new_folder_name);
-    // 方法2: 递归创建目录（推荐）
+    // 递归创建目录
     match tokio::fs::create_dir_all(path_).await {
         Ok(_) => {
             return Ok(ResData {

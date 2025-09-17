@@ -36,6 +36,7 @@ watch(
       if (ToolUtils.notEmptyObject(newValue.params)) {
         path = newValue.matched[newValue.matched.length - 1].path
       }
+      console.log("tageview ", path)
       tagview.addTagView({
         name: newValue.name as string,
         path,

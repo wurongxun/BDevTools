@@ -40,7 +40,7 @@ export const constantRoutes: Array<RouteRecordRaw> = [
   },
   {
     path: '/bind',
-    meta: { icon: 'House',hidden: true, noBreadCrumbs: true, title: '外部链接' },
+    meta: { icon: 'House', hidden: true, noBreadCrumbs: true, title: '外部链接' },
     redirect: 'https://www.bing.com'
   },
   {
@@ -82,38 +82,46 @@ export const constantRoutes: Array<RouteRecordRaw> = [
     component: () => import('@/views/login/index.vue')
   },
   {
-    path: "/App",
-    component: () => import("@/views/Common/Common.vue"),
+    path: '/notebookMd/:pathMatch(.*)*',
+    meta: { title: 'mdPreViewAndEdit', hidden: true, noTagView: true },
+    component: () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
+  },
+  {
+    path: '/App',
+    component: () => import('@/views/Common/Common.vue'),
     meta: { title: 'App', icon: 'error-handle', noBreadCrumbs: true },
     children: [
       {
-        path: "/AppSetting",
-        name: "AppSetting",
-        component: () => import("@/views/app/AppSetting.vue"),
+        path: '/AppSetting',
+        name: 'AppSetting',
+        component: () => import('@/views/app/AppSetting.vue'),
         meta: {
-           title: '设置', noTagView: true,
-          transition: "scroll-x-transition",
-        },
+          title: '设置',
+          noTagView: true,
+          transition: 'scroll-x-transition'
+        }
       },
       {
-        path: "/AppAbout",
-        name: "AppAbout",
-        component: () => import("@/views/app/AppAbout.vue"),
+        path: '/AppAbout',
+        name: 'AppAbout',
+        component: () => import('@/views/app/AppAbout.vue'),
         meta: {
-          title: '关于', noTagView: true,
-          transition: "scroll-x-transition",
-        },
+          title: '关于',
+          noTagView: true,
+          transition: 'scroll-x-transition'
+        }
       },
       {
-        path: "/AppHelp",
-        name: "AppHelp",
-        component: () => import("@/views/app/AppHelp.vue"),
+        path: '/AppHelp',
+        name: 'AppHelp',
+        component: () => import('@/views/app/AppHelp.vue'),
         meta: {
-           title: '帮助', noTagView: true,
-          transition: "scroll-x-transition",
-        },
-      },
-    ],
+          title: '帮助',
+          noTagView: true,
+          transition: 'scroll-x-transition'
+        }
+      }
+    ]
   },
   components,
   error,
