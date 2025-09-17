@@ -1,5 +1,5 @@
 export default {
-  appName: 'ExcelAssemblyline',
+  appName: 'md-viewer',
   settings: {
     name: '設置'
   },

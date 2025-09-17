@@ -3,7 +3,7 @@
 import { Notebook } from '@element-plus/icons-vue'
 
 export default {
-  appName: 'ExcelAssemblyline',
+  appName: 'md-viewer',
   settings: {
     name: '设置'
   },
