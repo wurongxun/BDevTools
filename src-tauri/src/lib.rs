@@ -75,7 +75,7 @@ pub fn run() {
                 "main".to_string(),
                 tauri::WebviewUrl::App("index.html".into()),
             )
-            .title("MdNote")
+            .title("MdViewer")
             .decorations(true)
             .inner_size(960.0, 640.0)
             .min_inner_size(640.0, 480.0)

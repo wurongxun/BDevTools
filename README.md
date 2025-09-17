@@ -1,7 +1,7 @@
-# vue-web-admin-frame
+# md-viewer
 
 #### 介绍
-前端， 基于vue3 + TypeScript + Element Plus + vue-router + Pinia
+前端， 基于vue3 + TypeScript + Element Plus + vue-router + Pinia + vue-web-admin-frame
 
 #### 安装教程
 

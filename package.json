@@ -1,6 +1,6 @@
 {
-  "name": "d",
-  "version": "0.0.0",
+  "name": "md-viewer",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "vite",

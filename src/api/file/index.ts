@@ -6,7 +6,7 @@ import { defineAsyncComponent, ref } from 'vue'
 import { RouteRecordRaw, RouteComponent } from 'vue-router'
 import Layout from '@/Layout/index.vue'
 import { load, Store } from '@tauri-apps/plugin-store'
-import { note_comm_router, note_comm_router_notebookMd } from '@/setting'
+import { note_comm_router, note_comm_router_notebookMd,note_comm_router_notebookPdf } from '@/setting'
 import { id } from 'element-plus/es/locales.mjs'
 import useStore from '@/store/index'
 import router from '@/router/index'
@@ -64,10 +64,10 @@ const get_notebooks_tree_Api = (
       if (child.isfile && child.data_type == 'md') {
         path = note_comm_router_notebookMd + child.id
       } else if (child.isfile && child.data_type == 'pdf') {
-        path = note_comm_router + child.id
+        path = note_comm_router_notebookPdf + child.id
       }
       let route2: RouteRecordRaw = {
-        path: note_comm_router + child.id,
+        path: path,
         name: child.id + child.name,
         redirect: '',
         meta: {
@@ -131,7 +131,7 @@ const get_notebooks_tree_child = (
       if (child.isfile && child.data_type == 'md') {
         path = note_comm_router_notebookMd + child.id
       } else if (child.isfile && child.data_type == 'pdf') {
-        path = note_comm_router + child.id
+        path = note_comm_router_notebookPdf + child.id
       }
       let route2: RouteRecordRaw = {
         path: path,
@@ -191,7 +191,7 @@ const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
       if (child.isfile && child.data_type == 'md') {
         path = note_comm_router_notebookMd + child.id
       } else if (child.isfile && child.data_type == 'pdf') {
-        path = note_comm_router + child.id
+        path = note_comm_router_notebookPdf + child.id
       }
       let route2: TreeNode = {
         id: child.id,
@@ -239,7 +239,7 @@ const File_treeNode_child = (notebooks_children: Array<NotebookInfo>): Array<Tre
       if (child.isfile && child.data_type == 'md') {
         path = note_comm_router_notebookMd + child.id
       } else if (child.isfile && child.data_type == 'pdf') {
-        path = note_comm_router + child.id
+        path = note_comm_router_notebookPdf + child.id
       }
       let route2: TreeNode = {
         id: child.id,
