@@ -38,21 +38,7 @@ export const get_notebooks_Api = async () => {
     return data
   } else {
     NotificationUtil.error(res.msg)
-    return [
-      {
-        path: '/notebook2',
-        meta: {
-          title: '笔记',
-          icon: 'component',
-          keepAlive: true,
-          id: 'notebook2',
-          folder: md_working_directory.value,
-          isFile: false
-        },
-        component: Layout,
-        children: []
-      }
-    ]
+    return []
   }
 }
 //将NotebookInfo结构转换为RouteRecordRaw
@@ -63,7 +49,6 @@ const get_notebooks_tree_Api = (
   let children_val: Array<RouteRecordRaw> = new Array<RouteRecordRaw>()
   let notebooks_children: NotebookInfo[] = notebooks_data.children
   if (notebooks_children && notebooks_children.length > 0) {
-    console.log('get_notebooks_tree_Api notebooks_children', notebooks_children)
     for (let i = 0; i < notebooks_children.length; i++) {
       let child: NotebookInfo = notebooks_children[i]
       let child_child: Array<NotebookInfo> = child.children
@@ -83,7 +68,7 @@ const get_notebooks_tree_Api = (
       }
       let route2: RouteRecordRaw = {
         path: note_comm_router + child.id,
-        name: child.name,
+        name: child.id + child.name,
         redirect: '',
         meta: {
           title: child.name,
@@ -91,7 +76,7 @@ const get_notebooks_tree_Api = (
           keepAlive: true,
           filePath: child.path,
           folder: child.folder,
-          name: child.name,
+          name: child.id + child.name,
           isfile: child.isfile,
           type: child.data_type,
           id: child.id
@@ -150,10 +135,10 @@ const get_notebooks_tree_child = (
       }
       let route2: RouteRecordRaw = {
         path: path,
-        name: child.name,
+        name: child.id + child.name,
         redirect: '',
         meta: {
-          title: child.id + child.name,
+          title: child.name,
           affix: child.isfile,
           keepAlive: true,
           filePath: child.path,
@@ -215,11 +200,11 @@ const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
         type: child.data_type as TreeNode['type'],
         path: path,
         meta: {
-          title: child.id + child.name,
+          title: child.name,
           keepAlive: true,
           filePath: child.path,
           folder: child.folder,
-          name: child.id + child.name,
+          name: child.name,
           isfile: child.isfile,
           type: child.data_type,
           id: child.id

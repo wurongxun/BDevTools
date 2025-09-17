@@ -10,7 +10,7 @@
 <script setup lang="ts" name="AppSidebar">
 import SideMenu from './components/SideMenu.vue'
 import logo from './components/Logo.vue'
-import FileTreeTest from './components/FileTreeTest.vue'
+import FileTreeTest from './components/FileTree.vue'
 
 </script>
 

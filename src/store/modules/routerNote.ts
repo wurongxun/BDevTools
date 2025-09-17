@@ -123,7 +123,6 @@ export const routerNoteStore = defineStore('routerNoteStore', {
               let item = red_note[i]
               router.addRoute('Layout', item)
             }
-            console.log('child_item setRoutes router ', router)
             this.routes = red_note
           })
           .catch((error) => {
