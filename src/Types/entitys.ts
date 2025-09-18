@@ -102,6 +102,17 @@ interface TreeNode {
   path: string,
   [key: string]: any
 }
+// 定义笔记数据接口
+interface NoteDataStore {
+  id: string
+  title: string
+  content: string
+  filePath?: string
+  tempContent?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
 //  {"id":"1752831345744","parent_id":"","path":"C:\\Users\\rongxun.wu01\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[{"id":"Jabalpur","parent_id":"1752831345744","path":"C:\\Users\\rongxun.wu01\\Documents\\notebooks\\Jabalpur","name":"Jabalpur","isfile":false,"children":[{"id":"OA.md","parent_id":"Jabalpur","path":"C:\\Users\\rongxun.wu01\\Documents\\notebooks\\Jabalpur\\OA.md","name":"OA.md","isfile":true,"children":[]},{"id":"OA24.md","parent_id":"Jabalpur","path":"C:\\Users\\rongxun.wu01\\Documents\\notebooks\\Jabalpur\\OA24.md","name":"OA24.md","isfile":true,"children":[]}]}]}
 export {
   Message,
@@ -112,5 +123,6 @@ export {
   SshLinkInfoTree,
   SshSubMenu,
   NotebookInfo,
-  TreeNode
+  TreeNode,
+  NoteDataStore
 }

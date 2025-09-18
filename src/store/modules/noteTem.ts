@@ -3,30 +3,21 @@
  * 包含多个笔记及每个笔记的临时编辑内容和原笔迹内容
  *
  */
+import { NoteDataStore } from '@/Types/entitys'
 import { defineStore } from 'pinia'
 
-// 定义笔记数据接口
-interface NoteData {
-  id: string
-  title: string
-  content: string
-  tempContent?: string
-  createdAt: Date
-  updatedAt: Date
-}
 
 export const useNoteStore = defineStore('note', {
   state: () => ({
-    notes: new Map<string, NoteData>(),
+    notes: new Map<string, NoteDataStore>(),
     activeNoteId: null as string | null
   }),
 
   getters: {
-    currentNote: (state) => {
+    currentNote: (state): NoteDataStore | null => {
       if (!state.activeNoteId) return null
       return state.notes.get(state.activeNoteId) || null
     },
-
     noteCount: (state) => {
       return state.notes.size
     }
@@ -37,7 +28,7 @@ export const useNoteStore = defineStore('note', {
       this.activeNoteId = id
     },
 
-    setNoteData(id: string, data: Partial<NoteData>) {
+    setNoteData(id: string, data: Partial<NoteDataStore>) {
       const existingNote = this.notes.get(id)
       if (existingNote) {
         // 如果笔记存在，则更新笔记
@@ -51,7 +42,7 @@ export const useNoteStore = defineStore('note', {
           createdAt: new Date(),
           updatedAt: new Date(),
           ...data
-        } as NoteData)
+        } as NoteDataStore)
       }
     },
 
@@ -66,8 +57,8 @@ export const useNoteStore = defineStore('note', {
       }
     },
 
-    addNote(note: Partial<NoteData>) {
-      const newNote: NoteData = {
+    addNote(note: Partial<NoteDataStore>) {
+      const newNote: NoteDataStore = {
         id: note.id || Date.now().toString(),
         title: note.title || '未命名笔记',
         content: note.content || '',

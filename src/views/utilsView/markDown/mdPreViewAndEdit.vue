@@ -68,6 +68,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MdEditor } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
 import { NotebookInfo, ResponseData } from "@/entity/entitys";
+
 // import TreeNode from "@/components/tsx/menu/TreeNode";
 import { tauri_request } from "@/utils/tauri_request";
 import {
@@ -84,6 +85,10 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useDark, useToggle } from '@vueuse/core'
 import { listen } from "@tauri-apps/api/event";
 import { useRoute, useRouter } from 'vue-router'
+import { NoteDataStore } from '@/Types/entitys'
+import useStore from '@/store/index'
+const { noteTem } = useStore()
+
 // 获取当前路由信息
 const route = useRoute()
 
@@ -151,12 +156,24 @@ onMounted(async () => {
     let path = route.path;
     let name = route.name;
     let meta = route.meta;
+    let md_id=meta.id;
     console.log("onMounted ", path, name, meta);
     console.log("onMounted meta", meta);
     var res = await tauri_request<ResponseData<string>>("read_note_file", {
         path: meta.path
     });
     if (res && res.code == 200) {
+        let tem_store: NoteDataStore = {
+            id: meta.id as string,
+            title: meta.name as string,
+            content: res.data,
+            filePath: meta.path as string,
+            tempContent: res.data,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        }
+        noteTem.setNoteData( md_id as string ,tem_store)
+        let noteData:NoteDataStore=noteTem.getNoteData( md_id as string );
         //重新赋值
         var tem = res.data;
         data.editedMdtext_md = tem;
