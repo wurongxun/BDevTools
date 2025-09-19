@@ -87,25 +87,13 @@ const data = reactive({
     folders: [], // 文件夹列表
     files: [] as { title: string }[], // 文件列表
     selectedKeys: [], // 笔记本选中项key
-    selectFolderPath: "", // 当前选中文件夹 用于建文件和子文件夹
-    selectIsFile: false,// 当前选中文件还是文件夹
     currentChooseFolderPath_md: "", // 当前选中文件的文件夹
     currentChooseNoteAllPath_md: "", // 当前选中笔记 全路径
     notEditedMdtext_md: "", // 未编辑的文件内容
     editedMdtext_md: "", // 文章内容Markdown格式
     title_md: "", // 文章标题
-    lastTimeTitle_md: "", //旧标题
     showMdEditor: false, // 是否显示编辑器
-    newFolderName: "", // 新建文件夹夹的名称
-    newFileName: "", // 新建的笔记文件名
-    upFileName: "",
-    confirmLoading: false, // 添加笔记表单等待状态（是否转圈圈）
-    formLabelWidth: "40%",
-    loading: false,
-    map: new Map(),
-    spinning: false,
-    sidebarSpan: 6, // 默认侧边栏宽度 (6/24 = 25%)
-    isResizing: false,
+
 });
 
 let notebooks_data = ref<NotebookInfo>();
@@ -128,14 +116,7 @@ onMounted(async () => {
 
     //关闭窗口保存
     listenClose();
-    // 从本地存储恢复侧边栏宽度
-    const savedSidebarWidth = localStorage.getItem('mdnote-sidebar-width');
-    if (savedSidebarWidth) {
-        const width = parseInt(savedSidebarWidth, 10);
-        if (width >= 4 && width <= 12) {
-            data.sidebarSpan = width;
-        }
-    }
+
     loadFile();
 });
 
@@ -192,7 +173,7 @@ const loadFile = async () => {
         data.editedMdtext_md = cachedNoteData.tempContent;
         data.notEditedMdtext_md = cachedNoteData.content;
         data.title_md = cachedNoteData.title;
-        data.lastTimeTitle_md = cachedNoteData.title;
+
         data.currentChooseNoteAllPath_md = cachedNoteData.filePath || "";
         data.currentChooseFolderPath_md = meta.folder as string;
         data.showMdEditor = true;
@@ -218,7 +199,6 @@ const loadFile = async () => {
             data.editedMdtext_md = tem;
             data.notEditedMdtext_md = tem;
             data.title_md = name as string;
-            data.lastTimeTitle_md = name as string;
             data.currentChooseNoteAllPath_md = meta.path as string;
             data.currentChooseFolderPath_md = meta.folder as string;
             data.showMdEditor = true;
@@ -362,34 +342,6 @@ const saveMdText = (mdText: string) => {
     }
     saveMd(data.editedMdtext_md, data.title_md, data.currentChooseNoteAllPath_md)
 };
-
-
-
-
-
-
-/**
- * 获取文件夹下笔记列表
- */
-const get_note_list = () => {
-    invoke<ResponseData<string[]>>("get_note_list", {
-        path: data.selectFolderPath,
-    })
-        .then((res: ResponseData<string[]>) => {
-            if (res && res.code == 200) {
-                var tem = res.data;
-                data.files = tem.map((n) => {
-                    return { title: n };
-                });
-            } else {
-                NotificationUtil.error("获取笔记列表数据失败：" + res.msg);
-            }
-        })
-        .catch((err) => {
-            console.log(err);
-        });
-};
-
 
 </script>
 

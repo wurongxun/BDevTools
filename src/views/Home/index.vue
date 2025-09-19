@@ -1,6 +1,6 @@
 <template>
   <container>
-    <el-row :gutter="12">
+    <!-- <el-row :gutter="12">
       <el-col :span="6">
         <el-card shadow="hover">
           <div class="num-card wait-num">
@@ -45,7 +45,7 @@
           </div>
         </el-card>
       </el-col>
-    </el-row>
+    </el-row> -->
     <section class="echarts-box">
       <echarts-data></echarts-data>
     </section>
@@ -66,7 +66,7 @@ const numState = reactive({
 })
 const { waitNum, overNum, passNum, rejectNum } = toRefs(numState)
 const countUpRef = ref()
-onMounted(() => {})
+onMounted(() => { })
 
 const initCount = () => {
   countUpRef.value.initCount()
@@ -157,6 +157,7 @@ const initCount = () => {
     }
   }
 }
+
 .echarts-box {
   margin-top: 20px;
 }

@@ -13,7 +13,7 @@
 
 <style scoped lang="scss">
 .__common-component-container {
-  margin: 15px;
+  margin: 2px;
   min-height: calc(100% - 30px);
   padding: 30px 20px 20px 20px;
   border-radius: 5px;
