@@ -5,12 +5,23 @@
       @node-click="handleNodeClick">
       <template #default="{ node, data }">
         <div class="custom-tree-node" @mouseenter="onNodeMouseEnter(data)" @mouseleave="onNodeMouseLeave">
-          <span class="node-label">
-            <el-icon class="node-icon">
-              <component :is="getNodeIcon(data)" />
-            </el-icon>
-            <span class="node-text">{{ node.label }}</span>
-          </span>
+          <el-tooltip v-if="!data.isFolder" :content="node.label" placement="top" :disabled="!isTooltipVisible(data.id)"
+            effect="dark" :open-delay="500">
+            <span class="node-label">
+              <el-icon class="node-icon">
+                <component :is="getNodeIcon(data)" />
+              </el-icon>
+              <span class="node-text">{{ node.label }}</span>
+            </span>
+          </el-tooltip>
+          <template v-else>
+            <span class="node-label">
+              <el-icon class="node-icon">
+                <component :is="getNodeIcon(data)" />
+              </el-icon>
+              <span class="node-text">{{ node.label }}</span>
+            </span>
+          </template>
 
           <span v-show="hoveredNodeId === data.id" class="node-actions">
             <template v-if="data.isFolder">
@@ -132,6 +143,7 @@ const emit = defineEmits<{
 const treeData = ref<TreeNode[]>(props.data)
 const treeRef: Ref<any> = ref(null)
 const hoveredNodeId = ref<string | null>(null)
+const tooltipNodes = ref<Set<string>>(new Set())
 const currentContextNode = ref<TreeNode | null>(null)
 
 // 菜单位置
@@ -183,10 +195,20 @@ const getNodeIcon = (data: TreeNode) => {
   return MarkDownColorful
 }
 
+// 判断是否应该显示tooltip
+const isTooltipVisible = (nodeId: string) => {
+  return tooltipNodes.value.has(nodeId);
+}
+
 // 鼠标进入节点
 const onNodeMouseEnter = (data: TreeNode) => {
   hoveredNodeId.value = data.id
+  // 如果是文件节点，添加到tooltipNodes集合中
+  if (!data.isFolder) {
+    tooltipNodes.value.add(data.id)
+  }
 }
+
 
 // 鼠标离开节点
 const onNodeMouseLeave = () => {

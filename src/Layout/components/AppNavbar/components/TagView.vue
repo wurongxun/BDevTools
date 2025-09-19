@@ -20,10 +20,12 @@ import { Close } from '@element-plus/icons-vue'
 import ToolUtils from '@/utils/ToolUtils'
 
 import type { ITagItem } from '@/Types/TagView'
+import { ElMessageBox } from 'element-plus'
+import NotificationUtil from '@/utils/NotificationUtil'
 
 const route = useRoute()
 const router = useRouter()
-const { tagview } = useStore()
+const { tagview,noteTem  } = useStore()
 
 watch(
   () => router.currentRoute.value,
@@ -51,7 +53,36 @@ watch(
 
 const tagViewList = computed<ITagItem[]>(() => tagview.tagViewList)
 
-const removeTab = (tag: ITagItem) => {
+const removeTab = async  (tag: ITagItem) => {
+
+ // 检查该标签页是否有未保存的笔记内容
+  const noteId = tag.name; // 使用标签名作为笔记ID
+  const noteData = noteTem.getNoteData(noteId);
+
+   // 如果有未保存的更改，询问用户是否保存
+  if (noteData && noteData.tempContent && noteData.tempContent !== noteData.content) {
+    try {
+      await ElMessageBox.confirm(
+        `标签页 "${tag.title}" 有未保存的内容，是否保存更改?`,
+        "保存提醒", {
+          confirmButtonText: "保存",
+          cancelButtonText: "不保存",
+          type: "warning",
+        }
+      );
+      // 用户选择保存，这里可以调用保存方法
+
+      // 调用保存方法
+      
+      // 由于我们无法直接访问编辑器组件，可以提示用户切换到该标签页进行保存
+      NotificationUtil.info("请切换到对应标签页手动保存内容");
+    } catch {
+      // 用户选择不保存，继续关闭标签页
+      console.log("用户选择不保存更改，继续关闭标签页");
+    }
+  }
+
+
   tagview.removeTagView(tag)
   if (isActive(tag)) {
     const endRoute = tagview.tagViewList[tagview.tagViewList.length - 1] as ITagItem

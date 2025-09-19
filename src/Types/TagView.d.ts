@@ -7,4 +7,5 @@ export interface ITagItem {
   query?: LocationQueryRaw
   params?: RouteParamsRaw
   affix?: boolean
+  id?: string
 }

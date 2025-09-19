@@ -1,7 +1,7 @@
 <template>
-  <div class="logo-box" :class="{ 'is-collapse': isCollapse }" @click="handleToHome">
+  <div class="logo-box" :class="{ 'is-collapse': isCollapse }" @click="handleToHome" data-tauri-drag-region>
     <el-image class="logo" fit="contain" :src="logo" />
-    <h1 class="title" :class="{ 'shrink-title': isCollapse }">{{ title }}</h1>
+    <h1 class="title" :class="{ 'shrink-title': isCollapse }" data-tauri-drag-region>{{ title }}</h1>
   </div>
 </template>
 
@@ -27,6 +27,7 @@ function handleToHome() {
 @import '@/styles/variables.scss';
 
 .logo-box {
+  user-select: none;
   width: $--menu-width;
   overflow: hidden;
   height: 51px;
@@ -57,9 +58,10 @@ function handleToHome() {
     }
   }
 }
-.logo{
-    width: 50px;
-    height: 50px;
-    padding: 4px 4px;
+
+.logo {
+  width: 50px;
+  height: 50px;
+  padding: 4px 4px;
 }
 </style>

@@ -2,7 +2,7 @@
   <logo></logo>
   <div class="app-sidebar">
     <!-- <side-menu></side-menu> -->
-     <FileTreeTest></FileTreeTest>
+    <FileTreeTest></FileTreeTest>
   </div>
 
 </template>
