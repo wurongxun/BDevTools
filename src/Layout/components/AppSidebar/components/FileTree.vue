@@ -41,14 +41,97 @@ const handleRefresh = () => {
     const routerNote = routerNoteStore.setRoutes();
 }
 
-const handleAddFile = (parent, name) => {
-    console.log(`在 ${parent.label} 下创建文件: ${name}`)
+const handleAddFile = async (parent: TreeNode, name) => {
+    console.log(`在 ${parent.folder} 下创建文件: ${name}`)
     // 添加文件逻辑
+    let newNoteMdFileName = name;
+    if (
+        newNoteMdFileName == null ||
+        newNoteMdFileName == undefined ||
+        newNoteMdFileName == ""
+    ) {
+        NotificationUtil.error("创建文件失败，请填写文件名称！");
+        return;
+    }
+    // 创建笔记
+    let childrenFoldersAndFiles = await tauri_request<ResponseData<string[]>>("get_path_childrenFoldersAndFiles", { path: parent.folder });
+    childrenFoldersAndFiles.data.map((n) => {
+        if (n == newNoteMdFileName) {
+            NotificationUtil.error("已有相同文件名，请检查！");
+            return;
+        }
+    });
+
+    var regex = /.*[/\\:*?|].*/;
+    //存在返回true，不存在返回false
+    if (regex.test(newNoteMdFileName)) {
+        NotificationUtil.error(
+            '笔记名称命名不规范，不能包含\\ / : * ? " < > |请检查！'
+        );
+        return;
+    }
+    if (/^\d+$/.test(newNoteMdFileName)) {
+        NotificationUtil.error("笔记名称命名不规范，不能为纯数字！");
+        return;
+    }
+
+    let create_note_file = await tauri_request<ResponseData<string>>("create_note_file", {
+        fatherPath: parent.folder,
+        newNoteMdFileName: newNoteMdFileName,
+    })
+    if (create_note_file && create_note_file.code == 200) {
+
+        NotificationUtil.success("笔记创建成功");
+
+    } else {
+        NotificationUtil.error("笔记创建失败：" + create_note_file.msg);
+    }
 }
 
-const handleAddFolder = (parent, name) => {
-    console.log(`在 ${parent.label} 下创建文件夹: ${name}`)
+const handleAddFolder = async (parent, name) => {
+    console.log(`在 ${parent.folder} 下创建文件夹: ${name}`)
     // 添加文件夹逻辑
+    let newFolderName = name;
+    if (newFolderName == null || newFolderName == undefined || newFolderName == "") {
+        NotificationUtil.error("创建文件夹失败，请填写文件夹名称！");
+        return;
+    }
+    let selectFolderPath = parent.folder;
+    if (selectFolderPath == null || selectFolderPath == undefined || selectFolderPath == "") {
+        NotificationUtil.error("未选择文件夹！");
+        return;
+    }
+
+    // 创建笔记本
+    let childrenFoldersAndFiles = await tauri_request<ResponseData<string[]>>("get_path_childrenFoldersAndFiles", { path: parent.folder });
+    childrenFoldersAndFiles.data.map((n) => {
+        if (n == newFolderName) {
+            NotificationUtil.error("已有相同文件夹名或者文件名，请检查！");
+
+            return;
+        }
+    });
+
+    var regex = /.*[/\\:*?|].*/;
+    //存在返回true，不存在返回false
+    if (regex.test(newFolderName)) {
+        NotificationUtil.error(
+            '文件夹命名不规范，不能包含\\ / : * ? " < > |请检查！'
+        );
+        return;
+    }
+    if (/^\d+$/.test(newFolderName)) {
+        NotificationUtil.error("文件夹命名不规范，不能为纯数字！");
+        return;
+    }
+    // 创建文件夹
+    let create_folder_ = await tauri_request<ResponseData<string>>("create_folder", { fatherPath: parent.folder, newFolderName: newFolderName })
+    if (create_folder_ && create_folder_.code == 200) {
+        NotificationUtil.success("文件夹创建成功");
+
+    } else {
+        NotificationUtil.error("笔记本创建失败：" + create_folder_.msg);
+    }
 }
 
 const handleDeleteNode = async (node: TreeNode) => {
@@ -73,7 +156,7 @@ const handleDeleteNode = async (node: TreeNode) => {
             cancelButtonText: "取消",
         }).then(async (action) => {
             // 点击了确定，开始删除
-            let deleteFile_re = await tauri_request<ResponseData<string>>("delete_file", {
+            let deleteFile_re = await tauri_request<ResponseData<string>>("remove_file", {
                 path: node.filePath
             });
             if (deleteFile_re && deleteFile_re.code == 200) {
