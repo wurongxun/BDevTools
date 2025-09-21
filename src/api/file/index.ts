@@ -198,17 +198,10 @@ const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
         label: child.name,
         isFolder: child.isfile ? false : true,
         type: child.data_type as TreeNode['type'],
-        path: path,
-        meta: {
-          title: child.name,
-          keepAlive: true,
-          filePath: child.path,
-          folder: child.folder,
-          name: child.name,
-          isfile: child.isfile,
-          type: child.data_type,
-          id: child.id
-        },
+        routerPath: path,
+        folder: child.folder,
+        filePath: child.path,
+        isfile: child.isfile,
         children: child.isfile ? [] : child_child_val
       }
 
@@ -246,17 +239,10 @@ const File_treeNode_child = (notebooks_children: Array<NotebookInfo>): Array<Tre
         label: child.name,
         isFolder: child.isfile ? false : true,
         type: child.data_type as TreeNode['type'],
-        path: path,
-        meta: {
-          title: child.name,
-          keepAlive: true,
-          filePath: child.path,
-          folder: child.folder,
-          name: child.name,
-          isfile: child.isfile,
-          type: child.data_type,
-          id: child.id
-        },
+        routerPath: path,
+        folder: child.folder,
+        filePath: child.path,
+        isfile: child.isfile,
         children: child.isfile ? [] : child_child_val
       }
       children_val.push(route2)

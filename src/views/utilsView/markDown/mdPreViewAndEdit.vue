@@ -46,7 +46,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MdEditor } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
 import { NotebookInfo, ResponseData } from "@/entity/entitys";
-
+import { load, Store } from '@tauri-apps/plugin-store';
 // import TreeNode from "@/components/tsx/menu/TreeNode";
 import { tauri_request } from "@/utils/tauri_request";
 import {
@@ -65,6 +65,10 @@ import { listen } from "@tauri-apps/api/event";
 import { useRoute, useRouter } from 'vue-router'
 import { NoteDataStore } from '@/Types/entitys'
 import useStore from '@/store/index'
+import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
+
+let store: Store | undefined = undefined;
+
 const { noteTem } = useStore()
 
 // 获取当前路由信息
@@ -99,14 +103,16 @@ const data = reactive({
 let notebooks_data = ref<NotebookInfo>();
 
 // 监听内容变化，实时保存到pinia
-const onContentChange = (value: string) => {
+const onContentChange = async (value: string) => {
+    let md_id = route.meta.id;
     data.editedMdtext_md = value;
     console.log("onContentChange 监听内容变化，实时保存到pinia editedMdtext_md===============", data.editedMdtext_md);
     // 实时更新pinia中的临时内容
-    if (route.meta.id) {
-        noteTem.setNoteData(route.meta.id as string, {
-            tempContent: value
-        });
+    if (md_id) {
+        await store.set(pdf_store_tem_key_prefix + md_id, { value: value });
+        await store.save();
+    } else {
+        NotificationUtil.error("缓存数据出现异常！");
     }
 };
 
@@ -118,6 +124,7 @@ onMounted(async () => {
     listenClose();
 
     loadFile();
+
 });
 
 //读取文件
@@ -153,57 +160,78 @@ const read_note_file_bypath = async function (path: string) {
 const fileName = ref('')
 // 根据路由参数加载文件
 const loadFile = async () => {
+     // 修复判断条件，检查 store 实例是否存在
+    if (store == null || store == undefined) {
+        store = await load(pdf_store_tem_key, {
+            autoSave: false,
+            defaults: {}
+        });
+    }
+    
+    console.log('加载文件:', route)
     console.log('加载文件:', route)
     let path = route.path;
-    let name = route.name;
+    let route_name = route.name;
     let meta = route.meta;
     let md_id = meta.id;
+    let title = meta.title;
     console.log("onMounted ", path, name, meta);
     console.log("onMounted meta", meta);
 
+
     // 先检查pinia中是否有缓存的内容
-    let cachedNoteData: NoteDataStore = null;
+    let cached_content: string = null;
+    let content: string = null;
     if (md_id) {
-        cachedNoteData = noteTem.getNoteData(md_id as string);
+        let key_tem = pdf_store_tem_key_prefix + md_id;
+        let key_conten = pdf_store_conten_key_prefix + md_id;
+        console.log("loadFile key_tem key_conten:", key_tem, key_conten);
+        let tem_val = await store.get<{ value: string }>(key_tem);
+        if (tem_val !== undefined) {
+            cached_content = tem_val.value;
+        }
+        let content_val = await store.get<{ value: string }>(key_conten);
+        if (content_val !== undefined) {
+            content = content_val.value;
+        }
+
     }
-    if (cachedNoteData && cachedNoteData.tempContent) {
+    if (cached_content != null) {
         // 如果pinia中有缓存内容，使用缓存的内容
 
         // 使用缓存的内容
-        data.editedMdtext_md = cachedNoteData.tempContent;
-        data.notEditedMdtext_md = cachedNoteData.content;
-        data.title_md = cachedNoteData.title;
+        data.editedMdtext_md = cached_content;
+        data.notEditedMdtext_md = content;
+        data.title_md = meta.title as string;
 
-        data.currentChooseNoteAllPath_md = cachedNoteData.filePath || "";
+        data.currentChooseNoteAllPath_md = meta.filePath as string || "";
         data.currentChooseFolderPath_md = meta.folder as string;
         data.showMdEditor = true;
-        console.log("从pinia缓存加载内容:", cachedNoteData);
+        console.log("从pinia缓存加载内容 cached_content content:", cached_content, content);
     } else {
         // 如果没有缓存，从文件中读取
         var res = await tauri_request<ResponseData<string>>("read_note_file", {
             path: meta.filePath
         });
         if (res && res.code == 200) {
-            let tem_store: NoteDataStore = {
-                id: meta.id as string,
-                title: meta.name as string,
-                content: res.data,
-                filePath: meta.filePath as string,
-                tempContent: res.data,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-            }
-            noteTem.setNoteData(md_id as string, tem_store)
             //重新赋值
             var tem = res.data;
-            data.editedMdtext_md = tem;
-            data.notEditedMdtext_md = tem;
-            data.title_md = name as string;
-            data.currentChooseNoteAllPath_md = meta.path as string;
-            data.currentChooseFolderPath_md = meta.folder as string;
-            data.showMdEditor = true;
-            console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
-            console.log("read_note_file notEditedMdtext_md===============", data.notEditedMdtext_md);
+            if (md_id) {
+                // 缓存内容
+                await store.set(pdf_store_tem_key_prefix + md_id, { value: tem });
+                await store.set(pdf_store_conten_key_prefix + md_id, { value: tem });
+                await store.save();
+
+                data.editedMdtext_md = tem;
+                data.notEditedMdtext_md = tem;
+                data.title_md = title as string;
+                data.currentChooseNoteAllPath_md = meta.path as string;
+                data.currentChooseFolderPath_md = meta.folder as string;
+                data.showMdEditor = true;
+                console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
+                console.log("read_note_file notEditedMdtext_md===============", data.notEditedMdtext_md);
+            }
+
         } else {
             NotificationUtil.error("读取失败：" + res.msg);
         }

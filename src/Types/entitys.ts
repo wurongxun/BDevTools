@@ -99,7 +99,10 @@ interface TreeNode {
   isFolder: boolean
   type?: 'folder' | 'markdown' | 'pdf'
   children?: TreeNode[]
-  path: string,
+  routerPath: string,
+  folder: string,
+  filePath: string,
+  isfile: boolean,
   [key: string]: any
 }
 // 定义笔记数据接口

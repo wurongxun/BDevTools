@@ -110,19 +110,11 @@ import NotificationUtil from '@/utils/NotificationUtil'
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/entity/entitys'
 import useStore from '@/store/index'
+import { TreeNode } from '@/Types/entitys'
 let md_working_directory = ref<string>('')
 
 const { appConfig } = useStore()
 const userStore = appConfig;
-// 定义节点数据结构
-interface TreeNode {
-  id: string
-  label: string
-  isFolder: boolean
-  type?: 'folder' | 'markdown' | 'pdf'
-  children?: TreeNode[]
-  [key: string]: any
-}
 
 // Props
 const props = defineProps<{
@@ -227,6 +219,7 @@ const handleNodeContextMenu = (
 ) => {
   event.preventDefault()
 
+  console.log('handleNodeContextMenu', event, data)
   // 设置当前上下文节点
   currentContextNode.value = data
 
@@ -401,8 +394,17 @@ const handleContextMenuCommand = (command: string) => {
 // 显示重命名对话框
 const showRenameDialog = () => {
   if (!currentContextNode.value) return
+   // 修改这里：去掉文件后缀
+  let label = currentContextNode.value.label;
+  if (!currentContextNode.value.isFolder) {
+    // 如果是文件，去掉后缀
+    const lastDotIndex = label.lastIndexOf('.');
+    if (lastDotIndex > 0) {
+      label = label.substring(0, lastDotIndex);
+    }
+  }
 
-  renameInput.value = currentContextNode.value.label
+  renameInput.value = label;
   renameDialogVisible.value = true
 
   nextTick(() => {
@@ -468,19 +470,7 @@ const confirmCreate = () => {
 const handleDelete = () => {
   if (!currentContextNode.value) return
 
-  const message = currentContextNode.value.isFolder
-    ? '确定要删除这个文件夹及其所有内容吗？'
-    : '确定要删除这个文件吗？'
-
-  ElMessageBox.confirm(message, '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    emit('delete-node', currentContextNode.value!)
-  }).catch(() => {
-    // 用户取消删除
-  })
+  emit('delete-node', currentContextNode.value!)
 }
 
 // 处理新增文件
@@ -500,6 +490,10 @@ const handleAddRootFile = () => {
     id: 'root',
     label: '根目录',
     isFolder: true,
+    routerPath: '',
+    folder: '',
+    filePath: '',
+    isfile: false,
     children: []
   }
   currentContextNode.value = rootNode
@@ -513,6 +507,10 @@ const handleAddRootFolder = () => {
     id: 'root',
     label: '根目录',
     isFolder: true,
+    routerPath: '',
+    folder: '',
+    filePath: '',
+    isfile: false,
     children: []
   }
   currentContextNode.value = rootNode
