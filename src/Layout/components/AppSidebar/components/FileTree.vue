@@ -200,6 +200,20 @@ const handleDeleteNode = async (node: TreeNode) => {
             confirmButtonText: "删除",
             cancelButtonText: "取消",
         }).then(async (action) => {
+            let active_tagview_clear: boolean = false;
+            //查找文件夹节点下所有的文件
+            const list: TreeNode[] = [];
+            getAllChildrenFile(node, list, active_tagview_clear);
+            // 使用 Promise.all 并行处理所有文件的缓存
+            const cacheResults = await Promise.all(list.map(item => processNodeCache(item)));
+            let kes: string[] = await store.keys();
+            console.log("processNodeCache kes:", kes);
+            // 如果有任何一个文件处理失败，则返回
+            if (cacheResults.some(result => !result)) {
+                NotificationUtil.error("文件缓存处理失败！");
+                return;
+            }
+
             // 点击了确定，开始删除
             let remove_folder = await tauri_request<ResponseData<string>>("remove_folder", {
                 path: node.folder
@@ -209,11 +223,14 @@ const handleDeleteNode = async (node: TreeNode) => {
             } else {
                 NotificationUtil.error("操作失败：" + remove_folder.msg);
             }
-
+            if (active_tagview_clear) {
+                activeRouteRedirect()
+            }
         }).catch((err) => {
             NotificationUtil.error("操作失败：" + err);
         });
     }
+    const routerNote = routerNoteStore.setRoutes();
 }
 
 const handleRenameNode = async (node: TreeNode, newName) => {
@@ -230,62 +247,7 @@ const handleRenameNode = async (node: TreeNode, newName) => {
     //是否清空到活动路由
     let active_tagview_clear: boolean = false;
     console.log("handleRenameNode active_path:", active_path);
-    // 提取公共的缓存处理函数
-    const processNodeCache = async (item: TreeNode) => {
-        try {
-            if (active_path == item.routerPath) {
-                active_tagview_clear = true;
-            }
-            let cached_content: string | null = null;
-            let content: string | null = null;
-            const key_tem = pdf_store_tem_key_prefix + item.id;
-            const key_conten = pdf_store_conten_key_prefix + item.id;
-            console.log("processNodeCache key_tem key_conten:", key_tem, key_conten);
 
-            const tem_val = await store.get<{ value: string }>(key_tem);
-            console.log("processNodeCache tem_val:", tem_val);
-            if (tem_val != undefined && tem_val.value != null && tem_val.value != "") {
-                cached_content = tem_val.value;
-            } else {
-                console.log("processNodeCache 无需处理:", key_tem, key_conten);
-                return true
-            }
-
-            const content_val = await store.get<{ value: string }>(key_conten);
-            if (content_val !== undefined) {
-                content = content_val.value;
-            }
-
-            // 简化条件判断
-            console.log("processNodeCache 简化条件判断:", cached_content, content);
-            if (cached_content && content != cached_content) {
-                console.log("processNodeCache 简化条件判断:",);
-                //保存文件
-                const save_file_re = await tauri_request<ResponseData<String[]>>("save_note", {
-                    path: item.filePath, // 修复：使用正确的路径
-                    mdText: cached_content,
-                })
-                if (save_file_re && save_file_re.code != 200) {
-                    NotificationUtil.error("文件保存失败：" + save_file_re.msg + "请检查！");
-                    return false;
-                }
-                // 删除缓存
-
-
-            }
-            let delete_tem: boolean = await store.delete(key_tem);
-            let delete_conten: boolean = await store.delete(key_conten);
-            console.log("processNodeCache 删除缓存 删除结果:", delete_tem, delete_conten);
-            if (!delete_tem || !delete_conten) {
-                NotificationUtil.error("缓存删除失败！");
-            }
-            tagview.removeTagViewByPath(item.routerPath);
-            return true;
-        } catch (error) {
-            NotificationUtil.error("操作失败：" + error);
-            return false;
-        }
-    };
 
     // 重命名逻辑
     if (node.isfile) {
@@ -306,7 +268,7 @@ const handleRenameNode = async (node: TreeNode, newName) => {
     } else if (node.isFolder) {
         //查找文件夹节点下所有的文件
         const list: TreeNode[] = [];
-        getAllChildrenFile(node, list);
+        getAllChildrenFile(node, list, active_tagview_clear);
         console.log("processNodeCache 用 Promise.all 并行处理所有文件的缓存:");
         // 使用 Promise.all 并行处理所有文件的缓存
         const cacheResults = await Promise.all(list.map(item => processNodeCache(item)));
@@ -331,30 +293,86 @@ const handleRenameNode = async (node: TreeNode, newName) => {
         }
     }
     const routerNote = routerNoteStore.setRoutes();
-
     if (active_tagview_clear) {
-        const endRoute = tagview.tagViewList[tagview.tagViewList.length - 1] as ITagItem
-        if (endRoute) {
-            router.push({
-                path: endRoute.path
-            })
-        } else {
-            router.push({
-                path: '/'
-            })
-        }
+        activeRouteRedirect()
     }
 
 }
-
-const getAllChildrenFile = (node: TreeNode, list: TreeNode[]) => {
-
+const activeRouteRedirect = () => {
+    const endRoute = tagview.tagViewList[tagview.tagViewList.length - 1] as ITagItem
+    if (endRoute) {
+        router.push({
+            path: endRoute.path
+        })
+    } else {
+        router.push({
+            path: '/'
+        })
+    }
+}
+const getAllChildrenFile = (node: TreeNode, list: TreeNode[], active_tagview_clear: boolean) => {
+    let active_path = route.path;
+    if (active_path == node.routerPath && node.isfile) {
+        active_tagview_clear = true;
+    }
     if (node.isfile) {
         list.push(node);
     } else {
         node.children.forEach(async (child) => {
-            getAllChildrenFile(child, list);
+            getAllChildrenFile(child, list, active_tagview_clear);
         });
     }
 }
+// 提取公共的缓存处理函数
+const processNodeCache = async (item: TreeNode) => {
+    try {
+        let cached_content: string | null = null;
+        let content: string | null = null;
+        const key_tem = pdf_store_tem_key_prefix + item.id;
+        const key_conten = pdf_store_conten_key_prefix + item.id;
+        console.log("processNodeCache key_tem key_conten:", key_tem, key_conten);
+        const tem_val = await store.get<{ value: string }>(key_tem);
+        console.log("processNodeCache tem_val:", tem_val);
+        if (tem_val != undefined && tem_val.value != null && tem_val.value != "") {
+            cached_content = tem_val.value;
+        } else {
+            console.log("processNodeCache 无需处理:", key_tem, key_conten);
+            return true
+        }
+
+        const content_val = await store.get<{ value: string }>(key_conten);
+        if (content_val !== undefined) {
+            content = content_val.value;
+        }
+
+        // 简化条件判断
+        console.log("processNodeCache 简化条件判断:", cached_content, content);
+        if (cached_content && content != cached_content) {
+            console.log("processNodeCache 简化条件判断:",);
+            //保存文件
+            const save_file_re = await tauri_request<ResponseData<String[]>>("save_note", {
+                path: item.filePath, // 修复：使用正确的路径
+                mdText: cached_content,
+            })
+            if (save_file_re && save_file_re.code != 200) {
+                NotificationUtil.error("文件保存失败：" + save_file_re.msg + "请检查！");
+                return false;
+            }
+            // 删除缓存
+
+
+        }
+        let delete_tem: boolean = await store.delete(key_tem);
+        let delete_conten: boolean = await store.delete(key_conten);
+        console.log("processNodeCache 删除缓存 删除结果:", delete_tem, delete_conten);
+        if (!delete_tem || !delete_conten) {
+            NotificationUtil.error("缓存删除失败！");
+        }
+        tagview.removeTagViewByPath(item.routerPath);
+        return true;
+    } catch (error) {
+        NotificationUtil.error("操作失败：" + error);
+        return false;
+    }
+};
 </script>
