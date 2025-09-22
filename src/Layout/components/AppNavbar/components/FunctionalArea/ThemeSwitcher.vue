@@ -28,6 +28,12 @@ onMounted(async () => {
     autoSave: false,
     defaults: {}
   });
+  let dark_val = await store.get<{ value: boolean }>('dark');
+  if (dark_val !== undefined) {
+    if (dark_val.value!= isDark.value) {
+      toggleDark()
+    }
+  }
 })
 const switchTheme = () => {
   toggleDark()
