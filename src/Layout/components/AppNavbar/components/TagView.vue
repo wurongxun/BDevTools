@@ -97,7 +97,11 @@ const removeTab = async  (tag: ITagItem) => {
     }
   }
 }
-
+/**
+ * 如果当前路由设置了noTagView且有activeMenu，则比较activeMenu与标签路径
+ * 如果标签对象不为空，则使用路由匹配路径进行比较
+ * 否则直接比较路由路径与标签路径
+ */
 const isActive = (tag: ITagItem): boolean => {
   if (route.meta.noTagView && route.meta.activeMenu) {
     return route.meta.activeMenu === tag.path

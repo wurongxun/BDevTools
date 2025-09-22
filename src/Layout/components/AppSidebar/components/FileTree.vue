@@ -8,7 +8,7 @@ import { computed, h, onMounted } from 'vue'
 import FileInfoTree from '@/components/FileTree/FileInfoTree.vue'
 import { ref } from 'vue'
 import useStore from '@/store'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { tauri_request } from '@/utils/tauri_request'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { ResponseData, TreeNode } from '@/Types/entitys'
@@ -21,6 +21,7 @@ import { ITagItem } from '@/Types/TagView'
 
 let store: Store | undefined = undefined;
 const router = useRouter()
+const route = useRoute()
 const { routerNoteStore, tagview, noteTem } = useStore()
 const tree_node: any = computed(() =>
     routerNoteStore.tree_node
@@ -224,10 +225,17 @@ const handleRenameNode = async (node: TreeNode, newName) => {
             defaults: {}
         });
     }
-
+    //当前活动的路由
+    let active_path = route.path;
+    //是否清空到活动路由
+    let active_tagview_clear: boolean = false;
+    console.log("handleRenameNode active_path:", active_path);
     // 提取公共的缓存处理函数
     const processNodeCache = async (item: TreeNode) => {
         try {
+            if (active_path == item.routerPath) {
+                active_tagview_clear = true;
+            }
             let cached_content: string | null = null;
             let content: string | null = null;
             const key_tem = pdf_store_tem_key_prefix + item.id;
@@ -323,16 +331,20 @@ const handleRenameNode = async (node: TreeNode, newName) => {
         }
     }
     const routerNote = routerNoteStore.setRoutes();
-    const endRoute = tagview.tagViewList[tagview.tagViewList.length - 1] as ITagItem
-    if (endRoute) {
-        router.push({
-            path: endRoute.path
-        })
-    } else {
-        router.push({
-            path: '/'
-        })
+
+    if (active_tagview_clear) {
+        const endRoute = tagview.tagViewList[tagview.tagViewList.length - 1] as ITagItem
+        if (endRoute) {
+            router.push({
+                path: endRoute.path
+            })
+        } else {
+            router.push({
+                path: '/'
+            })
+        }
     }
+
 }
 
 const getAllChildrenFile = (node: TreeNode, list: TreeNode[]) => {
