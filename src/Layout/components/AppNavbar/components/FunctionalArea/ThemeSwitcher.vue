@@ -1,8 +1,8 @@
 <template>
-  <el-icon @click="switchTheme" class="icon-box" v-show="!isDark">
+  <el-icon @click="dark_change" class="icon-box" v-show="!isDark">
     <Sunny />
   </el-icon>
-  <el-icon @click="switchTheme" class="icon-box" v-show="isDark">
+  <el-icon @click="dark_change" class="icon-box" v-show="isDark">
     <Moon />
   </el-icon>
 </template>
@@ -10,9 +10,25 @@
 <script lang="ts" setup>
 import { isDark, toggleDark } from '@/composables/useDark'
 import useStore from '@/store'
+import { onMounted } from 'vue';
+import { load, Store } from '@tauri-apps/plugin-store';
 
 const { system } = useStore()
+let store: Store | undefined = undefined;
 
+async function dark_change() {
+  if (store) {
+    toggleDark()
+    await store.set('dark', { value: isDark.value });
+    await store.save();
+  }
+}
+onMounted(async () => {
+    store = await load('settings.json', {
+    autoSave: false,
+    defaults: {}
+  });
+})
 const switchTheme = () => {
   toggleDark()
   system.toggleDark(isDark.value)

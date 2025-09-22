@@ -8,13 +8,8 @@ import useStore from '@/store/index'
 import { load, Store } from '@tauri-apps/plugin-store';
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart';
 import { open } from '@tauri-apps/plugin-dialog';
-import { useDark, useToggle } from '@vueuse/core'
-const isDark = useDark({
-  storageKey: 'theme-appearance', //自定义localStorage存储名称
-  valueDark: 'dark', //类名暗黑模式下值是dark
-  valueLight: 'light', // 类名亮色模式下值是light
-})
-const toggleDark = useToggle(isDark)
+import { isDark, toggleDark } from '@/composables/useDark'
+
 const { appConfig, routerNoteStore } = useStore()
 
 const { t, locale } = useI18n()
