@@ -160,14 +160,14 @@ const read_note_file_bypath = async function (path: string) {
 const fileName = ref('')
 // 根据路由参数加载文件
 const loadFile = async () => {
-     // 修复判断条件，检查 store 实例是否存在
+    // 修复判断条件，检查 store 实例是否存在
     if (store == null || store == undefined) {
         store = await load(pdf_store_tem_key, {
             autoSave: false,
             defaults: {}
         });
     }
-    
+
     console.log('加载文件:', route)
     console.log('加载文件:', route)
     let path = route.path;
@@ -261,7 +261,7 @@ const listenClose = async () => {
     const listenClose_ = await listen('close', async (event) => {
         //关闭前保存
         if (data.currentChooseNoteAllPath_md != "" && data.editedMdtext_md != data.notEditedMdtext_md && data.title_md != "") {
-            saveMd(data.editedMdtext_md, data.title_md, data.currentChooseNoteAllPath_md)
+            saveMd(data.editedMdtext_md, data.currentChooseNoteAllPath_md)
         }
         await getCurrentWindow().close();
     });
@@ -330,18 +330,12 @@ const state = reactive({
  * @param {笔记内容} mdText
  * @param {标题} mdTitle
  */
-const saveMd = (mdText: string, mdTitle: string, path: string,) => {
+const saveMd = (mdText: string, path: string,) => {
     var p = new Promise(async function () {
-        if (mdTitle == "") {
-            // 标题为空
-            NotificationUtil.error("请输入标题");
-            return;
-        }
 
-        if (mdText && mdTitle && path) {
+        if (mdText && path) {
             let res = await tauri_request<ResponseData<String[]>>("save_note", {
                 path: path,
-                mdTitle: mdTitle,
                 mdText: mdText,
             })
             if (res && res.code == 200) {
@@ -368,7 +362,7 @@ const saveMdText = (mdText: string) => {
         NotificationUtil.error("请输入标题");
         return;
     }
-    saveMd(data.editedMdtext_md, data.title_md, data.currentChooseNoteAllPath_md)
+    saveMd(data.editedMdtext_md,  data.currentChooseNoteAllPath_md)
 };
 
 </script>

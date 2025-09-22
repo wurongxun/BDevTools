@@ -33,7 +33,7 @@ function hasIncludeTab(item: ITagItem, arr: Array<ITagItem>): boolean | IResult 
  * 2. 如果路由项有[affix]标记，则创建对应的标签项并加入结果数组
  * 3. 如果路由项有子路由，则递归处理子路由
  * 4. 返回包含所有affix标签的数组
- * 这是用于生成固定标签页的功能。 
+ * 这是用于生成固定标签页的功能。
  * */
 function getAffix(arr: RouteRecordRaw[], result: ITagItem[]): ITagItem[] {
   arr.map((item) => {
@@ -105,6 +105,19 @@ const tagViewStore = defineStore('tagViewStore', {
       for (let index = 0; index < this.tagViewList.length; index++) {
         const element = this.tagViewList[index]
         if (element.path === tag.path) {
+          this.tagViewList.splice(index, 1)
+          return
+        }
+      }
+    },
+    /**
+     * @param { string } path
+     * @description 删除 tag view
+     */
+    removeTagViewByPath(path: string) {
+      for (let index = 0; index < this.tagViewList.length; index++) {
+        const element = this.tagViewList[index]
+        if (element.path === path) {
           this.tagViewList.splice(index, 1)
           return
         }
