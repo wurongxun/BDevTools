@@ -1,6 +1,6 @@
 <template>
   <div class="file-tree-container">
-    <el-tree v-if="treeData.length > 0" ref="treeRef" :data="treeData" node-key="id" :props="defaultProps"
+    <el-tree v-show="treeData.length > 0" ref="treeRef" :data="treeData" node-key="id" :props="defaultProps"
       :expand-on-click-node="false" highlight-current @node-contextmenu="handleNodeContextMenu"
       @node-click="handleNodeClick">
       <template #default="{ node, data }">
@@ -38,7 +38,7 @@
     </el-tree>
 
     <!-- 当 treeData 无数据时显示新增按钮 -->
-    <div v-else class="empty-tree-actions">
+    <div v-show="treeData.length === 0" class="empty-tree-actions">
       <el-card class="button-card" @click="handleAddRootFile">
         <el-icon class="svg-icon">
           <DocumentAdd />

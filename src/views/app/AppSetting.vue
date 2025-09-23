@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { Check, Close } from '@element-plus/icons-vue'
 import { invoke } from '@tauri-apps/api/core'
 import { ResponseData, SettingIdValueName, SettingMap } from '@/entity/entitys';
@@ -9,9 +9,16 @@ import { load, Store } from '@tauri-apps/plugin-store';
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart';
 import { open } from '@tauri-apps/plugin-dialog';
 import { isDark, toggleDark } from '@/composables/useDark'
+import { ITagItem } from '@/Types/TagView';
+import NotificationUtil from '@/utils/NotificationUtil';
+import { tauri_request } from '@/utils/tauri_request';
+import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting';
+import { TreeNode } from '@/Types/entitys';
+import { useRouter, useRoute, LocationQueryRaw, RouteParamsRaw } from 'vue-router'
 
-const { appConfig, routerNoteStore } = useStore()
-
+const { appConfig, routerNoteStore, tagview } = useStore()
+const router = useRouter()
+const route = useRoute()
 const { t, locale } = useI18n()
 const userStore = appConfig;
 let store: Store | undefined = undefined;
@@ -55,6 +62,7 @@ const theme_options = [
     disabled: false,
   }
 ]
+const tagViewList = computed<ITagItem[]>(() => tagview.tagViewList)
 
 onMounted(async () => {
   if (userStore.appConfig.length < 1) {
@@ -162,19 +170,42 @@ async function dark_change() {
   }
 }
 async function md_working_directory_change() {
-  const file = await open({
+  const file_directory: string = await open({
     multiple: false,
     directory: true,
   });
-  if (file) {
-    md_working_directory.value = file;
+  if (file_directory) {
+
+  }
+  if (md_working_directory.value != file_directory) {
+    md_working_directory.value = file_directory;
+
+    //清空tagView
+    let tagviews: ITagItem[] = tagview.getTagviewList()
+    console.log("tagviews:=================", tagviews)
+    for (let tagview of tagviews) {
+      let result: boolean = await processNodeCache({
+        filePath: tagview.filePath,
+        id: tagview.id, label: tagview.title,
+        isfile: true, isFolder: false, routerPath: tagview.path, folder: ''
+      })
+      if (!result) {
+        console.log("processNodeCache error:", result);
+        return
+      }
+    }
     if (store) {
-      store.set('md_working_directory', { value: file });
+      store.set('md_working_directory', { value: file_directory });
       store.save();
     }
+    console.log("processNodeCache error:========");
+    tagview.resetTagViewList();
+    const routerNote = routerNoteStore.setRoutes();
+    console.log("processNodeCache error:========2",routerNote);
+
   }
   // 重新加载数据逻辑
-  const routerNote = routerNoteStore.setRoutes();
+
 }
 // 添加清除缓存和浏览器缓存的函数
 const clear_cache = () => {
@@ -186,6 +217,60 @@ const clear_browser_cache = () => {
   // 实现清除浏览器缓存的逻辑
   console.log('清除浏览器缓存')
 }
+// 提取公共的缓存处理函数
+const processNodeCache = async (item: TreeNode) => {
+  try {
+    let cached_content: string | null = null;
+    let content: string | null = null;
+    const key_tem = pdf_store_tem_key_prefix + item.id;
+    const key_conten = pdf_store_conten_key_prefix + item.id;
+    console.log("processNodeCache key_tem key_conten:", key_tem, key_conten);
+    const tem_val = await store.get<{ value: string }>(key_tem);
+    console.log("processNodeCache tem_val:", tem_val);
+    if (tem_val != undefined && tem_val.value != null && tem_val.value != "") {
+      cached_content = tem_val.value;
+    } else {
+      console.log("processNodeCache 无需处理:", key_tem, key_conten);
+      return true
+    }
+
+    const content_val = await store.get<{ value: string }>(key_conten);
+    if (content_val !== undefined) {
+      content = content_val.value;
+    }
+
+    // 简化条件判断
+    console.log("processNodeCache 简化条件判断:", cached_content, content);
+    if (cached_content && content != cached_content) {
+      console.log("processNodeCache 简化条件判断:",);
+      //保存文件
+      const save_file_re = await tauri_request<ResponseData<String[]>>("save_note", {
+        path: item.filePath, // 修复：使用正确的路径
+        mdText: cached_content,
+      })
+      if (save_file_re && save_file_re.code != 200) {
+        NotificationUtil.error("文件保存失败：" + save_file_re.msg + "请检查！");
+        return false;
+      }
+      // 删除缓存
+    }
+    let delete_tem: boolean = await store.delete(key_tem);
+    let delete_conten: boolean = await store.delete(key_conten);
+    console.log("processNodeCache 删除缓存 删除结果:", delete_tem, delete_conten);
+    if (!delete_tem || !delete_conten) {
+      NotificationUtil.error("缓存删除失败！");
+    }
+    console.log("processNodeCache 删除缓存 删除结果:", item.routerPath);
+
+    tagview.removeTagViewByPath(item.routerPath);
+    return true;
+  } catch (error) {
+    NotificationUtil.error("操作失败：" + error);
+    return false;
+  }
+};
+
+
 
 </script>
 

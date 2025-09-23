@@ -24,10 +24,26 @@ const router = useRouter()
 const route = useRoute()
 const { routerNoteStore, tagview, noteTem } = useStore()
 const tree_node: any = computed(() =>
-    routerNoteStore.tree_node
+    sortTreeData(routerNoteStore.tree_node)
 )
-
-onMounted(async () => { 
+// 添加排序函数：文件夹在前，文件在后
+const sortTreeData = (data: TreeNode[]): TreeNode[] => {
+    return data.sort((a, b) => {
+        // 如果两个节点都是文件夹或都是文件，按字母顺序排序
+        if (a.isFolder === b.isFolder) {
+            return a.label.localeCompare(b.label);
+        }
+        // 文件夹排在前面
+        return a.isFolder ? -1 : 1;
+    }).map(node => {
+        // 递归处理子节点
+        if (node.children && node.children.length > 0) {
+            node.children = sortTreeData(node.children);
+        }
+        return node;
+    });
+}
+onMounted(async () => {
     if (!store) {
         store = await load(pdf_store_tem_key, {
             autoSave: false,
@@ -98,7 +114,7 @@ const handleAddFile = async (parent: TreeNode, name) => {
     if (create_note_file && create_note_file.code == 200) {
 
         NotificationUtil.success("笔记创建成功");
-
+        const routerNote = routerNoteStore.setRoutes();
     } else {
         NotificationUtil.error("笔记创建失败：" + create_note_file.msg);
     }
@@ -148,6 +164,7 @@ const handleAddFolder = async (parent, name) => {
     } else {
         NotificationUtil.error("笔记本创建失败：" + create_folder_.msg);
     }
+    const routerNote = routerNoteStore.setRoutes();
 }
 
 const handleDeleteNode = async (node: TreeNode) => {
@@ -181,9 +198,15 @@ const handleDeleteNode = async (node: TreeNode) => {
             } else {
                 NotificationUtil.error("删除文件失败：" + deleteFile_re.msg);
             }
+            const routerNote = routerNoteStore.setRoutes();
+            let active_path = route.path;
+            if (active_path == node.routerPath && node.isfile) {
+                processNodeCache(node);
+            }
         }).catch((err) => {
             NotificationUtil.error("操作失败：" + err);
         });
+
     } else {
         /**
          *删除文件夹
@@ -238,8 +261,9 @@ const handleDeleteNode = async (node: TreeNode) => {
         }).catch((err) => {
             NotificationUtil.error("操作失败：" + err);
         });
+        const routerNote = routerNoteStore.setRoutes();
     }
-    const routerNote = routerNoteStore.setRoutes();
+
 }
 
 const handleRenameNode = async (node: TreeNode, newName) => {
@@ -307,7 +331,7 @@ const handleRenameNode = async (node: TreeNode, newName) => {
     }
 
 }
-const activeRouteRedirect =  async() => {
+const activeRouteRedirect = async () => {
     const endRoute = tagview.tagViewList[tagview.tagViewList.length - 1] as ITagItem
     if (endRoute) {
         router.push({

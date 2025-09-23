@@ -44,7 +44,9 @@ watch(
         path,
         title: newValue.meta.title as string,
         query: newValue.query,
-        params: newValue.params
+        params: newValue.params,
+        id: route.meta.id as string,
+        filePath: route.meta.filePath as string
       })
     }
   },

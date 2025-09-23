@@ -17,7 +17,7 @@ import SearchMenu from './SearchMenu.vue'
 import ErrorHandler from './ErrorHandler.vue'
 import ThemeSwitcher from './ThemeSwitcher.vue'
 import Hide from './Hide.vue'
-import AppSetting from './AppSetting.vue'
+import AppSetting from './Setting.vue'
 </script>
 
 <style scoped lang="scss">

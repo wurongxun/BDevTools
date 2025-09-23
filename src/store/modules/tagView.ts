@@ -132,6 +132,9 @@ const tagViewStore = defineStore('tagViewStore', {
         this.cacheList.push(cacheName)
       }
     },
+    getTagviewList() {
+      return this.tagViewList
+    },
     /**
      * @description 所有数据清空
      */

@@ -8,4 +8,5 @@ export interface ITagItem {
   params?: RouteParamsRaw
   affix?: boolean
   id?: string
+  filePath?: string
 }

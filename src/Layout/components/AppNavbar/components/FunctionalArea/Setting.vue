@@ -4,7 +4,7 @@
       <svg-icon class-name="svg-icon" style="height: 1rem;width: 1rem;" icon-class="setting" />
     </header>
     <template #dropdown>
-      <el-dropdown-menu>
+      <el-dropdown-menu >
         <!-- <div class="userinfo-name">{{ userInfo.nickName }}</div> -->
         <el-dropdown-item command="setting">设置</el-dropdown-item>
         <el-dropdown-item command="about">关于</el-dropdown-item>
