@@ -104,11 +104,11 @@ function show_setting() {
 }
 
 function query_setting_list() {
-  invoke('query_setting_list').then((res): void => {
-    let res_ = res as ResponseData<Array<SettingMap>>
-    let data = res_.data as Array<SettingMap>;
-    userStore.setAppConfig(data);
-  })
+  // invoke('query_setting_list').then((res): void => {
+  //   let res_ = res as ResponseData<Array<SettingMap>>
+  //   let data = res_.data as Array<SettingMap>;
+  //   userStore.setAppConfig(data);
+  // })
 }
 
 function setting_change() {

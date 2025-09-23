@@ -26,6 +26,15 @@ const { routerNoteStore, tagview, noteTem } = useStore()
 const tree_node: any = computed(() =>
     routerNoteStore.tree_node
 )
+
+onMounted(async () => { 
+    if (!store) {
+        store = await load(pdf_store_tem_key, {
+            autoSave: false,
+            defaults: {}
+        });
+    }
+})
 const handleNodeClick = (node) => {
     // 打印初始路由配置
     console.log("打印初始路由配置 node", node)
@@ -298,7 +307,7 @@ const handleRenameNode = async (node: TreeNode, newName) => {
     }
 
 }
-const activeRouteRedirect = () => {
+const activeRouteRedirect =  async() => {
     const endRoute = tagview.tagViewList[tagview.tagViewList.length - 1] as ITagItem
     if (endRoute) {
         router.push({

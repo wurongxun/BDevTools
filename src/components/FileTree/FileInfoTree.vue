@@ -425,6 +425,8 @@ const confirmRename = () => {
 
 // 显示创建对话框
 const showCreateDialog = (mode: 'file' | 'folder') => {
+  console.log("showCreateDialog mode", mode);
+   console.log("showCreateDialog currentContextNode.value", currentContextNode.value );
   if (!currentContextNode.value) return
 
   createMode.value = mode
@@ -476,11 +478,13 @@ const handleDelete = () => {
 // 处理新增文件
 const handleAddFile = (data: TreeNode) => {
   console.log('handleAddFile', data)
+  currentContextNode.value = data
   showCreateDialog('file')
 }
 
 // 处理新增文件夹
 const handleAddFolder = (data: TreeNode) => {
+  currentContextNode.value = data
   showCreateDialog('folder')
 }
 // 处理新增根目录文件

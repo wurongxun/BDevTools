@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { SettingMap } from '@/Types/entitys'
+import { load, Store } from '@tauri-apps/plugin-store';
 
 export const appConfigInfo = defineStore('app_Config', {
   state: () => ({
@@ -9,9 +10,49 @@ export const appConfigInfo = defineStore('app_Config', {
     language: 'zh-CN',
     md_working_directory: '',
     theme: 'light',
-    autoStart: false
+    autoStart: false,
+    update_reminder: false
   }),
   actions: {
+    async initializeApp() {
+
+      let store: Store | undefined = undefined;
+      store = await load('settings.json', {
+        autoSave: false,
+        defaults: {}
+      });
+
+      let val_auto_start = await store.get<{ value: boolean }>('auto_start');
+      if (val_auto_start !== undefined) {
+        
+        this.setAutoStart(val_auto_start.value);
+      }
+      let language_val = await store.get<{ value: string }>('language');
+      if (language_val !== undefined) {
+        
+        this.setLanguage(language_val.value);
+      }
+      let md_working_directory_val = await store.get<{ value: string }>('md_working_directory');
+      if (md_working_directory_val !== undefined) {
+       
+        this.setMdWorkingDirectory(md_working_directory_val.value);
+      }
+      let update_reminder_val = await store.get<{ value: boolean }>('update_reminder');
+      if (update_reminder_val !== undefined) {
+       // update_reminder.value = update_reminder_val.value;
+       this.setUpdateReminder(update_reminder_val.value)
+      }
+      let theme_val = await store.get<{ value: string }>('theme');
+      if (theme_val !== undefined) {
+        
+        this.setTheme(theme_val.value);
+      }
+      let dark_val = await store.get<{ value: boolean }>('dark');
+      if (dark_val !== undefined) {
+
+        this.setDark(dark_val.value);
+      }
+    },
     insetId(id: string) {
       this.isDarkId = id
     },
@@ -38,6 +79,9 @@ export const appConfigInfo = defineStore('app_Config', {
     },
     setDark(isDark: boolean) {
       this.isDark = isDark
+    },
+    setUpdateReminder(update_reminder: boolean){
+      this.update_reminder = update_reminder
     }
   },
   getters: {

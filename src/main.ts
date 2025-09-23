@@ -16,6 +16,7 @@ import registerDirectives from '@/directives/index'
 import errorHandler from './errorHandler'
 // import VuePdfEmbed from 'vue-pdf-embed'
 import i18n from '../src/locales'
+import useStore from '@/store'
 const app = createApp(App)
 app.use(i18n)
 app.use(router)
@@ -30,7 +31,9 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
 registerDirectives(app)
-
+// 挂载前初始化
+const { appConfig } = useStore()
+await appConfig.initializeApp()
 app.mount('#app')
 
 // 全局错误监听
