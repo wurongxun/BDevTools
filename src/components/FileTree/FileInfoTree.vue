@@ -31,6 +31,9 @@
               <el-icon class="action-icon add-folder" @click.stop="handleAddFolder(data)" title="新增文件夹">
                 <FolderAdd />
               </el-icon>
+              <el-icon class="action-icon add-refresh" @click.stop="handleRefresh(data)" title="刷新">
+                <Refresh />
+              </el-icon>
             </template>
           </span>
         </div>
@@ -394,7 +397,7 @@ const handleContextMenuCommand = (command: string) => {
 // 显示重命名对话框
 const showRenameDialog = () => {
   if (!currentContextNode.value) return
-   // 修改这里：去掉文件后缀
+  // 修改这里：去掉文件后缀
   let label = currentContextNode.value.label;
   if (!currentContextNode.value.isFolder) {
     // 如果是文件，去掉后缀
@@ -426,7 +429,7 @@ const confirmRename = () => {
 // 显示创建对话框
 const showCreateDialog = (mode: 'file' | 'folder') => {
   console.log("showCreateDialog mode", mode);
-   console.log("showCreateDialog currentContextNode.value", currentContextNode.value );
+  console.log("showCreateDialog currentContextNode.value", currentContextNode.value);
   if (!currentContextNode.value) return
 
   createMode.value = mode
@@ -487,6 +490,10 @@ const handleAddFolder = (data: TreeNode) => {
   currentContextNode.value = data
   showCreateDialog('folder')
 }
+const handleRefresh = (data: TreeNode) => {
+  emit('refresh')
+}
+
 // 处理新增根目录文件
 const handleAddRootFile = () => {
   // 创建一个虚拟的根节点用于添加文件
