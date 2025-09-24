@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "md-note",
+  "productName": "MdViewer",
   "version": "0.1.1",
-  "identifier": "com.md-note.app",
+  "identifier": "com.md-viewer.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,14 +12,42 @@
   "app": {
     "windows": [],
     "security": {
-      "csp": null,
+      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost",
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": ["$DOCUMENT/**", "$HOME/**", "**"]
+          "allow": [
+            "**",
+            "$AUDIO/**",
+            "$CACHE/**",
+            "$CONFIG/**",
+            "$DATA/**",
+            "$LOCALDATA/**",
+            "$DESKTOP/**",
+            "$DOCUMENT/**",
+            "$DOWNLOAD/**",
+            "$EXE/**",
+            "$FONT/**",
+            "$HOME/**",
+            "$PICTURE/**",
+            "$PUBLIC/**",
+            "$RUNTIME/**",
+            "$TEMPLATE/**",
+            "$VIDEO/**",
+            "$RESOURCE/**",
+            "$APP/**",
+            "$LOG/**",
+            "$TEMP/**",
+            "$APPCONFIG/**",
+            "$APPDATA/**",
+            "$APPLOCALDATA/**",
+            "$APPCACHE/**",
+            "$APPLOG/**"
+          ]
         }
       }
-    }
+    },
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": true,

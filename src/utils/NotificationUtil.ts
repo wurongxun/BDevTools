@@ -1,62 +1,46 @@
-import { ElNotification } from "element-plus";
+import { ElNotification } from 'element-plus'
 
 const NotificationUtil = {
-  info: (
-    description: string = "",
-    duration: number = 3000,
-    onClose?: () => void
-  ) => {
+  info: (description: string = '', duration: number = 3000, onClose?: () => void) => {
     ElNotification({
-      title: "Info",
+      title: 'Info',
       message: description,
-      type: "info",
+      type: 'info',
       offset: 50,
       duration: duration,
-      onClose: onClose,
-    });
+      onClose: onClose
+    })
   },
-  warn: (
-    description: string = "",
-    duration: number = 3000,
-    onClose?: () => void
-  ) => {
+  warn: (description: string = '', duration: number = 3000, onClose?: () => void) => {
     ElNotification({
-      title: "Warning",
+      title: 'Warning',
       message: description,
-      type: "warning",
+      type: 'warning',
       offset: 50,
       duration: duration,
-      onClose: onClose,
-    });
+      onClose: onClose
+    })
   },
-  success: (
-    description: string = "",
-    duration: number = 3000,
-    onClose?: () => void
-  ) => {
+  success: (description: string = '', duration: number = 3000, onClose?: () => void) => {
     ElNotification({
-      title: "Success",
+      title: 'Success',
       message: description,
-      type: "success",
+      type: 'success',
       offset: 50,
       duration: duration,
-      onClose: onClose,
-    });
+      onClose: onClose
+    })
   },
-  error: (
-    description: string = "",
-    duration: number = 3000,
-    onClose?: () => void
-  ) => {
+  error: (description: string = '', duration: number = 3000, onClose?: () => void) => {
     ElNotification({
-      title: "Error",
+      title: 'Error',
       message: description,
-      type: "error",
+      type: 'error',
       offset: 50,
       duration: duration,
-      onClose: onClose,
-    });
-  },
-};
+      onClose: onClose
+    })
+  }
+}
 
-export default NotificationUtil;
+export default NotificationUtil

@@ -1,0 +1,30 @@
+[
+  {
+    "path": "/manage",
+    "children": [
+      {
+        "path": "/manage/table/list"
+      },
+      {
+        "path": "/manage/error/page"
+      },
+      {
+        "path": "/manage/myDirectives"
+      }
+    ]
+  },
+  {
+    "path": "/file",
+    "children": [
+      {
+        "path": "/file/table/list"
+      },
+      {
+        "path": "/file/error/page"
+      },
+      {
+        "path": "/file/myDirectives"
+      }
+    ]
+  }
+]

@@ -3,8 +3,12 @@ import { computed, onMounted, ref, unref } from 'vue';
 import { useI18n } from "vue-i18n";
 import { useRoute } from 'vue-router';
 import BackHeader from "@/components/header/BackHeader.vue";
-import { useHomeNavigation } from '@/events/navigation.ts';
-
+import { useHomeNavigation } from '@/events/navigation';
+import Back from '@/Layout/components/AppNavbar/components/Back.vue'
+import BreadCrumb from '@/Layout/components/AppNavbar/components/BreadCrumb.vue'
+import avatar from '@/Layout/components/AppNavbar/components/Avatar.vue'
+import TagView from '@/Layout/components/AppNavbar/components/TagView.vue'
+import FunctionalArea from '@/Layout/components/AppNavbar/components/FunctionalArea/index.vue'
 const { pages } = useHomeNavigation();
 const { t } = useI18n();
 const route = useRoute();
@@ -13,14 +17,16 @@ const appName = ref<string>(t('appName'));
 </script>
 
 <template>
+  
   <div class="common-layout">
-    <header class="app-header">
-      <template v-for="item in pages" :key="item.name">
-        <BackHeader v-if="$route.name === item.name" :showTitle="item.showTitle" :title="unref(item.title)"
-          :showWinMin="item.showWinMin" :showWinChange="item.showWinChange" :showWinHide="item.showWinHide"
-          :showWinBack="item.showWinBack" />
-      </template>
-    </header>
+   <header class="topbar-box" data-tauri-drag-region>
+   <Back></Back>
+    <div class="bread-crumb-box">
+      <bread-crumb></bread-crumb>
+    </div>
+    <functional-area></functional-area>
+    <!-- <avatar></avatar> -->
+  </header>
     <main class="app-container">
       <!-- 根据路由元信息决定是否缓存 -->
       <keep-alive>
@@ -32,6 +38,23 @@ const appName = ref<string>(t('appName'));
 </template>
 
 <style lang="scss" scoped>
+@import '@/styles/variables.scss';
+
+.topbar-box {
+  height: 51px;
+  margin-bottom: 1px;
+  display: flex;
+  align-items: center;
+
+  @include useTheme {
+    border-bottom: 1px solid getVar('borderColor');
+  }
+
+  .bread-crumb-box {
+    flex: 1;
+  }
+}
+
 .common-layout {
   width: 100vw;
   height: 100vh;
@@ -74,4 +97,5 @@ const appName = ref<string>(t('appName'));
 .router-view {
   transition: all 0.3s ease;
 }
+
 </style>

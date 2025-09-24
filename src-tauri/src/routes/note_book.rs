@@ -89,7 +89,7 @@ pub async fn create_folder(
     }
     let mut path_ = PathBuf::from(father_path);
     path_.push(new_folder_name);
-    // 方法2: 递归创建目录（推荐）
+    // 递归创建目录
     match tokio::fs::create_dir_all(path_).await {
         Ok(_) => {
             return Ok(ResData {
@@ -164,19 +164,11 @@ pub async fn create_note_file(
 pub async fn save_note(
     app_handle: tauri::AppHandle,
     path: String,
-    md_title: String,
     md_text: String,
 ) -> Result<ResData<String>, String> {
     //format!("save_note1 {}", path);
     println!("save_note1 {}", path);
-    //判断文件名是否为空
-    if md_title.is_empty() {
-        return Ok(ResData {
-            code: 500,
-            msg: "文件名不能为空！".to_string(),
-            data: String::new(),
-        });
-    }
+  
 
     // 克隆path以避免所有权问题
     let path_clone = path.clone();
@@ -186,52 +178,7 @@ pub async fn save_note(
             let wres = std::fs::write(&path, md_text);
             match wres {
                 Ok(_) => {
-                    let mut _filename = String::new();
-                    let path_ = PathBuf::from(&path);
-                    if path_.is_file() {
-                        if let Some(filename) = path_.file_stem() {
-                            _filename = filename.to_string_lossy().to_string();
-                        }
-                    }
-                    // 替换原来的比较代码
-                    let filename_lower = _filename.to_lowercase();
-                    let title_lower = md_title.to_lowercase();
-                    println!(
-                        "save_note2 path {}  md_title {} _filename {}  比较结果 {}",
-                        path,
-                        md_title,
-                        _filename,
-                        _filename.to_lowercase() != md_title.to_lowercase()
-                    );
-                    let bb: bool = _filename.to_lowercase() != md_title.to_lowercase();
-
-                    if bb {
-                        let mut full_name = "";
-                        if let Some(last_dot) = md_title.rfind('.') {
-                            full_name = &md_title[..last_dot];
-                        } else {
-                            full_name = &md_title;
-                        }
-                        let new_file_path = rename_file_path(&path, full_name, ".md");
-                        let new_name_res = tokio::fs::rename(path, new_file_path).await;
-                        match new_name_res {
-                            Ok(_) => {
-                                return Ok(ResData {
-                                    code: 200,
-                                    msg: "操作成功".to_string(),
-                                    data: String::new(),
-                                });
-                            }
-                            Err(e) => {
-                                return Ok(ResData {
-                                    code: 500,
-                                    msg: e.to_string(),
-                                    data: String::new(),
-                                });
-                            }
-                        }
-                    }
-
+                    println!("文件已保存");
                     return Ok(ResData {
                         code: 200,
                         msg: "操作成功".to_string(),

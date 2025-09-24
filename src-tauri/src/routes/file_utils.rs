@@ -76,3 +76,55 @@ pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<Str
         }
     }
 }
+/**
+ * 更新文件夹名称
+ * @param path 文件夹
+ * @param up_folder_name 文件夹名称
+ */
+
+#[tauri::command]
+pub async fn up_folder_name(
+    app_handle: AppHandle,
+    path: String,
+    up_folder_name: String,
+) -> Result<ResData<String>, String> {
+    let dir = PathBuf::from(&path);
+    // 文件夹是否存在
+    if !dir.exists() {
+        return Ok(ResData {
+            code: 500,
+            msg: "选择文件夹不存在！".to_string(),
+            data: String::new(),
+        });
+    }
+    //判断文件夹名称是否为空
+    if up_folder_name.is_empty() {
+        return Ok(ResData {
+            code: 500,
+            msg: "文件夹名称不能为空！".to_string(),
+            data: String::new(),
+        });
+    }
+    //文件路径 转换  linux and mac  "//"  windows "\\"
+    //将最后的文件夹名称替换为 up_folder_name
+    let up_folder_name = regexUtil::replace_last_path_component(&path, &up_folder_name);
+
+    //文件夹拼接 更换"/"追后的字符
+    let new_name_res = tokio::fs::rename(&path, &up_folder_name).await;
+    match new_name_res {
+        Ok(_) => {
+            return Ok(ResData {
+                code: 200,
+                msg: "操作成功".to_string(),
+                data: String::new(),
+            });
+        }
+        Err(e) => {
+            return Ok(ResData {
+                code: 500,
+                msg: e.to_string(),
+                data: String::new(),
+            });
+        }
+    }
+}

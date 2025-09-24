@@ -26,7 +26,7 @@
         <section id="product-intro" class="help-section">
           <h2>产品介绍</h2>
           <div class="section-content">
-            <p>MD Note 是一款现代化的 Markdown 笔记应用，专为开发者和写作爱好者设计。它结合了简洁的界面与强大的功能，让您能够专注于内容创作。</p>
+            <p>{{ $t('appName')}} 是一款现代化的 Markdown 笔记应用，专为开发者和写作爱好者设计。它结合了简洁的界面与强大的功能，让您能够专注于内容创作。</p>
             <div class="features-grid">
               <div class="feature-card">
                 <h3>实时预览</h3>
@@ -157,7 +157,8 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n();
 const activeSection = ref('product-intro')
 
 const sections = [

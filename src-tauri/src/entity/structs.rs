@@ -24,6 +24,7 @@ pub struct DirAndFileInfo {
     pub folder: String,
     pub name: String,
     pub isfile: bool,
+    pub data_type: String,
     pub children: Vec<DirAndFileInfo>,
 }
 
@@ -35,6 +36,7 @@ impl DirAndFileInfo {
         folder: String,
         name: String,
         isfile: bool,
+        data_type: String,
     ) -> DirAndFileInfo {
         DirAndFileInfo {
             id,
@@ -43,6 +45,7 @@ impl DirAndFileInfo {
             folder,
             name,
             isfile,
+            data_type,
             children: Vec::new(),
         }
     }
@@ -63,6 +66,24 @@ impl DirAndFileInfo {
     }
     pub fn set_folder(&mut self, folder: String) {
         self.folder = folder;
+    }
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
+    }
+    pub fn set_isfile(&mut self, isfile: bool) {
+        self.isfile = isfile;
+    }
+    pub fn set_dataType(&mut self, dataType: String) {
+        self.data_type = dataType;
+    }
+    pub fn get_name(&mut self) -> String {
+        return self.name.clone();
+    }
+    pub fn get_isfile(&mut self) -> bool {
+        return self.isfile;
+    }
+    pub fn get_dataType(&mut self) -> String {
+        return self.data_type.clone();
     }
 }
 

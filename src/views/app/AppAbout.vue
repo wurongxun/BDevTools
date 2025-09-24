@@ -51,7 +51,7 @@
       <div class="coffee-section">
         <h2>请我喝杯咖啡</h2>
         <div class="coffee-content">
-          <a-image 
+          <el-image 
             alt="请我喝杯咖啡" 
             class="coffee-image"
             :src="coffeeImage" 

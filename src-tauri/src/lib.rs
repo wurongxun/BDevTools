@@ -22,7 +22,7 @@ use crate::routes::app_window::{
     about, loding_window_close, note_book_window, windows_close, windows_hide, windows_maximize,
     windows_minimize,
 };
-use crate::routes::file_utils::{file_manager_open_path, get_document_notebooks};
+use crate::routes::file_utils::{file_manager_open_path, get_document_notebooks,up_folder_name};
 use crate::routes::note_book::{
     create_folder, create_note_file, get_note_list, get_path_childrenFoldersAndFiles,
     read_note_file, remove_file, remove_folder, save_note, up_file_name,
@@ -52,6 +52,7 @@ pub fn run() {
             get_path_childrenFoldersAndFiles,
             save_note,
             up_file_name,
+            up_folder_name,
             remove_folder,
             remove_file,
             loding_window_close,
@@ -75,7 +76,7 @@ pub fn run() {
                 "main".to_string(),
                 tauri::WebviewUrl::App("index.html".into()),
             )
-            .title("MdNote")
+            .title("MdViewer")
             .decorations(false)
             .inner_size(960.0, 640.0)
             .min_inner_size(640.0, 480.0)
