@@ -256,6 +256,7 @@ watch(
 
 // 添加键盘快捷键支持
 onMounted(() => {
+  console.log('pdfPreview mounted',route)
   const handleKeydown = (e: KeyboardEvent) => {
     // 防止在输入框中触发
     if ((e.target as HTMLElement).tagName === 'INPUT') return

@@ -140,6 +140,9 @@ const tagViewStore = defineStore('tagViewStore', {
      */
     resetTagViewList() {
       this.$reset()
+    },
+    deleteTagViewList() {
+      this.tagViewList = []
     }
   }
 })

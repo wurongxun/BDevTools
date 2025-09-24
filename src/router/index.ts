@@ -81,11 +81,7 @@ export const constantRoutes: Array<RouteRecordRaw> = [
     meta: { title: '登录', hidden: true, noTagView: true },
     component: () => import('@/views/login/index.vue')
   },
-  {
-    path: '/notebookMd/:pathMatch(.*)*',
-    meta: { title: 'mdPreViewAndEdit', hidden: true, noTagView: true },
-    component: () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
-  },
+  
   {
     path: '/App',
     component: () => import('@/views/Common/Common.vue'),
@@ -134,5 +130,9 @@ const router = createRouter({
   history: createWebHistory(),
   routes: constantRoutes
 })
-
+// {
+//     path: '/notebookMd/:pathMatch(.*)*',
+//     meta: { title: 'mdPreViewAndEdit',  noTagView: true,keepAlive: true  },
+//     component: () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
+//   },
 export default router

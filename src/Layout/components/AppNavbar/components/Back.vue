@@ -35,6 +35,7 @@ const activeRouteRedirect = async () => {
     
     // 如果没有活动的 tagView，则跳转到最后一个 tagView 或默认路由
     const endRoute = tagview.tagViewList[tagview.tagViewList.length - 1] as ITagItem
+    console.log("===========endRoute===========",endRoute)
     if (endRoute) {
         router.push({
             path: endRoute.path

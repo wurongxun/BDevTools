@@ -203,7 +203,7 @@ const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
         folder: child.folder,
         filePath: child.path,
         isfile: child.isfile,
-        value:  child.name,
+        value: child.name,
         children: child.isfile ? [] : child_child_val
       }
       // 由于两个数组包含的是对同一对象的引用，所以：
@@ -252,7 +252,7 @@ const File_treeNode_child = (notebooks_children: Array<NotebookInfo>, searchData
         folder: child.folder,
         filePath: child.path,
         isfile: child.isfile,
-         value:  child.name,
+        value: child.name,
         children: child.isfile ? [] : child_child_val
       }
       if (child.isfile) {

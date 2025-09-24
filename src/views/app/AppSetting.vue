@@ -199,7 +199,7 @@ async function md_working_directory_change() {
       store.save();
     }
     console.log("processNodeCache error:========");
-    tagview.resetTagViewList();
+    tagview.deleteTagViewList();
     const routerNote = routerNoteStore.setRoutes();
     console.log("processNodeCache error:========2",routerNote);
 

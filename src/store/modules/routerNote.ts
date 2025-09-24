@@ -120,6 +120,7 @@ export const routerNoteStore = defineStore('routerNoteStore', {
         get_notebooks_Api()
           .then((red_note: RouteRecordRaw[]) => {
             // 处理获取到的路由数据
+            console.log('setRoutes ===============bred_note', red_note)
             for (let i = 0; i < red_note.length; i++) {
               let item = red_note[i]
               router.addRoute('Layout', item)

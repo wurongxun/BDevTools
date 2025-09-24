@@ -106,7 +106,7 @@ let notebooks_data = ref<NotebookInfo>();
 const onContentChange = async (value: string) => {
     let md_id = route.meta.id;
     data.editedMdtext_md = value;
-    console.log("onContentChange 监听内容变化，实时保存到pinia editedMdtext_md===============", data.editedMdtext_md);
+    console.log("onContentChange 监听内容变化，实时保存到pinia editedMdtext_md===============");
     // 实时更新pinia中的临时内容
     if (md_id) {
         await store.set(pdf_store_tem_key_prefix + md_id, { value: value });
@@ -207,7 +207,7 @@ const loadFile = async () => {
         data.currentChooseNoteAllPath_md = meta.filePath as string || "";
         data.currentChooseFolderPath_md = meta.folder as string;
         data.showMdEditor = true;
-        console.log("从pinia缓存加载内容 cached_content content:", cached_content, content);
+        //console.log("从pinia缓存加载内容 cached_content content:", cached_content, content);
     } else {
         // 如果没有缓存，从文件中读取
         var res = await tauri_request<ResponseData<string>>("read_note_file", {
