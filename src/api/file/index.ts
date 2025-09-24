@@ -6,7 +6,7 @@ import { defineAsyncComponent, ref } from 'vue'
 import { RouteRecordRaw, RouteComponent } from 'vue-router'
 import Layout from '@/Layout/index.vue'
 import { load, Store } from '@tauri-apps/plugin-store'
-import { note_comm_router, note_comm_router_notebookMd,note_comm_router_notebookPdf } from '@/setting'
+import { note_comm_router, note_comm_router_notebookMd, note_comm_router_notebookPdf } from '@/setting'
 import { id } from 'element-plus/es/locales.mjs'
 import useStore from '@/store/index'
 import router from '@/router/index'
@@ -174,6 +174,7 @@ const get_component = (str: string): (() => Promise<any>) | null => {
 
 const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
   let children_val: Array<TreeNode> = new Array<TreeNode>()
+  let searchData_val: Array<TreeNode> = new Array<TreeNode>()
   let notebooks_children: NotebookInfo[] = notebooks_data.children
   if (notebooks_children && notebooks_children.length > 0) {
     for (let i = 0; i < notebooks_children.length; i++) {
@@ -181,7 +182,7 @@ const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
       let child_child: Array<NotebookInfo> = child.children
       let child_child_val: Array<TreeNode> = new Array<TreeNode>()
       if (child_child && child_child.length > 0) {
-        let children: Array<TreeNode> = File_treeNode_child(child_child)
+        let children: Array<TreeNode> = File_treeNode_child(child_child, searchData_val)
         for (let j = 0; j < children.length; j++) {
           let child_item = children[j]
           child_child_val.push(child_item)
@@ -202,18 +203,26 @@ const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
         folder: child.folder,
         filePath: child.path,
         isfile: child.isfile,
+        value:  child.name,
         children: child.isfile ? [] : child_child_val
       }
-
+      // 由于两个数组包含的是对同一对象的引用，所以：
+      // ✅ 清空数组操作是独立的
+      // ❌ 修改对象属性会影响两个数组中的对象
+      // ✅ 删除数组元素操作是独立的
+      if (child.isfile) {
+        searchData_val.push(route2)
+      }
       children_val.push(route2)
     }
   }
   const { routerNoteStore } = useStore()
   routerNoteStore.addTreeNode(children_val)
+  routerNoteStore.addSearchData(searchData_val)
   return children_val
 }
 
-const File_treeNode_child = (notebooks_children: Array<NotebookInfo>): Array<TreeNode> => {
+const File_treeNode_child = (notebooks_children: Array<NotebookInfo>, searchData_val: Array<TreeNode>): Array<TreeNode> => {
   let children_val: Array<TreeNode> = new Array<TreeNode>()
   if (notebooks_children && notebooks_children.length > 0) {
     console.log('get_notebooks_tree_child notebooks_children', notebooks_children)
@@ -222,7 +231,7 @@ const File_treeNode_child = (notebooks_children: Array<NotebookInfo>): Array<Tre
       let child_child: Array<NotebookInfo> = child.children
       let child_child_val: Array<TreeNode> = new Array<TreeNode>()
       if (child_child && child_child.length > 0) {
-        let children: Array<TreeNode> = File_treeNode_child(child_child)
+        let children: Array<TreeNode> = File_treeNode_child(child_child, searchData_val)
         for (let j = 0; j < children.length; j++) {
           let child_item = children[j]
           child_child_val.push(child_item)
@@ -243,8 +252,14 @@ const File_treeNode_child = (notebooks_children: Array<NotebookInfo>): Array<Tre
         folder: child.folder,
         filePath: child.path,
         isfile: child.isfile,
+         value:  child.name,
         children: child.isfile ? [] : child_child_val
       }
+      if (child.isfile) {
+
+        searchData_val.push(route2)
+      }
+
       children_val.push(route2)
     }
   }

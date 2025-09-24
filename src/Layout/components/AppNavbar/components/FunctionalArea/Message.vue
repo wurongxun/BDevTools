@@ -1,7 +1,7 @@
 <template>
   <el-popover placement="bottom" :width="300" trigger="click">
     <template #reference>
-      <el-badge :is-dot="true">
+      <el-badge :is-dot="is_dot">
         <el-icon class="icon-box message-icon">
           <Message />
         </el-icon>
@@ -33,14 +33,10 @@
 
 <script lang="ts" setup>
 import { ref } from 'vue'
-
+let is_dot = ref(false)
 let activeName = ref('wait')
 const messageList = ref([
-  { title: 'Message Title', content: 'This is a notification message. Please reply upon receipt' },
-  { title: 'Message Title', content: 'This is a notification message. Please reply upon receipt' },
-  { title: 'Message Title', content: 'This is a notification message. Please reply upon receipt' },
-  { title: 'Message Title', content: 'This is a notification message. Please reply upon receipt' },
-  { title: 'Message Title', content: 'This is a notification message. Please reply upon receipt' }
+  { title: 'MdViewer 0.2.0 版发布', content: 'MdViewer 0.2.0 版发布啦，请升级到最新版' }
 ])
 </script>
 

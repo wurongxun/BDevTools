@@ -97,6 +97,7 @@ export const routerNoteStore = defineStore('routerNoteStore', {
     return {
       routes: [] as RouteRecordRaw[],
       tree_node: [] as TreeNode[],
+      search_data: [] as TreeNode[],
       routes_loading: false
     }
   },
@@ -137,6 +138,9 @@ export const routerNoteStore = defineStore('routerNoteStore', {
     },
     async addTreeNode(item: TreeNode[]) {
       this.tree_node = item
+    },
+    async addSearchData(item: TreeNode[]) {
+      this.search_data = item
     },
     /**
      * @description 路由重置
