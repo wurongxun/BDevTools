@@ -21,6 +21,7 @@ let isDark: ComputedRef<boolean> = computed(() =>
   system.isDark
 )
 watch(() => system.isDark, (newValue, oldValue) => {
+  console.log("watch  toggleDarkMode", newValue, oldValue)
   toggleDarkMode(newValue)
 })
 let pdfDoc: any = null
@@ -101,19 +102,32 @@ const loadPdfFile = async () => {
     loading.value = false
   }
 }
-
-// 修改 renderPage 函数，添加安全检查
 function renderPage(num: number) {
   if (!pdfDoc || !ctx || !canvas) return
 
   pageRendering = true
   pdfDoc.getPage(num).then(function (page: any) {
     const viewport = page.getViewport({ scale: scale.value })
-    // 添加安全检查
-    if (canvas && ctx) {
-      canvas.height = viewport.height
-      canvas.width = viewport.width
+    
+    // 确保在设置 canvas 尺寸前 canvas 元素存在
+    if (canvas) {
+      // 先设置 canvas 的显示尺寸
+      canvas.style.width = viewport.width + 'px'
+      canvas.style.height = viewport.height + 'px'
+      
+      // 再设置 canvas 的绘图尺寸（必须是整数）
+      canvas.width = Math.floor(viewport.width)
+      canvas.height = Math.floor(viewport.height)
+      
+      // 设置 CSS 样式以确保正确显示
+      canvas.style.display = 'block'
+      canvas.style.margin = '0 auto'
+    }
 
+    if (canvas && ctx) {
+      // 清除画布
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      
       const renderContext = {
         canvasContext: ctx,
         viewport: viewport,
@@ -127,12 +141,49 @@ function renderPage(num: number) {
           renderPage(pageNumPending)
           pageNumPending = null
         }
+      }).catch((error: any) => {
+        console.error('渲染页面出错:', error)
+        pageRendering = false
       })
     }
+  }).catch((error: any) => {
+    console.error('获取页面出错:', error)
+    pageRendering = false
   })
 
   page_num.value = num
 }
+// 修改 renderPage 函数，添加安全检查
+// function renderPage(num: number) {
+//   if (!pdfDoc || !ctx || !canvas) return
+
+//   pageRendering = true
+//   pdfDoc.getPage(num).then(function (page: any) {
+//     const viewport = page.getViewport({ scale: scale.value })
+//     // 添加安全检查
+//     if (canvas && ctx) {
+//       canvas.height = viewport.height
+//       canvas.width = viewport.width
+
+//       const renderContext = {
+//         canvasContext: ctx,
+//         viewport: viewport,
+//         background: 'rgba(0,0,0,0)'
+//       }
+      
+//       const renderTask = page.render(renderContext)
+//       renderTask.promise.then(function () {
+//         pageRendering = false
+//         if (pageNumPending !== null) {
+//           renderPage(pageNumPending)
+//           pageNumPending = null
+//         }
+//       })
+//     }
+//   })
+
+//   page_num.value = num
+// }
 // function renderPage(num: number) {
 //   if (!pdfDoc || !ctx || !canvas) return
 
