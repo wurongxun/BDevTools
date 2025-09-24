@@ -24,7 +24,7 @@ function handleToHome() {
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss';
 
 .logo-box {
   user-select: none;

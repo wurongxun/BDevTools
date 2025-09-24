@@ -19,7 +19,7 @@ import FunctionalArea from './components/FunctionalArea/index.vue'
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use  '@/styles/variables.scss';
 
 .topbar-box {
   height: 51px;

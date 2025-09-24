@@ -74,7 +74,7 @@ const initCount = () => {
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use  '@/styles/variables.scss';
 
 .num-card {
   text-align: center;

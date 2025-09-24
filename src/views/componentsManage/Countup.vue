@@ -58,7 +58,7 @@ const onStart = () => {
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use  '@/styles/variables.scss';
 
 .count-up-box {
   font-size: 48px;

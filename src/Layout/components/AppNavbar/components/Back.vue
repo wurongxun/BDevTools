@@ -49,7 +49,7 @@ const activeRouteRedirect = async () => {
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use  '@/styles/variables.scss';
 
 .scale-icon {
   cursor: pointer;

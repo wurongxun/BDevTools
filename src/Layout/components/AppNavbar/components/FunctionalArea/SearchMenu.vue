@@ -109,7 +109,7 @@ const onSearchRoutes = () => {
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use  '@/styles/variables.scss';
 
 :deep(.el-input__wrapper) {
   box-shadow: none !important;

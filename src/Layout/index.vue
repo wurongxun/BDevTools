@@ -22,7 +22,7 @@ const { isCollapse } = storeToRefs(system)
 </script>
 <!-- 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss';
 
 .main-box {
   position: relative;
@@ -60,7 +60,7 @@ const { isCollapse } = storeToRefs(system)
 </style> -->
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use  '@/styles/variables.scss';
 
 .main-box {
   position: relative;
