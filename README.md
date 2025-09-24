@@ -1,7 +1,7 @@
 # md-viewer
 
 #### 介绍
-前端， 基于vue3 + TypeScript + Element Plus + vue-router + Pinia + vue-web-admin-frame
+前端， 基于vue3 + TypeScript + Element Plus + vue-router + Pinia + vue-web-admin-frame + md-editor-v3 + pdfjs-dist
 
 #### 安装教程
 

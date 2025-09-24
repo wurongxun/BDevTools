@@ -21,17 +21,20 @@ async function dark_change() {
     toggleDark()
     await store.set('dark', { value: isDark.value });
     await store.save();
+    
+    system.toggleDark(isDark.value)
   }
 }
 onMounted(async () => {
-    store = await load('settings.json', {
+  store = await load('settings.json', {
     autoSave: false,
     defaults: {}
   });
   let dark_val = await store.get<{ value: boolean }>('dark');
   if (dark_val !== undefined) {
-    if (dark_val.value!= isDark.value) {
+    if (dark_val.value != isDark.value) {
       toggleDark()
+      system.toggleDark(isDark.value)
     }
   }
 })

@@ -5,7 +5,7 @@ const systemStore = defineStore('systemStore', {
   state: () => {
     return {
       isCollapse: false,
-      isDark: localStorage.getItem('vue-admin-frame-vueuse-theme-key') === 'dark' ? true : false
+      isDark: localStorage.getItem('theme-appearance') === 'dark' ? true : false
     }
   },
   actions: {
@@ -29,7 +29,9 @@ const systemStore = defineStore('systemStore', {
      */
 
     toggleDark(isDark: boolean) {
+      console.log("toggleDark============",isDark)
       this.isDark = isDark
+      console.log("toggleDark============ this.isDark", this.isDark)
     }
   }
 })
