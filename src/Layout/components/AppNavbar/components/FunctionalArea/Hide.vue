@@ -2,33 +2,33 @@
     <!-- <el-icon class="svg-icon" @click="windowHide" >
         <Close  />
     </el-icon> -->
-    
-            <!-- <div class="control-group window-controls"> -->
-            <el-tooltip content="最小化" placement="bottom">
-                <!-- <div @click="handleWinMin" class="control-button "> -->
-                    <el-icon class="svg-icon" @click="handleWinMin" >
-                        <Minus />
-                    </el-icon>
-                <!-- </div> -->
-            </el-tooltip>
 
-            <el-tooltip :content="visible ? '还原' : '最大化'" placement="bottom">
-                <!-- <div @click="windowChange" class="control-button "> -->
-                    <el-icon class="svg-icon" @click="windowChange" >
-                        <WindowRestoreIcon v-if="visible" />
-                        <WindowMaximizationIcon v-else />
-                    </el-icon>
-                <!-- </div> -->
-            </el-tooltip>
+    <!-- <div class="control-group window-controls"> -->
+    <el-tooltip content="最小化" placement="bottom">
+        <!-- <div @click="handleWinMin" class="control-button "> -->
+        <el-icon class="svg-icon" @click="handleWinMin">
+            <Minus />
+        </el-icon>
+        <!-- </div> -->
+    </el-tooltip>
 
-            <el-tooltip content="关闭" placement="bottom">
-                <!-- <div @click="windowHide" class="control-button close-button"> -->
+    <el-tooltip :content="visible ? '还原' : '最大化'" placement="bottom">
+        <!-- <div @click="windowChange" class="control-button "> -->
+        <el-icon class="svg-icon" @click="windowChange">
+            <WindowRestoreIcon v-if="visible" />
+            <WindowMaximizationIcon v-else />
+        </el-icon>
+        <!-- </div> -->
+    </el-tooltip>
 
-                    <el-icon class="svg-icon" @click="windowHide">
-                        <Close />
-                    </el-icon>
-                <!-- </div> -->
-            </el-tooltip>
+    <el-tooltip content="关闭" placement="bottom">
+        <!-- <div @click="windowHide" class="control-button close-button"> -->
+
+        <el-icon class="svg-icon" @click="windowHide">
+            <Close />
+        </el-icon>
+        <!-- </div> -->
+    </el-tooltip>
 
 </template>
 <script setup lang="ts">
@@ -99,25 +99,26 @@ onMounted(() => {
 })
 </script>
 <style lang="scss" scoped>
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss' as variables;
 
 .icon-box {
-  cursor: pointer;
-  margin-right: 12px;
-  margin-bottom: 2px;
+    cursor: pointer;
+    margin-right: 12px;
+    margin-bottom: 2px;
 
-  &:hover {
-    color: $--theme-color;
-  }
+    &:hover {
+        color: variables.$theme-color;
+    }
 }
-.svg-icon {
-  width: 20px;
-  height: 20px;
-  margin-right: 12px;
-  cursor: pointer;
 
-  &:hover {
-    color: $--theme-color;
-  }
+.svg-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 12px;
+    cursor: pointer;
+
+    &:hover {
+        color: variables.$theme-color;
+    }
 }
 </style>

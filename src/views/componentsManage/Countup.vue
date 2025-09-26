@@ -58,11 +58,11 @@ const onStart = () => {
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss' as variables;
 
 .count-up-box {
   font-size: 48px;
-  color: $--theme-color;
+  color: variables.$theme-color;
   text-align: center;
   margin: 36px 0;
 

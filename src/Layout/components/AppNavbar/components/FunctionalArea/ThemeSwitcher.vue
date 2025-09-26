@@ -21,7 +21,7 @@ async function dark_change() {
     toggleDark()
     await store.set('dark', { value: isDark.value });
     await store.save();
-    
+
     system.toggleDark(isDark.value)
   }
 }
@@ -45,7 +45,7 @@ const switchTheme = () => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss' as variables;
 
 .icon-box {
   cursor: pointer;
@@ -53,7 +53,7 @@ const switchTheme = () => {
   margin-bottom: 2px;
 
   &:hover {
-    color: $--theme-color;
+    color: variables.$theme-color;
   }
 }
 </style>

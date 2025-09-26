@@ -87,14 +87,14 @@ const createFilter = (queryString: string) => {
   }
 }
 const handleSelect = (route: TreeNode) => {
-   console.log('handleSelect route', route)
+  console.log('handleSelect route', route)
   let routerPath = route.routerPath;
   if (routerPath) {
     router.push({
       path: routerPath
     })
   }
- 
+
 }
 
 const onSearchRoutes = () => {
@@ -109,7 +109,7 @@ const onSearchRoutes = () => {
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss' as variables;
 
 :deep(.el-input__wrapper) {
   box-shadow: none !important;
@@ -136,7 +136,7 @@ const onSearchRoutes = () => {
     margin-right: 0;
 
     &:hover {
-      color: $--theme-color;
+      color: variables.$theme-color;
     }
   }
 }

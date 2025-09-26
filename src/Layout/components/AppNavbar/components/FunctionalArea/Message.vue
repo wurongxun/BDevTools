@@ -41,13 +41,13 @@ const messageList = ref([
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss' as variables;
 
 .icon-box {
   cursor: pointer;
 
   &:hover {
-    color: $--theme-color;
+    color: variables.$theme-color;
   }
 
   &.message-icon {

@@ -1,16 +1,6 @@
 <template>
-  <svg-icon
-    v-show="!isFullscreen"
-    class-name="svg-icon"
-    icon-class="fullscreen-exit"
-    @click="onToggleScreen"
-  />
-  <svg-icon
-    v-show="isFullscreen"
-    class-name="svg-icon"
-    icon-class="fullscreen"
-    @click="onToggleScreen"
-  />
+  <svg-icon v-show="!isFullscreen" class-name="svg-icon" icon-class="fullscreen-exit" @click="onToggleScreen" />
+  <svg-icon v-show="isFullscreen" class-name="svg-icon" icon-class="fullscreen" @click="onToggleScreen" />
 </template>
 
 <script lang="ts" setup>
@@ -42,7 +32,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss' as variables;
 
 .svg-icon {
   width: 20px;
@@ -51,7 +41,7 @@ onUnmounted(() => {
   cursor: pointer;
 
   &:hover {
-    color: $--theme-color;
+    color: variables.$theme-color;
   }
 }
 </style>

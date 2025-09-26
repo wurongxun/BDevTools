@@ -22,7 +22,7 @@ const { isCollapse } = storeToRefs(system)
 </script>
 <!-- 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss';
 
 .main-box {
   position: relative;
@@ -34,7 +34,7 @@ const { isCollapse } = storeToRefs(system)
     left: 0;
     top: 0;
     height: 100%;
-    width: $--menu-width;
+    width: $menu-width;
     flex-shrink: 0;
     // overflow: auto;
     border-right: 1px solid #e4e7ed;
@@ -45,10 +45,10 @@ const { isCollapse } = storeToRefs(system)
   }
 
   .app-content {
-    width: calc(100vw - $--menu-width);
+    width: calc(100vw - $menu-width);
     height: 100%;
     overflow: hidden;
-    margin-left: $--menu-width;
+    margin-left: $menu-width;
     transition: all 0.36s;
 
     &.is-collapse {
@@ -60,18 +60,19 @@ const { isCollapse } = storeToRefs(system)
 </style> -->
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss' as variables;
 
 .main-box {
   position: relative;
   width: calc(100vw);
   height: calc(100vh);
+
   .side-box {
     position: fixed;
     left: 0;
     top: 0;
     height: 100%;
-    width: $--menu-width;
+    width: variables.$menu-width;
     flex-shrink: 0;
     // overflow: auto;
     border-right: 1px solid #e4e7ed;
@@ -80,15 +81,15 @@ const { isCollapse } = storeToRefs(system)
 
     &.is-collapse {
       width: $--collapse-width;
-      transform: translateX(-($--menu-width - $--collapse-width));
+      transform: translateX(-($menu-width - $--collapse-width));
     }
   }
 
   .app-content {
-    width: calc(100vw - $--menu-width);
+    width: calc(100vw - variables.$menu-width);
     height: 100%;
     overflow: hidden;
-    margin-left: $--menu-width;
+    margin-left: variables.$menu-width;
     transition: all 0.36s;
 
     &.is-collapse {

@@ -74,7 +74,7 @@ const initCount = () => {
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss' as variables;
 
 .num-card {
   text-align: center;
@@ -132,12 +132,12 @@ const initCount = () => {
   }
 
   &.pass-num {
-    color: $--theme-color;
+    color: variables.$theme-color;
 
     svg {
       &:hover {
         fill: #fff;
-        background-color: $--theme-color;
+        background-color: variables.$theme-color;
         cursor: pointer;
       }
     }

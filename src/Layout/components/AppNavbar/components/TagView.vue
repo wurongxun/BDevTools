@@ -155,7 +155,7 @@ watch(
   () => router.currentRoute.value,
   (newValue) => {
     // ... existing code ...
-    
+
     // 在添加标签后滚动到激活项
     setTimeout(() => {
       scrollToActiveTab();
@@ -166,7 +166,7 @@ watch(
 </script>
 
 <!-- <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss';
 
 .suspension {
   box-shadow: 0 0 5px #ccc;
@@ -196,13 +196,13 @@ watch(
     .tag-item {
       display: inline-block;
       padding: 6px 15px;
-      font-size: $--font-size;
+      font-size: $font-size;
       margin: 3px 6px;
       border-radius: 5px;
       color: #666;
 
       &:not(.active):hover {
-        color: $--theme-color;
+        color: $theme-color;
       }
 
       &:hover {
@@ -215,7 +215,7 @@ watch(
 
       &.active {
         box-shadow: inset 0 0 3px 0px #ddd;
-        color: $--theme-color;
+        color: $theme-color;
       }
 
       .tag--title {
@@ -242,7 +242,7 @@ watch(
 }
 </style> -->
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss' as variables;
 
 .suspension {
   box-shadow: 0 0 5px #ccc;
@@ -260,7 +260,7 @@ watch(
   height: 42px;
 
   @include useTheme {
-    border-bottom: 1px solid getVar('borderColor');
+    border-bottom: 1px solid variables.getVar('borderColor');
   }
 
   .tab-box {
@@ -268,22 +268,22 @@ watch(
     overflow-x: auto;
     overflow-y: hidden; // 确保只允许横向滚动
     scroll-behavior: smooth;
-    
+
     // 改善滚动体验
     -webkit-overflow-scrolling: touch;
-    
+
     @include scrollbar;
 
     .tag-item {
       display: inline-block;
       padding: 6px 15px;
-      font-size: $--font-size;
+      font-size: $font-size;
       margin: 3px 6px;
       border-radius: 5px;
       color: #666;
 
       &:not(.active):hover {
-        color: $--theme-color;
+        color: variables.$theme-color;
       }
 
       &:hover {
@@ -296,7 +296,7 @@ watch(
 
       &.active {
         box-shadow: inset 0 0 3px 0px #ddd;
-        color: $--theme-color;
+        color: variables.$theme-color;
       }
 
       .tag--title {

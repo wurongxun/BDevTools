@@ -24,11 +24,11 @@ function handleToHome() {
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/variables.scss';
+@use '@/styles/variables.scss' as variables;
 
 .logo-box {
   user-select: none;
-  width: $--menu-width;
+  width: variables.$menu-width;
   overflow: hidden;
   height: 51px;
   display: flex;
@@ -37,11 +37,11 @@ function handleToHome() {
   margin-bottom: 1px;
 
   @include useTheme {
-    border-bottom: 1px solid getVar('borderColor');
+    border-bottom: 1px solid variables.getVar('borderColor');
   }
 
   &.is-collapse {
-    width: $--collapse-width;
+    width: variables.$collapse-width;
   }
 
   .icon {

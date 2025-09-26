@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
-// @ts-ignore
+
 import { createSvg } from './src/icons/index'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -22,7 +22,7 @@ export default defineConfig({
     preprocessorOptions: {
       scss: {
         additionalData: `
-          @import "@/styles/theme.scss";
+          @use "@/styles/theme.scss";
         `
       }
     }
