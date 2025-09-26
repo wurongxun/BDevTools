@@ -37,7 +37,7 @@ function handleToHome() {
   margin-bottom: 1px;
 
   @include useTheme {
-    border-bottom: 1px solid variables.getVar('borderColor');
+    border-bottom: 1px solid getVar('borderColor');
   }
 
   &.is-collapse {

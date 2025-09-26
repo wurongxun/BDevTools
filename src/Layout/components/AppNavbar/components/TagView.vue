@@ -260,7 +260,7 @@ watch(
   height: 42px;
 
   @include useTheme {
-    border-bottom: 1px solid variables.getVar('borderColor');
+    border-bottom: 1px solid getVar('borderColor');
   }
 
   .tab-box {
