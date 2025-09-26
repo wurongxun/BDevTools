@@ -59,7 +59,7 @@ let _: DirFileMenuUtils = {
     type
   ) {
     let name = "";
-    if (StringUtil.isNotNullOrEmpty(label)) {
+    if (StringUtil.isNullOrEmpty(label)) {
       let arr = label.split(".");
       if (arr.length > 1) {
         name = arr[0];
