@@ -12,7 +12,6 @@
 </template>
 
 <style scoped lang="scss">
-@use '@/styles/theme.scss' as *;
 .__common-component-container {
   margin: 2px;
   min-height: calc(100% - 30px);

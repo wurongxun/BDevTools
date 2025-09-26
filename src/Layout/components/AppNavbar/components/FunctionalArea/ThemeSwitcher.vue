@@ -45,7 +45,7 @@ const switchTheme = () => {
 </script>
 
 <style lang="scss" scoped>
-@use '@/styles/variables.scss';
+@import '@/styles/variables.scss';
 
 .icon-box {
   cursor: pointer;

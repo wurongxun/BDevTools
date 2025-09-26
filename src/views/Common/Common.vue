@@ -38,7 +38,7 @@ const appName = ref<string>(t('appName'));
 </template>
 
 <style lang="scss" scoped>
-@use  '@/styles/variables.scss';
+@import '@/styles/variables.scss';
 
 .topbar-box {
   height: 51px;

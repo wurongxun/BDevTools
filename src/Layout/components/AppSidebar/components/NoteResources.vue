@@ -826,7 +826,7 @@ const read_note_file = async function (node: NotebookInfo) {
 </script>
 
 <style lang="scss">
-@use  '@/styles/variables.scss';
+@import '@/styles/variables.scss';
 
 .box {
   width: 100%;

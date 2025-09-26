@@ -22,7 +22,7 @@ function handleToggleSide() {
 </script>
 
 <style scoped lang="scss">
-@use  '@/styles/variables.scss';
+@import '@/styles/variables.scss';
 
 .scale-icon {
   cursor: pointer;

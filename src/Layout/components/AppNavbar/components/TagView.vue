@@ -242,7 +242,7 @@ watch(
 }
 </style> -->
 <style scoped lang="scss">
-@use  '@/styles/variables.scss';
+@import '@/styles/variables.scss';
 
 .suspension {
   box-shadow: 0 0 5px #ccc;

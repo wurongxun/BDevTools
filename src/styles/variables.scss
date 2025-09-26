@@ -1,5 +1,3 @@
-@use './mixin.scss' as *;
-
 /* Variables */
 
 $--menu-width: 220px;
@@ -21,3 +19,4 @@ $--dialog-width: 640px;
   dialogWidth: $--dialog-width;
 }
 
+@import './mixin.scss';

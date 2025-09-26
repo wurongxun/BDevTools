@@ -34,7 +34,6 @@ import {
     onActivated,
     onDeactivated,
     watch,
-    onUnmounted,
 } from "vue";
 //import { notification, Modal } from 'ant-design-vue';
 import { ElMessage, ElMessageBox, ElSubMenu, ElMenuItem } from "element-plus";
@@ -127,9 +126,7 @@ onMounted(async () => {
     loadFile();
 
 });
-onUnmounted(async () => { 
-    console.log("onUnmounted 监听关闭窗口===============");
-})
+
 //读取文件
 const read_note_file_bypath = async function (path: string) {
 

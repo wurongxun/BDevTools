@@ -41,7 +41,7 @@ const messageList = ref([
 </script>
 
 <style scoped lang="scss">
-@use '@/styles/variables.scss';
+@import '@/styles/variables.scss';
 
 .icon-box {
   cursor: pointer;
