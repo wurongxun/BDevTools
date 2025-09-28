@@ -2,7 +2,7 @@
     <template v-for="item in menuList" :key="item.path">
         <el-sub-menu v-if="!item.meta?.hidden && hasShowChildren(item)" :index="item.redirect || item.path">
             <template #title>
-                <el-icon v-if="isElIcon(item.meta?.icon)">
+                <el-icon v-if="isElIcon(item.meta?.icon as string)">
                     <component :is="item.meta?.icon" />
                 </el-icon>
                 <i v-else class="svg-box">
@@ -14,7 +14,7 @@
         </el-sub-menu>
 
         <el-menu-item v-else-if="!item.meta?.hidden" :index="item.redirect || item.path">
-            <el-icon v-if="isElIcon(item.meta?.icon)">
+            <el-icon v-if="isElIcon(item.meta?.icon as string)">
                 <component :is="item.meta?.icon" />
             </el-icon>
             <i v-else class="svg-box">

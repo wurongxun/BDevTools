@@ -243,7 +243,7 @@ watch(
 </style> -->
 <style scoped lang="scss">
 @use '@/styles/variables.scss' as variables;
-
+@use '@/styles/theme.scss';
 .suspension {
   box-shadow: 0 0 5px #ccc;
 
@@ -260,7 +260,7 @@ watch(
   height: 42px;
 
   @include useTheme {
-    border-bottom: 1px solid variables.getVar('borderColor');
+    border-bottom: 1px solid getVar('borderColor');
   }
 
   .tab-box {

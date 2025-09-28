@@ -19,7 +19,7 @@ const { cacheList } = storeToRefs(tagview)
 
 <style scoped lang="scss">
 @use '@/styles/variables.scss';
-
+@use '@/styles/theme.scss';
 .app-main {
   width: 100%;
   height: calc(100vh - 51px - 42px);
