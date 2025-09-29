@@ -21,7 +21,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import useStore from '@/store/index'
-import IndexUtils from '@/utils/Index'
+import IndexUtils from '@/utils/index'
 import PagerTable from '@/components/PagerTable/index.vue'
 import { storeToRefs } from 'pinia'
 import { ElMessageBox, ElMessage } from 'element-plus'
