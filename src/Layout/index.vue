@@ -80,7 +80,7 @@ const { isCollapse } = storeToRefs(system)
     z-index: 1000;
 
     &.is-collapse {
-      width: $--collapse-width;
+      width: $collapse-width;
       transform: translateX(-($menu-width - $collapse-width));
     }
   }

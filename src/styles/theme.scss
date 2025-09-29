@@ -1,3 +1,5 @@
+@use 'sass:map'; // 导入 map 模块
+
 $themes: (
   light: (
     appMainBgColor: #f1f1f1,
@@ -18,6 +20,7 @@ $themes: (
 );
 
 $currentTheme: light;
+
 @mixin useTheme() {
   @each $key, $value in $themes {
     $currentTheme: $key !global;
@@ -28,6 +31,6 @@ $currentTheme: light;
 }
 
 @function getVar($key) {
-  $themeMap: map-get($themes, $currentTheme);
-  @return map-get($themeMap, $key);
+  $themeMap: map.get($themes, $currentTheme);  // 使用 map.get 替代 map-get
+  @return map.get($themeMap, $key);            // 使用 map.get 替代 map-get
 }
