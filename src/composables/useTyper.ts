@@ -1,8 +1,6 @@
 import TypeIt from 'typeit'
 import { onMounted } from 'vue'
 
-import type { TypeItOptions } from 'typeit'
-
 // 使用 typeIt 插件实现的打字机效果， 具体使用可参考 https://www.typeitjs.com/
 
 /**
@@ -11,15 +9,16 @@ import type { TypeItOptions } from 'typeit'
  * @description
  */
 
-let instance: any = null
+let instance: TypeIt = null
 
-export const useTyper = (dom: string | Element, options?: TypeItOptions) => {
-  const typeItOptions: TypeItOptions = {
+export const useTyper = (dom: string | Element, options?: any) => {
+  const typeItOptions: any = {
     speed: 100,
     cursor: true,
     cursorSpeed: 800,
     waitUntilVisible: true
   }
+
   Object.assign(typeItOptions, options)
   instance = new (TypeIt as any)(dom, typeItOptions)
   instance.go()
