@@ -81,7 +81,7 @@ const { isCollapse } = storeToRefs(system)
 
     &.is-collapse {
       width: $collapse-width;
-      transform: translateX(-($menu-width - $collapse-width));
+      transform: translateX(-(variables.$menu-width - variables.$collapse-width));
     }
   }
 

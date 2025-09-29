@@ -102,6 +102,9 @@ importers:
         specifier: ^4.5.1
         version: 4.5.1(vue@3.5.21(typescript@5.6.3))
     devDependencies:
+      '@intlify/devtools-types':
+        specifier: ^11.1.12
+        version: 11.1.12
       '@rushstack/eslint-patch':
         specifier: ^1.12.0
         version: 1.12.0
@@ -616,6 +619,10 @@ packages:
 
   '@intlify/core-base@11.1.12':
     resolution: {integrity: sha512-whh0trqRsSqVLNEUCwU59pyJZYpU8AmSWl8M3Jz2Mv5ESPP6kFh4juas2NpZ1iCvy7GlNRffUD1xr84gceimjg==, tarball: https://registry.npmmirror.com/@intlify/core-base/-/core-base-11.1.12.tgz}
+    engines: {node: '>= 16'}
+
+  '@intlify/devtools-types@11.1.12':
+    resolution: {integrity: sha512-WYgdadYwOxZOAuhiCirQy2yjs7ZLBLEpllkbTbBEjFA7RsvzztJuYaEhHM+NIssyBcWWiWyC+IjgL2wnfK4uUQ==, tarball: https://registry.npmmirror.com/@intlify/devtools-types/-/devtools-types-11.1.12.tgz}
     engines: {node: '>= 16'}
 
   '@intlify/message-compiler@11.1.12':
@@ -3286,6 +3293,11 @@ snapshots:
   '@intlify/core-base@11.1.12':
     dependencies:
       '@intlify/message-compiler': 11.1.12
+      '@intlify/shared': 11.1.12
+
+  '@intlify/devtools-types@11.1.12':
+    dependencies:
+      '@intlify/core-base': 11.1.12
       '@intlify/shared': 11.1.12
 
   '@intlify/message-compiler@11.1.12':

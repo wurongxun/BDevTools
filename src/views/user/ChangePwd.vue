@@ -2,13 +2,7 @@
   <container>
     <el-row justify="center" @onSubmit.stop>
       <el-col :span="18">
-        <el-form
-          :model="formData"
-          status-icon
-          ref="ruleFormRef"
-          :rules="formRules"
-          label-width="120px"
-        >
+        <el-form :model="formData" status-icon ref="ruleFormRef" :rules="formRules" label-width="120px">
           <el-form-item label="账号">
             <el-input v-model="userInfo.nickName" disabled />
           </el-form-item>
@@ -71,7 +65,8 @@ const onSubmit = (formEl: FormInstance | undefined) => {
     if (valid) {
       ElMessage.success('提交成功')
     } else {
-      return false
+      ElMessage.error('提交失败!')
+      //return false
     }
   })
 }
