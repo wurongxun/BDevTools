@@ -1,4 +1,4 @@
-# md-note
+# MdViewer
 
 ### 项目介绍
 基于tauri跨平台桌面应用框架的Markdown本地笔记软件
