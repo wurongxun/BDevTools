@@ -17,33 +17,30 @@ import errorHandler from './errorHandler'
 // import VuePdfEmbed from 'vue-pdf-embed'
 import i18n from '../src/locales'
 import useStore from '@/store'
-const app = createApp(App)
-app.use(i18n)
-app.use(router)
-app.use(piniaStore)
-app.use(ElementPlus, {
-  locale: zhCn
-})
-// app.component('vue-pdf-embed', VuePdfEmbed)
-app.component('svg-icon', SvgIcon)
-// 注册指令
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-  app.component(key, component)
-}
-registerDirectives(app)
-// 挂载前初始化
-const { appConfig } = useStore()
-await appConfig.initializeApp()
-app.mount('#app')
+async function initializeApp() {
+  const app = createApp(App)
+  app.use(i18n)
+  app.use(router)
+  app.use(piniaStore)
+  app.use(ElementPlus, {
+    locale: zhCn
+  })
+  // app.component('vue-pdf-embed', VuePdfEmbed)
+  app.component('svg-icon', SvgIcon)
+  // 注册指令
+  for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+    app.component(key, component)
+  }
+  registerDirectives(app)
+  // 挂载前初始化
+  const { appConfig } = useStore()
+  await appConfig.initializeApp()
+  app.mount('#app')
 
-// 全局错误监听
-app.config.errorHandler = (err, vm, info) => {
-  errorHandler(err, vm, info)
+  // 全局错误监听
+  app.config.errorHandler = (err, vm, info) => {
+    errorHandler(err, vm, info)
+  }
 }
 
-IndexUtils.windowResize()
-
-// 高德地图组件密钥校验
-window._AMapSecurityConfig = {
-  securityJsCode: import.meta.env.VITE_MAP_SECRET_KEY
-}
+initializeApp()
