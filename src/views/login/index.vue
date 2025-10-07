@@ -1,6 +1,6 @@
 <template>
   <div class="container">
-    <img class="icon" src="../../assets/login/login_icon.png" alt="icon" />
+    <!-- <img class="icon" src="../../assets/login/login_icon.png" alt="icon" /> -->
     <div class="login-model">
       <h2 class="title">{{ title }}</h2>
       <p class="desc">{{ login_desc }}</p>
@@ -57,14 +57,16 @@ onMounted(() => {
   useTyper('.title')
 })
 </script>
-
 <style lang="scss" scoped>
 .container {
   width: 100vw;
   height: 100vh;
-  padding: 160px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: linear-gradient(to right, #97c6fe, #f2f5ff);
-
+  padding: 20px; // 添加内边距防止小屏幕时内容被截断
+  
   .icon {
     position: absolute;
     width: 360px;
@@ -93,13 +95,19 @@ onMounted(() => {
 }
 
 .login-model {
-  width: 500px;
+  width: 100%;
+  max-width: 500px; // 使用 max-width 而不是固定宽度
   padding: 36px 80px;
   border-radius: 5px;
   background: #f1f1f1;
   box-shadow: 0 0 5px 0 #97c6fe;
-  margin: 0 50vw;
   background: url('../../assets/login/login_background.jpg') no-repeat;
   background-size: cover;
+  
+  // 小屏幕适配
+  @media (max-width: 768px) {
+    padding: 24px 30px;
+    margin: 0 10px;
+  }
 }
 </style>
