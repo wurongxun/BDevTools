@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import Layout from '@/Layout/index.vue'
 
@@ -127,7 +127,7 @@ export const constantRoutes: Array<RouteRecordRaw> = [
 export const asyncRoutes: Array<RouteRecordRaw> = [pages]
 
 const router = createRouter({
-  history: createWebHistory(),
+ history: createWebHashHistory(), // 使用 hash 模式
   routes: constantRoutes
 })
 // {

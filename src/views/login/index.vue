@@ -36,12 +36,20 @@ const accountInfo = {
 
 function handleLogin() {
   user.userLogin(accountInfo).then(() => {
-    router.push('/')
+    console.log('Login successful, navigating to home')
+    router.push('/').then(() => {
+      console.log('Navigation completed')
+    }).catch(err => {
+      console.error('Navigation failed:', err)
+    })
+    
     ElNotification({
       title: title,
       message: `登录成功`,
       type: 'success'
     })
+  }).catch(error => {
+    console.error('Login failed:', error)
   })
 }
 
