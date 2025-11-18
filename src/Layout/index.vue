@@ -20,47 +20,10 @@ import { storeToRefs } from 'pinia'
 const { system } = useStore()
 const { isCollapse } = storeToRefs(system)
 </script>
-<!-- 
+
 <style scoped lang="scss">
 @use '@/styles/variables.scss';
-
-.main-box {
-  position: relative;
-  width: calc(100vw);
-  height: calc(100vh);
-
-  .side-box {
-    position: fixed;
-    left: 0;
-    top: 0;
-    height: 100%;
-    width: $menu-width;
-    flex-shrink: 0;
-    // overflow: auto;
-    border-right: 1px solid #e4e7ed;
-
-    &.is-collapse {
-      width: $--collapse-width;
-    }
-  }
-
-  .app-content {
-    width: calc(100vw - $menu-width);
-    height: 100%;
-    overflow: hidden;
-    margin-left: $menu-width;
-    transition: all 0.36s;
-
-    &.is-collapse {
-      width: calc(100vw - $--collapse-width);
-      margin-left: $--collapse-width;
-    }
-  }
-}
-</style> -->
-
-<style scoped lang="scss">
-@use '@/styles/variables.scss' as variables;
+@use '@/styles/theme.scss';
 
 .main-box {
   position: relative;
@@ -75,7 +38,9 @@ const { isCollapse } = storeToRefs(system)
     width: variables.$menu-width;
     flex-shrink: 0;
     // overflow: auto;
-    border-right: 1px solid #e4e7ed;
+    @include useTheme {
+      border-right: 1px solid getVar('borderColor');
+    }
     transition: transform 0.36s;
     z-index: 1000;
 

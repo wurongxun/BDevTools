@@ -17,16 +17,16 @@ const appName = ref<string>(t('appName'));
 </script>
 
 <template>
-  
+
   <div class="common-layout">
-   <header class="topbar-box" data-tauri-drag-region>
-   <Back></Back>
-    <div class="bread-crumb-box">
-      <bread-crumb></bread-crumb>
-    </div>
-    <functional-area></functional-area>
-    <!-- <avatar></avatar> -->
-  </header>
+    <header class="topbar-box" data-tauri-drag-region>
+      <Back></Back>
+      <div class="bread-crumb-box">
+        <bread-crumb></bread-crumb>
+      </div>
+      <functional-area></functional-area>
+      <!-- <avatar></avatar> -->
+    </header>
     <main class="app-container">
       <!-- 根据路由元信息决定是否缓存 -->
       <keep-alive>
@@ -39,6 +39,7 @@ const appName = ref<string>(t('appName'));
 
 <style lang="scss" scoped>
 @use '@/styles/variables.scss';
+@use '@/styles/theme.scss';
 
 .topbar-box {
   height: 51px;
@@ -97,5 +98,4 @@ const appName = ref<string>(t('appName'));
 .router-view {
   transition: all 0.3s ease;
 }
-
 </style>
