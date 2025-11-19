@@ -225,7 +225,7 @@ const loadFile = async () => {
                 data.editedMdtext_md = tem;
                 data.notEditedMdtext_md = tem;
                 data.title_md = title as string;
-                data.currentChooseNoteAllPath_md = meta.path as string;
+                data.currentChooseNoteAllPath_md = meta.filePath as string;
                 data.currentChooseFolderPath_md = meta.folder as string;
                 data.showMdEditor = true;
                 console.log("read_note_file editedMdtext_md===============", data.editedMdtext_md);
@@ -362,7 +362,8 @@ const saveMdText = (mdText: string) => {
         NotificationUtil.error("请输入标题");
         return;
     }
-    saveMd(data.editedMdtext_md,  data.currentChooseNoteAllPath_md)
+    console.log("saveMdText mdText===============data ", data);
+    saveMd(data.editedMdtext_md, data.currentChooseNoteAllPath_md)
 };
 
 </script>

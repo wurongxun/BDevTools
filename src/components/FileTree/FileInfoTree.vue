@@ -78,7 +78,7 @@
             <el-icon class="folder-icon">
               <Folder />
             </el-icon>
-            <span class="setting-working-directory">{{ md_working_directory }}</span>
+            <span class="setting-working-directory">{{ currentContextNode.folder }}</span>
           </div>
         </div>
       </div>
@@ -115,10 +115,11 @@ import { ResponseData } from '@/entity/entitys'
 import useStore from '@/store/index'
 import { TreeNode } from '@/Types/entitys'
 let md_working_directory = ref<string>('')
-
+import { load, Store } from '@tauri-apps/plugin-store';
 const { appConfig } = useStore()
 const userStore = appConfig;
 
+let store: Store | undefined = undefined;
 // Props
 const props = defineProps<{
   data: TreeNode[]
@@ -502,10 +503,11 @@ const handleAddRootFile = () => {
     label: '根目录',
     isFolder: true,
     routerPath: '',
-    folder: '',
+    folder: md_working_directory.value,
     filePath: '',
     isfile: false,
-    children: []
+    children: [],
+    value: md_working_directory.value,
   }
   currentContextNode.value = rootNode
   showCreateDialog('file')
@@ -519,9 +521,10 @@ const handleAddRootFolder = () => {
     label: '根目录',
     isFolder: true,
     routerPath: '',
-    folder: '',
+    folder: md_working_directory.value,
     filePath: '',
     isfile: false,
+    value: md_working_directory.value,
     children: []
   }
   currentContextNode.value = rootNode
