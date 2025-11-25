@@ -244,6 +244,7 @@ watch(
 <style scoped lang="scss">
 @use '@/styles/variables.scss' as variables;
 @use '@/styles/theme.scss';
+
 .suspension {
   box-shadow: 0 0 5px #ccc;
 
@@ -257,7 +258,7 @@ watch(
   align-items: center;
   padding: 2px 2px;
   border-radius: 3px;
-  height: 42px;
+  height: $tage-view-height;
 
   @include useTheme {
     border-bottom: 1px solid getVar('borderColor');
@@ -268,7 +269,7 @@ watch(
     overflow-x: auto;
     overflow-y: hidden; // 确保只允许横向滚动
     scroll-behavior: smooth;
-
+    width: 100%;
     // 改善滚动体验
     -webkit-overflow-scrolling: touch;
 
@@ -276,10 +277,10 @@ watch(
 
     .tag-item {
       display: inline-block;
-      padding: 6px 15px;
+      padding: 0px 3px;
       font-size: $font-size;
-      margin: 3px 6px;
-      border-radius: 5px;
+      margin: 0px 3px;
+      border-radius: 1px;
       color: #666;
 
       &:not(.active):hover {

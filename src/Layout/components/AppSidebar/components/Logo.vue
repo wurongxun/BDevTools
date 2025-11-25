@@ -31,7 +31,7 @@ function handleToHome() {
   user-select: none;
   width: variables.$menu-width;
   overflow: hidden;
-  height: 51px;
+  height: $header-height;
   display: flex;
   align-items: center;
   cursor: pointer;

@@ -42,7 +42,7 @@ const appName = ref<string>(t('appName'));
 @use '@/styles/theme.scss';
 
 .topbar-box {
-  height: 51px;
+  height: $header-height;
   margin-bottom: 1px;
   display: flex;
   align-items: center;

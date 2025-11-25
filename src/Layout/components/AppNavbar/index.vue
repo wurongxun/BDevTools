@@ -21,9 +21,10 @@ import FunctionalArea from './components/FunctionalArea/index.vue'
 <style scoped lang="scss">
 @use '@/styles/variables.scss';
 @use '@/styles/theme.scss';
+
 .topbar-box {
-  height: 51px;
- // margin-bottom: 1px;
+  height: $header-height;
+  // margin-bottom: 1px;
   display: flex;
   align-items: center;
 

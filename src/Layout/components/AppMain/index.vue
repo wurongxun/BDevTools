@@ -23,17 +23,20 @@ const { cacheList } = storeToRefs(tagview)
 
 .app-main {
   width: 100%;
-  height: calc(100vh - 51px - 42px);
+  height: calc(100vh - $header-height - 42px);
   overflow: auto;
   box-sizing: border-box;
   @include scrollbar; // 保留自定义滚动条样式
+
   @include useTheme {
     background-color: getVar('appMainBgColor');
   }
+
   // 添加以下样式来隐藏滚动条但保留滚动功能
   &::-webkit-scrollbar {
     display: none; // 隐藏滚动条但保留滚动功能 (WebKit浏览器)
   }
+
   -ms-overflow-style: none; // 隐藏滚动条但保留滚动功能 (IE/Edge)
   scrollbar-width: none;
 }
