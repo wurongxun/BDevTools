@@ -246,7 +246,7 @@ watch(
 @use '@/styles/theme.scss';
 
 .suspension {
-  box-shadow: 0 0 5px #ccc;
+  // box-shadow: 0 0 2px 0px #ccc;
 
   &:hover {
     box-shadow: inset 0 0 3px 0px #ddd;
@@ -281,7 +281,6 @@ watch(
       font-size: $font-size;
       margin: 0px 3px;
       border-radius: 1px;
-      color: #666;
 
       &:not(.active):hover {
         color: variables.$theme-color;
@@ -314,6 +313,12 @@ watch(
           background: #ccc;
           border-radius: 50%;
         }
+      }
+
+      // 针对首个 tag-item 去除 padding 和 margin
+      &:first-child {
+        padding: 0px 3px 0px 0px;
+        margin: 0px 3px 0px 0px;
       }
     }
   }
