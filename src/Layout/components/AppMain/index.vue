@@ -23,7 +23,7 @@ const { cacheList } = storeToRefs(tagview)
 
 .app-main {
   width: 100%;
-  height: calc(100vh - $header-height - 42px);
+  height: calc(100vh - $header-height - $tage-view-height);
   overflow: auto;
   box-sizing: border-box;
   @include scrollbar; // 保留自定义滚动条样式
