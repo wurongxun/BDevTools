@@ -446,7 +446,7 @@ const showCreateDialog = (mode: 'file' | 'folder') => {
 const FileMmanagerOpen = async () => {
   try {
     console.log("FileMmanagerOpen", currentContextNode.value);
-    let res = await tauri_request<ResponseData<string>>("file_manager_open_path", { path: currentContextNode.value.meta.folder });
+    let res = await tauri_request<ResponseData<string>>("file_manager_open_path", { path: currentContextNode.value.folder });
     if (res && res.code != 200) {
       NotificationUtil.error(res.msg);
     }
