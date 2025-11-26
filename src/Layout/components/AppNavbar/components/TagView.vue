@@ -165,82 +165,6 @@ watch(
 );
 </script>
 
-<!-- <style scoped lang="scss">
-@use '@/styles/variables.scss';
-
-.suspension {
-  box-shadow: 0 0 5px #ccc;
-
-  &:hover {
-    box-shadow: inset 0 0 3px 0px #ddd;
-  }
-}
-
-.tab-control {
-  display: flex;
-  align-items: center;
-  padding: 2px 2px;
-  border-radius: 3px;
-  height: 46px;
-
-  @include useTheme {
-    border-bottom: 1px solid getVar('borderColor');
-  }
-
-  .tab-box {
-    white-space: nowrap;
-    overflow-x: auto;
-
-    @include scrollbar;
-
-    .tag-item {
-      display: inline-block;
-      padding: 6px 15px;
-      font-size: $font-size;
-      margin: 3px 6px;
-      border-radius: 5px;
-      color: #666;
-
-      &:not(.active):hover {
-        color: $theme-color;
-      }
-
-      &:hover {
-        .close--icon {
-          display: inline-block;
-          width: 14px;
-          margin-left: 8px;
-        }
-      }
-
-      &.active {
-        box-shadow: inset 0 0 3px 0px #ddd;
-        color: $theme-color;
-      }
-
-      .tag--title {
-        vertical-align: middle;
-      }
-
-      .close--icon {
-        width: 0;
-        vertical-align: middle;
-        transition: all 0.5s;
-
-        &:hover {
-          color: #fff;
-          background: #ccc;
-          border-radius: 50%;
-        }
-      }
-    }
-  }
-}
-
-:deep(.el-tabs__header) {
-  margin-bottom: 0;
-}
-</style> -->
 <style scoped lang="scss">
 @use '@/styles/variables.scss' as variables;
 @use '@/styles/theme.scss';
@@ -261,7 +185,7 @@ watch(
   height: $tage-view-height;
 
   @include useTheme {
-    border-bottom: 1px solid getVar('borderColor');
+    // border-bottom: 1px solid getVar('borderColor');
   }
 
   .tab-box {
