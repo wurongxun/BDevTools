@@ -181,7 +181,7 @@ watch(
   display: flex;
   align-items: center;
   padding: 2px 2px;
-  border-radius: 3px;
+  // border-radius: 3px;
   height: $tage-view-height;
 
   @include useTheme {

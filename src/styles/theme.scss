@@ -7,15 +7,15 @@ $themes: (
     textColor: #212121,
     shadowColor: #eee,
     borderColor: #e6e6e6,
-    hoverColor: #ecf5ff,
+    hoverColor: #ecf5ff
   ),
   dark: (
     appMainBgColor: #000,
-    bgColor: #212121,
+    bgColor: #000000,
     textColor: #fff,
     shadowColor: #2e2d2d,
     borderColor: #424141,
-    hoverColor: #18222c,
+    hoverColor: #18222c
   )
 );
 
@@ -31,6 +31,6 @@ $currentTheme: light;
 }
 
 @function getVar($key) {
-  $themeMap: map.get($themes, $currentTheme);  // 使用 map.get 替代 map-get
-  @return map.get($themeMap, $key);            // 使用 map.get 替代 map-get
+  $themeMap: map.get($themes, $currentTheme); // 使用 map.get 替代 map-get
+  @return map.get($themeMap, $key); // 使用 map.get 替代 map-get
 }

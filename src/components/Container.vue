@@ -12,11 +12,14 @@
 </template>
 
 <style scoped lang="scss">
+@use '@/styles/theme.scss';
+@use '@/styles/variables.scss';
+
 .__common-component-container {
-  margin: 2px;
-  min-height: calc(100% - 30px);
-  padding: 30px 20px 20px 20px;
-  border-radius: 5px;
+  // margin: 2px;
+  // min-height: calc(100% - 30px);
+  padding: 10px 10px 10px 10px;
+  // border-radius: 5px;
 
   @include useTheme {
     background-color: getVar('bgColor');

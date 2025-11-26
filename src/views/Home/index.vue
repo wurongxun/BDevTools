@@ -1,51 +1,5 @@
 <template>
   <container>
-    <!-- <el-row :gutter="12">
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="num-card wait-num">
-            <svg-icon class-name="svg-icon" icon-class="audit"></svg-icon>
-            <div class="num-wrapper">
-              <span class="num-label">待审核</span>
-              <count-up class="count-wrapper" ref="countUpRef" :end="waitNum"></count-up>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="num-card over-num">
-            <svg-icon class-name="svg-icon" icon-class="over"></svg-icon>
-            <div class="num-wrapper">
-              <span class="num-label">已提交</span>
-              <count-up class="count-wrapper" ref="countUp" :end="overNum"></count-up>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="num-card pass-num">
-            <svg-icon class-name="svg-icon" icon-class="pass"></svg-icon>
-            <div class="num-wrapper">
-              <span class="num-label">已处理</span>
-              <count-up class="count-wrapper" ref="countUp" :end="passNum"></count-up>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="num-card reject-num">
-            <svg-icon class-name="svg-icon" icon-class="reject"></svg-icon>
-            <div class="num-wrapper">
-              <span class="num-label">已驳回</span>
-              <count-up class="count-wrapper" ref="countUp" :end="rejectNum"></count-up>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row> -->
     <section class="echarts-box">
       <echarts-data></echarts-data>
     </section>
