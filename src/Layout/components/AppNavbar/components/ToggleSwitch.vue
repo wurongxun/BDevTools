@@ -24,15 +24,16 @@ function handleToggleSide() {
 <style scoped lang="scss">
 @use '@/styles/variables.scss';
 @use '@/styles/theme.scss';
+
 .scale-icon {
   cursor: pointer;
-  width: 60px;
+  width: 30px;
   height: 100%;
   font-size: 0;
   display: flex;
   align-items: center;
-  padding-left: 20px;
-  margin-right: 10px;
+  padding-left: 1px;
+  // margin-right: 10px;
 
   &:hover {
     @include useTheme {
