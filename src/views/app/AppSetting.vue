@@ -128,6 +128,7 @@ function setting_change() {
 
 async function language_change() {
   locale.value = language.value;
+  console.log("locale.value:=================", locale.value)
   if (store) {
     await store.set('language', { value: language.value });
     await store.save();
@@ -201,7 +202,7 @@ async function md_working_directory_change() {
     console.log("processNodeCache error:========");
     tagview.deleteTagViewList();
     const routerNote = routerNoteStore.setRoutes();
-    console.log("processNodeCache error:========2",routerNote);
+    console.log("processNodeCache error:========2", routerNote);
 
   }
   // 重新加载数据逻辑
@@ -279,12 +280,12 @@ const processNodeCache = async (item: TreeNode) => {
     <div class="settings-content">
       <!-- 通用设置 -->
       <div class="settings-section">
-        <h2 class="section-title">通用设置</h2>
+        <h2 class="section-title">{{ $t('settings.name') }}</h2>
 
         <div class="settings-item">
           <div class="setting-info">
-            <span class="setting-label">开机自启动</span>
-            <span class="setting-description">可能影响开机速度</span>
+            <span class="setting-label">{{ $t('autostart.name') }}</span>
+            <span class="setting-description">{{ $t('autostart.hint') }}</span>
           </div>
           <div class="setting-control">
             <el-switch v-model="autostart" @change="autostart_change()" inline-prompt :active-icon="Check"
@@ -294,8 +295,8 @@ const processNodeCache = async (item: TreeNode) => {
 
         <div class="settings-item">
           <div class="setting-info">
-            <span class="setting-label">软件更新提醒</span>
-            <span class="setting-description">及时获取新功能和安全更新</span>
+            <span class="setting-label">{{ $t('update.name') }}</span>
+            <span class="setting-description">{{ $t('update.hint') }}</span>
           </div>
           <div class="setting-control">
             <el-switch v-model="update_reminder" @change="software_change()" inline-prompt :active-icon="Check"
@@ -304,7 +305,7 @@ const processNodeCache = async (item: TreeNode) => {
         </div>
         <div class="settings-item">
           <div class="setting-info">
-            <span class="setting-label">主题</span>
+            <span class="setting-label">{{ $t('settings.theme') }}</span>
             <span class="setting-description">切换主题</span>
           </div>
           <div class="setting-control">
@@ -316,7 +317,7 @@ const processNodeCache = async (item: TreeNode) => {
         </div>
         <div class="settings-item">
           <div class="setting-info">
-            <span class="setting-label">暗黑模式</span>
+            <span class="setting-label">{{ $t('darkMode.name') }}</span>
             <span class="setting-description"></span>
           </div>
           <div class="setting-control">
@@ -326,7 +327,7 @@ const processNodeCache = async (item: TreeNode) => {
         </div>
         <div class="settings-item">
           <div class="setting-info">
-            <span class="setting-label">切换语言</span>
+            <span class="setting-label">{{ $t('locale.language') }}</span>
             <span class="setting-description">选择界面显示语言</span>
           </div>
           <div class="setting-control">

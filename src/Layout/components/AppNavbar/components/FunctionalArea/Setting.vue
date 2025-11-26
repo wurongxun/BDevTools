@@ -4,11 +4,11 @@
       <svg-icon class-name="svg-icon" style="height: 1rem;width: 1rem;" icon-class="setting" />
     </header>
     <template #dropdown>
-      <el-dropdown-menu >
+      <el-dropdown-menu>
         <!-- <div class="userinfo-name">{{ userInfo.nickName }}</div> -->
-        <el-dropdown-item command="setting">设置</el-dropdown-item>
-        <el-dropdown-item command="about">关于</el-dropdown-item>
-        <el-dropdown-item command="help" divided>帮助</el-dropdown-item>
+        <el-dropdown-item command="setting">{{ $t('settings.name') }}</el-dropdown-item>
+        <el-dropdown-item command="about">{{ $t('about.name') }}</el-dropdown-item>
+        <el-dropdown-item command="help" divided>{{ $t('help.name') }}</el-dropdown-item>
       </el-dropdown-menu>
     </template>
   </el-dropdown>
@@ -18,6 +18,8 @@ import useStore from '@/store/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import { useI18n } from "vue-i18n";
+const { t, locale } = useI18n()
 
 const { user } = useStore()
 const router = useRouter()

@@ -184,8 +184,9 @@ watch(
   // border-radius: 3px;
   height: $tage-view-height;
 
+
   @include useTheme {
-    // border-bottom: 1px solid getVar('borderColor');
+    border-bottom: 1px solid getVar('borderColor');
   }
 
   .tab-box {

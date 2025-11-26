@@ -1,7 +1,43 @@
 export default {
   appName: 'md-viewer',
   settings: {
-    name: '設置'
+    name: '設置',
+    projectSetting: '项目配置',
+    theme: '主題',
+    layout: '布局',
+    systemTheme: '系统主题',
+    menuTheme: '菜单主题',
+    interfaceDisplay: '界面显示',
+    breadcrumb: '面包屑',
+    breadcrumbIcon: '面包屑图标',
+    collapseMenu: '折叠菜单',
+    hamburgerIcon: '折叠图标',
+    screenfullIcon: '全屏图标',
+    sizeIcon: '尺寸图标',
+    localeIcon: '多语言图标',
+    messageIcon: '消息图标',
+    tagsView: '标签页',
+    logo: '标志',
+    greyMode: '灰色模式',
+    fixedHeader: '固定头部',
+    headerTheme: '头部主题',
+    cutMenu: '切割菜单',
+    copy: '拷贝',
+    clearAndReset: '清除缓存并且重置',
+    copySuccess: '拷贝成功',
+    copyFailed: '拷贝失败',
+    footer: '页脚',
+    uniqueOpened: '菜单手风琴',
+    tagsViewIcon: '标签页图标',
+    reExperienced: '请重新退出登录体验',
+    fixedMenu: '固定菜单'
+  },
+  autostart: {
+    name: '開機自啟動',
+    hint: '可能影響開機速度'
+  },
+  darkMode: {
+    name: '暗黑模式'
   },
   about: {
     name: '關於'
@@ -13,7 +49,8 @@ export default {
     name: '分類'
   },
   update: {
-    name: '更新'
+    name: '更新',
+    hint: '及時獲取新功能和安全更新'
   },
   upload: {
     app: '上传应用'
@@ -228,37 +265,7 @@ export default {
     hasPermission: `请设置操作权限标签值`,
     hasRole: `请设置角色权限标签值`
   },
-  setting: {
-    projectSetting: '项目配置',
-    theme: '主题',
-    layout: '布局',
-    systemTheme: '系统主题',
-    menuTheme: '菜单主题',
-    interfaceDisplay: '界面显示',
-    breadcrumb: '面包屑',
-    breadcrumbIcon: '面包屑图标',
-    collapseMenu: '折叠菜单',
-    hamburgerIcon: '折叠图标',
-    screenfullIcon: '全屏图标',
-    sizeIcon: '尺寸图标',
-    localeIcon: '多语言图标',
-    messageIcon: '消息图标',
-    tagsView: '标签页',
-    logo: '标志',
-    greyMode: '灰色模式',
-    fixedHeader: '固定头部',
-    headerTheme: '头部主题',
-    cutMenu: '切割菜单',
-    copy: '拷贝',
-    clearAndReset: '清除缓存并且重置',
-    copySuccess: '拷贝成功',
-    copyFailed: '拷贝失败',
-    footer: '页脚',
-    uniqueOpened: '菜单手风琴',
-    tagsViewIcon: '标签页图标',
-    reExperienced: '请重新退出登录体验',
-    fixedMenu: '固定菜单'
-  },
+
   size: {
     default: '默认',
     large: '大',

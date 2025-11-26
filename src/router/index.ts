@@ -81,7 +81,7 @@ export const constantRoutes: Array<RouteRecordRaw> = [
     meta: { title: '登录', hidden: true, noTagView: true },
     component: () => import('@/views/login/index.vue')
   },
-  
+
   {
     path: '/App',
     component: () => import('@/views/Common/Common.vue'),
@@ -94,6 +94,7 @@ export const constantRoutes: Array<RouteRecordRaw> = [
         meta: {
           title: '设置',
           noTagView: true,
+          i18n: 'settings.name',
           transition: 'scroll-x-transition'
         }
       },
@@ -104,6 +105,7 @@ export const constantRoutes: Array<RouteRecordRaw> = [
         meta: {
           title: '关于',
           noTagView: true,
+          i18n: 'about.name',
           transition: 'scroll-x-transition'
         }
       },
@@ -113,6 +115,7 @@ export const constantRoutes: Array<RouteRecordRaw> = [
         component: () => import('@/views/app/AppHelp.vue'),
         meta: {
           title: '帮助',
+          i18n: 'help.name',
           noTagView: true,
           transition: 'scroll-x-transition'
         }
@@ -127,7 +130,7 @@ export const constantRoutes: Array<RouteRecordRaw> = [
 export const asyncRoutes: Array<RouteRecordRaw> = [pages]
 
 const router = createRouter({
- history: createWebHashHistory(), // 使用 hash 模式
+  history: createWebHashHistory(), // 使用 hash 模式
   routes: constantRoutes
 })
 // {
