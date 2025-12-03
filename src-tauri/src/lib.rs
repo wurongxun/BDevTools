@@ -22,7 +22,7 @@ use crate::routes::app_window::{
     about, loding_window_close, note_book_window, windows_close, windows_hide, windows_maximize,
     windows_minimize,
 };
-use crate::routes::file_utils::{file_manager_open_path, get_document_notebooks,up_folder_name};
+use crate::routes::file_utils::{file_manager_open_path, get_document_notebooks, up_folder_name};
 use crate::routes::note_book::{
     create_folder, create_note_file, get_note_list, get_path_childrenFoldersAndFiles,
     read_note_file, remove_file, remove_folder, save_note, up_file_name,
@@ -35,6 +35,7 @@ struct Payload {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
