@@ -168,7 +168,6 @@ pub async fn save_note(
 ) -> Result<ResData<String>, String> {
     //format!("save_note1 {}", path);
     println!("save_note1 {}", path);
-  
 
     // 克隆path以避免所有权问题
     let path_clone = path.clone();

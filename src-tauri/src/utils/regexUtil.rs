@@ -11,7 +11,7 @@ pub fn validate(pattern: &str, content: &str) -> bool {
 // 跨平台替换路径最后一部分的函数
 pub fn replace_last_path_component(path: &str, new_name: &str) -> String {
     use std::path::Path;
-    
+
     let path_obj = Path::new(path);
     if let Some(parent) = path_obj.parent() {
         let new_path = parent.join(new_name);

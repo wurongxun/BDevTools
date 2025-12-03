@@ -11,8 +11,6 @@ use crate::{
 };
 use tauri::{AppHandle, Manager};
 
-
-
 pub fn read_dir_info<P: AsRef<Path>>(local_data_dir: P) -> Result<ResData<Vec<String>>, String> {
     let mut notebooks: Vec<String> = vec![];
     let paths = std::fs::read_dir(local_data_dir);
@@ -37,7 +35,6 @@ pub fn read_dir_info<P: AsRef<Path>>(local_data_dir: P) -> Result<ResData<Vec<St
         Err(_) => return Err("读取目录失败".to_string()),
     }
 }
-
 
 /**
  *
@@ -163,7 +160,12 @@ pub fn get_dir_and_file_with_depth(
             );
             if !path_1.is_file() {
                 // 递归处理子目录，增加层级限制
-                get_dir_and_file_with_depth(num, &mut children_dir_and_file_info, max_depth, current_depth + 1)?;
+                get_dir_and_file_with_depth(
+                    num,
+                    &mut children_dir_and_file_info,
+                    max_depth,
+                    current_depth + 1,
+                )?;
                 children_dirAndFileInfo.set_children(children_dir_and_file_info);
             } else if (is_md || is_pdf) && path_1.is_file() {
                 // 只添加 md 或 pdf 文件

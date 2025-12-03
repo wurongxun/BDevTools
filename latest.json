@@ -1,0 +1,19 @@
+{
+  "version": "v0.2.2",
+  "notes": "v0.2.2 release",
+  "pub_date": "",
+  "platforms": {
+    "linux-x86_64": {
+      "signature": "",
+      "url": ""
+    },
+    "windows-x86_64": {
+      "signature": "",
+      "url": ""
+    },
+    "darwin-x86_64": {
+      "signature": "",
+      "url": ""
+    }
+  }
+}

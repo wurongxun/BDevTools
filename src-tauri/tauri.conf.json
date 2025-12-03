@@ -58,6 +58,13 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg5N0MyRkE4NzRCQUZENTMKUldSVC9icDBxQzk4aVM1UUlwUnV6THhwcmZCZ0dRSEg3dzl0V01PRm1JZFVXK0NTU3Z0dHp1ZG8K",
+      "endpoints": ["https://gitee.com/wurongxun/md-note/blob/MdViewer-V2/latest.json"]
+    }
   }
 }
