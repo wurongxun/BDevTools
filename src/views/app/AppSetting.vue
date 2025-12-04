@@ -15,9 +15,9 @@ import { tauri_request } from '@/utils/tauri_request';
 import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting';
 import { TreeNode } from '@/Types/entitys';
 import { useRouter, useRoute, LocationQueryRaw, RouteParamsRaw } from 'vue-router'
-import { check } from '@tauri-apps/plugin-updater';
+import { check as check_ } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
-
+const update_app_check = await check_();
 const { appConfig, routerNoteStore, tagview } = useStore()
 const router = useRouter()
 const route = useRoute()
@@ -275,15 +275,15 @@ const processNodeCache = async (item: TreeNode) => {
 
 
 const app_updates_check = async () => {
-  const update = await check();
-  if (update) {
+
+  if (update_app_check) {
     console.log(
-      `found update ${update.version} from ${update.date} with notes ${update.body}`
+      `found update ${update_app_check.version} from ${update_app_check.date} with notes ${update_app_check.body}`
     );
     let downloaded = 0;
     let contentLength = 0;
     // alternatively we could also call update.download() and update.install() separately
-    await update.downloadAndInstall((event) => {
+    await update_app_check.downloadAndInstall((event) => {
       switch (event.event) {
         case 'Started':
           contentLength = event.data.contentLength;
