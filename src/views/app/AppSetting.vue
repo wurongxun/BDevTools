@@ -15,6 +15,8 @@ import { tauri_request } from '@/utils/tauri_request';
 import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting';
 import { TreeNode } from '@/Types/entitys';
 import { useRouter, useRoute, LocationQueryRaw, RouteParamsRaw } from 'vue-router'
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 
 const { appConfig, routerNoteStore, tagview } = useStore()
 const router = useRouter()
@@ -272,7 +274,35 @@ const processNodeCache = async (item: TreeNode) => {
 };
 
 
+const app_updates_check = async () => {
+  const update = await check();
+  if (update) {
+    console.log(
+      `found update ${update.version} from ${update.date} with notes ${update.body}`
+    );
+    let downloaded = 0;
+    let contentLength = 0;
+    // alternatively we could also call update.download() and update.install() separately
+    await update.downloadAndInstall((event) => {
+      switch (event.event) {
+        case 'Started':
+          contentLength = event.data.contentLength;
+          console.log(`started downloading ${event.data.contentLength} bytes`);
+          break;
+        case 'Progress':
+          downloaded += event.data.chunkLength;
+          console.log(`downloaded ${downloaded} from ${contentLength}`);
+          break;
+        case 'Finished':
+          console.log('download finished');
+          break;
+      }
+    });
 
+    console.log('update installed');
+    await relaunch();
+  }
+}
 </script>
 
 <template>
@@ -342,7 +372,6 @@ const processNodeCache = async (item: TreeNode) => {
       <!-- 网络设置 -->
       <div class="settings-section">
         <h2 class="section-title">网络</h2>
-
         <div class="settings-item">
           <div class="setting-info">
             <span class="setting-label">网络检测</span>
@@ -353,7 +382,19 @@ const processNodeCache = async (item: TreeNode) => {
           </div>
         </div>
       </div>
-
+      <!-- 更新设置 -->
+      <div class="settings-section">
+        <h2 class="section-title">更新</h2>
+        <div class="settings-item">
+          <div class="setting-info">
+            <span class="setting-label">应用更新</span>
+            <span class="setting-description">手动检查新版本，获取最新功能和修复</span>
+          </div>
+          <div class="setting-control">
+            <el-button type="primary" @click="app_updates_check" plain>检查更新</el-button>
+          </div>
+        </div>
+      </div>
       <!-- 其他设置 -->
       <div class="settings-section">
         <h2 class="section-title">其他设置</h2>

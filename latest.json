@@ -1,14 +1,14 @@
 {
   "version": "v0.2.2",
   "notes": "v0.2.2 release",
-  "pub_date": "",
+  "pub_date": "2025-12-04T16:30:00+08:00",
   "platforms": {
     "linux-x86_64": {
       "signature": "",
       "url": ""
     },
     "windows-x86_64": {
-      "signature": "",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSVC9icDBxQzk4aWRVdzdGbFNjck5wck11aU9WekRHeVlqN0tuK0Y2SGNudDdXb3dwVGVUdXhOOGV0R0dTTWthQWYvYXpYOTFyYmtRdTJZOVBkOUFYZDNKRUtDZnJUNndvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzY0ODI5Nzc0CWZpbGU6TWRWaWV3ZXJfMC4yLjJfeDY0X2VuLVVTLm1zaQp0VndYZHUzYm5BR0prQkZDRm54UnpPTDFMSEZvVnVhamhmSlo5ZFowQk9GN3BXbGFzb05yUVJObmplRGw0bFV3ZDZ6YTlDRkExdlh3NHY3anFaMXNCdz09Cg==",
       "url": ""
     },
     "darwin-x86_64": {
