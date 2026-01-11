@@ -6,7 +6,7 @@
 
 ### 软件架构
 
-rust、tauri、vue3、ant-design-vue、v-md-editor
+rust、tauri、vue3、element-plus、v-md-editor
 
 ### 使用说明
 
