@@ -26,11 +26,11 @@ $collapse-width: 64px;
 
 $theme-color: #7e9cff;
 
-$font-size: 14px;
+$font-size: 16px;
 
 $dialog-width: 640px;
 $header-height: 2em;
-$tage-view-height: 1.7em;
+$tage-view-height: 2em;
 // The :export directive is the magic sauce for webpack
 // https://mattferderer.com/use-sass-variables-in-typescript-and-javascript
 :export {
