@@ -1,12 +1,12 @@
 <template>
   <div class="main-box">
-    <div class="side-box" :class="{ 'is-collapse': isCollapse }">
+    <aside class="side-box" :class="{ 'is-collapse': isCollapse }">
       <app-sidebar />
-    </div>
-    <div class="app-content" :class="{ 'is-collapse': isCollapse }">
+    </aside>
+    <main class="app-content" :class="{ 'is-collapse': isCollapse }">
       <app-navbar></app-navbar>
       <app-main></app-main>
-    </div>
+    </main>
   </div>
 </template>
 
@@ -26,46 +26,74 @@ const { isCollapse } = storeToRefs(system)
 @use '@/styles/theme.scss';
 
 .main-box {
-  position: relative;
+  display: flex;
   width: 100vw;
   height: 100vh;
+  overflow: hidden;
 
   .side-box {
-    position: fixed;
-    left: 0;
-    top: 0;
-    height: 100%;
-    width: $menu-width;
     flex-shrink: 0;
+    width: $menu-width;
+    height: 100%;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+
     @include theme.useTheme {
+      background-color: theme.getVar('bgColor');
       border-right: 1px solid theme.getVar('borderColor');
     }
-    transition: transform 0.3s ease;
-    z-index: 1000;
 
     &.is-collapse {
       width: $collapse-width;
-      transform: translateX(-($menu-width - $collapse-width));
     }
   }
 
   .app-content {
-    width: calc(100vw - #{$menu-width});
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     height: 100%;
     overflow: hidden;
-    margin-left: $menu-width;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
 
-    &.is-collapse {
-      width: 100vw;
+// 平板端适配
+@media screen and (max-width: 1024px) and (min-width: 769px) {
+  .main-box {
+    .side-box {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+
+      &.is-collapse {
+        transform: translateX(-$menu-width);
+      }
+    }
+
+    .app-content {
+      width: 100%;
       margin-left: 0;
+
+      &.is-collapse {
+        margin-left: 0;
+      }
     }
   }
 }
 
+// 移动端适配
 @media screen and (max-width: 768px) {
   .main-box {
     .side-box {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: $menu-width;
+      box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
       transform: translateX(-$menu-width);
 
       &.is-collapse {
@@ -74,12 +102,8 @@ const { isCollapse } = storeToRefs(system)
     }
 
     .app-content {
-      width: 100vw;
+      width: 100%;
       margin-left: 0;
-
-      &.is-collapse {
-        margin-left: 0;
-      }
     }
   }
 }
