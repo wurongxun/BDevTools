@@ -39,8 +39,8 @@ importers:
         specifier: ^2.4.3
         version: 2.4.3
       '@tauri-apps/plugin-updater':
-        specifier: ~2.9.0
-        version: 2.9.0
+        specifier: ^2.10.1
+        version: 2.10.1
       '@tauri-apps/plugin-window-state':
         specifier: ^2.4.1
         version: 2.4.1
@@ -63,8 +63,8 @@ importers:
         specifier: ^6.1.0
         version: 6.1.0
       element-plus:
-        specifier: ^2.14.1
-        version: 2.14.1(vue@3.5.38(typescript@5.6.3))
+        specifier: ^2.14.2
+        version: 2.14.2(vue@3.5.38(typescript@5.6.3))
       js-cookie:
         specifier: ^3.0.8
         version: 3.0.8
@@ -1131,8 +1131,8 @@ packages:
   '@tauri-apps/plugin-store@2.4.3':
     resolution: {integrity: sha512-9LWPj9yMphRi9czEtUv87XHbl1b6xgd9EXpPrUnq6nG7+nbtoF84d4Kwz9xhAv/Hf30sr58pq7EOlyI936y8qw==}
 
-  '@tauri-apps/plugin-updater@2.9.0':
-    resolution: {integrity: sha512-j++sgY8XpeDvzImTrzWA08OqqGqgkNyxczLD7FjNJJx/uXxMZFz5nDcfkyoI/rCjYuj2101Tci/r/HFmOmoxCg==}
+  '@tauri-apps/plugin-updater@2.10.1':
+    resolution: {integrity: sha512-NFYMg+tWOZPJdzE/PpFj2qfqwAWwNS3kXrb1tm1gnBJ9mYzZ4WDRrwy8udzWoAnfGCHLuePNLY1WVCNHnh3eRA==}
 
   '@tauri-apps/plugin-window-state@2.4.1':
     resolution: {integrity: sha512-OuvdrzyY8Q5Dbzpj+GcrnV1iCeoZbcFdzMjanZMMcAEUNy/6PH5pxZPXpaZLOR7whlzXiuzx0L9EKZbH7zpdRw==}
@@ -1622,8 +1622,8 @@ packages:
   electron-to-chromium@1.5.372:
     resolution: {integrity: sha512-M3yhbAlilnwqC8D21t28UCDGHyitShTmmLRU/H+b74P6Ski16Nb9HONYEaVpMj/pwC7BEo5B95FpjODLCWbtfA==}
 
-  element-plus@2.14.1:
-    resolution: {integrity: sha512-UFnm1+BckNi+azkKJ7L32q1uXs9ekr99Z9pWTQPeDR05jqEWUwQq51ro4kZMVrANbjknX3Z7ukCZwTi2T6Tr9A==}
+  element-plus@2.14.2:
+    resolution: {integrity: sha512-eNH9uP3wQoNqieEIHXiNvIVv+zO5sZDU0CAZq5b0zqSN06DD0/V9xIq1R/qm3rw5k3nBTM1JvpxhCfRbaFLzDQ==}
     peerDependencies:
       vue: ^3.3.7
 
@@ -3805,7 +3805,7 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.11.0
 
-  '@tauri-apps/plugin-updater@2.9.0':
+  '@tauri-apps/plugin-updater@2.10.1':
     dependencies:
       '@tauri-apps/api': 2.11.0
 
@@ -4388,7 +4388,7 @@ snapshots:
 
   electron-to-chromium@1.5.372: {}
 
-  element-plus@2.14.1(vue@3.5.38(typescript@5.6.3)):
+  element-plus@2.14.2(vue@3.5.38(typescript@5.6.3)):
     dependencies:
       '@ctrl/tinycolor': 4.2.0
       '@element-plus/icons-vue': 2.3.2(vue@3.5.38(typescript@5.6.3))
