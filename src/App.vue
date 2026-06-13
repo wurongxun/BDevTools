@@ -1,9 +1,11 @@
 <template>
   <div id="app">
-    <router-view v-slot="{ Component }">
-      <keep-alive :include="cacheList">
-        <component :is="Component" />
-      </keep-alive>
+    <router-view v-slot="{ Component, route }">
+      <transition name="fade-transform" mode="out-in">
+        <keep-alive :include="cacheList" :max="20">
+          <component :is="Component" :key="route.fullPath" />
+        </keep-alive>
+      </transition>
     </router-view>
   </div>
 </template>

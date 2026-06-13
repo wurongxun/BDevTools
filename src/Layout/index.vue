@@ -22,44 +22,64 @@ const { isCollapse } = storeToRefs(system)
 </script>
 
 <style scoped lang="scss">
-@use '@/styles/variables.scss';
+@use '@/styles/variables.scss' as *;
 @use '@/styles/theme.scss';
 
 .main-box {
   position: relative;
-  width: calc(100vw);
-  height: calc(100vh);
+  width: 100vw;
+  height: 100vh;
 
   .side-box {
     position: fixed;
     left: 0;
     top: 0;
     height: 100%;
-    width: variables.$menu-width;
+    width: $menu-width;
     flex-shrink: 0;
-    // overflow: auto;
-    @include useTheme {
-      border-right: 1px solid getVar('borderColor');
+    @include theme.useTheme {
+      border-right: 1px solid theme.getVar('borderColor');
     }
-    transition: transform 0.36s;
+    transition: transform 0.3s ease;
     z-index: 1000;
 
     &.is-collapse {
       width: $collapse-width;
-      transform: translateX(-(variables.$menu-width - variables.$collapse-width));
+      transform: translateX(-($menu-width - $collapse-width));
     }
   }
 
   .app-content {
-    width: calc(100vw - variables.$menu-width);
+    width: calc(100vw - #{$menu-width});
     height: 100%;
     overflow: hidden;
-    margin-left: variables.$menu-width;
-    transition: all 0.36s;
+    margin-left: $menu-width;
+    transition: all 0.3s ease;
 
     &.is-collapse {
-      width: calc(100vw);
+      width: 100vw;
       margin-left: 0;
+    }
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .main-box {
+    .side-box {
+      transform: translateX(-$menu-width);
+
+      &.is-collapse {
+        transform: translateX(0);
+      }
+    }
+
+    .app-content {
+      width: 100vw;
+      margin-left: 0;
+
+      &.is-collapse {
+        margin-left: 0;
+      }
     }
   }
 }

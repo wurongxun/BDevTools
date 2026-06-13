@@ -1,24 +1,59 @@
 <template>
-  <div class="tab-control">
-    <div class="tab-box">
-      <router-link class="tag-item suspension" :class="{ active: isActive(tag) }" v-for="tag in tagViewList"
-        :key="tag.path" :to="getToPath(tag)">
-        <span class="tag--title">{{ tag.title }}</span>
-        <el-icon v-if="!tag.affix" class="close--icon" @click.prevent.stop="removeTab(tag)">
-          <Close />
-        </el-icon>
-      </router-link>
+  <div class="idea-tab-bar">
+    <div class="tab-scroll-container" ref="scrollContainer">
+      <transition-group name="idea-tab" tag="div" class="tabs-wrapper">
+        <div
+          v-for="tag in tagViewList"
+          :key="tag.path"
+          class="idea-tab"
+          :class="{
+            'is-active': isActive(tag),
+            'is-pinned': tag.affix
+          }"
+          @click="navigateToTab(tag)"
+        >
+          <span class="tab-icon">
+            <component :is="getTabIcon(tag)" />
+          </span>
+          <span class="tab-text">{{ truncateText(tag.title) }}</span>
+          <el-icon
+            v-if="!tag.affix"
+            class="close-icon"
+            @click.stop="removeTab(tag)"
+          >
+            <Close />
+          </el-icon>
+        </div>
+      </transition-group>
+    </div>
+
+    <!-- 滚动控制按钮 -->
+    <div v-if="showScrollControls" class="scroll-controls">
+      <div class="control-btn left" @click="scrollLeft" title="向左滚动">
+        <el-icon><ArrowLeft /></el-icon>
+      </div>
+      <div class="control-btn right" @click="scrollRight" title="向右滚动">
+        <el-icon><ArrowRight /></el-icon>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import useStore from '@/store/index'
-import { computed, nextTick, watch } from 'vue'
+import { computed, nextTick, watch, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Close } from '@element-plus/icons-vue'
+import {
+  Close,
+  ArrowLeft,
+  ArrowRight,
+  Document,
+  HomeFilled,
+  Setting,
+  InfoFilled,
+  QuestionFilled
+} from '@element-plus/icons-vue'
 import ToolUtils from '@/utils/ToolUtils'
-
 import type { ITagItem } from '@/Types/TagView'
 import { ElMessageBox } from 'element-plus'
 import NotificationUtil from '@/utils/NotificationUtil'
@@ -26,6 +61,8 @@ import NotificationUtil from '@/utils/NotificationUtil'
 const route = useRoute()
 const router = useRouter()
 const { tagview, noteTem } = useStore()
+const scrollContainer = ref<HTMLElement | null>(null)
+const showScrollControls = ref(false)
 
 watch(
   () => router.currentRoute.value,
@@ -38,7 +75,6 @@ watch(
       if (ToolUtils.notEmptyObject(newValue.params)) {
         path = newValue.matched[newValue.matched.length - 1].path
       }
-      console.log("tageview ", path)
       tagview.addTagView({
         name: newValue.name as string,
         path,
@@ -53,58 +89,45 @@ watch(
   { immediate: true }
 )
 
-
 const tagViewList = computed<ITagItem[]>(() => tagview.tagViewList)
 
+const navigateToTab = (tag: ITagItem) => {
+  const toPath = getToPath(tag)
+  router.push(toPath)
+}
+
 const removeTab = async (tag: ITagItem) => {
+  const noteId = tag.name
+  const noteData = noteTem.getNoteData(noteId)
 
-  // 检查该标签页是否有未保存的笔记内容
-  const noteId = tag.name; // 使用标签名作为笔记ID
-  const noteData = noteTem.getNoteData(noteId);
-
-  // 如果有未保存的更改，询问用户是否保存
   if (noteData && noteData.tempContent && noteData.tempContent !== noteData.content) {
     try {
       await ElMessageBox.confirm(
         `标签页 "${tag.title}" 有未保存的内容，是否保存更改?`,
-        "保存提醒", {
-        confirmButtonText: "保存",
-        cancelButtonText: "不保存",
-        type: "warning",
-      }
-      );
-      // 用户选择保存，这里可以调用保存方法
-
-      // 调用保存方法
-
-      // 由于我们无法直接访问编辑器组件，可以提示用户切换到该标签页进行保存
-      NotificationUtil.info("请切换到对应标签页手动保存内容");
+        "保存提醒",
+        {
+          confirmButtonText: "保存",
+          cancelButtonText: "不保存",
+          type: "warning",
+        }
+      )
+      NotificationUtil.info("请切换到对应标签页手动保存内容")
     } catch {
-      // 用户选择不保存，继续关闭标签页
-      console.log("用户选择不保存更改，继续关闭标签页");
+      console.log("用户选择不保存更改，继续关闭标签页")
     }
   }
-
 
   tagview.removeTagView(tag)
   if (isActive(tag)) {
     const endRoute = tagview.tagViewList[tagview.tagViewList.length - 1] as ITagItem
     if (endRoute) {
-      router.push({
-        path: endRoute.path
-      })
+      router.push({ path: endRoute.path })
     } else {
-      router.push({
-        path: '/'
-      })
+      router.push({ path: '/' })
     }
   }
 }
-/**
- * 如果当前路由设置了noTagView且有activeMenu，则比较activeMenu与标签路径
- * 如果标签对象不为空，则使用路由匹配路径进行比较
- * 否则直接比较路由路径与标签路径
- */
+
 const isActive = (tag: ITagItem): boolean => {
   if (route.meta.noTagView && route.meta.activeMenu) {
     return route.meta.activeMenu === tag.path
@@ -129,127 +152,324 @@ const getToPath = (tag: ITagItem) => {
   }
 }
 
-// 添加自动滚动到激活标签的函数
+// 根据路径获取合适的图标
+const getTabIcon = (tag: ITagItem) => {
+  const path = tag.path.toLowerCase()
+
+  if (path === '/home' || path === '/') {
+    return HomeFilled
+  } else if (path.includes('setting') || path.includes('config')) {
+    return Setting
+  } else if (path.includes('help') || path.includes('about')) {
+    return InfoFilled
+  } else if (path.includes('question') || path.includes('faq')) {
+    return QuestionFilled
+  }
+
+  return Document
+}
+
+// 截断过长的文本
+const truncateText = (text: string, maxLength = 20) => {
+  if (text.length <= maxLength) return text
+  return text.substring(0, maxLength - 3) + '...'
+}
+
+// 滚动控制
+const scrollLeft = () => {
+  if (scrollContainer.value) {
+    scrollContainer.value.scrollBy({ left: -150, behavior: 'smooth' })
+  }
+}
+
+const scrollRight = () => {
+  if (scrollContainer.value) {
+    scrollContainer.value.scrollBy({ left: 150, behavior: 'smooth' })
+  }
+}
+
+// 检查是否需要显示滚动控件
+const checkScrollControls = () => {
+  nextTick(() => {
+    if (scrollContainer.value) {
+      showScrollControls.value = scrollContainer.value.scrollWidth > scrollContainer.value.clientWidth
+    }
+  })
+}
+
+// 自动滚动到激活的标签
 const scrollToActiveTab = () => {
   nextTick(() => {
-    const activeTab = document.querySelector('.tag-item.active');
-    if (activeTab) {
-      activeTab.scrollIntoView({
-        behavior: 'smooth',
-        inline: 'center'
-      });
+    const activeTab = document.querySelector('.idea-tab.is-active')
+    if (activeTab && scrollContainer.value) {
+      const container = scrollContainer.value
+      const tab = activeTab as HTMLElement
+      const containerRect = container.getBoundingClientRect()
+      const tabRect = tab.getBoundingClientRect()
+
+      // 只有当标签不完全可见时才滚动
+      if (tabRect.left < containerRect.left || tabRect.right > containerRect.right) {
+        tab.scrollIntoView({
+          behavior: 'smooth',
+          inline: 'center',
+          block: 'nearest'
+        })
+      }
     }
-  });
-};
-// 监听路由变化并滚动到激活标签
+  })
+}
+
+onMounted(() => {
+  checkScrollControls()
+})
+
 watch(
   () => route.path,
   () => {
     setTimeout(() => {
-      scrollToActiveTab();
-    }, 100);
+      scrollToActiveTab()
+      checkScrollControls()
+    }, 100)
   }
 )
-// 在添加标签页后也调用滚动
-watch(
-  () => router.currentRoute.value,
-  (newValue) => {
-    // ... existing code ...
 
-    // 在添加标签后滚动到激活项
-    setTimeout(() => {
-      scrollToActiveTab();
-    }, 100);
-  },
-  { immediate: true }
-);
+watch(
+  () => tagViewList.value.length,
+  () => {
+    checkScrollControls()
+  }
+)
 </script>
 
 <style scoped lang="scss">
-@use '@/styles/variables.scss' as variables;
+@use '@/styles/variables.scss' as *;
 @use '@/styles/theme.scss';
 
-.suspension {
-  // box-shadow: 0 0 2px 0px #ccc;
-
-  &:hover {
-    box-shadow: inset 0 0 3px 0px #ddd;
-  }
-}
-
-.tab-control {
+.idea-tab-bar {
   display: flex;
   align-items: center;
-  padding: 2px 2px;
-  // border-radius: 3px;
-  height: $tage-view-height;
+  height: 32px;
+  position: relative;
 
-
-  @include useTheme {
-    border-bottom: 1px solid getVar('borderColor');
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+    border-bottom: 1px solid theme.getVar('borderColor');
   }
 
-  .tab-box {
-    white-space: nowrap;
+  .tab-scroll-container {
+    flex: 1;
     overflow-x: auto;
-    overflow-y: hidden; // 确保只允许横向滚动
-    scroll-behavior: smooth;
-    width: 100%;
-    // 改善滚动体验
-    -webkit-overflow-scrolling: touch;
+    overflow-y: hidden;
+    white-space: nowrap;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 
-    @include scrollbar;
+    &::-webkit-scrollbar {
+      display: none;
+    }
 
-    .tag-item {
-      display: inline-block;
-      padding: 0px 3px;
-      font-size: $font-size;
-      margin: 0px 3px;
-      border-radius: 1px;
+    .tabs-wrapper {
+      display: inline-flex;
+      height: 100%;
+      align-items: center;
+    }
+  }
 
-      &:not(.active):hover {
-        color: variables.$theme-color;
+  .idea-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    height: 28px;
+    margin: 0 1px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    min-width: 100px;
+    max-width: 200px;
+
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+      background-color: theme.getVar('bgColor');
+      border: 1px solid transparent;
+    }
+
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+
+    &:hover {
+      @include theme.useTheme {
+        background-color: theme.getVar('hoverColor');
+        color: theme.getVar('textColor');
+      }
+
+      .close-icon {
+        opacity: 1;
+        visibility: visible;
+      }
+    }
+// ... existing code ...
+
+    &.is-active {
+      font-weight: 500;
+      position: relative;
+      z-index: 1;
+
+      @include theme.useTheme {
+        background-color: theme.getVar('appMainBgColor');
+        color: $theme-color;
+        border-color: theme.getVar('borderColor');
+        border-bottom-color: transparent;
+      }
+
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, $theme-color 0%, lighten($theme-color, 10%) 100%);
+      }
+
+      .close-icon {
+        opacity: 1;
+        visibility: visible;
+
+        &:hover {
+          @include theme.useTheme {
+            background-color: rgba($theme-color, 0.2);
+          }
+          color: #ff6b6b;
+        }
+      }
+    }
+
+// ... existing code ...
+
+
+    &.is-pinned {
+      cursor: default;
+
+      .close-icon {
+        display: none;
+      }
+    }
+
+    .tab-icon {
+      font-size: 13px;
+      flex-shrink: 0;
+      opacity: 0.8;
+
+      svg {
+        width: 13px;
+        height: 13px;
+      }
+    }
+
+    .tab-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      line-height: 1;
+    }
+
+    .close-icon {
+      font-size: 11px;
+      padding: 2px;
+      border-radius: 3px;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+
+      &:hover {
+        @include theme.useTheme {
+          background-color: theme.getVar('shadowColor');
+        }
+      }
+    }
+  }
+
+  .scroll-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 4px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 2;
+
+    @include theme.useTheme {
+      background: linear-gradient(to right,
+        theme.getVar('bgColor') 0%,
+        theme.getVar('bgColor') 80%,
+        transparent 100%);
+    }
+
+    .control-btn {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      @include theme.useTheme {
+        color: theme.getVar('textColor');
       }
 
       &:hover {
-        .close--icon {
-          display: inline-block;
-          width: 14px;
-          margin-left: 8px;
-        }
-      }
-
-      &.active {
-        box-shadow: inset 0 0 3px 0px #ddd;
-        color: variables.$theme-color;
-      }
-
-      .tag--title {
-        vertical-align: middle;
-      }
-
-      .close--icon {
-        width: 0;
-        vertical-align: middle;
-        transition: all 0.5s;
-
-        &:hover {
+        @include theme.useTheme {
+          background-color: $theme-color;
           color: #fff;
-          background: #ccc;
-          border-radius: 50%;
         }
       }
 
-      // 针对首个 tag-item 去除 padding 和 margin
-      &:first-child {
-        padding: 0px 3px 0px 0px;
-        margin: 0px 3px 0px 0px;
+      &:active {
+        transform: scale(0.95);
+      }
+
+      &.left {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+      }
+
+      &.right {
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
       }
     }
   }
 }
 
-:deep(.el-tabs__header) {
-  margin-bottom: 0;
+// IDEA 风格的标签动画
+.idea-tab-enter-active {
+  transition: all 0.2s ease-out;
+}
+
+.idea-tab-leave-active {
+  transition: all 0.2s ease-in;
+  position: absolute;
+}
+
+.idea-tab-enter-from {
+  opacity: 0;
+  transform: translateX(-10px) scale(0.95);
+}
+
+.idea-tab-leave-to {
+  opacity: 0;
+  transform: translateX(10px) scale(0.95);
+}
+
+.idea-tab-move {
+  transition: transform 0.2s ease;
 }
 </style>

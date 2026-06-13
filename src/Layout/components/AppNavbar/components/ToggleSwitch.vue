@@ -12,6 +12,7 @@
 <script lang="ts" setup>
 import useStore from '@/store'
 import { storeToRefs } from 'pinia'
+import { Expand, Fold } from '@element-plus/icons-vue'
 
 const { system } = useStore()
 const { isCollapse } = storeToRefs(system)

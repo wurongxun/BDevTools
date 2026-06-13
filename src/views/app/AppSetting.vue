@@ -2,116 +2,124 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { Check, Close } from '@element-plus/icons-vue'
 import { invoke } from '@tauri-apps/api/core'
-import { ResponseData, SettingIdValueName, SettingMap } from '@/entity/entitys';
-import { useI18n } from "vue-i18n";
+import { ResponseData, SettingIdValueName, SettingMap } from '@/entity/entitys'
+import { useI18n } from 'vue-i18n'
 import useStore from '@/store/index'
-import { load, Store } from '@tauri-apps/plugin-store';
-import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart';
-import { open } from '@tauri-apps/plugin-dialog';
+import { load, Store } from '@tauri-apps/plugin-store'
+import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
+import { open } from '@tauri-apps/plugin-dialog'
 import { isDark, toggleDark } from '@/composables/useDark'
-import { ITagItem } from '@/Types/TagView';
-import NotificationUtil from '@/utils/NotificationUtil';
-import { tauri_request } from '@/utils/tauri_request';
-import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting';
-import { TreeNode } from '@/Types/entitys';
+import { ITagItem } from '@/Types/TagView'
+import NotificationUtil from '@/utils/NotificationUtil'
+import { tauri_request } from '@/utils/tauri_request'
+import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting'
+import { TreeNode } from '@/Types/entitys'
 import { useRouter, useRoute, LocationQueryRaw, RouteParamsRaw } from 'vue-router'
-import { check as check_ } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
-const update_app_check = await check_();
+import { check as check_, Update } from '@tauri-apps/plugin-updater'
+import { relaunch } from '@tauri-apps/plugin-process'
+//const update_app_check = await check_();
 const { appConfig, routerNoteStore, tagview } = useStore()
 const router = useRouter()
 const route = useRoute()
 const { t, locale } = useI18n()
-const userStore = appConfig;
-let store: Store | undefined = undefined;
+const userStore = appConfig
+let store: Store | undefined = undefined
 let autostart = ref<boolean>(false)
 let update_reminder = ref<boolean>(false)
 let dark = ref<boolean>(false)
 let theme = ref<string>('white')
 let language = ref<string>('')
 let md_working_directory = ref<string>('')
+let update_app_check = ref<Update | null>(null)
 const language_options = [
   {
     value: 'zh_CN',
     label: '简体中文',
-    disabled: false,
+    disabled: false
   },
   {
     value: 'zh_TW',
     label: '繁体中文（中国台湾）',
-    disabled: false,
+    disabled: false
   },
   {
     value: 'zh_TW',
     label: '繁体中文（中国香港）',
-    disabled: false,
+    disabled: false
   },
   {
     value: 'en',
     label: 'English',
-    disabled: false,
+    disabled: false
   }
 ]
 const theme_options = [
   {
     value: 'white',
     label: '亮色',
-    disabled: false,
+    disabled: false
   },
   {
     value: 'black',
     label: '黑色',
-    disabled: false,
+    disabled: false
   }
 ]
 const tagViewList = computed<ITagItem[]>(() => tagview.tagViewList)
 
 onMounted(async () => {
+  debugger
   if (userStore.appConfig.length < 1) {
-    query_setting_list();
+    query_setting_list()
   }
   if (userStore.appConfig.length > 1) {
     show_setting()
   }
+  // try {
+  //   update_app_check.value = await check_()
+  //   console.log('Update check result:', update_app_check.value)
+  // } catch (error) {
+  //   console.error('Failed to check for updates:', error)
+  //   update_app_check.value = null
+  // }
+
   store = await load('settings.json', {
     autoSave: false,
     defaults: {}
-  });
+  })
 
-  let val_auto_start = await store.get<{ value: boolean }>('auto_start');
+  let val_auto_start = await store.get<{ value: boolean }>('auto_start')
   if (val_auto_start !== undefined) {
-    autostart.value = val_auto_start.value;
-    userStore.setAutoStart(val_auto_start.value);
+    autostart.value = val_auto_start.value
+    userStore.setAutoStart(val_auto_start.value)
   }
-  let language_val = await store.get<{ value: string }>('language');
+  let language_val = await store.get<{ value: string }>('language')
   if (language_val !== undefined) {
-    language.value = language_val.value;
-    userStore.setLanguage(language_val.value);
+    language.value = language_val.value
+    userStore.setLanguage(language_val.value)
   }
-  let md_working_directory_val = await store.get<{ value: string }>('md_working_directory');
+  let md_working_directory_val = await store.get<{ value: string }>('md_working_directory')
   if (md_working_directory_val !== undefined) {
-    md_working_directory.value = md_working_directory_val.value;
-    userStore.setMdWorkingDirectory(md_working_directory_val.value);
+    md_working_directory.value = md_working_directory_val.value
+    userStore.setMdWorkingDirectory(md_working_directory_val.value)
   }
-  let update_reminder_val = await store.get<{ value: boolean }>('update_reminder');
+  let update_reminder_val = await store.get<{ value: boolean }>('update_reminder')
   if (update_reminder_val !== undefined) {
-    update_reminder.value = update_reminder_val.value;
+    update_reminder.value = update_reminder_val.value
   }
-  let theme_val = await store.get<{ value: string }>('theme');
+  let theme_val = await store.get<{ value: string }>('theme')
   if (theme_val !== undefined) {
-    theme.value = theme_val.value;
-    userStore.setTheme(theme_val.value);
+    theme.value = theme_val.value
+    userStore.setTheme(theme_val.value)
   }
-  let dark_val = await store.get<{ value: boolean }>('dark');
+  let dark_val = await store.get<{ value: boolean }>('dark')
   if (dark_val !== undefined) {
-    dark.value = dark_val.value;
-    userStore.setDark(dark.value);
+    dark.value = dark_val.value
+    userStore.setDark(dark.value)
   }
 })
 
-function show_setting() {
-
-}
+function show_setting() {}
 
 function query_setting_list() {
   // invoke('query_setting_list').then((res): void => {
@@ -129,42 +137,42 @@ function setting_change() {
 }
 
 async function language_change() {
-  locale.value = language.value;
-  console.log("locale.value:=================", locale.value)
+  locale.value = language.value
+  console.log('locale.value:=================', locale.value)
   if (store) {
-    await store.set('language', { value: language.value });
-    await store.save();
+    await store.set('language', { value: language.value })
+    await store.save()
   }
 }
 async function autostart_change() {
   if (store) {
-    await store.set('auto_start', { value: autostart.value });
-    await store.save();
+    await store.set('auto_start', { value: autostart.value })
+    await store.save()
     if (autostart.value) {
-      await enable();
+      await enable()
     } else {
-      await disable();
+      await disable()
     }
   }
 }
 async function software_change() {
   if (store) {
-    await store.set('update_reminder', { value: update_reminder.value });
-    await store.save();
+    await store.set('update_reminder', { value: update_reminder.value })
+    await store.save()
   }
 }
 async function theme_change() {
   if (store) {
-    await store.set('theme', { value: theme.value });
-    await store.save();
-    let el_color_primary = isDark.value ? "black" : ""
-    document.documentElement.style.setProperty('--el-color-primary', el_color_primary);
+    await store.set('theme', { value: theme.value })
+    await store.save()
+    let el_color_primary = isDark.value ? 'black' : ''
+    document.documentElement.style.setProperty('--el-color-primary', el_color_primary)
   }
 }
 async function dark_change() {
   if (store) {
-    await store.set('dark', { value: dark.value });
-    await store.save();
+    await store.set('dark', { value: dark.value })
+    await store.save()
     if (!isDark.value && dark.value) {
       toggleDark()
     } else if (isDark.value && !dark.value) {
@@ -173,42 +181,44 @@ async function dark_change() {
   }
 }
 async function md_working_directory_change() {
-  const file_directory: string = await open({
+  let file_directory: string = await open({
     multiple: false,
-    directory: true,
-  });
+    directory: true
+  })
+  debugger
   if (file_directory) {
-
   }
   if (md_working_directory.value != file_directory) {
-    md_working_directory.value = file_directory;
+    md_working_directory.value = file_directory
 
     //清空tagView
     let tagviews: ITagItem[] = tagview.getTagviewList()
-    console.log("tagviews:=================", tagviews)
+    console.log('tagviews:=================', tagviews)
     for (let tagview of tagviews) {
       let result: boolean = await processNodeCache({
         filePath: tagview.filePath,
-        id: tagview.id, label: tagview.title,
-        isfile: true, isFolder: false, routerPath: tagview.path, folder: ''
+        id: tagview.id,
+        label: tagview.title,
+        isfile: true,
+        isFolder: false,
+        routerPath: tagview.path,
+        folder: ''
       })
       if (!result) {
-        console.log("processNodeCache error:", result);
+        console.log('processNodeCache error:', result)
         return
       }
     }
     if (store) {
-      store.set('md_working_directory', { value: file_directory });
-      store.save();
+      store.set('md_working_directory', { value: file_directory })
+      store.save()
     }
-    console.log("processNodeCache error:========");
-    tagview.deleteTagViewList();
-    const routerNote = routerNoteStore.setRoutes();
-    console.log("processNodeCache error:========2", routerNote);
-
+    console.log('processNodeCache error:========')
+    tagview.deleteTagViewList()
+    const routerNote = routerNoteStore.setRoutes()
+    console.log('processNodeCache error:========2', routerNote)
   }
   // 重新加载数据逻辑
-
 }
 // 添加清除缓存和浏览器缓存的函数
 const clear_cache = () => {
@@ -223,84 +233,82 @@ const clear_browser_cache = () => {
 // 提取公共的缓存处理函数
 const processNodeCache = async (item: TreeNode) => {
   try {
-    let cached_content: string | null = null;
-    let content: string | null = null;
-    const key_tem = pdf_store_tem_key_prefix + item.id;
-    const key_conten = pdf_store_conten_key_prefix + item.id;
-    console.log("processNodeCache key_tem key_conten:", key_tem, key_conten);
-    const tem_val = await store.get<{ value: string }>(key_tem);
-    console.log("processNodeCache tem_val:", tem_val);
-    if (tem_val != undefined && tem_val.value != null && tem_val.value != "") {
-      cached_content = tem_val.value;
+    let cached_content: string | null = null
+    let content: string | null = null
+    const key_tem = pdf_store_tem_key_prefix + item.id
+    const key_conten = pdf_store_conten_key_prefix + item.id
+    console.log('processNodeCache key_tem key_conten:', key_tem, key_conten)
+    const tem_val = await store.get<{ value: string }>(key_tem)
+    console.log('processNodeCache tem_val:', tem_val)
+    if (tem_val != undefined && tem_val.value != null && tem_val.value != '') {
+      cached_content = tem_val.value
     } else {
-      console.log("processNodeCache 无需处理:", key_tem, key_conten);
+      console.log('processNodeCache 无需处理:', key_tem, key_conten)
       return true
     }
 
-    const content_val = await store.get<{ value: string }>(key_conten);
+    const content_val = await store.get<{ value: string }>(key_conten)
     if (content_val !== undefined) {
-      content = content_val.value;
+      content = content_val.value
     }
 
     // 简化条件判断
-    console.log("processNodeCache 简化条件判断:", cached_content, content);
+    console.log('processNodeCache 简化条件判断:', cached_content, content)
     if (cached_content && content != cached_content) {
-      console.log("processNodeCache 简化条件判断:",);
+      console.log('processNodeCache 简化条件判断:')
       //保存文件
-      const save_file_re = await tauri_request<ResponseData<String[]>>("save_note", {
+      const save_file_re = await tauri_request<ResponseData<String[]>>('save_note', {
         path: item.filePath, // 修复：使用正确的路径
-        mdText: cached_content,
+        mdText: cached_content
       })
       if (save_file_re && save_file_re.code != 200) {
-        NotificationUtil.error("文件保存失败：" + save_file_re.msg + "请检查！");
-        return false;
+        NotificationUtil.error('文件保存失败：' + save_file_re.msg + '请检查！')
+        return false
       }
       // 删除缓存
     }
-    let delete_tem: boolean = await store.delete(key_tem);
-    let delete_conten: boolean = await store.delete(key_conten);
-    console.log("processNodeCache 删除缓存 删除结果:", delete_tem, delete_conten);
+    let delete_tem: boolean = await store.delete(key_tem)
+    let delete_conten: boolean = await store.delete(key_conten)
+    console.log('processNodeCache 删除缓存 删除结果:', delete_tem, delete_conten)
     if (!delete_tem || !delete_conten) {
-      NotificationUtil.error("缓存删除失败！");
+      NotificationUtil.error('缓存删除失败！')
     }
-    console.log("processNodeCache 删除缓存 删除结果:", item.routerPath);
+    console.log('processNodeCache 删除缓存 删除结果:', item.routerPath)
 
-    tagview.removeTagViewByPath(item.routerPath);
-    return true;
+    tagview.removeTagViewByPath(item.routerPath)
+    return true
   } catch (error) {
-    NotificationUtil.error("操作失败：" + error);
-    return false;
+    NotificationUtil.error('操作失败：' + error)
+    return false
   }
-};
-
+}
 
 const app_updates_check = async () => {
-
   if (update_app_check) {
     console.log(
       `found update ${update_app_check.version} from ${update_app_check.date} with notes ${update_app_check.body}`
-    );
-    let downloaded = 0;
-    let contentLength = 0;
+    )
+    let downloaded = 0
+    let contentLength = 0
     // alternatively we could also call update.download() and update.install() separately
     await update_app_check.downloadAndInstall((event) => {
       switch (event.event) {
         case 'Started':
-          contentLength = event.data.contentLength;
-          console.log(`started downloading ${event.data.contentLength} bytes`);
-          break;
+          contentLength = event.data.contentLength
+          console.log(`started downloading ${event.data.contentLength} bytes`)
+          break
         case 'Progress':
-          downloaded += event.data.chunkLength;
-          console.log(`downloaded ${downloaded} from ${contentLength}`);
-          break;
+          downloaded += event.data.chunkLength
+          console.log(`downloaded ${downloaded} from ${contentLength}`)
+          break
         case 'Finished':
-          console.log('download finished');
-          break;
+          console.log('download finished')
+          break
       }
-    });
+    })
 
-    console.log('update installed');
-    await relaunch();
+    console.log('update installed')
+    await relaunch()
   }
 }
 </script>
@@ -318,8 +326,13 @@ const app_updates_check = async () => {
             <span class="setting-description">{{ $t('autostart.hint') }}</span>
           </div>
           <div class="setting-control">
-            <el-switch v-model="autostart" @change="autostart_change()" inline-prompt :active-icon="Check"
-              :inactive-icon="Close" />
+            <el-switch
+              v-model="autostart"
+              @change="autostart_change()"
+              inline-prompt
+              :active-icon="Check"
+              :inactive-icon="Close"
+            />
           </div>
         </div>
 
@@ -329,8 +342,14 @@ const app_updates_check = async () => {
             <span class="setting-description">{{ $t('update.hint') }}</span>
           </div>
           <div class="setting-control">
-            <el-switch v-model="update_reminder" @change="software_change()" inline-prompt :active-icon="Check"
-              :inactive-icon="Close" disabled />
+            <el-switch
+              v-model="update_reminder"
+              @change="software_change()"
+              inline-prompt
+              :active-icon="Check"
+              :inactive-icon="Close"
+              disabled
+            />
           </div>
         </div>
         <div class="settings-item">
@@ -339,9 +358,19 @@ const app_updates_check = async () => {
             <span class="setting-description">切换主题</span>
           </div>
           <div class="setting-control">
-            <el-select v-model="theme" @change="theme_change" placeholder="选择主题" style="width: 180px">
-              <el-option v-for="item in theme_options" :key="item.value" :label="item.label" :value="item.value"
-                :disabled="item.disabled" />
+            <el-select
+              v-model="theme"
+              @change="theme_change"
+              placeholder="选择主题"
+              style="width: 180px"
+            >
+              <el-option
+                v-for="item in theme_options"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+                :disabled="item.disabled"
+              />
             </el-select>
           </div>
         </div>
@@ -351,8 +380,13 @@ const app_updates_check = async () => {
             <span class="setting-description"></span>
           </div>
           <div class="setting-control">
-            <el-switch v-model="dark" @change="dark_change()" inline-prompt :active-icon="Check"
-              :inactive-icon="Close" />
+            <el-switch
+              v-model="dark"
+              @change="dark_change()"
+              inline-prompt
+              :active-icon="Check"
+              :inactive-icon="Close"
+            />
           </div>
         </div>
         <div class="settings-item">
@@ -361,9 +395,19 @@ const app_updates_check = async () => {
             <span class="setting-description">选择界面显示语言</span>
           </div>
           <div class="setting-control">
-            <el-select v-model="language" @change="language_change" placeholder="选择语言" style="width: 180px">
-              <el-option v-for="item in language_options" :key="item.value" :label="item.label" :value="item.value"
-                :disabled="item.disabled" />
+            <el-select
+              v-model="language"
+              @change="language_change"
+              placeholder="选择语言"
+              style="width: 180px"
+            >
+              <el-option
+                v-for="item in language_options"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+                :disabled="item.disabled"
+              />
             </el-select>
           </div>
         </div>
