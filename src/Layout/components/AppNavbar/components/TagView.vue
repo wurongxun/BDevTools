@@ -262,6 +262,7 @@ watch(
 
 <style scoped lang="scss">
 @use '@/styles/variables.scss' as *;
+@use 'sass:color';
 @use '@/styles/theme.scss';
 
 .idea-tab-bar {
@@ -289,125 +290,110 @@ watch(
       display: none;
     }
 
-    .tabs-wrapper {
+    .idea-tab {
       display: inline-flex;
-      height: 100%;
       align-items: center;
-      padding-left: 4px;
-    }
-  }
-
-  .idea-tab {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 12px;
-    height: 28px;
-    margin: 0 1px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    user-select: none;
-    min-width: 100px;
-    max-width: 200px;
-    flex-shrink: 0;
-
-    @include theme.useTheme {
-      color: theme.getVar('textColor');
-      background-color: theme.getVar('bgColor');
-      border: 1px solid transparent;
-    }
-
-    border-top-left-radius: 3px;
-    border-top-right-radius: 3px;
-
-    &:hover {
-      @include theme.useTheme {
-        background-color: theme.getVar('hoverColor');
-        color: theme.getVar('textColor');
-      }
-
-      .close-icon {
-        opacity: 1;
-        visibility: visible;
-      }
-    }
-
-    &.is-active {
-      font-weight: 500;
-      position: relative;
-      z-index: 1;
-
-      @include theme.useTheme {
-        background-color: theme.getVar('appMainBgColor');
-        color: $theme-color;
-        border-color: theme.getVar('borderColor');
-        border-bottom-color: transparent;
-      }
-
-      &::after {
-        content: '';
-        position: absolute;
-        bottom: -1px;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: linear-gradient(90deg, $theme-color 0%, lighten($theme-color, 10%) 100%);
-      }
-
-      .close-icon {
-        opacity: 1;
-        visibility: visible;
-
-        &:hover {
-          @include theme.useTheme {
-            background-color: rgba($theme-color, 0.2);
-          }
-          color: #ff6b6b;
-        }
-      }
-    }
-
-    &.is-pinned {
-      cursor: default;
-
-      .close-icon {
-        display: none;
-      }
-    }
-
-    .tab-icon {
-      font-size: 13px;
-      flex-shrink: 0;
-      opacity: 0.8;
-
-      svg {
-        width: 13px;
-        height: 13px;
-      }
-    }
-
-    .tab-text {
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      line-height: 1;
-      min-width: 0;
-    }
-
-    .close-icon {
-      font-size: 11px;
-      padding: 2px;
-      border-radius: 3px;
-      opacity: 0;
-      visibility: hidden;
+      gap: 6px;
+      padding: 4px 12px;
+      margin-right: 1px;
+      height: 28px;
+      cursor: pointer;
       transition: all 0.15s ease;
-      flex-shrink: 0;
+      position: relative;
+      border-radius: 4px 4px 0 0;
+      font-size: 13px;
+      user-select: none;
+      vertical-align: top;
+
+      @include theme.useTheme {
+        color: theme.getVar('textColor');
+        background-color: transparent;
+      }
 
       &:hover {
         @include theme.useTheme {
-          background-color: theme.getVar('shadowColor');
+          background-color: rgba(theme.getVar('textColor'), 0.05);
+        }
+
+        .close-icon {
+          opacity: 1;
+          visibility: visible;
+        }
+      }
+
+      &.is-active {
+        font-weight: 500;
+
+        @include theme.useTheme {
+          background-color: theme.getVar('bgColor');
+          color: $theme-color;
+          border-bottom-color: transparent;
+        }
+
+        &::after {
+          content: '';
+          position: absolute;
+          bottom: -1px;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background: linear-gradient(90deg, $theme-color 0%, color.adjust($theme-color, $lightness: 10%) 100%);
+        }
+
+        .close-icon {
+          opacity: 1;
+          visibility: visible;
+
+          &:hover {
+            @include theme.useTheme {
+              background-color: rgba($theme-color, 0.2);
+            }
+            color: #ff6b6b;
+          }
+        }
+      }
+
+      &.is-pinned {
+        cursor: default;
+
+        .close-icon {
+          display: none;
+        }
+      }
+
+      .tab-icon {
+        font-size: 13px;
+        flex-shrink: 0;
+        opacity: 0.8;
+
+        svg {
+          width: 13px;
+          height: 13px;
+        }
+      }
+
+      .tab-text {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        line-height: 1;
+        min-width: 0;
+      }
+
+      .close-icon {
+        font-size: 11px;
+        padding: 2px;
+        border-radius: 3px;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+
+        &:hover {
+          @include theme.useTheme {
+            background-color: theme.getVar('shadowColor');
+          }
         }
       }
     }

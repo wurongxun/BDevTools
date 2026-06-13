@@ -11,7 +11,7 @@
       </template>
 
       <el-table-column
-        v-for="(item, index) in attrs.columns || []"
+        v-for="(item, index) in (attrs as propsType).columns || []"
         :key="index"
         v-bind="item"
         :align="item.align || 'center'"
@@ -30,10 +30,10 @@
     <div class="pager-box" v-if="isShowPager">
       <el-pagination
         ref="PaginationRef"
-        v-model:current-page="attrs.pager!.currentPage"
-        v-model:page-size="attrs.pager!.pageSize"
-        :page-sizes="attrs.pager?.pageSizes || [10, 20, 30, 50]"
-        :total="attrs.pager?.total || 0"
+        v-model:current-page="(attrs as propsType).pager!.currentPage"
+        v-model:page-size="(attrs as propsType).pager!.pageSize"
+        :page-sizes="(attrs as propsType).pager?.pageSizes || [10, 20, 30, 50]"
+        :total="(attrs as propsType).pager?.total || 0"
         background
         layout="total, sizes, prev, pager, next, jumper"
       />
@@ -47,10 +47,11 @@ import type { propsType } from './types'
 
 let ElTableRef = ref(null)
 let PaginationRef = ref(null)
-const attrs: propsType = useAttrs()
+const attrs = useAttrs()
 
 const isShowPager = computed((): boolean => {
-  return !!attrs.pager?.currentPage && !!attrs.pager?.pageSize
+  const pagerAttrs = attrs as propsType
+  return !!pagerAttrs.pager?.currentPage && !!pagerAttrs.pager?.pageSize
 })
 
 defineExpose({
