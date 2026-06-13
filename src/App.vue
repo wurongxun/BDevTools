@@ -1,11 +1,7 @@
 <template>
   <div id="app">
-    <router-view v-slot="{ Component, route }">
-      <transition name="fade-transform" mode="out-in">
-        <keep-alive :include="cacheList" :max="20">
-          <component :is="Component" :key="route.fullPath" />
-        </keep-alive>
-      </transition>
+    <router-view v-slot="{ Component }">
+      <component :is="Component" />
     </router-view>
   </div>
 </template>
@@ -15,6 +11,7 @@ import { storeToRefs } from 'pinia'
 
 const { tagview } = useStore()
 const { cacheList } = storeToRefs(tagview)
+
 
 //禁止F12
 // document.onkeydown = function (event: KeyboardEvent) {

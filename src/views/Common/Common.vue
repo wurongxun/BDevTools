@@ -24,7 +24,7 @@ const appName = ref<string>(t('appName'));
       <div class="bread-crumb-box">
         <bread-crumb></bread-crumb>
       </div>
-      <functional-area></functional-area>
+<!--      <functional-area></functional-area>-->
       <!-- <avatar></avatar> -->
     </header>
     <main class="app-container">

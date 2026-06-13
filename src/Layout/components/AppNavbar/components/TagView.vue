@@ -41,7 +41,7 @@
 
 <script setup lang="ts">
 import useStore from '@/store/index'
-import { computed, nextTick, watch, ref, onMounted } from 'vue'
+import { computed, nextTick, watch, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Close,
@@ -57,12 +57,14 @@ import ToolUtils from '@/utils/ToolUtils'
 import type { ITagItem } from '@/Types/TagView'
 import { ElMessageBox } from 'element-plus'
 import NotificationUtil from '@/utils/NotificationUtil'
+import { useResizeObserver } from '@vueuse/core'
 
 const route = useRoute()
 const router = useRouter()
 const { tagview, noteTem } = useStore()
 const scrollContainer = ref<HTMLElement | null>(null)
 const showScrollControls = ref(false)
+const tabBarController = ref<HTMLElement | null>(null)
 
 watch(
   () => router.currentRoute.value,
@@ -219,8 +221,25 @@ const scrollToActiveTab = () => {
   })
 }
 
+// 使用 ResizeObserver 监听容器大小变化（不影响其他组件）
+useResizeObserver(tabBarController, (entries) => {
+  for (const entry of entries) {
+    if (entry.target === tabBarController.value) {
+      setTimeout(() => {
+        checkScrollControls()
+        scrollToActiveTab()
+      }, 100)
+      break
+    }
+  }
+})
+
 onMounted(() => {
   checkScrollControls()
+})
+
+onUnmounted(() => {
+  // ResizeObserver 会自动清理，无需手动操作
 })
 
 watch(
@@ -250,6 +269,7 @@ watch(
   align-items: center;
   height: 32px;
   position: relative;
+  overflow: hidden;
 
   @include theme.useTheme {
     background-color: theme.getVar('bgColor');
@@ -263,6 +283,7 @@ watch(
     white-space: nowrap;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    min-width: 0;
 
     &::-webkit-scrollbar {
       display: none;
@@ -272,6 +293,7 @@ watch(
       display: inline-flex;
       height: 100%;
       align-items: center;
+      padding-left: 4px;
     }
   }
 
@@ -288,6 +310,7 @@ watch(
     user-select: none;
     min-width: 100px;
     max-width: 200px;
+    flex-shrink: 0;
 
     @include theme.useTheme {
       color: theme.getVar('textColor');
@@ -309,7 +332,6 @@ watch(
         visibility: visible;
       }
     }
-// ... existing code ...
 
     &.is-active {
       font-weight: 500;
@@ -346,9 +368,6 @@ watch(
       }
     }
 
-// ... existing code ...
-
-
     &.is-pinned {
       cursor: default;
 
@@ -374,6 +393,7 @@ watch(
       text-overflow: ellipsis;
       white-space: nowrap;
       line-height: 1;
+      min-width: 0;
     }
 
     .close-icon {
@@ -403,6 +423,7 @@ watch(
     top: 0;
     bottom: 0;
     z-index: 2;
+    flex-shrink: 0;
 
     @include theme.useTheme {
       background: linear-gradient(to right,
@@ -420,6 +441,7 @@ watch(
       border-radius: 3px;
       cursor: pointer;
       transition: all 0.15s ease;
+      flex-shrink: 0;
 
       @include theme.useTheme {
         color: theme.getVar('textColor');

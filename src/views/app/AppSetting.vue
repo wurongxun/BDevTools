@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Check, Close } from '@element-plus/icons-vue'
+import { Check, Close, Folder, FolderChecked } from '@element-plus/icons-vue'
 import { invoke } from '@tauri-apps/api/core'
 import { ResponseData, SettingIdValueName, SettingMap } from '@/entity/entitys'
 import { useI18n } from 'vue-i18n'
@@ -15,9 +15,9 @@ import { tauri_request } from '@/utils/tauri_request'
 import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting'
 import { TreeNode } from '@/Types/entitys'
 import { useRouter, useRoute, LocationQueryRaw, RouteParamsRaw } from 'vue-router'
-import { check as check_, Update } from '@tauri-apps/plugin-updater'
+import { check as check_, Update, DownloadEvent } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
-//const update_app_check = await check_();
+
 const { appConfig, routerNoteStore, tagview } = useStore()
 const router = useRouter()
 const route = useRoute()
@@ -30,7 +30,13 @@ let dark = ref<boolean>(false)
 let theme = ref<string>('white')
 let language = ref<string>('')
 let md_working_directory = ref<string>('')
-let update_app_check = ref<Update | null>(null)
+let has_update = ref<boolean>(false)
+let update_info = ref<{
+  version?: string;
+  date?: string;
+  body?: string;
+} | null>(null)
+
 const language_options = [
   {
     value: 'zh_CN',
@@ -43,7 +49,7 @@ const language_options = [
     disabled: false
   },
   {
-    value: 'zh_TW',
+    value: 'zh_HK',
     label: '繁体中文（中国香港）',
     disabled: false
   },
@@ -53,6 +59,7 @@ const language_options = [
     disabled: false
   }
 ]
+
 const theme_options = [
   {
     value: 'white',
@@ -65,23 +72,36 @@ const theme_options = [
     disabled: false
   }
 ]
+
 const tagViewList = computed<ITagItem[]>(() => tagview.tagViewList)
 
 onMounted(async () => {
-  debugger
   if (userStore.appConfig.length < 1) {
     query_setting_list()
   }
   if (userStore.appConfig.length > 1) {
     show_setting()
   }
-  // try {
-  //   update_app_check.value = await check_()
-  //   console.log('Update check result:', update_app_check.value)
-  // } catch (error) {
-  //   console.error('Failed to check for updates:', error)
-  //   update_app_check.value = null
-  // }
+
+  // 检查更新
+  try {
+    const update_result = await check_();
+    if (update_result) {
+      has_update.value = true;
+      update_info.value = {
+        version: update_result.version || '未知版本',
+        date: update_result.date || '',
+        body: update_result.body || ''
+      };
+      console.log('Update available:', update_info.value);
+    } else {
+      has_update.value = false;
+      console.log('No updates available');
+    }
+  } catch (error) {
+    console.error('Failed to check for updates:', error);
+    has_update.value = false;
+  }
 
   store = await load('settings.json', {
     autoSave: false,
@@ -144,6 +164,7 @@ async function language_change() {
     await store.save()
   }
 }
+
 async function autostart_change() {
   if (store) {
     await store.set('auto_start', { value: autostart.value })
@@ -155,12 +176,14 @@ async function autostart_change() {
     }
   }
 }
+
 async function software_change() {
   if (store) {
     await store.set('update_reminder', { value: update_reminder.value })
     await store.save()
   }
 }
+
 async function theme_change() {
   if (store) {
     await store.set('theme', { value: theme.value })
@@ -169,6 +192,7 @@ async function theme_change() {
     document.documentElement.style.setProperty('--el-color-primary', el_color_primary)
   }
 }
+
 async function dark_change() {
   if (store) {
     await store.set('dark', { value: dark.value })
@@ -180,15 +204,14 @@ async function dark_change() {
     }
   }
 }
+
 async function md_working_directory_change() {
   let file_directory: string = await open({
     multiple: false,
     directory: true
   })
-  debugger
+
   if (file_directory) {
-  }
-  if (md_working_directory.value != file_directory) {
     md_working_directory.value = file_directory
 
     //清空tagView
@@ -209,17 +232,18 @@ async function md_working_directory_change() {
         return
       }
     }
+
     if (store) {
-      store.set('md_working_directory', { value: file_directory })
-      store.save()
+      await store.set('md_working_directory', { value: file_directory })
+      await store.save()
     }
-    console.log('processNodeCache error:========')
+
     tagview.deleteTagViewList()
     const routerNote = routerNoteStore.setRoutes()
     console.log('processNodeCache error:========2', routerNote)
   }
-  // 重新加载数据逻辑
 }
+
 // 添加清除缓存和浏览器缓存的函数
 const clear_cache = () => {
   // 实现清除缓存的逻辑
@@ -230,6 +254,7 @@ const clear_browser_cache = () => {
   // 实现清除浏览器缓存的逻辑
   console.log('清除浏览器缓存')
 }
+
 // 提取公共的缓存处理函数
 const processNodeCache = async (item: TreeNode) => {
   try {
@@ -258,15 +283,15 @@ const processNodeCache = async (item: TreeNode) => {
       console.log('processNodeCache 简化条件判断:')
       //保存文件
       const save_file_re = await tauri_request<ResponseData<String[]>>('save_note', {
-        path: item.filePath, // 修复：使用正确的路径
+        path: item.filePath,
         mdText: cached_content
       })
       if (save_file_re && save_file_re.code != 200) {
         NotificationUtil.error('文件保存失败：' + save_file_re.msg + '请检查！')
         return false
       }
-      // 删除缓存
     }
+
     let delete_tem: boolean = await store.delete(key_tem)
     let delete_conten: boolean = await store.delete(key_conten)
     console.log('processNodeCache 删除缓存 删除结果:', delete_tem, delete_conten)
@@ -284,31 +309,51 @@ const processNodeCache = async (item: TreeNode) => {
 }
 
 const app_updates_check = async () => {
-  if (update_app_check) {
-    console.log(
-      `found update ${update_app_check.version} from ${update_app_check.date} with notes ${update_app_check.body}`
-    )
-    let downloaded = 0
-    let contentLength = 0
-    // alternatively we could also call update.download() and update.install() separately
-    await update_app_check.downloadAndInstall((event) => {
+  if (!has_update.value || !update_info.value) {
+    NotificationUtil.info('当前已是最新版本');
+    return;
+  }
+
+  try {
+    const version = update_info.value.version || '未知版本';
+    const date = update_info.value.date || '';
+    const body = update_info.value.body || '';
+
+    console.log(`开始下载更新 ${version} (${date})`);
+
+    let downloaded = 0;
+    let contentLength = 0;
+
+    // 重新检查更新以获取 Update 对象
+    const update = await check_();
+    if (!update) {
+      NotificationUtil.error('无法获取更新信息');
+      return;
+    }
+
+    await update.downloadAndInstall((event: DownloadEvent) => {
       switch (event.event) {
         case 'Started':
-          contentLength = event.data.contentLength
-          console.log(`started downloading ${event.data.contentLength} bytes`)
-          break
+          contentLength = event.data.contentLength || 0;
+          console.log(`开始下载 ${contentLength} bytes`);
+          break;
         case 'Progress':
-          downloaded += event.data.chunkLength
-          console.log(`downloaded ${downloaded} from ${contentLength}`)
-          break
+          downloaded += event.data.chunkLength || 0;
+          const progress = contentLength > 0 ? Math.round((downloaded / contentLength) * 100) : 0;
+          console.log(`下载进度: ${progress}% (${downloaded}/${contentLength})`);
+          break;
         case 'Finished':
-          console.log('download finished')
-          break
+          console.log('下载完成');
+          break;
       }
-    })
+    });
 
-    console.log('update installed')
-    await relaunch()
+    console.log('更新安装完成');
+    NotificationUtil.success('更新成功，即将重启应用');
+    await relaunch();
+  } catch (error) {
+    console.error('更新失败:', error);
+    NotificationUtil.error('更新失败: ' + (error instanceof Error ? error.message : String(error)));
   }
 }
 </script>
@@ -352,6 +397,7 @@ const app_updates_check = async () => {
             />
           </div>
         </div>
+
         <div class="settings-item">
           <div class="setting-info">
             <span class="setting-label">{{ $t('settings.theme') }}</span>
@@ -374,6 +420,7 @@ const app_updates_check = async () => {
             </el-select>
           </div>
         </div>
+
         <div class="settings-item">
           <div class="setting-info">
             <span class="setting-label">{{ $t('darkMode.name') }}</span>
@@ -389,6 +436,7 @@ const app_updates_check = async () => {
             />
           </div>
         </div>
+
         <div class="settings-item">
           <div class="setting-info">
             <span class="setting-label">{{ $t('locale.language') }}</span>
@@ -426,6 +474,7 @@ const app_updates_check = async () => {
           </div>
         </div>
       </div>
+
       <!-- 更新设置 -->
       <div class="settings-section">
         <h2 class="section-title">更新</h2>
@@ -433,12 +482,23 @@ const app_updates_check = async () => {
           <div class="setting-info">
             <span class="setting-label">应用更新</span>
             <span class="setting-description">手动检查新版本，获取最新功能和修复</span>
+            <span v-if="has_update && update_info" class="update-info">
+              发现新版本: {{ update_info.version }} ({{ update_info.date }})
+            </span>
           </div>
           <div class="setting-control">
-            <el-button type="primary" @click="app_updates_check" plain>检查更新</el-button>
+            <el-button
+              type="primary"
+              @click="app_updates_check"
+              :loading="!has_update"
+              plain
+            >
+              {{ has_update ? '立即更新' : '检查更新' }}
+            </el-button>
           </div>
         </div>
       </div>
+
       <!-- 其他设置 -->
       <div class="settings-section">
         <h2 class="section-title">其他设置</h2>
@@ -453,7 +513,7 @@ const app_updates_check = async () => {
               <el-icon class="folder-icon">
                 <Folder />
               </el-icon>
-              <span class="setting-working-directory">{{ md_working_directory }}</span>
+              <span class="setting-working-directory">{{ md_working_directory || '未设置' }}</span>
             </div>
           </div>
           <div class="setting-control">
@@ -489,6 +549,7 @@ const app_updates_check = async () => {
     </div>
   </div>
 </template>
+
 <style lang="scss" scoped>
 .settings-container {
   width: 100%;
@@ -566,6 +627,14 @@ const app_updates_check = async () => {
   display: block;
   font-size: 0.85rem;
   color: var(--el-text-color-secondary);
+}
+
+.update-info {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--el-color-success);
+  margin-top: 4px;
+  font-weight: 500;
 }
 
 .directory-display {
