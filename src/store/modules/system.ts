@@ -24,6 +24,13 @@ const systemStore = defineStore('systemStore', {
     },
 
     /**
+     * @description 展开侧边栏
+     */
+    expandCollapse(){
+      this.isCollapse = false
+    },
+
+    /**
      * @param { isDark } boolean
      * @description 暗黑，明亮主题切换
      */

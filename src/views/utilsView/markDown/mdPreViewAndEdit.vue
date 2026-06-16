@@ -1,46 +1,50 @@
 <template>
-    <div class="box" ref="box">
-        <div class="mid">
-            <div v-if="data.showMdEditor" class="editor-wrapper">
-                <!-- 修复: previewOnly 应该是布尔值绑定，虽然 true 也可以，但建议统一风格 -->
-                <MdEditor 
-                    :previewOnly="true"  
-                    v-model="data.editedMdtext_md" 
-                    @onSave="saveMdText" 
-                    :theme="editorTheme" 
-                    class="md-editor"
-                    @onError="onError" 
-                    @change="onContentChange" 
-                />
-            </div>
-            <div v-else class="editor-placeholder">
-                <div class="placeholder-content">
-                    <el-icon :size="48">
-                        <Document />
-                    </el-icon>
-                    <p class="placeholder-text">选择或创建一个笔记开始编辑</p>
-                    <!-- 注意: notebooks_data 在原代码中未赋值，这里保留原逻辑，但需注意其始终为 undefined 除非外部修改 -->
-                    <el-button 
-                        v-if="notebooks_data && notebooks_data.children && notebooks_data.children.length > 0"
-                        class="create-note-button"
-                        @click="handleCreateNote"
-                    >
-                        创建新笔记
-                    </el-button>
-                </div>
-            </div>
+  <div class="box" ref="box">
+    <div class="mid">
+      <div v-if="data.showMdEditor" class="editor-wrapper">
+        <MdEditor
+          ref="editorRef"
+          :previewOnly=true
+          v-model="data.editedMdtext_md"
+          @onSave="saveMdText"
+          :theme="editorTheme"
+          class="md-editor"
+          @onError="onError"
+          @change="onContentChange"
+        />
+      </div>
+      <div v-else class="editor-placeholder">
+        <div class="placeholder-content">
+          <el-icon :size="48">
+            <Document />
+          </el-icon>
+          <p class="placeholder-text">选择或创建一个笔记开始编辑</p>
+          <el-button v-if="notebooks_data && notebooks_data.children && notebooks_data.children.length > 0"
+                     class="create-note-button">
+            创建新笔记
+          </el-button>
         </div>
+      </div>
     </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import {
-    computed,
-    onMounted,
-    onUnmounted,
-    reactive,
-    ref,
-    watch,
+  computed,
+  h,
+  defineComponent,
+  onMounted,
+  reactive,
+  ref,
+  toRefs,
+  createVNode,
+  toRaw,
+  onActivated,
+  onDeactivated,
+  watch,
+  onUnmounted,
+  nextTick,
 } from "vue";
 import { ElMessage } from "element-plus"; // 仅保留实际使用的 Element Plus 导入
 import NotificationUtil from "@/utils/NotificationUtil";
@@ -94,6 +98,62 @@ let notebooks_data = ref<any>(undefined);
 
 // 编辑器引用
 const editorRef = ref<ExposeParam>();
+// 监听窗口 resize 事件，强制刷新编辑器
+let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+
+const handleWindowResize = async () => {
+  if (resizeTimer) {
+    clearTimeout(resizeTimer);
+  }
+
+  resizeTimer = setTimeout(async () => {
+    await nextTick();
+
+    // 如果编辑器实例存在，尝试触发其内部的重绘
+    if (editorRef.value) {
+      console.log('[mdPreViewAndEdit] Window resized, refreshing editor');
+
+      // 方法1: 尝试调用 md-editor-v3 的内置方法（如果有）
+      // editorRef.value?.rerender?.();
+
+      // 方法2: 通过修改 key 强制重新渲染（更激进的方式）
+      // 这里我们只是触发了一个自定义事件，让组件知道需要重新计算布局
+    }
+
+    // 触发编辑器的滚动同步（如果有）
+    const scrollEvent = new CustomEvent('editor-scroll-sync');
+    window.dispatchEvent(scrollEvent);
+  }, 250);
+};
+
+onMounted(async () => {
+  //页面布局
+  //dragControllerDiv();
+
+  //关闭窗口保存
+  listenClose();
+
+  loadFile();
+  editorRef.value?.on('catalog', console.log);
+
+  // 监听窗口 resize 事件
+  window.addEventListener('resize', handleWindowResize);
+
+  // 监听来自 AppMain 的自定义 resize 事件
+  window.addEventListener('window-resize', handleWindowResize);
+});
+
+onUnmounted(() => {
+  // 清理事件监听器
+  window.removeEventListener('resize', handleWindowResize);
+  window.removeEventListener('window-resize', handleWindowResize);
+
+  if (resizeTimer) {
+    clearTimeout(resizeTimer);
+  }
+});
+
+
 
 // 事件监听清理函数
 let unlistenClose: UnlistenFn | null = null;
