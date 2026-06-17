@@ -15,6 +15,7 @@ const page_num = ref<number>(1)
 const page_count = ref<number>(0)
 const loading = ref<boolean>(true)
 const error = ref<string | null>(null)
+const controlsPosition = ref<{ top: number; left: number }>({ top: 0, left: 0 })
 
 
 let isDark: ComputedRef<boolean> = computed(() =>
@@ -36,6 +37,19 @@ let ctx: CanvasRenderingContext2D | null = null
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 
+const updateControlsPosition = () => {
+  const container = document.querySelector('.pdf-container') as HTMLElement
+  if (!container) return
+
+  const rect = container.getBoundingClientRect()
+  const containerCenterY = rect.top + rect.height-30;
+  const containerCenterX = rect.left + rect.width / 2;
+
+  controlsPosition.value = {
+    top: containerCenterY,
+    left: containerCenterX
+  }
+}
 // 添加加载状态管理
 const onMagnify = () => {
   if (!pdfDoc || !ctx) return
@@ -63,15 +77,24 @@ function scrollToTop() {
 }
 
 // 改进错误处理
+
 const loadPdfFile = async () => {
   try {
     loading.value = true
     error.value = null
-   // 确保 canvas 已经渲染
+
     await nextTick()
+
+    if (!canvasRef.value) {
+      console.warn('Canvas element not ready, retrying...')
+      await new Promise(resolve => setTimeout(resolve, 100))
+      await nextTick()
+
       if (!canvasRef.value) {
-      throw new Error('Canvas element not found')
+        throw new Error('Canvas element not found')
+      }
     }
+
     let filePath = ""
     if (route.meta.filePath) {
       filePath = decodeURIComponent(route.meta.filePath as string)
@@ -79,15 +102,20 @@ const loadPdfFile = async () => {
       filePath = route.query.file as string
     }
 
+    if (!filePath) {
+      throw new Error('No PDF file path provided')
+    }
+
     const url = convertFileSrc(filePath)
-    // canvas = document.getElementById('the-canvas') as HTMLCanvasElement
-    // ctx = canvas.getContext('2d')
-      canvas = canvasRef.value
+    canvas = canvasRef.value
     ctx = canvas.getContext('2d')
+
+    if (!ctx) {
+      throw new Error('Failed to get canvas context')
+    }
 
     const loadingTask = pdfjsLib.getDocument(url)
 
-    // 添加加载进度监听
     loadingTask.onProgress = (progressData) => {
       console.log(`Loading: ${progressData.loaded / progressData.total * 100}%`)
     }
@@ -102,6 +130,7 @@ const loadPdfFile = async () => {
     loading.value = false
   }
 }
+
 function renderPage(num: number) {
   if (!pdfDoc || !ctx || !canvas) return
 
@@ -153,66 +182,7 @@ function renderPage(num: number) {
 
   page_num.value = num
 }
-// 修改 renderPage 函数，添加安全检查
-// function renderPage(num: number) {
-//   if (!pdfDoc || !ctx || !canvas) return
 
-//   pageRendering = true
-//   pdfDoc.getPage(num).then(function (page: any) {
-//     const viewport = page.getViewport({ scale: scale.value })
-//     // 添加安全检查
-//     if (canvas && ctx) {
-//       canvas.height = viewport.height
-//       canvas.width = viewport.width
-
-//       const renderContext = {
-//         canvasContext: ctx,
-//         viewport: viewport,
-//         background: 'rgba(0,0,0,0)'
-//       }
-      
-//       const renderTask = page.render(renderContext)
-//       renderTask.promise.then(function () {
-//         pageRendering = false
-//         if (pageNumPending !== null) {
-//           renderPage(pageNumPending)
-//           pageNumPending = null
-//         }
-//       })
-//     }
-//   })
-
-//   page_num.value = num
-// }
-// function renderPage(num: number) {
-//   if (!pdfDoc || !ctx || !canvas) return
-
-//   pageRendering = true
-//   pdfDoc.getPage(num).then(function (page: any) {
-//     const viewport = page.getViewport({ scale: scale.value })
-//     if (canvas && ctx) {
-//       canvas.height = viewport.height
-//       canvas.width = viewport.width
-
-//       const renderContext = {
-//         canvasContext: ctx,
-//         viewport: viewport,
-//         background: 'rgba(0,0,0,0)' // 透明背景
-//       }
-
-//       const renderTask = page.render(renderContext)
-//       renderTask.promise.then(function () {
-//         pageRendering = false
-//         if (pageNumPending !== null) {
-//           renderPage(pageNumPending)
-//           pageNumPending = null
-//         }
-//       })
-//     }
-//   })
-
-//   page_num.value = num
-// }
 
 function queueRenderPage(num: number) {
   if (pageRendering) {
@@ -254,11 +224,15 @@ watch(
   { immediate: true }
 )
 
+
+
+
 // 添加键盘快捷键支持
+
 onMounted(() => {
-  console.log('pdfPreview mounted',route)
+  console.log('pdfPreview mounted', route)
+
   const handleKeydown = (e: KeyboardEvent) => {
-    // 防止在输入框中触发
     if ((e.target as HTMLElement).tagName === 'INPUT') return
 
     if (e.key === 'ArrowLeft') {
@@ -273,12 +247,37 @@ onMounted(() => {
   }
 
   window.addEventListener('keydown', handleKeydown)
+
+  let resizeObserver: ResizeObserver | null = null
+
   onUnmounted(() => {
     window.removeEventListener('keydown', handleKeydown)
+    if (resizeObserver) {
+      resizeObserver.disconnect()
+    }
   })
+
   toggleDarkMode(isDark.value)
-  loadPdfFile();
+
+  nextTick(() => {
+    loadPdfFile()
+
+    setTimeout(() => {
+      updateControlsPosition()
+
+      const container = document.querySelector('.pdf-container') as HTMLElement
+      if (container) {
+        resizeObserver = new ResizeObserver(() => {
+          updateControlsPosition()
+        })
+        resizeObserver.observe(container)
+      }
+
+      window.addEventListener('scroll', updateControlsPosition, true)
+    }, 200)
+  })
 })
+
 // const renderContext = {
 //   canvasContext: ctx,
 //   viewport: viewport,
@@ -309,7 +308,12 @@ const toggleDarkMode = (isDarkMode: boolean) => {
     <!-- <canvas class="pdf-canvas" id="the-canvas"></canvas> -->
          <canvas ref="canvasRef" class="pdf-canvas" id="the-canvas"></canvas>
 
-    <div class="pdf-controls">
+    <div class="pdf-controls" :style="{
+      position: 'fixed',
+      top: `${controlsPosition.top}px`,
+      left: `${controlsPosition.left}px`,
+      transform: 'translate(-50%, -50%)'
+    }">
       <button @click="onReduce" :disabled="scale <= 0.2 || loading" title="缩小 (Ctrl+-)">
         -
       </button>
@@ -374,57 +378,58 @@ const toggleDarkMode = (isDarkMode: boolean) => {
   padding: 20px;
 }
 
+
+
+
 .pdf-controls {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 10px;
   padding: 8px 16px;
   border-radius: 30px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
   z-index: 100;
-  backdrop-filter: blur(5px);
-  /* 使用hsla设置背景色 */
-  background-color: hsla(0, 0%, 100%, 0.1);
-  /* 最后一个参数0.5控制透明度 */
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(10px);
+  background-color: rgba(30, 30, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
 }
+
 
 .pdf-controls button {
   padding: 8px 16px;
-  border: 1px solid var(--el-border-color-light);
-  background-color: var(--el-fill-color-light);
-  ;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
   border-radius: 20px;
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s ease;
   min-width: 60px;
-  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
 }
 
 .pdf-controls button:hover:not(:disabled) {
-  background-color: var(--el-fill-color-light);
-  ;
-  color: var(--el-text-color-regular);
-  border-color: var(--el-border-color-light);
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
   transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
 .pdf-controls button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
   transform: none;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .pdf-controls span {
   font-weight: 500;
-  color: var(--el-text-color-regular);
+  color: #ffffff;
   font-size: 14px;
   min-width: 80px;
   text-align: center;
@@ -436,6 +441,7 @@ const toggleDarkMode = (isDarkMode: boolean) => {
     width: 90%;
     justify-content: center;
     gap: 8px;
+    padding: 8px 16px;
   }
 
   .pdf-controls button {
@@ -449,6 +455,8 @@ const toggleDarkMode = (isDarkMode: boolean) => {
     min-width: 60px;
   }
 }
+
+
 
 /* 给PDF渲染容器添加CSS滤镜来实现暗黑效果： */
 .pdf-container.dark-mode .pdf-canvas {
