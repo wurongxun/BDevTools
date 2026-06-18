@@ -68,7 +68,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { NoteDataStore } from '@/Types/entitys'
 import useStore from '@/store/index'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
-
+defineOptions({
+  name: 'mdPreViewAndEdit_v2'
+})
 let store: Store | undefined = undefined;
 
 const { noteTem } = useStore()

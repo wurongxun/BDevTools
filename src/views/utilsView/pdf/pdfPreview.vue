@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, nextTick, watch, computed, ComputedRef } from "vue"
+import { onMounted, onUnmounted, ref, nextTick, watch, computed, ComputedRef, onActivated, onDeactivated } from "vue"
 import * as pdfjsLib from "pdfjs-dist"
 import { useRoute } from 'vue-router'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
@@ -7,15 +7,26 @@ import { ElMessage } from 'element-plus'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import useStore from '@/store/index'
 
+defineOptions({
+  name: 'PdfPreview'
+})
+
 const { appConfig, system } = useStore()
 
 const route = useRoute()
-const scale = ref<number>(3)
+const scale = ref<number>(1)
 const page_num = ref<number>(1)
 const page_count = ref<number>(0)
 const loading = ref<boolean>(true)
 const error = ref<string | null>(null)
 const controlsPosition = ref<{ top: number; left: number }>({ top: 0, left: 0 })
+
+// 保存组件状态
+const savedState = new Map<string, {
+  pageNum: number
+  scale: number
+  filePath: string
+}>()
 
 
 let isDark: ComputedRef<boolean> = computed(() =>
@@ -31,6 +42,7 @@ let pageRendering = false
 let pageNumPending: number | null = null
 // 使用模板引用
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const containerRef = ref<HTMLElement | null>(null)
 let canvas: HTMLCanvasElement | null = null
 let ctx: CanvasRenderingContext2D | null = null
 
@@ -42,14 +54,75 @@ const updateControlsPosition = () => {
   if (!container) return
 
   const rect = container.getBoundingClientRect()
-  const containerCenterY = rect.top + rect.height-30;
-  const containerCenterX = rect.left + rect.width / 2;
+  const containerCenterY = rect.top + rect.height -40;
+  const containerCenterX = rect.left + rect.width / 2
 
   controlsPosition.value = {
     top: containerCenterY,
     left: containerCenterX
   }
 }
+
+const calculateFitScale = async (): Promise<number> => {
+  if (!pdfDoc || !canvasRef.value) return 1
+
+  const container = document.querySelector('.pdf-container') as HTMLElement
+  if (!container) return 1
+
+  const containerWidth = container.clientWidth - 40 // 减去左右边距
+
+  const firstPage = await pdfDoc.getPage(1)
+  const viewport = firstPage.getViewport({ scale: 1 })
+
+  const fitScale = containerWidth / viewport.width
+
+  return Math.min(fitScale, 3) // 最大不超过 3 倍
+}
+
+// 组件被激活时恢复状态
+onActivated(() => {
+  console.log('[PdfPreview] Activated, restoring state')
+  const currentPath = route.path
+  const state = savedState.get(currentPath)
+
+  if (state && state.filePath === getCurrentFilePath()) {
+    // 恢复页码和缩放比例
+    pageNum = state.pageNum
+    scale.value = state.scale
+
+    // 如果 PDF 已加载，直接跳转到保存的页面
+    if (pdfDoc) {
+      renderPage(pageNum)
+    }
+  }
+})
+
+// 组件被停用时保存状态
+onDeactivated(() => {
+  console.log('[PdfPreview] Deactivated, saving state')
+  const currentPath = route.path
+  const filePath = getCurrentFilePath()
+
+  if (filePath) {
+    savedState.set(currentPath, {
+      pageNum,
+      scale: scale.value,
+      filePath
+    })
+  }
+})
+
+// 获取当前文件路径
+const getCurrentFilePath = (): string => {
+  if (route.meta.filePath) {
+    return decodeURIComponent(route.meta.filePath as string)
+  } else if (route.query.file) {
+    return route.query.file as string
+  }
+  return ''
+}
+
+
 // 添加加载状态管理
 const onMagnify = () => {
   if (!pdfDoc || !ctx) return
@@ -77,7 +150,6 @@ function scrollToTop() {
 }
 
 // 改进错误处理
-
 const loadPdfFile = async () => {
   try {
     loading.value = true
@@ -95,12 +167,7 @@ const loadPdfFile = async () => {
       }
     }
 
-    let filePath = ""
-    if (route.meta.filePath) {
-      filePath = decodeURIComponent(route.meta.filePath as string)
-    } else if (route.query.file) {
-      filePath = route.query.file as string
-    }
+    let filePath = getCurrentFilePath()
 
     if (!filePath) {
       throw new Error('No PDF file path provided')
@@ -122,6 +189,11 @@ const loadPdfFile = async () => {
 
     pdfDoc = await loadingTask.promise
     page_count.value = pdfDoc.numPages
+
+    // 计算自适应缩放比例
+    const fitScale = await calculateFitScale()
+    scale.value = fitScale
+
     renderPage(pageNum)
   } catch (err: any) {
     error.value = err.message || 'Failed to load PDF'
@@ -130,6 +202,8 @@ const loadPdfFile = async () => {
     loading.value = false
   }
 }
+
+
 
 function renderPage(num: number) {
   if (!pdfDoc || !ctx || !canvas) return
@@ -267,8 +341,15 @@ onMounted(() => {
 
       const container = document.querySelector('.pdf-container') as HTMLElement
       if (container) {
-        resizeObserver = new ResizeObserver(() => {
+        resizeObserver = new ResizeObserver(async () => {
           updateControlsPosition()
+
+          // 窗口大小改变时重新计算缩放比例
+          if (pdfDoc) {
+            const fitScale = await calculateFitScale()
+            scale.value = fitScale
+            renderPage(pageNum)
+          }
         })
         resizeObserver.observe(container)
       }
@@ -277,7 +358,6 @@ onMounted(() => {
     }, 200)
   })
 })
-
 // const renderContext = {
 //   canvasContext: ctx,
 //   viewport: viewport,
@@ -296,7 +376,7 @@ const toggleDarkMode = (isDarkMode: boolean) => {
 </script>
 
 <template>
-  <div class="pdf-container">
+  <div class="pdf-container" ref="containerRef">
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-overlay">
       <div class="loading-spinner">Loading PDF...</div>
@@ -305,8 +385,7 @@ const toggleDarkMode = (isDarkMode: boolean) => {
     <div v-else-if="error" class="error-overlay">
       <div class="error-message">{{ error }}</div>
     </div>
-    <!-- <canvas class="pdf-canvas" id="the-canvas"></canvas> -->
-         <canvas ref="canvasRef" class="pdf-canvas" id="the-canvas"></canvas>
+    <canvas ref="canvasRef" class="pdf-canvas" id="the-canvas"></canvas>
 
     <div class="pdf-controls" :style="{
       position: 'fixed',

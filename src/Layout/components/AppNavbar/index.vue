@@ -7,7 +7,7 @@
     <functional-area></functional-area>
     <!-- <avatar></avatar> -->
   </header>
-  <tag-view></tag-view>
+<!--  <tag-view></tag-view>-->
 </template>
 
 <script lang="ts" setup name="AppNavbar">

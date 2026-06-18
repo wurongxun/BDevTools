@@ -63,7 +63,9 @@ import { useRoute } from 'vue-router'
 import { NoteDataStore } from '@/Types/entitys' // 检查此类型是否实际使用，若未使用可删除
 import useStore from '@/store/index'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
-
+defineOptions({
+  name: 'mdPreViewAndEdit'
+})
 // --- 状态与 Store 初始化 ---
 let store: Store | undefined = undefined;
 const { noteTem } = useStore()
@@ -82,19 +84,19 @@ const editorTheme = computed(() => {
 
 // 响应式数据
 const data = reactive({
-    folders: [], 
-    files: [] as { title: string }[], 
-    selectedKeys: [], 
-    currentChooseFolderPath_md: "", 
-    currentChooseNoteAllPath_md: "", 
-    notEditedMdtext_md: "", 
-    editedMdtext_md: "", 
-    title_md: "", 
-    showMdEditor: false, 
+    folders: [],
+    files: [] as { title: string }[],
+    selectedKeys: [],
+    currentChooseFolderPath_md: "",
+    currentChooseNoteAllPath_md: "",
+    notEditedMdtext_md: "",
+    editedMdtext_md: "",
+    title_md: "",
+    showMdEditor: false,
 });
 
 // 原代码中定义了但未使用的变量，保留以维持结构兼容性，但标记为可能无用
-let notebooks_data = ref<any>(undefined); 
+let notebooks_data = ref<any>(undefined);
 
 // 编辑器引用
 const editorRef = ref<ExposeParam>();
@@ -152,6 +154,16 @@ onUnmounted(() => {
     clearTimeout(resizeTimer);
   }
 });
+
+// 组件被激活时（从缓存中恢复）
+onActivated(() => {
+  console.log('[mdPreViewAndEdit] Activated - 从缓存恢复')
+})
+
+// 组件被停用时（保存到缓存）
+onDeactivated(() => {
+  console.log('[mdPreViewAndEdit] Deactivated - 保存到缓存')
+})
 
 
 
@@ -310,13 +322,13 @@ const loadFile = async () => {
 };
 
 // 监听路由变化
-watch(
-    () => route.path,
-    () => {
-        loadFile();
-    },
-    { immediate: true }
-);
+// watch(
+//     () => route.path,
+//     () => {
+//         loadFile();
+//     },
+//     { immediate: true }
+// );
 
 // 监听关闭事件
 const listenClose = async () => {

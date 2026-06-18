@@ -8,6 +8,7 @@ import errorInfoStore from './modules/errorInfo'
 import { appConfigInfo } from './modules/appConfigInfo'
 import { useNoteStore } from './modules/noteTem'
 import { routerNoteStore } from './modules/routerNote'
+import { useDocumentManagerStore } from './modules/documents'
 const pinia = createPinia()
 
 export default function useStore() {
@@ -20,6 +21,7 @@ export default function useStore() {
     errorStore: errorInfoStore(pinia),
     appConfig: appConfigInfo(pinia),
     noteTem: useNoteStore(pinia),
-    routerNoteStore: routerNoteStore(pinia)
+    routerNoteStore: routerNoteStore(pinia),
+    useDocumentManagerStore: useDocumentManagerStore(pinia)
   }
 }

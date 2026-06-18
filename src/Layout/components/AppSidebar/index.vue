@@ -3,7 +3,7 @@
     <logo></logo>
     <div class="app-sidebar">
       <!-- <side-menu></side-menu> -->
-      <FileTreeTest></FileTreeTest>
+      <FileTree></FileTree>
     </div>
   </div>
 </template>
@@ -11,7 +11,7 @@
 <script setup lang="ts" name="AppSidebar">
 import SideMenu from './components/SideMenu.vue'
 import logo from './components/Logo.vue'
-import FileTreeTest from './components/FileTree.vue'
+import FileTree from './components/FileTree.vue'
 
 </script>
 
