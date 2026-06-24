@@ -2,6 +2,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from "@tauri-apps/api/core";
+import { tauri_request } from '@/utils/tauri_request'
+import { ResponseData } from '@/entity/entitys'
+import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting'
+import NotificationUtil from '@/utils/NotificationUtil'
 // 文件类型枚举
 export enum FileType {
   CODE = 'code',
@@ -114,11 +118,9 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
       isReadOnly: false,
       isLoading: true
     }
-
     // 添加到文档集合
     documents.value.set(filePath, doc)
     documentOrder.value.push(filePath)
-
     // 从磁盘加载文件内容
     try {
       const content = await loadFileContent(filePath, type)
@@ -131,10 +133,8 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
       doc.isLoading = false
       // 可以设置错误状态
     }
-
     // 激活该文档
     setActiveDocument(filePath)
-
     // 检查是否需要清理缓存
     cleanupDocumentCache()
   }
@@ -151,13 +151,13 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     activeDocumentId.value = filePath
 
     // 更新文档顺序（将激活的文档移到最前面）
-    if (filePath) {
-      const index = documentOrder.value.indexOf(filePath)
-      if (index > -1) {
-        documentOrder.value.splice(index, 1)
-        documentOrder.value.unshift(filePath)
-      }
-    }
+    // if (filePath) {
+    //   const index = documentOrder.value.indexOf(filePath)
+    //   if (index > -1) {
+    //     documentOrder.value.splice(index, 1)
+    //     documentOrder.value.unshift(filePath)
+    //   }
+    // }
   }
 
   /**
@@ -441,9 +441,15 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     if (fileType === FileType.IMAGE || fileType === FileType.BINARY) {
       return await invoke('read_file_bytes', { path: filePath })
     }
-
-    // 对于文本和代码文件，返回字符串
-    return await invoke('read_file_text', { path: filePath })
+    var res = await tauri_request<ResponseData<string>>("read_note_file", {
+      path: filePath
+    });
+    if (res && res.code == 200) {
+      //重新赋值
+      return res.data;
+    } else {
+      NotificationUtil.error("读取失败：" + res.msg);
+    }
   }
 
   /**
@@ -483,6 +489,7 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     closeAllDocuments,
     closeOtherDocuments,
     reloadDocument,
+    reorderDocuments,
     createNewDocument,
     renameDocument,
     getDocumentStatus

@@ -5,16 +5,12 @@
       <bread-crumb></bread-crumb>
     </div>
     <functional-area></functional-area>
-    <!-- <avatar></avatar> -->
   </header>
-<!--  <tag-view></tag-view>-->
 </template>
 
 <script lang="ts" setup name="AppNavbar">
 import ToggleSwitch from './components/ToggleSwitch.vue'
 import BreadCrumb from './components/BreadCrumb.vue'
-import avatar from './components/Avatar.vue'
-import TagView from './components/TagView.vue'
 import FunctionalArea from './components/FunctionalArea/index.vue'
 </script>
 

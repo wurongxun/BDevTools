@@ -29,7 +29,7 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup lang="ts" name="MdEditor">
 import {
   computed,
   h,
@@ -46,9 +46,9 @@ import {
   onUnmounted,
   nextTick,
 } from "vue";
-import { ElMessage } from "element-plus"; // 仅保留实际使用的 Element Plus 导入
+import { ElMessage } from "element-plus";
 import NotificationUtil from "@/utils/NotificationUtil";
-import { invoke } from "@tauri-apps/api/core"; // 虽然当前未直接使用 invoke，但保留以防万一，或者如果 tauri_request 封装了它
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MdEditor } from "md-editor-v3";
 import type { ExposeParam } from 'md-editor-v3';
@@ -59,17 +59,14 @@ import { tauri_request } from "@/utils/tauri_request";
 import { Document } from '@element-plus/icons-vue';
 import { useDark } from '@vueuse/core'
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
-import { useRoute } from 'vue-router'
-import { NoteDataStore } from '@/Types/entitys' // 检查此类型是否实际使用，若未使用可删除
 import useStore from '@/store'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
-defineOptions({
-  name: 'mdPreViewAndEdit'
-})
+import { FileType } from '@/store/modules/documents'
+
 // --- 状态与 Store 初始化 ---
 let store: Store | undefined = undefined;
-const { noteTem } = useStore()
-const route = useRoute()
+const { noteTem, useDocumentManagerStore } = useStore()
+const docStore = useDocumentManagerStore
 
 // 暗黑模式
 const isDark = useDark({
@@ -107,19 +104,12 @@ const handleWindowResize = async () => {
   if (resizeTimer) {
     clearTimeout(resizeTimer);
   }
-
   resizeTimer = setTimeout(async () => {
     await nextTick();
 
     // 如果编辑器实例存在，尝试触发其内部的重绘
     if (editorRef.value) {
       console.log('[mdPreViewAndEdit] Window resized, refreshing editor');
-
-      // 方法1: 尝试调用 md-editor-v3 的内置方法（如果有）
-      // editorRef.value?.rerender?.();
-
-      // 方法2: 通过修改 key 强制重新渲染（更激进的方式）
-      // 这里我们只是触发了一个自定义事件，让组件知道需要重新计算布局
     }
 
     // 触发编辑器的滚动同步（如果有）
@@ -128,19 +118,70 @@ const handleWindowResize = async () => {
   }, 250);
 };
 
+// 当前激活的文档路径
+const activeDocId = computed(() => docStore.activeDocumentId)
+
+// 根据文档ID加载文件
+// 根据文档ID加载文件
+const loadFile = async (docId: string) => {
+  if (!docId) {
+    data.showMdEditor = false;
+    return;
+  }
+  // 从 document store 获取文档信息
+  const doc = docStore.documents.get(docId)
+  console.log("docdocdocdocdoc",doc)
+  if (!doc) {
+    console.warn(`Document not found: ${docId}`)
+    data.showMdEditor = false
+    return
+  }
+  // 如果没有缓存，从文件中读取
+  if (doc.id) {
+    data.showMdEditor = true;
+    // 读取成功后，更新元数据并缓存
+    if (data.showMdEditor) {
+      data.title_md = doc.name;
+      data.currentChooseNoteAllPath_md = doc.id;
+
+      // 确保 content 是字符串类型
+      if (typeof doc.content === 'string') {
+        data.editedMdtext_md = doc.content;
+      } else if (doc.content instanceof ArrayBuffer) {
+        // 如果是 ArrayBuffer，转换为字符串（通常用于二进制文件）
+        const decoder = new TextDecoder('utf-8');
+        data.editedMdtext_md = decoder.decode(doc.content);
+      } else {
+        // 默认为空字符串
+        data.editedMdtext_md = '';
+      }
+    }
+  } else {
+    NotificationUtil.error("文件路径缺失");
+  }
+
+};
+
+// 监听激活文档变化
+watch(activeDocId, async (newId) => {
+  console.log(newId)
+  if (newId) {
+    await loadFile(newId)
+  } else {
+    data.showMdEditor = false
+  }
+}, { immediate: true })
+
 onMounted(async () => {
   //页面布局
   //dragControllerDiv();
 
-  //关闭窗口保存
+  //关闭窗口保存 监听
   listenClose();
 
-  loadFile();
   editorRef.value?.on('catalog', console.log);
-
   // 监听窗口 resize 事件
   window.addEventListener('resize', handleWindowResize);
-
   // 监听来自 AppMain 的自定义 resize 事件
   window.addEventListener('window-resize', handleWindowResize);
 });
@@ -158,11 +199,19 @@ onUnmounted(() => {
 // 组件被激活时（从缓存中恢复）
 onActivated(() => {
   console.log('[mdPreViewAndEdit] Activated - 从缓存恢复')
+  // 重新加载当前激活的文档
+  if (activeDocId.value) {
+    loadFile(activeDocId.value)
+  }
 })
 
 // 组件被停用时（保存到缓存）
 onDeactivated(() => {
   console.log('[mdPreViewAndEdit] Deactivated - 保存到缓存')
+  // 保存当前文档状态到 store
+  if (activeDocId.value && data.editedMdtext_md !== data.notEditedMdtext_md) {
+    docStore.updateDocumentContent(activeDocId.value, data.editedMdtext_md)
+  }
 })
 
 
@@ -179,9 +228,7 @@ let saveTimeoutId: number | null = null;
 const onContentChange = async (value: string) => {
   data.editedMdtext_md = value;
 
-  const md_id = route.meta.id as string | undefined;
-  if (!md_id) {
-    // 如果没有 ID，可能是一个新笔记或错误状态，暂不保存
+  if (!activeDocId.value) {
     return;
   }
 
@@ -193,8 +240,12 @@ const onContentChange = async (value: string) => {
   // 设置新的防抖保存 (例如 500ms)
   saveTimeoutId = window.setTimeout(async () => {
     try {
+      // 更新文档内容到 store
+      docStore.updateDocumentContent(activeDocId.value!, value)
+
+      // 同时保存到本地临时存储
       if (store) {
-        await store.set(pdf_store_tem_key_prefix + md_id, { value: value });
+        await store.set(pdf_store_tem_key_prefix + activeDocId.value, { value: value });
         await store.save();
         console.log("内容已防抖保存至临时存储");
       }
@@ -246,89 +297,6 @@ const read_note_file_bypath = async function (path: string) {
   }
 };
 
-// 根据路由参数加载文件
-const loadFile = async () => {
-  await initStore();
-
-  const meta = route.meta as any;
-  const md_id = meta.id as string | undefined;
-  const title = meta.title as string | undefined;
-  const filePath = meta.filePath as string | undefined;
-  const folder = meta.folder as string | undefined;
-
-  if (!md_id) {
-    // 如果没有 ID，重置编辑器状态
-    data.showMdEditor = false;
-    return;
-  }
-
-  let cached_content: string | null = null;
-  let original_content: string | null = null;
-
-  try {
-    if (store) {
-      const key_tem = pdf_store_tem_key_prefix + md_id;
-      const key_conten = pdf_store_conten_key_prefix + md_id;
-
-      const tem_val = await store.get<{ value: string }>(key_tem);
-      if (tem_val && tem_val.value !== undefined) {
-        cached_content = tem_val.value;
-      }
-
-      const content_val = await store.get<{ value: string }>(key_conten);
-      if (content_val && content_val.value !== undefined) {
-        original_content = content_val.value;
-      }
-    }
-  } catch (error) {
-    console.warn("读取缓存失败，将从文件加载", error);
-  }
-
-  if (cached_content != null) {
-    // 使用缓存的内容
-    data.editedMdtext_md = cached_content;
-    // 如果没有原始内容缓存，则假设缓存的即为原始内容，或者保持为空等待加载
-    data.notEditedMdtext_md = original_content !== null ? original_content : cached_content;
-    data.title_md = title || "";
-    data.currentChooseNoteAllPath_md = filePath || "";
-    data.currentChooseFolderPath_md = folder || "";
-    data.showMdEditor = true;
-  } else {
-    // 如果没有缓存，从文件中读取
-    if (filePath) {
-      await read_note_file_bypath(filePath);
-
-      // 读取成功后，更新元数据并缓存
-      if (data.showMdEditor) {
-        data.title_md = title || "";
-        data.currentChooseNoteAllPath_md = filePath;
-        data.currentChooseFolderPath_md = folder || "";
-
-        // 初始加载后，同步到缓存
-        if (store) {
-          try {
-            await store.set(pdf_store_tem_key_prefix + md_id, { value: data.editedMdtext_md });
-            await store.set(pdf_store_conten_key_prefix + md_id, { value: data.editedMdtext_md });
-            await store.save();
-          } catch (e) {
-            console.error("初始缓存保存失败", e);
-          }
-        }
-      }
-    } else {
-      NotificationUtil.error("文件路径缺失");
-    }
-  }
-};
-
-// 监听路由变化
-// watch(
-//     () => route.path,
-//     () => {
-//         loadFile();
-//     },
-//     { immediate: true }
-// );
 
 // 监听关闭事件
 const listenClose = async () => {
@@ -379,13 +347,16 @@ const saveMd = async (mdText: string, path: string) => {
       NotificationUtil.success("笔记保存成功");
 
       // 保存成功后，更新永久缓存
-      const md_id = route.meta.id as string | undefined;
-      if (md_id && store) {
-        await store.set(pdf_store_conten_key_prefix + md_id, { value: mdText });
+      if (store) {
+        await store.set(pdf_store_conten_key_prefix + path, { value: mdText });
         // 临时缓存也更新，保持一致
-        await store.set(pdf_store_tem_key_prefix + md_id, { value: mdText });
+        await store.set(pdf_store_tem_key_prefix + path, { value: mdText });
         await store.save();
       }
+
+      // 更新 store 中的文档状态
+      docStore.updateDocumentContent(path, mdText)
+
       return true;
     } else {
       NotificationUtil.error("笔记保存失败：" + (res?.msg || "未知错误"));
@@ -412,7 +383,7 @@ const saveMdText = async () => {
     return;
   }
 
-  await saveMd(data.editedMdtext_md, data.currentChooseNoteAllPath_md);
+ // await saveMd(data.editedMdtext_md, data.currentChooseNoteAllPath_md);
 };
 
 // 占位符按钮点击事件（原代码未实现，补充空函数避免报错）

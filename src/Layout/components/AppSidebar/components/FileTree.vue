@@ -22,7 +22,7 @@ import { ITagItem } from '@/Types/TagView'
 let store: Store | undefined = undefined;
 const router = useRouter()
 const route = useRoute()
-const { routerNoteStore, tagview, noteTem } = useStore()
+const { routerNoteStore, tagview, noteTem,useDocumentManagerStore } = useStore()
 const tree_node: any = computed(() =>
     sortTreeData(routerNoteStore.tree_node)
 )
@@ -64,6 +64,9 @@ const handleNodeClick = (node) => {
         router.push({
             path: node.routerPath
         })
+      useDocumentManagerStore.openDocument( node.filePath);
+      //添加至editor tab 缓存中
+
     }
 }
 

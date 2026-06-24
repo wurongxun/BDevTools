@@ -6,6 +6,7 @@
     <main ref="mainContentRef" class="app-content" :class="{ 'is-collapse': isCollapse, 'has-sidebar': !isCollapse && windowWidth >= 1024 }">
       <app-navbar class="app-navbar"></app-navbar>
       <app-editor-main></app-editor-main>
+<!--      <AppMain></AppMain>-->
     </main>
   </div>
 </template>

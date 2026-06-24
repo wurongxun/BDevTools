@@ -1,27 +1,23 @@
 <template>
   <div class="app-main" :style="{ height: appMainHeight }">
-    <tag-view></tag-view>
-    <router-view v-slot="{ Component, route }">
-      <transition name="fade-transform" mode="out-in">
-        <keep-alive :include="cacheList" :max="20">
-          <component :is="Component" :key="route.fullPath" />
-        </keep-alive>
-      </transition>
-    </router-view>
-
-    <!-- 返回顶部按钮 -->
-    <el-backtop
-      :right="30"
-      :bottom="50"
-      :visibility-height="300"
-      target=".app-main"
-    >
-      <div class="back-to-top">
-        <el-icon><ArrowUp /></el-icon>
-      </div>
-    </el-backtop>
+    <el-header class="app-header"><EditorTab></EditorTab></el-header>
+    <el-main class="app-main-content">
+      <file-editor></file-editor>
+      <!-- 返回顶部按钮 -->
+      <el-backtop
+        :right="30"
+        :bottom="50"
+        :visibility-height="300"
+        target=".app-main-content"
+      >
+        <div class="back-to-top">
+          <el-icon><ArrowUp /></el-icon>
+        </div>
+      </el-backtop>
+    </el-main>
   </div>
 </template>
+
 
 <script lang="ts" setup name="AppEditorMain">
 import useStore from '@/store'
@@ -29,16 +25,21 @@ import { storeToRefs } from 'pinia'
 import { ArrowUp } from '@element-plus/icons-vue'
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import TagView from '../AppNavbar/components/TagView.vue'
+import FileEditor from '../../../components/FileEditor/FileEditor.vue'
+import EditorTab from '@/Layout/components/AppEditorMain/EditorTab.vue'
+
 const { tagview } = useStore()
 const { cacheList } = storeToRefs(tagview)
 
 // 动态计算主内容区域高度
 const appMainHeight = ref('calc(100vh - var(--header-height) - var(--tage-view-height))')
+const appMainContent = ref('calc(100vh - var(--header-height) - var(--tage-view-height))')
 
 const updateHeight = () => {
   const navbar = document.querySelector('.topbar-box')
-  const tagView = document.querySelector('.idea-tab-bar')
-
+  //const tagView = document.querySelector('.idea-tab-bar');
+  //tab-bar-container
+  const tagView = document.querySelector('.tab-bar-container');
   let headerHeight = 32
   let tagHeight = 32
 
@@ -50,7 +51,10 @@ const updateHeight = () => {
     tagHeight = tagView.offsetHeight
   }
 
-  appMainHeight.value = `calc(100vh - ${headerHeight}px - ${tagHeight}px)`
+  //appMainHeight.value = `calc(100vh - ${headerHeight}px - ${tagHeight}px)`
+  appMainHeight.value = `calc(100vh - ${headerHeight}px)`
+
+  appMainContent.value= `calc(100vh - ${headerHeight}px - ${tagHeight}px)`
 
   console.log('[AppMain] Height updated:', appMainHeight.value, '| Header:', headerHeight, 'TagView:', tagHeight)
 }
@@ -136,71 +140,59 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped lang="scss">
-@use '@/styles/variables.scss' as *;
-@use '@/styles/theme.scss';
+<style scoped lang="scss">@use '@/styles/variables' as *;
+@use '@/styles/theme';
 
 .app-main {
   width: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
   box-sizing: border-box;
   position: relative;
-  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
 
   @include theme.useTheme {
     background-color: theme.getVar('appMainBgColor');
   }
-
-  // 美化滚动条样式
-  scrollbar-width: thin;
-  scrollbar-color: rgba(155, 155, 155, 0.4) transparent;
-
-  &::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-    border-radius: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(155, 155, 155, 0.4);
-    border-radius: 4px;
-    transition: all 0.3s ease;
-
-    &:hover {
-      background: rgba(155, 155, 155, 0.6);
-    }
-
-    &:active {
-      background: rgba(155, 155, 155, 0.8);
-    }
-  }
-
-  &::-webkit-scrollbar-corner {
-    background: transparent;
-  }
 }
+
+.app-header {
+  margin: 0;
+  padding: 0;
+  height: auto !important;
+  min-height: unset;
+  flex-shrink: 0;
+}
+
+.app-main-content {
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  flex: 1;
+  min-height: 0;
+  // 移除滚动条相关样式，因为滚动由外层处理
+}
+
 
 // 深色模式下的滚动条样式
-html.dark .app-main {
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-
-    &:hover {
-      background: rgba(255, 255, 255, 0.3);
-    }
-
-    &:active {
-      background: rgba(255, 255, 255, 0.4);
-    }
-  }
-}
+//html.dark .app-main-content {
+//  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+//
+//  &::-webkit-scrollbar-thumb {
+//    background: rgba(255, 255, 255, 0.2);
+//
+//    &:hover {
+//      background: rgba(255, 255, 255, 0.3);
+//    }
+//
+//    &:active {
+//      background: rgba(255, 255, 255, 0.4);
+//    }
+//  }
+//}
 
 // 返回顶部按钮样式
 .back-to-top {
@@ -246,22 +238,22 @@ html.dark .app-main {
 }
 
 // 响应式优化
-@media screen and (max-width: 768px) {
-  .app-main {
-    &::-webkit-scrollbar {
-      width: 4px;
-    }
-  }
-
-  .back-to-top {
-    width: 36px;
-    height: 36px;
-    right: 15px !important;
-    bottom: 30px !important;
-
-    .el-icon {
-      font-size: 16px;
-    }
-  }
-}
+//@media screen and (max-width: 768px) {
+//  .app-main {
+//    &::-webkit-scrollbar {
+//      width: 4px;
+//    }
+//  }
+//
+//  .back-to-top {
+//    width: 36px;
+//    height: 36px;
+//    right: 15px !important;
+//    bottom: 30px !important;
+//
+//    .el-icon {
+//      font-size: 16px;
+//    }
+//  }
+//}
 </style>
