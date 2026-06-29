@@ -85,7 +85,7 @@ const get_notebooks_tree_Api = (
       }
       // 只有当是文件时才添加component属性
       if (child.isfile) {
-        route2.component = get_component(child.data_type)
+        route2.component = null
       }
       children_val.push(route2)
     }
@@ -153,7 +153,7 @@ const get_notebooks_tree_child = (
       }
       // 只有当是文件时才添加component属性
       if (child.isfile) {
-        route2.component = get_component(child.data_type)
+        route2.component = null
       }
       children_val.push(route2)
     }
@@ -161,17 +161,6 @@ const get_notebooks_tree_child = (
 
   return children_val
 }
-const get_component = (str: string): (() => Promise<any>) | null => {
-  if (str == 'md') {
-    return () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
-  } else if (str == 'pdf') {
-    return () => import('@/views/utilsView/pdf/pdfPreview.vue')
-  } else {
-    // 返回一个默认组件，避免返回null
-    return () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
-  }
-}
-
 const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
   let children_val: Array<TreeNode> = new Array<TreeNode>()
   let searchData_val: Array<TreeNode> = new Array<TreeNode>()
