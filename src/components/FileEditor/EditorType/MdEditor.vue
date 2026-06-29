@@ -227,22 +227,18 @@ let saveTimeoutId: number | null = null;
 // 监听内容变化，实时保存到 pinia (带防抖)
 const onContentChange = async (value: string) => {
   data.editedMdtext_md = value;
-
   if (!activeDocId.value) {
     return;
   }
-
   // 清除之前的定时器
   if (saveTimeoutId !== null) {
     clearTimeout(saveTimeoutId);
   }
-
   // 设置新的防抖保存 (例如 500ms)
   saveTimeoutId = window.setTimeout(async () => {
     try {
       // 更新文档内容到 store
       docStore.updateDocumentContent(activeDocId.value!, value)
-
       // 同时保存到本地临时存储
       if (store) {
         await store.set(pdf_store_tem_key_prefix + activeDocId.value, { value: value });
@@ -341,11 +337,9 @@ const saveMd = async (mdText: string, path: string) => {
       path: path,
       mdText: mdText,
     });
-
     if (res && res.code === 200) {
       data.notEditedMdtext_md = mdText;
       NotificationUtil.success("笔记保存成功");
-
       // 保存成功后，更新永久缓存
       if (store) {
         await store.set(pdf_store_conten_key_prefix + path, { value: mdText });
@@ -353,10 +347,8 @@ const saveMd = async (mdText: string, path: string) => {
         await store.set(pdf_store_tem_key_prefix + path, { value: mdText });
         await store.save();
       }
-
       // 更新 store 中的文档状态
       docStore.updateDocumentContent(path, mdText)
-
       return true;
     } else {
       NotificationUtil.error("笔记保存失败：" + (res?.msg || "未知错误"));
@@ -383,7 +375,7 @@ const saveMdText = async () => {
     return;
   }
 
- // await saveMd(data.editedMdtext_md, data.currentChooseNoteAllPath_md);
+ await saveMd(data.editedMdtext_md, data.currentChooseNoteAllPath_md);
 };
 
 // 占位符按钮点击事件（原代码未实现，补充空函数避免报错）

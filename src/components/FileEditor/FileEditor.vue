@@ -3,7 +3,7 @@
       <component
         :is="currentEditorComponent"
         :key="activePathId"
-        :path="activePath"
+        :path="activePathId"
         @update-state="handleStateUpdate"
       />
     </KeepAlive>
@@ -16,18 +16,14 @@ import CodeEditor from './EditorType/CodeEditor.vue'
 import ImageEditor from './EditorType/ImageEditor.vue'
 import PdfEditor from './EditorType/PdfEditor.vue'
 import MdEditor from './EditorType/MdEditor.vue'
-import EditorTab from '../../Layout/components/AppEditorMain/EditorTab.vue'
-import ToggleSwitch from '@/Layout/components/AppNavbar/components/ToggleSwitch.vue'
-import FunctionalArea from '@/Layout/components/AppNavbar/components/FunctionalArea/index.vue'
-import BreadCrumb from '@/Layout/components/AppNavbar/components/BreadCrumb.vue'
 const { routerNoteStore, tagview, useDocumentManagerStore } = useStore()
 
-const activePath = computed(() => useDocumentManagerStore.activeDocument)
-const activePathId = computed(() => activePath.value?.id || '')
+const activeDocument = computed(() => useDocumentManagerStore.activeDocument)
+const activePathId = computed(() => activeDocument.value?.id || '')
 // 根据文件类型动态选择组件
 const currentEditorComponent = computed(() => {
-  if (!activePath.value) return null
-  const doc = activePath.value;
+  if (!activeDocument.value) return null
+  const doc = activeDocument.value;
   if (!doc) return null
 
   switch (doc.type) {
@@ -41,7 +37,7 @@ const currentEditorComponent = computed(() => {
 const cachedPaths = computed(() => Array.from(useDocumentManagerStore.documents.keys()))
 
 function handleStateUpdate(state: any) {
-  if (activePath.value) {
+  if (activeDocument.value) {
     useDocumentManagerStore.updateViewState(useDocumentManagerStore.activeDocumentId, state)
   }
 }

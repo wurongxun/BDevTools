@@ -9,7 +9,6 @@
 </template>
 
 <script setup lang="ts" name="AppSidebar">
-import SideMenu from './components/SideMenu.vue'
 import logo from './components/Logo.vue'
 import FileTree from './components/FileTree.vue'
 

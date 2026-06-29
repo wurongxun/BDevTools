@@ -147,7 +147,7 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     if (activeDocumentId.value) {
       // 这里可以触发保存视图状态的逻辑
     }
-
+    // NotificationUtil.success(`已打开文件：${filePath}`)
     activeDocumentId.value = filePath
 
     // 更新文档顺序（将激活的文档移到最前面）
@@ -187,20 +187,32 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
   /**
    * 保存文档到磁盘
    */
-  async function saveDocument(filePath: string) {
+  async function saveDocument(filePath: string): Promise<boolean> {
     const doc = documents.value.get(filePath)
-    if (!doc || !doc.content) return
+    if (!doc || !doc.content||doc.content==doc.originalContent) return true;
 
     try {
-      await invoke('save_file', {
+      // await invoke('save_file', {
+      //   path: filePath,
+      //   content: doc.content,
+      //   encoding: doc.encoding
+      // })
+      //   doc.originalContent = doc.content
+      //   doc.isDirty = false
+      //   doc.lastModified = Date.now()
+      const res = await tauri_request<ResponseData<string[]>>("save_note", {
         path: filePath,
-        content: doc.content,
-        encoding: doc.encoding
-      })
+        mdText: doc.content,
+      });
+      if (res && res.code === 200) {
+        doc.originalContent = doc.content
+        doc.isDirty = false
+        doc.lastModified = Date.now()
+      } else {
+        NotificationUtil.error("笔记保存失败：" + (res?.msg || "未知错误"));
+        return false;
+      }
 
-      doc.originalContent = doc.content
-      doc.isDirty = false
-      doc.lastModified = Date.now()
     } catch (error) {
       console.error(`Failed to save file: ${filePath}`, error)
       throw error
@@ -224,6 +236,13 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
   function closeDocument(filePath: string) {
     const doc = documents.value.get(filePath)
     if (!doc) return
+
+    //保存文档
+     saveDocument(filePath).then(r =>  {
+      if (!r){
+        NotificationUtil.error("笔记保存失败：" + (r|| "未知错误"));
+      }
+     });
 
     // 保存到最近关闭列表
     const index = documentOrder.value.indexOf(filePath)

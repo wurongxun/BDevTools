@@ -1,30 +1,19 @@
 <template>
   <el-breadcrumb class="breadcrumb-container" separator=">" data-tauri-drag-region>
-    <el-breadcrumb-item v-for="item in list" :key="item.path">
-      {{ getMetaName(item) }}
+    <el-breadcrumb-item>
+      {{ name }}
     </el-breadcrumb-item>
   </el-breadcrumb>
 </template>
 
 <script lang="ts" setup>
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { useI18n } from "vue-i18n";
-
-const { t, locale } = useI18n()
-const router = useRouter()
-const list = computed(() => {
-  const { matched } = router.currentRoute.value
-  return matched.filter((item) => item.meta.title && !item.meta.noBreadCrumbs)
+import useStore from '@/store'
+const { useDocumentManagerStore } = useStore()
+const name = computed(() => {
+  console.log("4444444444444444444"+useDocumentManagerStore.activeDocument)
+  return useDocumentManagerStore.activeDocument.name
 })
-
-function getMetaName(item: string | any) {
-  if (item.meta.i18n) {
-    return t(item.meta.i18n)
-  }
-  return item.meta.title;
-}
-
 </script>
 
 <style lang="scss" scoped>

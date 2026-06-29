@@ -61,9 +61,9 @@ const handleNodeClick = (node) => {
     //打印当前点击的路由
     console.log("打印当前点击的路由", node.routerPath)
     if (!node.isFolder) {
-        router.push({
-            path: node.routerPath
-        })
+        // router.push({
+        //     path: node.routerPath
+        // })
       useDocumentManagerStore.openDocument( node.filePath);
       //添加至editor tab 缓存中
 

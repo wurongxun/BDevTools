@@ -144,7 +144,7 @@
 
 <script setup lang="ts">
 import useStore from '@/store'
-const { routerNoteStore, tagview, useDocumentManagerStore } = useStore()
+const {useDocumentManagerStore } = useStore()
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import FileIcon from './FileIcon.vue'
 
