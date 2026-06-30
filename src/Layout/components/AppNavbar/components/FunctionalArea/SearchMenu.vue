@@ -25,12 +25,11 @@ interface IRoutes extends Omit<RouteRecordRaw, 'redirect'> {
 }
 
 const router = useRouter()
-const { routeStore, routerNoteStore } = useStore()
+const {routerNoteStore } = useStore()
 
 let autoInputRef: Ref<any> = ref(null)
 let keyword: Ref<string> = ref('')
 let isSearch: Ref<boolean> = ref(false)
-let { flattenRouters } = storeToRefs(routeStore)
 const search_data: ComputedRef<TreeNode[]> = computed(() => routerNoteStore.search_data)
 
 

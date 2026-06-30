@@ -22,8 +22,8 @@ import FunctionalArea from './components/FunctionalArea/index.vue'
   height: $header-height;
   display: flex;
   align-items: center;
-  padding-left: 12px;
-  padding-right: 12px;
+  //padding-left: 12px;
+  //padding-right: 12px;
   gap: 8px;
 
   @include theme.useTheme {

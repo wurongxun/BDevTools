@@ -22,7 +22,7 @@ import { ITagItem } from '@/Types/TagView'
 let store: Store | undefined = undefined;
 const router = useRouter()
 const route = useRoute()
-const { routerNoteStore, tagview, noteTem,useDocumentManagerStore } = useStore()
+const { routerNoteStore, noteTem,useDocumentManagerStore } = useStore()
 const tree_node: any = computed(() =>
     sortTreeData(routerNoteStore.tree_node)
 )
@@ -335,16 +335,7 @@ const handleRenameNode = async (node: TreeNode, newName) => {
 
 }
 const activeRouteRedirect = async () => {
-    const endRoute = tagview.tagViewList[tagview.tagViewList.length - 1] as ITagItem
-    if (endRoute) {
-        router.push({
-            path: endRoute.path
-        })
-    } else {
-        router.push({
-            path: '/'
-        })
-    }
+
 }
 const getAllChildrenFile = (node: TreeNode, list: TreeNode[], active_tagview_clear: boolean) => {
     let active_path = route.path;
@@ -404,7 +395,6 @@ const processNodeCache = async (item: TreeNode) => {
         if (!delete_tem || !delete_conten) {
             NotificationUtil.error("缓存删除失败！");
         }
-        tagview.removeTagViewByPath(item.routerPath);
         return true;
     } catch (error) {
         NotificationUtil.error("操作失败：" + error);

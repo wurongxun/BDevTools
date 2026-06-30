@@ -8,8 +8,6 @@ import router from '@/router/index'
 import VerifyUtils from '@/utils/VerifyUtils'
 import ToolUtils from '@/utils/ToolUtils'
 import { TreeNode } from '@/Types/entitys'
-import { routes } from 'vue-router/auto-routes'
-
 /**
  *
  * @param { RouteRecordRaw[] } routes
@@ -95,14 +93,12 @@ function filterRoutes(arrData: Array<any>): Array<RouteRecordRaw> {
 export const routerNoteStore = defineStore('routerNoteStore', {
   state: () => {
     return {
-      routes: [] as RouteRecordRaw[],
       tree_node: [] as TreeNode[],
       search_data: [] as TreeNode[],
       routes_loading: false
     }
   },
   getters: {
-    getRoutes: (state) => state.routes,
     getTreeNode: (state) => state.tree_node,
     getRoutesLoading: (state) => state.routes_loading
   },

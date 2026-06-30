@@ -17,15 +17,12 @@ import useStore from '@/store'
 
 const router = useRouter()
 const route = useRoute()
-const { tagview } = useStore()
-
 const onBack = () => {
   const tagItem: ITagItem = {
     path: route.path,
     name: 'error500',
     title: ''
   }
-  tagview.removeTagView(tagItem)
   router.push('/')
 }
 </script>

@@ -61,7 +61,7 @@ import useStore from '@/store'
 import Cookies from 'js-cookie'
 
 const router = useRouter()
-const { user, routerNoteStore, routeStore, permission, tagview } = useStore()
+const { user, routerNoteStore, permission } = useStore()
 const loadingText = ref('正在启动...')
 const progress = ref(0)
 const appVersion = ref('1.0.0')
@@ -198,9 +198,7 @@ const handleInitialization = async () => {
 const initializeApp = async () => {
   try {
     const routerNote = await routerNoteStore.setRoutes()
-    const routes = await routeStore.setRoutes()
     await permission.getPermissions()
-    tagview.initTagViewList(routes)
     console.log('App initialized successfully')
   } catch (error) {
     console.error('Initialize app error:', error)

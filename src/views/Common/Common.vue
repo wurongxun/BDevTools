@@ -7,7 +7,6 @@ import { useHomeNavigation } from '@/events/navigation';
 import Back from '@/Layout/components/AppNavbar/components/Back.vue'
 import BreadCrumb from '@/Layout/components/AppNavbar/components/BreadCrumb.vue'
 import avatar from '@/Layout/components/AppNavbar/components/Avatar.vue'
-import TagView from '@/Layout/components/AppNavbar/components/TagView.vue'
 import FunctionalArea from '@/Layout/components/AppNavbar/components/FunctionalArea/index.vue'
 const { pages } = useHomeNavigation();
 const { t } = useI18n();

@@ -17,7 +17,7 @@ import useStore from '@/store'
 
 const router = useRouter()
 const route = useRoute()
-const { tagview } = useStore()
+
 
 const onBack = () => {
   const tagItem: ITagItem = {
@@ -25,7 +25,6 @@ const onBack = () => {
     name: 'error403',
     title: ''
   }
-  tagview.removeTagView(tagItem)
   router.push('/')
 }
 </script>

@@ -6,13 +6,6 @@
   </div>
 </template>
 <script lang="ts" setup>
-import useStore from '@/store'
-import { storeToRefs } from 'pinia'
-
-const { tagview } = useStore()
-const { cacheList } = storeToRefs(tagview)
-
-
 //禁止F12
 // document.onkeydown = function (event: KeyboardEvent) {
 //   // 使用 event.code 替代 keyCode

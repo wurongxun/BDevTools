@@ -99,7 +99,6 @@ interface TreeNode {
   isFolder: boolean
   type?: 'folder' | 'markdown' | 'pdf'
   children?: TreeNode[]
-  routerPath: string,
   folder: string,
   filePath: string,
   isfile: boolean,

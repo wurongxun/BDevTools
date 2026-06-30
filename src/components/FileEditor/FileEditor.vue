@@ -16,7 +16,7 @@ import CodeEditor from './EditorType/CodeEditor.vue'
 import ImageEditor from './EditorType/ImageEditor.vue'
 import PdfEditor from './EditorType/PdfEditor.vue'
 import MdEditor from './EditorType/MdEditor.vue'
-const { routerNoteStore, tagview, useDocumentManagerStore } = useStore()
+const { routerNoteStore,  useDocumentManagerStore } = useStore()
 
 const activeDocument = computed(() => useDocumentManagerStore.activeDocument)
 const activePathId = computed(() => activeDocument.value?.id || '')

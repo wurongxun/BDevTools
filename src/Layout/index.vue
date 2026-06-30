@@ -12,7 +12,6 @@
 </template>
 
 <script setup lang="ts" name="Layout">
-import AppMain from './components/AppMain/index.vue'
 import AppEditorMain from './components/AppEditorMain/index.vue'
 import AppNavbar from './components/AppNavbar/index.vue'
 import AppSidebar from './components/AppSidebar/index.vue'

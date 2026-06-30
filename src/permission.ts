@@ -7,7 +7,7 @@ import type { RouteLocationNormalized, NavigationGuardNext } from 'vue-router'
 
 NProgress.configure({ showSpinner: false }) // NProgress Configuration
 
-const { user, routeStore, permission, tagview, routerNoteStore } = useStore()
+const { user, permission,  routerNoteStore } = useStore()
 
 const whiteList = ['/login', '/component/AMap'] // no redirect whitelist
 
@@ -26,16 +26,10 @@ router.beforeEach(
           try {
             await user.getUserInfo()
             const routerNote = await routerNoteStore.setRoutes()
-            const router = await routeStore.setRoutes()
-           
-            console.log('beforeEach router ', router)
             await permission.getPermissions()
-            tagview.initTagViewList(router)
             next({ ...to, replace: true })
             NProgress.done()
           } catch (error: unknown) {
-            routeStore.resetRoutes()
-            tagview.resetTagViewList()
             user.resetUserInfo()
             next({ path: `/login?redirect=${to.fullPath}` })
             NProgress.done()

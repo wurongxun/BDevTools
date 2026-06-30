@@ -18,7 +18,7 @@ import { useRouter, useRoute, LocationQueryRaw, RouteParamsRaw } from 'vue-route
 import { check as check_, Update, DownloadEvent } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 
-const { appConfig, routerNoteStore, tagview } = useStore()
+const { appConfig, routerNoteStore } = useStore()
 const router = useRouter()
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -73,7 +73,7 @@ const theme_options = [
   }
 ]
 
-const tagViewList = computed<ITagItem[]>(() => tagview.tagViewList)
+
 
 onMounted(async () => {
   if (userStore.appConfig.length < 1) {
@@ -210,38 +210,12 @@ async function md_working_directory_change() {
     multiple: false,
     directory: true
   })
-
-  if (file_directory) {
-    md_working_directory.value = file_directory
-
-    //清空tagView
-    let tagviews: ITagItem[] = tagview.getTagviewList()
-    console.log('tagviews:=================', tagviews)
-    for (let tagview of tagviews) {
-      let result: boolean = await processNodeCache({
-        filePath: tagview.filePath,
-        id: tagview.id,
-        label: tagview.title,
-        isfile: true,
-        isFolder: false,
-        routerPath: tagview.path,
-        folder: ''
-      })
-      if (!result) {
-        console.log('processNodeCache error:', result)
-        return
-      }
-    }
-
     if (store) {
       await store.set('md_working_directory', { value: file_directory })
       await store.save()
     }
-
-    tagview.deleteTagViewList()
     const routerNote = routerNoteStore.setRoutes()
-    console.log('processNodeCache error:========2', routerNote)
-  }
+
 }
 
 // 添加清除缓存和浏览器缓存的函数
@@ -300,7 +274,6 @@ const processNodeCache = async (item: TreeNode) => {
     }
     console.log('processNodeCache 删除缓存 删除结果:', item.routerPath)
 
-    tagview.removeTagViewByPath(item.routerPath)
     return true
   } catch (error) {
     NotificationUtil.error('操作失败：' + error)

@@ -24,12 +24,10 @@ import useStore from '@/store'
 import { storeToRefs } from 'pinia'
 import { ArrowUp } from '@element-plus/icons-vue'
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import TagView from '../AppNavbar/components/TagView.vue'
 import FileEditor from '../../../components/FileEditor/FileEditor.vue'
 import EditorTab from '@/Layout/components/AppEditorMain/EditorTab.vue'
 
-const { tagview } = useStore()
-const { cacheList } = storeToRefs(tagview)
+
 
 // 动态计算主内容区域高度
 const appMainHeight = ref('calc(100vh - var(--header-height) - var(--tage-view-height))')
