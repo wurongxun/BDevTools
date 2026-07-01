@@ -456,7 +456,9 @@ function handleDragEnd() {
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '@/styles/theme.scss' as theme;
+
 .tab-bar-container {
   display: flex;
   align-items: stretch;
@@ -465,6 +467,11 @@ function handleDragEnd() {
   border-bottom: 1px solid #1e1e1e;
   user-select: none;
   position: relative;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+    border-bottom-color: theme.getVar('borderColor');
+  }
 }
 
 /* 滚动按钮样式 */
@@ -481,15 +488,29 @@ function handleDragEnd() {
   cursor: pointer;
   transition: background-color 0.2s;
   z-index: 10;
+
+  @include theme.useTheme {
+    background-color: lighten(theme.getVar('bgColor'), 5%);
+    color: theme.getVar('textColor');
+  }
 }
 
 .scroll-btn:hover {
   background-color: #3e3e3e;
   color: #ffffff;
+
+  @include theme.useTheme {
+    background-color: lighten(theme.getVar('bgColor'), 10%);
+    color: theme.getVar('textColor');
+  }
 }
 
 .scroll-btn:active {
   background-color: #4a4a4a;
+
+  @include theme.useTheme {
+    background-color: lighten(theme.getVar('bgColor'), 15%);
+  }
 }
 
 /* 标签页列表容器 */
@@ -530,6 +551,12 @@ function handleDragEnd() {
   transition: background-color 0.15s;
   white-space: nowrap;
   position: relative;
+
+  @include theme.useTheme {
+    background-color: lighten(theme.getVar('bgColor'), 3%);
+    border-right-color: theme.getVar('borderColor');
+    color: darken(theme.getVar('textColor'), 30%);
+  }
 }
 
 /* 活跃标签页样式 */
@@ -537,6 +564,12 @@ function handleDragEnd() {
   background-color: #1e1e1e;
   color: #ffffff;
   border-bottom: 2px solid #007acc;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+    color: theme.getVar('textColor');
+    border-bottom-color: #007acc;
+  }
 }
 
 .tab-active::after {
@@ -553,6 +586,11 @@ function handleDragEnd() {
 .tab-item:not(.tab-active):hover {
   background-color: #2a2d2e;
   color: #cccccc;
+
+  @include theme.useTheme {
+    background-color: lighten(theme.getVar('bgColor'), 8%);
+    color: theme.getVar('textColor');
+  }
 }
 
 /* 文件图标 */
@@ -596,6 +634,10 @@ function handleDragEnd() {
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s, background-color 0.15s;
+
+  @include theme.useTheme {
+    color: darken(theme.getVar('textColor'), 30%);
+  }
 }
 
 .tab-item:hover .tab-close {
@@ -605,6 +647,11 @@ function handleDragEnd() {
 .tab-close:hover {
   background-color: rgba(255, 255, 255, 0.1);
   color: #ffffff;
+
+  @include theme.useTheme {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: theme.getVar('textColor');
+  }
 }
 
 /* 拖拽时的占位符样式 */
@@ -634,11 +681,22 @@ function handleDragEnd() {
   color: #cccccc;
   cursor: pointer;
   transition: background-color 0.2s;
+
+  @include theme.useTheme {
+    background-color: lighten(theme.getVar('bgColor'), 5%);
+    border-left-color: theme.getVar('borderColor');
+    color: theme.getVar('textColor');
+  }
 }
 
 .dropdown-btn:hover {
   background-color: #3e3e3e;
   color: #ffffff;
+
+  @include theme.useTheme {
+    background-color: lighten(theme.getVar('bgColor'), 10%);
+    color: theme.getVar('textColor');
+  }
 }
 
 /* 下拉菜单 */
@@ -652,6 +710,12 @@ function handleDragEnd() {
   display: flex;
   flex-direction: column;
   animation: dropdownFadeIn 0.15s ease-out;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+    border-color: theme.getVar('borderColor');
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  }
 }
 
 @keyframes dropdownFadeIn {
@@ -676,6 +740,12 @@ function handleDragEnd() {
   font-size: 12px;
   color: #cccccc;
   font-weight: 500;
+
+  @include theme.useTheme {
+    background-color: lighten(theme.getVar('bgColor'), 5%);
+    border-bottom-color: theme.getVar('borderColor');
+    color: theme.getVar('textColor');
+  }
 }
 
 /* 关闭全部按钮 */
@@ -688,6 +758,11 @@ function handleDragEnd() {
   font-size: 11px;
   cursor: pointer;
   transition: all 0.15s;
+
+  @include theme.useTheme {
+    border-color: theme.getVar('borderColor');
+    color: theme.getVar('textColor');
+  }
 }
 
 .close-all-btn:hover {
@@ -712,6 +787,10 @@ function handleDragEnd() {
   cursor: pointer;
   transition: background-color 0.15s;
   border-bottom: 1px solid #1e1e1e;
+
+  @include theme.useTheme {
+    border-bottom-color: theme.getVar('borderColor');
+  }
 }
 
 .dropdown-item:last-child {
@@ -720,15 +799,29 @@ function handleDragEnd() {
 
 .dropdown-item:hover {
   background-color: #2a2d2e;
+
+  @include theme.useTheme {
+    background-color: lighten(theme.getVar('bgColor'), 8%);
+  }
 }
 
 .dropdown-item-active {
   background-color: #094771;
   color: #ffffff;
+
+  @include theme.useTheme {
+    background-color: #094771;
+    color: #ffffff;
+  }
 }
 
 .dropdown-item-active:hover {
   background-color: #0e5f94;
+
+  @include theme.useTheme {
+    background-color: #0e5f94;
+    color: #ffffff;
+  }
 }
 
 /* 下拉项图标 */
@@ -772,6 +865,10 @@ function handleDragEnd() {
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s, background-color 0.15s;
+
+  @include theme.useTheme {
+    color: darken(theme.getVar('textColor'), 30%);
+  }
 }
 
 .dropdown-item:hover .dropdown-close {
@@ -781,6 +878,11 @@ function handleDragEnd() {
 .dropdown-close:hover {
   background-color: rgba(255, 255, 255, 0.1);
   color: #ffffff;
+
+  @include theme.useTheme {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: theme.getVar('textColor');
+  }
 }
 
 /* Tooltip 提示框样式 */
@@ -801,6 +903,13 @@ function handleDragEnd() {
   overflow: hidden;
   text-overflow: ellipsis;
   animation: tooltipFadeIn 0.15s ease-out;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+    color: theme.getVar('textColor');
+    border-color: theme.getVar('borderColor');
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
 }
 
 @keyframes tooltipFadeIn {
@@ -835,6 +944,10 @@ function handleDragEnd() {
 .tab-dragging {
   opacity: 0.5;
   background-color: #3e3e3e;
+
+  @include theme.useTheme {
+    background-color: lighten(theme.getVar('bgColor'), 15%);
+  }
 }
 
 .tab-drag-over {

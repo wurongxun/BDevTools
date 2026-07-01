@@ -21,7 +21,7 @@ const appName = ref<string>(t('appName'));
     <header class="topbar-box" data-tauri-drag-region>
       <Back></Back>
       <div class="bread-crumb-box">
-        <bread-crumb></bread-crumb>
+<!--        <bread-crumb></bread-crumb>-->
       </div>
 <!--      <functional-area></functional-area>-->
       <!-- <avatar></avatar> -->
