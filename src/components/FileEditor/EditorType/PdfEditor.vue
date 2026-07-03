@@ -13,6 +13,7 @@ import {
 import * as pdfjsLib from 'pdfjs-dist'
 import { useRoute } from 'vue-router'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
+//import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url'
 import { ElMessage } from 'element-plus'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import useStore from '@/store'
@@ -225,7 +226,7 @@ const loadPdfFile = async () => {
     renderPage(pageNum)
   } catch (err: any) {
     error.value = err.message || 'Failed to load PDF'
-    ElMessage.error(error.value)
+    ElMessage.error(error.value?.toString())
   } finally {
     loading.value = false
   }
