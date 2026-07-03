@@ -103,7 +103,6 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     // 创建文档状态对象
     const fileName = filePath.split(/[/\\]/).pop() || 'Untitled'
     const type = fileType || detectFileType(filePath)
-
     const doc: DocumentState = {
       id: filePath,
       name: fileName,
@@ -217,6 +216,7 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
       console.error(`Failed to save file: ${filePath}`, error)
       throw error
     }
+    return true;
   }
 
   /**
@@ -457,7 +457,7 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
    */
   async function loadFileContent(filePath: string, fileType: FileType): Promise<string | ArrayBuffer> {
     // 对于图片和二进制文件，返回 ArrayBuffer
-    if (fileType === FileType.IMAGE || fileType === FileType.BINARY) {
+    if (fileType === FileType.IMAGE || fileType === FileType.BINARY|| fileType === FileType.PDF) {
       return await invoke('read_file_bytes', { path: filePath })
     }
     var res = await tauri_request<ResponseData<string>>("read_note_file", {
@@ -468,6 +468,7 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
       return res.data;
     } else {
       NotificationUtil.error("读取失败：" + res.msg);
+      throw new Error('Failed to read file')
     }
   }
 

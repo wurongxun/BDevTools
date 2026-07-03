@@ -12,7 +12,8 @@ import {
 } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
 import { useRoute } from 'vue-router'
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
+//import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
+//import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url'
 import { ElMessage } from 'element-plus'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import useStore from '@/store'
@@ -20,6 +21,9 @@ import useStore from '@/store'
 defineOptions({
   name: 'PdfPreview'
 })
+
+
+
 
 const { appConfig, system, useDocumentManagerStore } = useStore()
 // 当前激活的文档路径
@@ -31,6 +35,23 @@ const page_count = ref<number>(0)
 const loading = ref<boolean>(true)
 const error = ref<string | null>(null)
 const controlsPosition = ref<{ top: number; left: number }>({ top: 0, left: 0 })
+
+
+let pdfDoc: any = null
+let pageNum = 1
+let pageRendering = false
+let pageNumPending: number | null = null
+// 使用模板引用
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+const containerRef = ref<HTMLElement | null>(null)
+let canvas: HTMLCanvasElement | null = null
+let ctx: CanvasRenderingContext2D | null = null
+// pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+//   "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
+//   import.meta.url
+// ).toString();
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.1.200/pdf.worker.min.mjs'
 
 // 保存组件状态
 const savedState = new Map<
@@ -62,17 +83,8 @@ watch(
   },
   { immediate: true }
 )
-let pdfDoc: any = null
-let pageNum = 1
-let pageRendering = false
-let pageNumPending: number | null = null
-// 使用模板引用
-const canvasRef = ref<HTMLCanvasElement | null>(null)
-const containerRef = ref<HTMLElement | null>(null)
-let canvas: HTMLCanvasElement | null = null
-let ctx: CanvasRenderingContext2D | null = null
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
+
 
 const updateControlsPosition = () => {
   const container = document.querySelector('.pdf-container') as HTMLElement
@@ -172,7 +184,6 @@ function scrollToTop() {
     }
   })
 }
-
 // 改进错误处理
 const loadPdfFile = async () => {
   try {
@@ -190,30 +201,28 @@ const loadPdfFile = async () => {
         throw new Error('Canvas element not found')
       }
     }
+    if (!activeDocumentId.value) {
+      throw new Error('No active document selected')
+    }
     // 从 document store 获取文档信息
     const doc = useDocumentManagerStore.documents.get(activeDocumentId.value)
-
-    if (!doc.id) {
+    if (!doc || !doc.id) {
       throw new Error('No PDF file path provided')
     }
-
-    const url = convertFileSrc(doc.id)
+    let url = convertFileSrc(doc.id)
     canvas = canvasRef.value
     ctx = canvas.getContext('2d')
 
     if (!ctx) {
       throw new Error('Failed to get canvas context')
     }
-
-    const loadingTask = pdfjsLib.getDocument(url)
-
-    loadingTask.onProgress = (progressData) => {
-      console.log(`Loading: ${(progressData.loaded / progressData.total) * 100}%`)
-    }
-
+    console.log('[PdfPreview] Loading PDF:', url)
+    const loadingTask = pdfjsLib.getDocument({ url: url})
+    // loadingTask.onProgress = (progressData) => {
+    //   console.log(`Loading: ${(progressData.loaded / progressData.total) * 100}%`)
+    // }
     pdfDoc = await loadingTask.promise
     page_count.value = pdfDoc.numPages
-
     // 计算自适应缩放比例
     const fitScale = await calculateFitScale()
     scale.value = fitScale
@@ -351,12 +360,10 @@ onMounted(() => {
 
     setTimeout(() => {
       updateControlsPosition()
-
       const container = document.querySelector('.pdf-container') as HTMLElement
       if (container) {
         resizeObserver = new ResizeObserver(async () => {
           updateControlsPosition()
-
           // 窗口大小改变时重新计算缩放比例
           if (pdfDoc) {
             const fitScale = await calculateFitScale()

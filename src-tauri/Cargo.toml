@@ -38,6 +38,10 @@ parking_lot = "0.12.3"
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
 tauri-plugin-os = "2"
+# 文件编码处理
+encoding_rs = "0.8"
+chardetng = "0.1"
+
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.44.0", features = [
     "Win32_Foundation",

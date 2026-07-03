@@ -1,7 +1,7 @@
 use crate::response::resp_data::{ResData, ResDataNoData};
 use crate::utils::fileUtil::read_dir_info;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle,Manager};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 // 获取目录下笔记
@@ -39,6 +39,7 @@ pub async fn get_note_list(
         }
     }
 }
+// ... existing code ...
 
 // 读取本地笔记文件
 #[tauri::command]
@@ -46,24 +47,30 @@ pub async fn read_note_file(
     app_handle: tauri::AppHandle,
     path: String,
 ) -> Result<ResData<String>, String> {
-    let contents = tokio::fs::read_to_string(path).await;
-    match contents {
-        Ok(_contents) => {
-            return Ok(ResData {
-                code: 200,
-                msg: "读取成功".to_string(),
-                data: _contents,
-            })
-        }
-        Err(err) => {
-            return Ok(ResData {
-                code: 500,
-                msg: "笔记读取失败".to_string(),
-                data: err.to_string(),
-            })
-        }
-    }
+    // 首先读取原始字节
+    let bytes = tokio::fs::read(&path).await.map_err(|err| {
+        format!("读取文件失败: {}", err)
+    })?;
+
+    // 使用 chardetng 检测文件编码
+    let mut detector = chardetng::EncodingDetector::new();
+    detector.feed(&bytes, true);
+    let encoding = detector.guess(None, true);
+
+    // 根据检测到的编码解码文件内容
+    let (cow_text, _encoding_used, had_errors) = encoding.decode(&bytes);
+    // 转换为 String
+    let content = cow_text.into_owned();
+
+    Ok(ResData {
+        code: 200,
+        msg: "读取成功".to_string(),
+        data: content,
+    })
 }
+
+// ... existing code ...
+
 
 // 创建本地文件夹
 #[tauri::command]
