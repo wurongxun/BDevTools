@@ -12,8 +12,7 @@ import {
 } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
 import { useRoute } from 'vue-router'
-//import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
-//import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url'
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
 import { ElMessage } from 'element-plus'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import useStore from '@/store'
@@ -46,12 +45,8 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const containerRef = ref<HTMLElement | null>(null)
 let canvas: HTMLCanvasElement | null = null
 let ctx: CanvasRenderingContext2D | null = null
-// pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-//   "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
-//   import.meta.url
-// ).toString();
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.1.200/pdf.worker.min.mjs'
+pdfjsLib.GlobalWorkerOptions.workerSrc =pdfjsWorker;
 
 // 保存组件状态
 const savedState = new Map<
