@@ -16,7 +16,9 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
 import { ElMessage } from 'element-plus'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import useStore from '@/store'
+import BookmarkTree from './Pdf/BookmarkTree.vue'
 import { DocumentState } from '@/store/modules/documents'
+import { ArrowRight, ArrowDown, FolderOpened, Document } from '@element-plus/icons-vue'
 
 defineOptions({
   name: 'PdfPreview'
@@ -39,6 +41,11 @@ const page_count = ref<number>(0)
 const loading = ref<boolean>(true)
 const error = ref<string | null>(null)
 const controlsPosition = ref<{ top: number; left: number }>({ top: 0, left: 0 })
+
+// 书签栏相关
+const showBookmarkPanel = ref<boolean>(false)
+const bookmarks = ref<any[]>([])
+const expandedBookmarks = ref<Set<string>>(new Set())
 
 // 使用 shallowRef 存储大型对象，避免不必要的响应式开销
 let pdfDoc: any = null
@@ -249,6 +256,9 @@ const loadPdfFile = async () => {
     pdfDoc = await loadingTask.promise
     page_count.value = pdfDoc.numPages
 
+    // 提取书签
+    await extractBookmarks()
+
     const fitScale = await calculateFitScale()
     scale.value = fitScale
 
@@ -259,6 +269,83 @@ const loadPdfFile = async () => {
     ElMessage.error(error.value)
   } finally {
     loading.value = false
+  }
+}
+
+// 提取 PDF 书签
+const extractBookmarks = async () => {
+  try {
+    const outline = await pdfDoc.getOutline()
+    if (outline && Array.isArray(outline)) {
+      bookmarks.value = processBookmarks(outline)
+      console.log('提取到书签:', bookmarks.value.length, '个')
+    } else {
+      bookmarks.value = []
+      console.log('此 PDF 没有书签')
+    }
+  } catch (err) {
+    console.error('提取书签失败:', err)
+    bookmarks.value = []
+  }
+}
+
+// 处理书签数据，添加唯一标识和层级信息
+const processBookmarks = (outline: any[], level = 0): any[] => {
+  return outline.map((item, index) => {
+    const id = `${level}-${index}-${Date.now()}`
+    const processed = {
+      ...item,
+      id,
+      level,
+      expanded: false,
+      children: item.items ? processBookmarks(item.items, level + 1) : []
+    }
+    return processed
+  })
+}
+
+// 切换书签展开/折叠
+const toggleBookmarkExpand = (bookmark: any) => {
+  bookmark.expanded = !bookmark.expanded
+}
+
+// 跳转到指定页码
+const goToBookmarkPage = (dest: any) => {
+  if (!pdfDoc) return
+
+  try {
+    // dest 可能是数组或对象，需要解析页码
+    let targetPage = 1
+
+    if (Array.isArray(dest)) {
+      // dest[0] 通常是页面引用
+      const pageRef = dest[0]
+      if (pageRef && typeof pageRef === 'object') {
+        // 通过页面引用获取页码
+        pdfDoc.getPageIndex(pageRef).then((pageIndex: number) => {
+          const pageNumber = pageIndex + 1
+          jumpToPage(pageNumber)
+        }).catch(err => {
+          console.error('获取页码失败:', err)
+        })
+      }
+    } else if (typeof dest === 'number') {
+      targetPage = dest
+      jumpToPage(targetPage)
+    }
+  } catch (err) {
+    console.error('跳转失败:', err)
+    ElMessage.error('跳转失败')
+  }
+}
+
+// 执行页面跳转
+const jumpToPage = (pageNumber: number) => {
+  if (pageNumber >= 1 && pageNumber <= page_count.value) {
+    pageNum = pageNumber
+    queueRenderPage(pageNum)
+    scrollToTop()
+    ElMessage.success(`已跳转到第 ${pageNumber} 页`)
   }
 }
 
@@ -376,6 +463,36 @@ const goToPage = (page: number) => {
   }
 }
 
+// 切换书签面板显示
+const toggleBookmarkPanel = () => {
+  showBookmarkPanel.value = !showBookmarkPanel.value
+}
+// 全部展开
+const expandAllBookmarks = () => {
+  const expandRecursive = (items: any[]) => {
+    items.forEach(item => {
+      item.expanded = true
+      if (item.children && item.children.length > 0) {
+        expandRecursive(item.children)
+      }
+    })
+  }
+  expandRecursive(bookmarks.value)
+}
+
+// 全部折叠
+const collapseAllBookmarks = () => {
+  const collapseRecursive = (items: any[]) => {
+    items.forEach(item => {
+      item.expanded = false
+      if (item.children && item.children.length > 0) {
+        collapseRecursive(item.children)
+      }
+    })
+  }
+  collapseRecursive(bookmarks.value)
+}
+
 onMounted(() => {
   console.log('pdfPreview mounted', route)
 
@@ -444,41 +561,227 @@ onMounted(() => {
 
 
 <template>
-  <div class="pdf-container" ref="containerRef">
-    <!-- 加载状态 -->
-    <div v-if="loading" class="loading-overlay">
-      <div class="loading-spinner">Loading PDF...</div>
-    </div>
-    <!-- 错误状态 -->
-    <div v-else-if="error" class="error-overlay">
-      <div class="error-message">{{ error }}</div>
-    </div>
-    <canvas ref="canvasRef" class="pdf-canvas" id="the-canvas"></canvas>
+  <div class="pdf-wrapper" :class="{ 'with-bookmark': showBookmarkPanel }">
+    <!-- 书签栏 -->
+    <div v-if="showBookmarkPanel" class="bookmark-panel">
+      <div class="bookmark-header">
+        <span class="bookmark-title">
+          <el-icon><FolderOpened /></el-icon>
+          书签
+        </span>
+        <div class="bookmark-actions">
+          <el-button-group size="small">
+            <el-tooltip content="全部展开" placement="top">
+              <el-button @click="expandAllBookmarks">
+                <el-icon><ArrowDown /></el-icon>
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="全部折叠" placement="top">
+              <el-button @click="collapseAllBookmarks">
+                <el-icon><ArrowRight /></el-icon>
+              </el-button>
+            </el-tooltip>
+          </el-button-group>
+          <el-button
+            size="small"
+            @click="toggleBookmarkPanel"
+            :icon="'Close'"
+          />
+        </div>
+      </div>
 
-    <div
-      class="pdf-controls"
-      :style="{
-        position: 'fixed',
-        top: `${controlsPosition.top}px`,
-        left: `${controlsPosition.left}px`,
-        transform: 'translate(-50%, -50%)'
-      }"
-    >
-      <button @click="onReduce" :disabled="scale <= 0.2 || loading" title="缩小 (Ctrl+-)">-</button>
-      <button @click="onMagnify" :disabled="scale >= 5 || loading" title="放大 (Ctrl++)">+</button>
-      <button @click="onPrevPage" :disabled="page_num <= 1 || loading" title="上一页 (←)">
-        Previous
-      </button>
-      <span>Page: {{ page_num }} / {{ page_count }}</span>
-      <button @click="onNextPage" :disabled="page_num >= page_count || loading" title="下一页 (→)">
-        Next
-      </button>
+      <div class="bookmark-content">
+        <div v-if="bookmarks.length === 0" class="no-bookmarks">
+          <el-empty description="此 PDF 没有书签" :image-size="80" />
+        </div>
+
+        <div v-else class="bookmark-tree">
+          <BookmarkTree
+            :bookmarks="bookmarks"
+            :current-page="page_num"
+            @go-to-page="goToBookmarkPage"
+            @toggle-expand="toggleBookmarkExpand"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- PDF 预览区域 -->
+    <div class="pdf-container" ref="containerRef">
+      <!-- 加载状态 -->
+      <div v-if="loading" class="loading-overlay">
+        <div class="loading-spinner">Loading PDF...</div>
+      </div>
+      <!-- 错误状态 -->
+      <div v-else-if="error" class="error-overlay">
+        <div class="error-message">{{ error }}</div>
+      </div>
+      <canvas ref="canvasRef" class="pdf-canvas" id="the-canvas"></canvas>
+
+      <div
+        class="pdf-controls"
+        :style="{
+          position: 'fixed',
+          top: `${controlsPosition.top}px`,
+          left: `${controlsPosition.left}px`,
+          transform: 'translate(-50%, -50%)'
+        }"
+      >
+        <!-- 书签按钮 -->
+        <el-button
+          @click="toggleBookmarkPanel"
+          :type="showBookmarkPanel ? 'primary' : 'default'"
+          size="small"
+          title="书签"
+        >
+          <el-icon><FolderOpened /></el-icon>
+        </el-button>
+
+        <button @click="onReduce" :disabled="scale <= 0.2 || loading" title="缩小 (Ctrl+-)">-</button>
+        <button @click="onMagnify" :disabled="scale >= 5 || loading" title="放大 (Ctrl++)">+</button>
+        <button @click="onPrevPage" :disabled="page_num <= 1 || loading" title="上一页 (←)">
+          Previous
+        </button>
+        <span>Page: {{ page_num }} / {{ page_count }}</span>
+        <button @click="onNextPage" :disabled="page_num >= page_count || loading" title="下一页 (→)">
+          Next
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.pdf-wrapper {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.pdf-wrapper.with-bookmark {
+  padding-left: 300px;
+}
+
+/* 书签栏样式 */
+.bookmark-panel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 300px;
+  background-color: var(--el-bg-color);
+  border-right: 1px solid var(--el-border-color);
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.bookmark-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background-color: var(--el-fill-color-light);
+}
+
+.bookmark-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+}
+
+.bookmark-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bookmark-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+}
+
+.no-bookmarks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--el-text-color-secondary);
+}
+
+.bookmark-tree {
+  user-select: none;
+}
+
+/* 书签项样式 */
+.bookmark-item {
+  margin-bottom: 2px;
+}
+
+.bookmark-node {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+  gap: 8px;
+}
+
+.bookmark-node:hover {
+  background-color: var(--el-fill-color-light);
+}
+
+.bookmark-node.active {
+  background-color: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+}
+
+.bookmark-toggle {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--el-text-color-secondary);
+  flex-shrink: 0;
+}
+
+.bookmark-icon {
+  color: var(--el-color-warning);
+  flex-shrink: 0;
+}
+
+.bookmark-text {
+  flex: 1;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bookmark-page {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  flex-shrink: 0;
+  min-width: 30px;
+  text-align: right;
+}
+
+.bookmark-children {
+  padding-left: 20px;
+}
+
 .pdf-container {
+  flex: 1;
   width: 100%;
   height: 100%;
   position: relative;
@@ -577,6 +880,14 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .pdf-wrapper.with-bookmark {
+    padding-left: 0;
+  }
+
+  .bookmark-panel {
+    width: 250px;
+  }
+
   .pdf-controls {
     flex-wrap: wrap;
     width: 90%;
