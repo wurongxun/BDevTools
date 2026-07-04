@@ -2,7 +2,6 @@
   <div class="sidebar-container">
     <logo></logo>
     <div class="app-sidebar">
-      <!-- <side-menu></side-menu> -->
       <FileTree></FileTree>
     </div>
   </div>

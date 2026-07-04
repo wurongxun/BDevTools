@@ -1,12 +1,24 @@
 <template>
   <div class="main-box">
-    <aside ref="sideBoxRef" class="side-box" :class="{ 'is-collapse': isCollapse }">
+    <aside
+      ref="sideBoxRef"
+      class="side-box"
+      :class="{ 'is-collapse': isCollapse }"
+      :style="!isCollapse ? { width: sidebarWidth + 'px', minWidth: sidebarWidth + 'px', maxWidth: sidebarWidth + 'px' } : {}"
+    >
       <app-sidebar />
     </aside>
+    <div
+      v-show="!isCollapse"
+      class="resize-handle"
+      :class="{ 'is-dragging': isDragging }"
+      @mousedown="onResizeStart"
+    >
+      <div class="resize-handle-line"></div>
+    </div>
     <main ref="mainContentRef" class="app-content" :class="{ 'is-collapse': isCollapse, 'has-sidebar': !isCollapse && windowWidth >= 1024 }">
       <app-navbar class="app-navbar"></app-navbar>
       <app-editor-main></app-editor-main>
-<!--      <AppMain></AppMain>-->
     </main>
   </div>
 </template>
@@ -17,7 +29,7 @@ import AppNavbar from './components/AppNavbar/index.vue'
 import AppSidebar from './components/AppSidebar/index.vue'
 import useStore from '@/store/index'
 import { storeToRefs } from 'pinia'
-import { watch, nextTick, onMounted, ref, onUnmounted } from 'vue'
+import { watch, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 
 const { system } = useStore()
@@ -26,6 +38,40 @@ const { isCollapse } = storeToRefs(system)
 const sideBoxRef = ref<HTMLElement | null>(null)
 const mainContentRef = ref<HTMLElement | null>(null)
 const windowWidth = ref(window.innerWidth)
+
+const SIDEBAR_MIN_WIDTH = 150
+const SIDEBAR_MAX_WIDTH = 500
+const SIDEBAR_DEFAULT_WIDTH = 220
+
+const sidebarWidth = ref(SIDEBAR_DEFAULT_WIDTH)
+const isDragging = ref(false)
+
+const onResizeStart = (e: MouseEvent) => {
+  e.preventDefault()
+  isDragging.value = true
+  const startX = e.clientX
+  const startWidth = sidebarWidth.value
+
+  const onMouseMove = (moveEvent: MouseEvent) => {
+    const delta = moveEvent.clientX - startX
+    const newWidth = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startWidth + delta))
+    sidebarWidth.value = newWidth
+  }
+
+  const onMouseUp = () => {
+    isDragging.value = false
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = 'none'
+    triggerLayoutUpdate('drag-resize')
+  }
+
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
+}
 
 let windowWidth_2 = ref<number>(window.innerWidth)
 let lastWindowWidth = ref<number>(window.innerWidth)
@@ -165,7 +211,7 @@ onUnmounted(() => {
 
     @include theme.useTheme {
       background-color: theme.getVar('bgColor');
-      border-right: 1px solid theme.getVar('borderColor');
+      border-right: none;
     }
 
     &.is-collapse {
@@ -173,7 +219,46 @@ onUnmounted(() => {
       min-width: 0;
       max-width: 0;
       opacity: 0;
-      border-right: none;
+    }
+  }
+
+  .resize-handle {
+    flex-shrink: 0;
+    width: 6px;
+    cursor: col-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+    position: relative;
+    transition: background-color 0.2s;
+
+    @include theme.useTheme {
+      background-color: theme.getVar('borderColor');
+    }
+
+    &:hover,
+    &.is-dragging {
+      @include theme.useTheme {
+        background-color: theme.getVar('themeColor', $theme-color);
+      }
+    }
+
+    .resize-handle-line {
+      width: 2px;
+      height: 30px;
+      border-radius: 1px;
+      opacity: 0;
+      transition: opacity 0.2s;
+
+      @include theme.useTheme {
+        background-color: theme.getVar('themeColor', $theme-color);
+      }
+    }
+
+    &:hover .resize-handle-line,
+    &.is-dragging .resize-handle-line {
+      opacity: 1;
     }
   }
 
