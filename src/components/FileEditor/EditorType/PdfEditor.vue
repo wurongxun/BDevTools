@@ -13,17 +13,21 @@ import {
 import * as pdfjsLib from 'pdfjs-dist'
 import { useRoute } from 'vue-router'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
-//import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url'
 import { ElMessage } from 'element-plus'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import useStore from '@/store'
+import { DocumentState } from '@/store/modules/documents'
 
 defineOptions({
   name: 'PdfPreview'
 })
 
-
-
+// 常量定义
+const SCALE_STEP = 0.2
+const MIN_SCALE = 0.2
+const MAX_SCALE = 5
+const CONTAINER_PADDING = 40
+const MAX_FIT_SCALE = 3
 
 const { appConfig, system, useDocumentManagerStore } = useStore()
 // 当前激活的文档路径
@@ -36,7 +40,7 @@ const loading = ref<boolean>(true)
 const error = ref<string | null>(null)
 const controlsPosition = ref<{ top: number; left: number }>({ top: 0, left: 0 })
 
-
+// 使用 shallowRef 存储大型对象，避免不必要的响应式开销
 let pdfDoc: any = null
 let pageNum = 1
 let pageRendering = false
@@ -47,7 +51,7 @@ const containerRef = ref<HTMLElement | null>(null)
 let canvas: HTMLCanvasElement | null = null
 let ctx: CanvasRenderingContext2D | null = null
 
-pdfjsLib.GlobalWorkerOptions.workerSrc =pdfjsWorker;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 // 保存组件状态
 const savedState = new Map<
@@ -59,31 +63,37 @@ const savedState = new Map<
   }
 >()
 
-let isDark: ComputedRef<boolean> = computed(() => system.isDark)
-watch(
-  () => system.isDark,
-  (newValue, oldValue) => {
-    console.log('watch  toggleDarkMode', newValue, oldValue)
-    toggleDarkMode(newValue)
+// 主题切换功能 - 提前定义
+const toggleDarkMode = (isDarkMode: boolean) => {
+  const canvas = document.getElementById('the-canvas')
+  if (isDarkMode) {
+    canvas?.classList.add('dark-mode')
+  } else {
+    canvas?.classList.remove('dark-mode')
   }
-)
+}
 
-// 监听激活文档变化
-watch(
-  activeDocumentId,
-  async (newId) => {
-    console.log(newId)
-    if (newId) {
-      await loadPdfFile()
-    }
-  },
-  { immediate: true }
-)
+// 获取当前文件路径
+const getCurrentFilePath = (): string => {
+  if (route.meta.filePath) {
+    return decodeURIComponent(route.meta.filePath as string)
+  } else if (route.query.file) {
+    return route.query.file as string
+  }
+  return ''
+}
 
-
+// 缓存容器元素，避免重复查询
+let cachedContainer: HTMLElement | null = null
+const getContainer = (): HTMLElement | null => {
+  if (!cachedContainer) {
+    cachedContainer = document.querySelector('.pdf-container') as HTMLElement
+  }
+  return cachedContainer
+}
 
 const updateControlsPosition = () => {
-  const container = document.querySelector('.pdf-container') as HTMLElement
+  const container = getContainer()
   if (!container) return
 
   const rect = container.getBoundingClientRect()
@@ -99,17 +109,36 @@ const updateControlsPosition = () => {
 const calculateFitScale = async (): Promise<number> => {
   if (!pdfDoc || !canvasRef.value) return 1
 
-  const container = document.querySelector('.pdf-container') as HTMLElement
+  const container = getContainer()
   if (!container) return 1
 
-  const containerWidth = container.clientWidth - 40 // 减去左右边距
+  const containerWidth = container.clientWidth - CONTAINER_PADDING
 
-  const firstPage = await pdfDoc.getPage(1)
-  const viewport = firstPage.getViewport({ scale: 1 })
+  try {
+    const firstPage = await pdfDoc.getPage(1)
+    const viewport = firstPage.getViewport({ scale: 1 })
+    const fitScale = containerWidth / viewport.width
+    return Math.min(fitScale, MAX_FIT_SCALE)
+  } catch (err) {
+    console.error('计算适配缩放失败:', err)
+    return 1
+  }
+}
 
-  const fitScale = containerWidth / viewport.width
-
-  return Math.min(fitScale, 3) // 最大不超过 3 倍
+// 防抖函数
+let resizeTimer: number | null = null
+const debouncedResize = () => {
+  if (resizeTimer) {
+    clearTimeout(resizeTimer)
+  }
+  resizeTimer = window.setTimeout(async () => {
+    updateControlsPosition()
+    if (pdfDoc) {
+      const fitScale = await calculateFitScale()
+      scale.value = fitScale
+      renderPage(pageNum)
+    }
+  }, 150)
 }
 
 // 组件被激活时恢复状态
@@ -119,11 +148,9 @@ onActivated(() => {
   const state = savedState.get(currentPath)
 
   if (state && state.filePath === getCurrentFilePath()) {
-    // 恢复页码和缩放比例
     pageNum = state.pageNum
     scale.value = state.scale
 
-    // 如果 PDF 已加载，直接跳转到保存的页面
     if (pdfDoc) {
       renderPage(pageNum)
     }
@@ -145,42 +172,33 @@ onDeactivated(() => {
   }
 })
 
-// 获取当前文件路径
-const getCurrentFilePath = (): string => {
-  if (route.meta.filePath) {
-    return decodeURIComponent(route.meta.filePath as string)
-  } else if (route.query.file) {
-    return route.query.file as string
-  }
-  return ''
-}
-
-// 添加加载状态管理
+// 缩放控制
 const onMagnify = () => {
   if (!pdfDoc || !ctx) return
-  if (scale.value < 5) {
-    scale.value += 0.2
+  if (scale.value < MAX_SCALE) {
+    scale.value = Math.min(scale.value + SCALE_STEP, MAX_SCALE)
     renderPage(pageNum)
   }
 }
 
 const onReduce = () => {
   if (!pdfDoc || !ctx) return
-  if (scale.value > 0.2) {
-    scale.value -= 0.2
+  if (scale.value > MIN_SCALE) {
+    scale.value = Math.max(scale.value - SCALE_STEP, MIN_SCALE)
     renderPage(pageNum)
   }
 }
 
 function scrollToTop() {
   nextTick(() => {
-    const pdfContainer = document.querySelector('.pdf-container')
+    const pdfContainer = getContainer()
     if (pdfContainer) {
       pdfContainer.scrollTo({ top: 0, behavior: 'smooth' })
     }
   })
 }
-// 改进错误处理
+
+// 加载 PDF 文件
 const loadPdfFile = async () => {
   try {
     loading.value = true
@@ -197,14 +215,20 @@ const loadPdfFile = async () => {
         throw new Error('Canvas element not found')
       }
     }
+
     if (!activeDocumentId.value) {
       throw new Error('No active document selected')
     }
-    // 从 document store 获取文档信息
+
     const doc = useDocumentManagerStore.documents.get(activeDocumentId.value)
     if (!doc || !doc.id) {
       throw new Error('No PDF file path provided')
     }
+
+    if (doc.type !== 'pdf') {
+      return
+    }
+
     let url = convertFileSrc(doc.id)
     canvas = canvasRef.value
     ctx = canvas.getContext('2d')
@@ -212,25 +236,65 @@ const loadPdfFile = async () => {
     if (!ctx) {
       throw new Error('Failed to get canvas context')
     }
+
     console.log('[PdfPreview] Loading PDF:', url)
-    const loadingTask = pdfjsLib.getDocument({ url: url})
-    // loadingTask.onProgress = (progressData) => {
-    //   console.log(`Loading: ${(progressData.loaded / progressData.total) * 100}%`)
-    // }
+
+    // 如果已有 PDF 文档，先销毁
+    if (pdfDoc) {
+      pdfDoc.destroy()
+      pdfDoc = null
+    }
+
+    const loadingTask = pdfjsLib.getDocument({ url: url })
     pdfDoc = await loadingTask.promise
     page_count.value = pdfDoc.numPages
-    // 计算自适应缩放比例
+
     const fitScale = await calculateFitScale()
     scale.value = fitScale
 
     renderPage(pageNum)
   } catch (err: any) {
-    error.value = err.message || 'Failed to load PDF'
-    ElMessage.error(error.value?.toString())
+    console.error('PDF 加载失败:', err)
+    error.value = getErrorMessage(err)
+    ElMessage.error(error.value)
   } finally {
     loading.value = false
   }
 }
+
+// 错误消息格式化
+const getErrorMessage = (err: any): string => {
+  if (err.name === 'PasswordException') {
+    return '此 PDF 文件需要密码'
+  } else if (err.message?.includes('Invalid PDF')) {
+    return '无效的 PDF 文件格式'
+  } else if (err.message?.includes('Missing PDF')) {
+    return 'PDF 文件不存在'
+  }
+  return err.message || 'Failed to load PDF'
+}
+
+// 监听激活文档变化
+watch(
+  activeDocumentId,
+  async (newId) => {
+    console.log('Active document changed:', newId)
+    if (newId) {
+      await loadPdfFile()
+    }
+  },
+  { immediate: true }
+)
+
+// 监听暗黑模式变化
+let isDark: ComputedRef<boolean> = computed(() => system.isDark)
+watch(
+  () => system.isDark,
+  (newValue, oldValue) => {
+    console.log('Dark mode changed:', newValue, oldValue)
+    toggleDarkMode(newValue)
+  }
+)
 
 function renderPage(num: number) {
   if (!pdfDoc || !ctx || !canvas) return
@@ -241,23 +305,16 @@ function renderPage(num: number) {
     .then(function (page: any) {
       const viewport = page.getViewport({ scale: scale.value })
 
-      // 确保在设置 canvas 尺寸前 canvas 元素存在
       if (canvas) {
-        // 先设置 canvas 的显示尺寸
         canvas.style.width = viewport.width + 'px'
         canvas.style.height = viewport.height + 'px'
-
-        // 再设置 canvas 的绘图尺寸（必须是整数）
         canvas.width = Math.floor(viewport.width)
         canvas.height = Math.floor(viewport.height)
-
-        // 设置 CSS 样式以确保正确显示
         canvas.style.display = 'block'
         canvas.style.margin = '0 auto'
       }
 
       if (canvas && ctx) {
-        // 清除画布
         ctx.clearRect(0, 0, canvas.width, canvas.height)
 
         const renderContext = {
@@ -311,7 +368,6 @@ function onNextPage() {
   scrollToTop()
 }
 
-// 添加跳转到指定页面功能
 const goToPage = (page: number) => {
   if (page >= 1 && page <= page_count.value && pdfDoc) {
     pageNum = page
@@ -319,7 +375,6 @@ const goToPage = (page: number) => {
     scrollToTop()
   }
 }
-// 添加键盘快捷键支持
 
 onMounted(() => {
   console.log('pdfPreview mounted', route)
@@ -343,10 +398,27 @@ onMounted(() => {
   let resizeObserver: ResizeObserver | null = null
 
   onUnmounted(() => {
+    console.log('[PdfPreview] Unmounting, cleaning up...')
     window.removeEventListener('keydown', handleKeydown)
+
     if (resizeObserver) {
       resizeObserver.disconnect()
     }
+
+    // 清理 PDF 文档
+    if (pdfDoc) {
+      pdfDoc.destroy()
+      pdfDoc = null
+    }
+
+    // 清除定时器
+    if (resizeTimer) {
+      clearTimeout(resizeTimer)
+      resizeTimer = null
+    }
+
+    // 清理缓存
+    cachedContainer = null
   })
 
   toggleDarkMode(isDark.value)
@@ -356,17 +428,9 @@ onMounted(() => {
 
     setTimeout(() => {
       updateControlsPosition()
-      const container = document.querySelector('.pdf-container') as HTMLElement
+      const container = getContainer()
       if (container) {
-        resizeObserver = new ResizeObserver(async () => {
-          updateControlsPosition()
-          // 窗口大小改变时重新计算缩放比例
-          if (pdfDoc) {
-            const fitScale = await calculateFitScale()
-            scale.value = fitScale
-            renderPage(pageNum)
-          }
-        })
+        resizeObserver = new ResizeObserver(debouncedResize)
         resizeObserver.observe(container)
       }
 
@@ -374,22 +438,10 @@ onMounted(() => {
     }, 200)
   })
 })
-// const renderContext = {
-//   canvasContext: ctx,
-//   viewport: viewport,
-//   // 设置透明背景，然后在容器上设置暗色背景
-//   background: 'rgba(0,0,0,0)' // 透明背景
-// };
-// 添加主题切换功能
-const toggleDarkMode = (isDarkMode: boolean) => {
-  const canvas = document.getElementById('the-canvas')
-  if (isDarkMode) {
-    canvas?.classList.add('dark-mode')
-  } else {
-    canvas?.classList.remove('dark-mode')
-  }
-}
 </script>
+
+<!-- ... existing code ... -->
+
 
 <template>
   <div class="pdf-container" ref="containerRef">
