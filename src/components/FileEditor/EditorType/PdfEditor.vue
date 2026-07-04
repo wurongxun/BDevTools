@@ -27,7 +27,7 @@ const SCALE_STEP = 0.2
 const MIN_SCALE = 0.2
 const MAX_SCALE = 5
 const CONTAINER_PADDING = 40
-const MAX_FIT_SCALE = 3
+const MAX_FIT_SCALE = 1.5
 
 const { appConfig, system, useDocumentManagerStore } = useStore()
 // 当前激活的文档路径
