@@ -1,5 +1,5 @@
 <template>
-  <div class="main-box">
+  <div class="main-box" :class="{ 'is-resizing': isDragging }">
     <aside
       ref="sideBoxRef"
       class="side-box"
@@ -51,19 +51,38 @@ const onResizeStart = (e: MouseEvent) => {
   isDragging.value = true
   const startX = e.clientX
   const startWidth = sidebarWidth.value
+  const asideEl = sideBoxRef.value
+  if (!asideEl) return
+
+  asideEl.style.transition = 'none'
+
+  let rafId: number | null = null
+  let pendingWidth = startWidth
 
   const onMouseMove = (moveEvent: MouseEvent) => {
     const delta = moveEvent.clientX - startX
-    const newWidth = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startWidth + delta))
-    sidebarWidth.value = newWidth
+    pendingWidth = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startWidth + delta))
+    if (rafId === null) {
+      rafId = requestAnimationFrame(() => {
+        asideEl.style.width = pendingWidth + 'px'
+        asideEl.style.minWidth = pendingWidth + 'px'
+        asideEl.style.maxWidth = pendingWidth + 'px'
+        rafId = null
+      })
+    }
   }
 
   const onMouseUp = () => {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId)
+    }
+    sidebarWidth.value = pendingWidth
+    asideEl.style.transition = ''
     isDragging.value = false
     document.removeEventListener('mousemove', onMouseMove)
     document.removeEventListener('mouseup', onMouseUp)
     document.body.style.cursor = ''
-    document.body.style.userSelect = 'none'
+    document.body.style.userSelect = ''
     triggerLayoutUpdate('drag-resize')
   }
 
@@ -139,6 +158,7 @@ watch(isCollapse, async (newValue) => {
 
 // 使用 ResizeObserver 监听侧边栏实际宽度变化
 useResizeObserver(sideBoxRef, async (entries) => {
+  if (isDragging.value) return
   for (const entry of entries) {
     if (entry.target === sideBoxRef.value) {
       await nextTick()
@@ -195,6 +215,13 @@ onUnmounted(() => {
   overflow: hidden;
   box-sizing: border-box;
 
+  &.is-resizing {
+    .side-box,
+    .app-content {
+      transition: none !important;
+    }
+  }
+
   .side-box {
     flex-shrink: 0;
     width: $menu-width;
@@ -224,7 +251,7 @@ onUnmounted(() => {
 
   .resize-handle {
     flex-shrink: 0;
-    width: 6px;
+    width: 1px;
     cursor: col-resize;
     display: flex;
     align-items: center;
@@ -240,7 +267,7 @@ onUnmounted(() => {
     &:hover,
     &.is-dragging {
       @include theme.useTheme {
-        background-color: theme.getVar('themeColor', $theme-color);
+        background-color: $theme-color;
       }
     }
 
@@ -252,7 +279,7 @@ onUnmounted(() => {
       transition: opacity 0.2s;
 
       @include theme.useTheme {
-        background-color: theme.getVar('themeColor', $theme-color);
+        background-color: $theme-color;
       }
     }
 

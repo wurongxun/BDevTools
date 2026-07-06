@@ -37,9 +37,9 @@ function handleToHome() {
   cursor: pointer;
   margin-bottom: 1px;
 
-  @include useTheme {
-    border-bottom: 1px solid getVar('borderColor');
-  }
+  //@include useTheme {
+  //  border-bottom: 1px solid getVar('borderColor');
+  //}
 
   &.is-collapse {
     width: variables.$collapse-width;
