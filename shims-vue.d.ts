@@ -9,8 +9,8 @@ declare module '*.svg' {
   export default content
 }
 
-declare module 'vue-i18n' {
-  import type { DefineComponent } from 'vue'
-  const useI18n: any
-  export { useI18n }
-}
+// declare module 'vue-i18n' {
+//   import type { DefineComponent } from 'vue'
+//   const useI18n: any
+//   export { useI18n }
+// }

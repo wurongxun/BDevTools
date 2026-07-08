@@ -1,13 +1,14 @@
 {
-  "include": ["env.d.ts", "window.d.ts", "src/**/*", "src/**/*.vue", "mock"],
+  "include": ["env.d.ts", "window.d.ts", "shims-vue.d.ts", "src/**/*", "src/**/*.vue", "mock"],
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
-    "ignoreDeprecations": "5.0",
+    "ignoreDeprecations": "6.0",
     "target": "ES2020",
     "jsx": "preserve",
+    "jsxImportSource": "vue",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "skipLibCheck": true

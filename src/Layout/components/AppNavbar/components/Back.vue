@@ -14,7 +14,6 @@ import { Back, Minus, Close } from "@element-plus/icons-vue";
 import { ITagItem } from '@/Types/TagView';
 import { useRouter, useRoute } from 'vue-router'
 
-const { routerNoteStore,  noteTem } = useStore()
 const { system } = useStore()
 const { isCollapse } = storeToRefs(system)
 const router = useRouter()

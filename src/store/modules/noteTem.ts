@@ -47,7 +47,7 @@ export const useNoteStore = defineStore('note', {
     },
 
     getNoteData(id: string):NoteDataStore {
-      return this.notes.get(id) || null
+      return this.notes.get(id) || null as unknown as NoteDataStore
     },
 
     removeNote(id: string) {

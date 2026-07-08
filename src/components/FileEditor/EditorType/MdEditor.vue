@@ -63,7 +63,7 @@ import useStore from '@/store'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
 // --- 状态与 Store 初始化 ---
 let store: Store | undefined = undefined;
-const { noteTem, useDocumentManagerStore } = useStore()
+const { useDocumentManagerStore } = useStore()
 const docStore = useDocumentManagerStore
 
 // 接收父组件传入的文档路径（每个实例绑定自己的文档）

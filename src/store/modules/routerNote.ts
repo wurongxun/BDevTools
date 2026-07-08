@@ -110,7 +110,7 @@ export const routerNoteStore = defineStore('routerNoteStore', {
     async setRoutes() {
       try {
         this.routes_loading = true
-        this.routes = []
+
         this.tree_node = []
         // 异步调用接口，主线程无需等待
         get_notebooks_Api()
@@ -121,7 +121,6 @@ export const routerNoteStore = defineStore('routerNoteStore', {
               let item = red_note[i]
               router.addRoute('Layout', item)
             }
-            this.routes = red_note
           })
           .catch((error) => {
             console.error('获取路由信息失败:', error)
@@ -131,7 +130,6 @@ export const routerNoteStore = defineStore('routerNoteStore', {
       } finally {
         this.routes_loading = false
       }
-      return this.routes
     },
     async addTreeNode(item: TreeNode[]) {
       this.tree_node = item

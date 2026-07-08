@@ -206,7 +206,7 @@ async function dark_change() {
 }
 
 async function md_working_directory_change() {
-  let file_directory: string = await open({
+  let file_directory: string | null = await open({
     multiple: false,
     directory: true
   })
@@ -231,6 +231,10 @@ const clear_browser_cache = () => {
 
 // 提取公共的缓存处理函数
 const processNodeCache = async (item: TreeNode) => {
+  if (!store) {
+    NotificationUtil.error('Store 未初始化')
+    return false
+  }
   try {
     let cached_content: string | null = null
     let content: string | null = null

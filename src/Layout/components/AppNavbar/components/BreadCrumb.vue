@@ -12,7 +12,7 @@ import useStore from '@/store'
 const { useDocumentManagerStore } = useStore()
 const name = computed(() => {
   console.log("4444444444444444444"+useDocumentManagerStore.activeDocument)
-  return useDocumentManagerStore.activeDocument.name
+  return useDocumentManagerStore.activeDocument?.name || ''
 })
 </script>
 

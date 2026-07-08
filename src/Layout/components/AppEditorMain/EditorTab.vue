@@ -458,7 +458,7 @@ function handleDragEnd() {
 
 <style scoped lang="scss">
 @use '@/styles/theme.scss' as theme;
-
+@use 'sass:color';
 .tab-bar-container {
   display: flex;
   align-items: stretch;
@@ -490,7 +490,7 @@ function handleDragEnd() {
   z-index: 10;
 
   @include theme.useTheme {
-    background-color: lighten(theme.getVar('bgColor'), 5%);
+     background-color: color.adjust(theme.getVar('bgColor'), $lightness:5%);
     color: theme.getVar('textColor');
   }
 }
@@ -500,7 +500,7 @@ function handleDragEnd() {
   color: #ffffff;
 
   @include theme.useTheme {
-    background-color: lighten(theme.getVar('bgColor'), 10%);
+     background-color: color.adjust(theme.getVar('bgColor'), $lightness:10%);
     color: theme.getVar('textColor');
   }
 }
@@ -509,7 +509,7 @@ function handleDragEnd() {
   background-color: #4a4a4a;
 
   @include theme.useTheme {
-    background-color: lighten(theme.getVar('bgColor'), 15%);
+     background-color: color.adjust(theme.getVar('bgColor'), $lightness:15%);
   }
 }
 
@@ -553,9 +553,9 @@ function handleDragEnd() {
   position: relative;
 
   @include theme.useTheme {
-    background-color: lighten(theme.getVar('bgColor'), 3%);
+     background-color: color.adjust(theme.getVar('bgColor'), $lightness:3%);
     border-right-color: theme.getVar('borderColor');
-    color: darken(theme.getVar('textColor'), 30%);
+    color: color.adjust(theme.getVar('textColor'), $lightness: -30%);
   }
 }
 
@@ -588,7 +588,7 @@ function handleDragEnd() {
   color: #cccccc;
 
   @include theme.useTheme {
-    background-color: lighten(theme.getVar('bgColor'), 8%);
+     background-color: color.adjust(theme.getVar('bgColor'), $lightness:8%);
     color: theme.getVar('textColor');
   }
 }
@@ -636,7 +636,7 @@ function handleDragEnd() {
   transition: opacity 0.15s, background-color 0.15s;
 
   @include theme.useTheme {
-    color: darken(theme.getVar('textColor'), 30%);
+    color: color.adjust(theme.getVar('textColor'), $lightness: -30%);
   }
 }
 
@@ -683,7 +683,7 @@ function handleDragEnd() {
   transition: background-color 0.2s;
 
   @include theme.useTheme {
-    background-color: lighten(theme.getVar('bgColor'), 5%);
+     background-color: color.adjust(theme.getVar('bgColor'), $lightness:5%);
     border-left-color: theme.getVar('borderColor');
     color: theme.getVar('textColor');
   }
@@ -694,7 +694,7 @@ function handleDragEnd() {
   color: #ffffff;
 
   @include theme.useTheme {
-    background-color: lighten(theme.getVar('bgColor'), 10%);
+     background-color: color.adjust(theme.getVar('bgColor'), $lightness:10%);
     color: theme.getVar('textColor');
   }
 }
@@ -742,7 +742,7 @@ function handleDragEnd() {
   font-weight: 500;
 
   @include theme.useTheme {
-    background-color: lighten(theme.getVar('bgColor'), 5%);
+     background-color: color.adjust(theme.getVar('bgColor'), $lightness:5%);
     border-bottom-color: theme.getVar('borderColor');
     color: theme.getVar('textColor');
   }
@@ -801,7 +801,7 @@ function handleDragEnd() {
   background-color: #2a2d2e;
 
   @include theme.useTheme {
-    background-color: lighten(theme.getVar('bgColor'), 8%);
+     background-color: color.adjust(theme.getVar('bgColor'), $lightness:8%);
   }
 }
 
@@ -867,7 +867,7 @@ function handleDragEnd() {
   transition: opacity 0.15s, background-color 0.15s;
 
   @include theme.useTheme {
-    color: darken(theme.getVar('textColor'), 30%);
+    color: color.adjust(theme.getVar('textColor'), $lightness: -30%);
   }
 }
 
@@ -946,7 +946,7 @@ function handleDragEnd() {
   background-color: #3e3e3e;
 
   @include theme.useTheme {
-    background-color: lighten(theme.getVar('bgColor'), 15%);
+     background-color: color.adjust(theme.getVar('bgColor'), $lightness:15%);
   }
 }
 

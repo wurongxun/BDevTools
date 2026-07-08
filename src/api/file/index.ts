@@ -30,7 +30,7 @@ export const get_notebooks_Api = async () => {
     let data_: NotebookInfo = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
     notebooks_data.value = data_
     FileTreeNodeHandler(data_)
-    let data: RouteRecordRaw[] = null;
+    let data: RouteRecordRaw[] = [] as RouteRecordRaw[]
     return data
   } else {
     NotificationUtil.error(res.msg)

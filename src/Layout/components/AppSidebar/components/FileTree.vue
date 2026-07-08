@@ -20,7 +20,7 @@ const MAX_FILENAME_LENGTH = 255
 let store: Store | undefined = undefined
 const router = useRouter()
 const route = useRoute()
-const { routerNoteStore, noteTem, useDocumentManagerStore } = useStore()
+const { routerNoteStore, useDocumentManagerStore } = useStore()
 
 // 优化：缓存排序后的树数据，避免每次渲染都重新计算
 const tree_node = computed(() => sortTreeData(routerNoteStore.tree_node))

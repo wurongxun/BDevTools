@@ -335,7 +335,7 @@ const goToBookmarkPage = (dest: any) => {
         pdfDoc.getPageIndex(pageRef).then((pageIndex: number) => {
           const pageNumber = pageIndex + 1
           jumpToPage(pageNumber)
-        }).catch(err => {
+        }).catch((err: any) => {
           console.error('获取页码失败:', err)
         })
       }

@@ -9,7 +9,7 @@ import { onMounted } from 'vue'
  * @description
  */
 
-let instance: TypeIt = null
+let instance: TypeIt | null = null as any
 
 export const useTyper = (dom: string | Element, options?: any) => {
   const typeItOptions: any = {
@@ -21,6 +21,6 @@ export const useTyper = (dom: string | Element, options?: any) => {
 
   Object.assign(typeItOptions, options)
   instance = new (TypeIt as any)(dom, typeItOptions)
-  instance.go()
+  instance?.go()
   return instance
 }

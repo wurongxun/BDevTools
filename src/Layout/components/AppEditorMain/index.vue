@@ -87,9 +87,11 @@ const handleResize = async () => {
     console.log('[AppMain] Window resized, height updated to:', appMainHeight.value)
   }, 200)
 }
+
 //处理侧边栏切换事件（重命名为 layout-update）
-const handleLayoutUpdate = async (event: CustomEvent) => {
-  console.log('[AppMain] Layout update detected:', event.detail)
+const handleLayoutUpdate = async (event: Event) => {
+  const customEvent = event as CustomEvent
+  console.log('[AppMain] Layout update detected:', customEvent.detail)
 
   // 布局变化时重新计算高度
   await nextTick()
@@ -99,10 +101,10 @@ const handleLayoutUpdate = async (event: CustomEvent) => {
   const resizeEvent = new CustomEvent('window-resize', {
     detail: {
       timestamp: Date.now(),
-      reason: event.detail.reason || 'layout-update',
-      isCollapse: event.detail.isCollapse,
-      sidebarWidth: event.detail.sidebarWidth,
-      mainWidth: event.detail.mainWidth
+      reason: customEvent.detail?.reason || 'layout-update',
+      isCollapse: customEvent.detail?.isCollapse,
+      sidebarWidth: customEvent.detail?.sidebarWidth,
+      mainWidth: customEvent.detail?.mainWidth
     }
   })
   window.dispatchEvent(resizeEvent)
@@ -119,7 +121,7 @@ onMounted(() => {
   window.addEventListener('orientationchange', handleResize)
 
   // 监听布局更新事件（替代原来的 sidebar-toggle）
-  window.addEventListener('layout-update', handleLayoutUpdate as EventListener)
+  window.addEventListener('layout-update',handleLayoutUpdate)
 
   console.log('[AppMain] Mounted, initial height:', appMainHeight.value)
 })
@@ -128,7 +130,7 @@ onUnmounted(() => {
   // 清理事件监听器
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('orientationchange', handleResize)
-  window.removeEventListener('layout-update', handleLayoutUpdate as EventListener)
+  window.removeEventListener('layout-update', handleLayoutUpdate)
 
   if (resizeTimer) {
     clearTimeout(resizeTimer)
