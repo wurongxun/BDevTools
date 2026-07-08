@@ -248,7 +248,7 @@ const loadPdfFile = async () => {
 
     // 如果已有 PDF 文档，先销毁
     if (pdfDoc) {
-      pdfDoc.destroy()
+      //pdfDoc.destroy()
       pdfDoc = null
     }
 
@@ -361,7 +361,7 @@ const getErrorMessage = (err: any): string => {
   return err.message || 'Failed to load PDF'
 }
 
-// 监听激活文档变化
+// 监听激活文档变化 - 移除 immediate，onMounted 已处理初始加载
 watch(
   activeDocumentId,
   async (newId) => {
@@ -369,9 +369,9 @@ watch(
     if (newId) {
       await loadPdfFile()
     }
-  },
-  { immediate: true }
+  }
 )
+
 
 // 监听暗黑模式变化
 let isDark: ComputedRef<boolean> = computed(() => system.isDark)
@@ -524,7 +524,7 @@ onMounted(() => {
 
     // 清理 PDF 文档
     if (pdfDoc) {
-      pdfDoc.destroy()
+      //pdfDoc.destroy()
       pdfDoc = null
     }
 

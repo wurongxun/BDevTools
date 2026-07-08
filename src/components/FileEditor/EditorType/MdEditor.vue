@@ -162,7 +162,7 @@ const loadFile = async (docId: string) => {
 
 };
 
-// 监听激活文档变化
+// 监听激活文档变化 - 移除 immediate，避免与 onMounted 重复加载
 watch(activeDocId, async (newId) => {
   console.log(newId)
   if (newId) {
@@ -170,7 +170,8 @@ watch(activeDocId, async (newId) => {
   } else {
     data.showMdEditor = false
   }
-}, { immediate: true })
+})
+
 
 onMounted(async () => {
   //页面布局
@@ -184,7 +185,12 @@ onMounted(async () => {
   window.addEventListener('resize', handleWindowResize);
   // 监听来自 AppMain 的自定义 resize 事件
   window.addEventListener('window-resize', handleWindowResize);
-});
+
+  // 初始加载当前文档
+  if (activeDocId.value) {
+    await loadFile(activeDocId.value)
+  }
+})
 
 onUnmounted(() => {
   // 清理事件监听器
@@ -196,13 +202,9 @@ onUnmounted(() => {
   }
 });
 
-// 组件被激活时（从缓存中恢复）
+// 组件被激活时（从缓存中恢复）- 数据保持在内存中，无需重新加载
 onActivated(() => {
   console.log('[mdPreViewAndEdit] Activated - 从缓存恢复')
-  // 重新加载当前激活的文档
-  if (activeDocId.value) {
-    loadFile(activeDocId.value)
-  }
 })
 
 // 组件被停用时（保存到缓存）

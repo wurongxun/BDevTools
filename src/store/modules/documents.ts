@@ -4,6 +4,7 @@ import { ref, computed } from 'vue'
 import { invoke } from "@tauri-apps/api/core";
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/entity/entitys'
+import { md5 } from '@/utils/Md5Utils'
 import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting'
 import NotificationUtil from '@/utils/NotificationUtil'
 // 文件类型枚举
@@ -42,6 +43,7 @@ export interface ViewState {
 
 // 文档状态接口
 export interface DocumentState {
+  key:string
   id: string                    // 文件绝对路径作为唯一ID
   name: string                  // 文件名
   type: FileType               // 文件类型
@@ -103,7 +105,9 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     // 创建文档状态对象
     const fileName = filePath.split(/[/\\]/).pop() || 'Untitled'
     const type = fileType || detectFileType(filePath)
+    const hash = md5(filePath)
     const doc: DocumentState = {
+      key: hash,
       id: filePath,
       name: fileName,
       type,
@@ -329,7 +333,9 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
    */
   function createNewDocument(type: FileType = FileType.TEXT) {
     const id = `untitled:${Date.now()}`
+    const hash = md5(id)
     const doc: DocumentState = {
+      key: hash,
       id,
       name: 'Untitled',
       type,
@@ -491,7 +497,6 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     activeDocumentId,
     documentOrder,
     recentlyClosed,
-
     // 计算属性
     activeDocument,
     documentList,
