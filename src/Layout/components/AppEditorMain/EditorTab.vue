@@ -167,7 +167,7 @@ let tooltipTimer: number | null = null
 
 // 计算属性
 const documentList = computed(() => docStore.documentList)
-const activeDocumentId = computed(() => docStore.activeDocumentId)
+const activeDocumentId = computed(() => docStore.activeDocumentPath)
 
 // 设置 tab 引用
 function setTabRef(id: string, el: any) {

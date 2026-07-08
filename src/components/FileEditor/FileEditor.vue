@@ -37,8 +37,8 @@ const currentEditorComponent = computed(() => {
 })
 
 function handleStateUpdate(state: any) {
-  if (activeDocument.value&&useDocumentManagerStore.activeDocumentId) {
-      useDocumentManagerStore.updateViewState(useDocumentManagerStore.activeDocumentId, state)
+  if (activeDocument.value&&useDocumentManagerStore.activeDocumentPath) {
+      useDocumentManagerStore.updateViewState(useDocumentManagerStore.activeDocumentPath, state)
   }
 }
 </script>

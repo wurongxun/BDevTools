@@ -11,7 +11,6 @@ import {
   onDeactivated
 } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
-import { useRoute } from 'vue-router'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
 import { ElMessage } from 'element-plus'
 import { convertFileSrc } from '@tauri-apps/api/core'
@@ -30,11 +29,9 @@ const MIN_SCALE = 0.2
 const MAX_SCALE = 5
 const CONTAINER_PADDING = 40
 const MAX_FIT_SCALE = 1.5
-
 const { appConfig, system, useDocumentManagerStore } = useStore()
 // 当前激活的文档路径
-const activeDocumentId = computed(() => useDocumentManagerStore.activeDocumentId)
-const route = useRoute()
+const activeDocumentPath = computed(() => useDocumentManagerStore.activeDocumentPath)
 const scale = ref<number>(1)
 const page_num = ref<number>(1)
 const page_count = ref<number>(0)
@@ -60,12 +57,15 @@ let ctx: CanvasRenderingContext2D | null = null
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
-// 保存组件状态
+// KeepAlive 缓存标志：防止 watch 在组件恢复时重复加载
+let isDeactivated = false
+// 保存组件状态（以文档ID为key，而非路由路径）
 const savedState = new Map<
   string,
   {
     pageNum: number
     scale: number
+    scrollTop: number
     filePath: string
   }
 >()
@@ -82,10 +82,8 @@ const toggleDarkMode = (isDarkMode: boolean) => {
 
 // 获取当前文件路径
 const getCurrentFilePath = (): string => {
-  if (route.meta.filePath) {
-    return decodeURIComponent(route.meta.filePath as string)
-  } else if (route.query.file) {
-    return route.query.file as string
+  if (activeDocumentPath.value) {
+    return decodeURIComponent(activeDocumentPath.value as string)
   }
   return ''
 }
@@ -151,15 +149,23 @@ const debouncedResize = () => {
 // 组件被激活时恢复状态
 onActivated(() => {
   console.log('[PdfPreview] Activated, restoring state')
-  const currentPath = route.path
-  const state = savedState.get(currentPath)
+  isDeactivated = false
+  const docId = activeDocumentPath.value
+  if (!docId) return
 
-  if (state && state.filePath === getCurrentFilePath()) {
+  const state = savedState.get(docId)
+  if (state && state.filePath === docId) {
     pageNum = state.pageNum
     scale.value = state.scale
 
     if (pdfDoc) {
       renderPage(pageNum)
+      nextTick(() => {
+        const container = getContainer()
+        if (container) {
+          container.scrollTop = state.scrollTop
+        }
+      })
     }
   }
 })
@@ -167,17 +173,21 @@ onActivated(() => {
 // 组件被停用时保存状态
 onDeactivated(() => {
   console.log('[PdfPreview] Deactivated, saving state')
-  const currentPath = route.path
-  const filePath = getCurrentFilePath()
+  isDeactivated = true
+  const docId = activeDocumentPath.value
+  if (!docId) return
 
-  if (filePath) {
-    savedState.set(currentPath, {
-      pageNum,
-      scale: scale.value,
-      filePath
-    })
-  }
+  const container = getContainer()
+  const scrollTop = container ? container.scrollTop : 0
+
+  savedState.set(docId, {
+    pageNum,
+    scale: scale.value,
+    scrollTop,
+    filePath: docId
+  })
 })
+
 
 // 缩放控制
 const onMagnify = () => {
@@ -223,11 +233,11 @@ const loadPdfFile = async () => {
       }
     }
 
-    if (!activeDocumentId.value) {
+    if (!activeDocumentPath.value) {
       throw new Error('No active document selected')
     }
 
-    const doc = useDocumentManagerStore.documents.get(activeDocumentId.value)
+    const doc = useDocumentManagerStore.documents.get(activeDocumentPath.value)
     if (!doc || !doc.id) {
       throw new Error('No PDF file path provided')
     }
@@ -361,11 +371,13 @@ const getErrorMessage = (err: any): string => {
   return err.message || 'Failed to load PDF'
 }
 
-// 监听激活文档变化 - 移除 immediate，onMounted 已处理初始加载
+// 监听激活文档变化 - 仅在组件处于激活状态时响应
 watch(
-  activeDocumentId,
-  async (newId) => {
-    console.log('Active document changed:', newId)
+  activeDocumentPath,
+  async (newId, oldId) => {
+    if (isDeactivated) return
+    if (oldId === undefined) return
+    console.log('[PdfPreview] Active document changed:', newId)
     if (newId) {
       await loadPdfFile()
     }
@@ -494,7 +506,7 @@ const collapseAllBookmarks = () => {
 }
 
 onMounted(() => {
-  console.log('pdfPreview mounted', route)
+  console.log('pdfPreview mounted', activeDocumentPath.value)
 
   const handleKeydown = (e: KeyboardEvent) => {
     if ((e.target as HTMLElement).tagName === 'INPUT') return
@@ -559,7 +571,6 @@ onMounted(() => {
 
 <!-- ... existing code ... -->
 
-
 <template>
   <div class="pdf-wrapper" :class="{ 'with-bookmark': showBookmarkPanel }">
     <!-- 书签栏 -->
@@ -582,11 +593,7 @@ onMounted(() => {
               </el-button>
             </el-tooltip>
           </el-button-group>
-          <el-button
-            size="small"
-            @click="toggleBookmarkPanel"
-            :icon="'Close'"
-          />
+          <el-button size="small" @click="toggleBookmarkPanel" :icon="'Close'" />
         </div>
       </div>
 
@@ -637,13 +644,21 @@ onMounted(() => {
           <el-icon><FolderOpened /></el-icon>
         </el-button>
 
-        <button @click="onReduce" :disabled="scale <= 0.2 || loading" title="缩小 (Ctrl+-)">-</button>
-        <button @click="onMagnify" :disabled="scale >= 5 || loading" title="放大 (Ctrl++)">+</button>
+        <button @click="onReduce" :disabled="scale <= 0.2 || loading" title="缩小 (Ctrl+-)">
+          -
+        </button>
+        <button @click="onMagnify" :disabled="scale >= 5 || loading" title="放大 (Ctrl++)">
+          +
+        </button>
         <button @click="onPrevPage" :disabled="page_num <= 1 || loading" title="上一页 (←)">
           Previous
         </button>
         <span>Page: {{ page_num }} / {{ page_count }}</span>
-        <button @click="onNextPage" :disabled="page_num >= page_count || loading" title="下一页 (→)">
+        <button
+          @click="onNextPage"
+          :disabled="page_num >= page_count || loading"
+          title="下一页 (→)"
+        >
           Next
         </button>
       </div>

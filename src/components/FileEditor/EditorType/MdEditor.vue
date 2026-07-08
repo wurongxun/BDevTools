@@ -61,12 +61,15 @@ import { useDark } from '@vueuse/core'
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import useStore from '@/store'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
-import { FileType } from '@/store/modules/documents'
-
 // --- 状态与 Store 初始化 ---
 let store: Store | undefined = undefined;
 const { noteTem, useDocumentManagerStore } = useStore()
 const docStore = useDocumentManagerStore
+
+// 接收父组件传入的文档路径（每个实例绑定自己的文档）
+const props = defineProps<{
+  path: string
+}>()
 
 // 暗黑模式
 const isDark = useDark({
@@ -74,7 +77,6 @@ const isDark = useDark({
   valueDark: 'dark',
   valueLight: 'light'
 })
-
 const editorTheme = computed(() => {
   return isDark.value ? 'dark' : 'light';
 });
@@ -119,104 +121,109 @@ const handleWindowResize = async () => {
 };
 
 // 当前激活的文档路径
-const activeDocId = computed(() => docStore.activeDocumentId)
+const activeDocId = computed(() => docStore.activeDocumentPath)
+
+// 当前组件绑定的文档路径（来自 prop，非全局状态）
+const docPath = computed(() => props.path)
+
+// KeepAlive 缓存标志：组件被停用时为 true，防止 watch 在恢复时重复加载
+let isDeactivated = false
+let isLoaded = false
 
 // 根据文档ID加载文件
-// 根据文档ID加载文件
-const loadFile = async (docId: string) => {
-  if (!docId) {
+const loadFile = async (filePath: string) => {
+  if (!filePath) {
     data.showMdEditor = false;
     return;
   }
-  // 从 document store 获取文档信息
-  const doc = docStore.documents.get(docId)
-  console.log("docdocdocdocdoc",doc)
+  const doc = docStore.documents.get(filePath)
+  console.log("[MdEditor] loadFile:", filePath, doc)
   if (!doc) {
-    console.warn(`Document not found: ${docId}`)
+    console.warn(`Document not found: ${filePath}`)
     data.showMdEditor = false
     return
   }
-  // 如果没有缓存，从文件中读取
   if (doc.id) {
     data.showMdEditor = true;
-    // 读取成功后，更新元数据并缓存
-    if (data.showMdEditor) {
-      data.title_md = doc.name;
-      data.currentChooseNoteAllPath_md = doc.id;
+    data.title_md = doc.name;
+    data.currentChooseNoteAllPath_md = doc.id;
 
-      // 确保 content 是字符串类型
-      if (typeof doc.content === 'string') {
-        data.editedMdtext_md = doc.content;
-      } else if (doc.content instanceof ArrayBuffer) {
-        // 如果是 ArrayBuffer，转换为字符串（通常用于二进制文件）
-        const decoder = new TextDecoder('utf-8');
-        data.editedMdtext_md = decoder.decode(doc.content);
-      } else {
-        // 默认为空字符串
-        data.editedMdtext_md = '';
-      }
+    if (typeof doc.content === 'string') {
+      data.editedMdtext_md = doc.content;
+    } else if (doc.content instanceof ArrayBuffer) {
+      const decoder = new TextDecoder('utf-8');
+      data.editedMdtext_md = decoder.decode(doc.content);
+    } else {
+      data.editedMdtext_md = '';
     }
+    isLoaded = true
   } else {
     NotificationUtil.error("文件路径缺失");
   }
-
 };
 
-// 监听激活文档变化 - 移除 immediate，避免与 onMounted 重复加载
-watch(activeDocId, async (newId) => {
-  console.log(newId)
-  if (newId) {
-    await loadFile(newId)
-  } else {
-    data.showMdEditor = false
+// 监听 prop 变化（仅当本实例的 path 改变时触发，正常不会发生）
+watch(() => props.path, async (newPath) => {
+  if (newPath && newPath !== data.currentChooseNoteAllPath_md) {
+    await loadFile(newPath)
   }
 })
 
 
 onMounted(async () => {
-  //页面布局
-  //dragControllerDiv();
-
-  //关闭窗口保存 监听
   listenClose();
 
   editorRef.value?.on('catalog', console.log);
-  // 监听窗口 resize 事件
   window.addEventListener('resize', handleWindowResize);
-  // 监听来自 AppMain 的自定义 resize 事件
   window.addEventListener('window-resize', handleWindowResize);
 
-  // 初始加载当前文档
-  if (activeDocId.value) {
-    await loadFile(activeDocId.value)
+  // 使用 prop 传入的路径加载文档
+  if (props.path) {
+    await loadFile(props.path)
   }
 })
 
+
+
 onUnmounted(() => {
-  // 清理事件监听器
   window.removeEventListener('resize', handleWindowResize);
   window.removeEventListener('window-resize', handleWindowResize);
 
   if (resizeTimer) {
     clearTimeout(resizeTimer);
   }
+
+  if (unlistenClose) {
+    unlistenClose();
+    unlistenClose = null;
+  }
+
+  if (saveTimeoutId !== null) {
+    clearTimeout(saveTimeoutId);
+  }
 });
 
-// 组件被激活时（从缓存中恢复）- 数据保持在内存中，无需重新加载
-onActivated(() => {
-  console.log('[mdPreViewAndEdit] Activated - 从缓存恢复')
-})
 
-// 组件被停用时（保存到缓存）
-onDeactivated(() => {
-  console.log('[mdPreViewAndEdit] Deactivated - 保存到缓存')
-  // 保存当前文档状态到 store
-  if (activeDocId.value && data.editedMdtext_md !== data.notEditedMdtext_md) {
-    docStore.updateDocumentContent(activeDocId.value, data.editedMdtext_md)
+// 组件被激活时（从缓存中恢复）- 检查是否需要加载
+onActivated(() => {
+  console.log('[MdEditor] Activated - 从缓存恢复')
+  isDeactivated = false
+  if (!isLoaded && props.path) {
+    loadFile(props.path)
   }
 })
 
 
+
+// 组件被停用时（保存到缓存）
+onDeactivated(() => {
+  console.log('[MdEditor] Deactivated - 保存到缓存')
+  isDeactivated = true
+  const currentPath = data.currentChooseNoteAllPath_md
+  if (currentPath && data.editedMdtext_md !== data.notEditedMdtext_md) {
+    docStore.updateDocumentContent(currentPath, data.editedMdtext_md)
+  }
+})
 
 // 事件监听清理函数
 let unlistenClose: UnlistenFn | null = null;
@@ -226,24 +233,22 @@ let unlistenClose: UnlistenFn | null = null;
 // 防抖定时器 ID
 let saveTimeoutId: number | null = null;
 
+
 // 监听内容变化，实时保存到 pinia (带防抖)
 const onContentChange = async (value: string) => {
   data.editedMdtext_md = value;
-  if (!activeDocId.value) {
+  const currentPath = data.currentChooseNoteAllPath_md
+  if (!currentPath) {
     return;
   }
-  // 清除之前的定时器
   if (saveTimeoutId !== null) {
     clearTimeout(saveTimeoutId);
   }
-  // 设置新的防抖保存 (例如 500ms)
   saveTimeoutId = window.setTimeout(async () => {
     try {
-      // 更新文档内容到 store
-      docStore.updateDocumentContent(activeDocId.value!, value)
-      // 同时保存到本地临时存储
+      docStore.updateDocumentContent(currentPath, value)
       if (store) {
-        await store.set(pdf_store_tem_key_prefix + activeDocId.value, { value: value });
+        await store.set(pdf_store_tem_key_prefix + currentPath, { value: value });
         await store.save();
         console.log("内容已防抖保存至临时存储");
       }
@@ -385,23 +390,6 @@ const handleCreateNote = () => {
   console.log("创建新笔记功能待实现");
   // TODO: 实现创建笔记逻辑
 };
-
-onMounted(async () => {
-  await listenClose();
-  // dragControllerDiv(); // 原代码注释掉的功能，若需启用请确保正确实现并处理销毁
-});
-
-onUnmounted(async () => {
-  // 清理事件监听
-  if (unlistenClose) {
-    await unlistenClose();
-    unlistenClose = null;
-  }
-  // 清除防抖定时器
-  if (saveTimeoutId !== null) {
-    clearTimeout(saveTimeoutId);
-  }
-});
 
 </script>
 

@@ -63,8 +63,9 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
   const documents = ref<Map<string, DocumentState>>(new Map())
 
   // 当前激活的文档路径
-  const activeDocumentId = ref<string | null>(null)
-
+  const activeDocumentPath = ref<string | null>(null)
+  // 当前激活的文档key
+  const activeDocumentKey = ref<string | null>(null)
   // 文档打开顺序（用于标签页排序）
   const documentOrder = ref<string[]>([])
 
@@ -76,8 +77,8 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
 
   // 计算属性：获取当前激活的文档
   const activeDocument = computed(() => {
-    if (!activeDocumentId.value) return null
-    return documents.value.get(activeDocumentId.value) || null
+    if (!activeDocumentPath.value) return null
+    return documents.value.get(activeDocumentPath.value) || null
   })
 
   // 计算属性：获取所有文档列表（按打开顺序）
@@ -147,11 +148,11 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
    */
   function setActiveDocument(filePath: string | null) {
     // 保存当前文档的视图状态
-    if (activeDocumentId.value) {
+    if (activeDocumentPath.value) {
       // 这里可以触发保存视图状态的逻辑
     }
     // NotificationUtil.success(`已打开文件：${filePath}`)
-    activeDocumentId.value = filePath
+    activeDocumentPath.value = filePath
 
     // 更新文档顺序（将激活的文档移到最前面）
     // if (filePath) {
@@ -162,6 +163,20 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     //   }
     // }
   }
+  /**
+   * 设置激活文档Key
+   */
+  function setActiveDocumentKey(key: string | null) {
+    // 保存当前文档的视图状态
+    if (activeDocumentKey.value) {
+      // 这里可以触发保存视图状态的逻辑
+    }
+    // NotificationUtil.success(`已打开文件：${filePath}`)
+    activeDocumentKey.value = key
+
+
+  }
+
 
   /**
    * 更新文档内容
@@ -262,7 +277,7 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     documentOrder.value = documentOrder.value.filter(id => id !== filePath)
 
     // 如果关闭的是当前激活文档，切换到其他文档
-    if (activeDocumentId.value === filePath) {
+    if (activeDocumentPath.value === filePath) {
       const nextDoc = documentOrder.value[0] || null
       setActiveDocument(nextDoc)
     }
@@ -284,9 +299,9 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     // 重新添加文档
     documents.value.set(doc.id, doc)
     documentOrder.value.splice(Math.min(index, documentOrder.value.length), 0, doc.id)
-
     // 激活该文档
     setActiveDocument(doc.id)
+    //setActiveDocumentKey(doc.key)
   }
 
   /**
@@ -353,7 +368,7 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     documents.value.set(id, doc)
     documentOrder.value.unshift(id)
     setActiveDocument(id)
-
+    //setActiveDocumentKey(hash)
     return id
   }
 
@@ -383,8 +398,8 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     }
 
     // 更新激活状态
-    if (activeDocumentId.value === oldPath) {
-      activeDocumentId.value = newPath
+    if (activeDocumentPath.value === oldPath) {
+      activeDocumentPath.value = newPath
     }
   }
 
@@ -396,7 +411,7 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
 
     // 获取最旧的文档（最后一个）
     const oldestId = documentOrder.value[documentOrder.value.length - 1]
-    if (oldestId && oldestId !== activeDocumentId.value) {
+    if (oldestId && oldestId !== activeDocumentPath.value) {
       closeDocument(oldestId)
     }
   }
@@ -494,7 +509,7 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
   return {
     // 状态
     documents,
-    activeDocumentId,
+    activeDocumentPath,
     documentOrder,
     recentlyClosed,
     // 计算属性
