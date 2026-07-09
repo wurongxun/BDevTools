@@ -33,4 +33,4 @@ https://cloud.tsinghua.edu.cn/d/df482a15afb64dfeaff8/?p=/&mode=list
 
 ### 应用截图
 
-![image](./App_2025.png)
+![image](./App_2026.png)
