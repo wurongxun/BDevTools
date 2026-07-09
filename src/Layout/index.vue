@@ -39,8 +39,8 @@ const sideBoxRef = ref<HTMLElement | null>(null)
 const mainContentRef = ref<HTMLElement | null>(null)
 const windowWidth = ref(window.innerWidth)
 
-const SIDEBAR_MIN_WIDTH = 150
-const SIDEBAR_MAX_WIDTH = 500
+const SIDEBAR_MIN_WIDTH =60
+const SIDEBAR_MAX_WIDTH = 700
 const SIDEBAR_DEFAULT_WIDTH = 220
 
 const sidebarWidth = ref(SIDEBAR_DEFAULT_WIDTH)

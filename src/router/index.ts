@@ -2,10 +2,6 @@ import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router
 import type { RouteRecordRaw } from 'vue-router'
 import Layout from '@/Layout/index.vue'
 
-import pages from './modules/pages'
-import components from './modules/components'
-import error from './modules/error'
-import universal from './modules/universal'
 /**
  * @param path: 路由的访问路径
  * @param component: 对应的映射文件
@@ -35,25 +31,6 @@ export const constantRoutes: Array<RouteRecordRaw> = [
         path: '/home/homePage',
         meta: { title: '首页', icon: 'House', keepAlive: true, affix: true },
         component: () => import('@/views/Home/index.vue')
-      }
-    ]
-  },
-  {
-    path: '/bind',
-    meta: { icon: 'House', hidden: true, noBreadCrumbs: true, title: '外部链接' },
-    redirect: 'https://www.bing.com'
-  },
-  {
-    path: '/errorlog',
-    component: Layout,
-    redirect: '/errorlog/handle',
-    meta: { icon: 'error-handle', noBreadCrumbs: true, hidden: true },
-    children: [
-      {
-        name: 'ErrorHandleDemo',
-        path: '/errorlog/handle',
-        meta: { title: 'errorHandle示例', icon: 'error-handle' },
-        component: () => import('@/views/pagesManage/error/index.vue')
       }
     ]
   },
@@ -121,21 +98,13 @@ export const constantRoutes: Array<RouteRecordRaw> = [
         }
       }
     ]
-  },
-  components,
-  error,
-  universal
+  }
 ]
 
-export const asyncRoutes: Array<RouteRecordRaw> = [pages]
 
 const router = createRouter({
   history: createWebHashHistory(), // 使用 hash 模式
   routes: constantRoutes
 })
-// {
-//     path: '/notebookMd/:pathMatch(.*)*',
-//     meta: { title: 'mdPreViewAndEdit',  noTagView: true,keepAlive: true  },
-//     component: () => import('@/views/utilsView/markDown/mdPreViewAndEdit.vue')
-//   },
+
 export default router

@@ -29,8 +29,8 @@ const appName = ref<string>(t('appName'));
     <main class="app-container">
       <!-- 根据路由元信息决定是否缓存 -->
       <keep-alive>
-        <router-view v-if="$route.meta.keepAlive" :key="$route.fullPath" />
-        <router-view v-else :key="'normal-' + $route.fullPath" />
+        <router-view v-if="route.meta.keepAlive" :key="route.fullPath" />
+        <router-view v-else :key="'normal-' + route.fullPath" />
       </keep-alive>
     </main>
   </div>

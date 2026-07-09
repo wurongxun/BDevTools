@@ -3,7 +3,7 @@ import type { RouteRecordRaw } from 'vue-router'
 import { getMenu } from '@/api/user'
 import { get_notebooks_Api } from '@/api/file'
 import useStore from '@/store/index'
-import { constantRoutes, asyncRoutes } from '@/router/index'
+import { constantRoutes } from '@/router/index'
 import router from '@/router/index'
 import VerifyUtils from '@/utils/VerifyUtils'
 import ToolUtils from '@/utils/ToolUtils'
@@ -80,15 +80,6 @@ function getChildrenData(
   return result
 }
 
-function filterRoutes(arrData: Array<any>): Array<RouteRecordRaw> {
-  const paths: Array<string> = []
-  // 获取所有的 path
-  arrData.forEach((item) => {
-    getResDataPaths(item, paths)
-  })
-  const result: Array<RouteRecordRaw> = getChildrenData(paths, asyncRoutes)
-  return result
-}
 
 export const routerNoteStore = defineStore('routerNoteStore', {
   state: () => {

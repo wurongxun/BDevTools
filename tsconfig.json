@@ -1,5 +1,5 @@
 {
-  "include": ["env.d.ts", "window.d.ts", "shims-vue.d.ts", "src/**/*", "src/**/*.vue", "mock"],
+  "include": ["env.d.ts", "window.d.ts", "shims-vue.d.ts", "vue-router-types.d.ts", "src/**/*", "src/**/*.vue", "mock"],
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
