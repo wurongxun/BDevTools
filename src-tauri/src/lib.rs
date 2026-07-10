@@ -11,19 +11,19 @@ mod app;
 mod app_setup;
 mod entity;
 mod response;
-mod routes;
+mod command;
 mod system_menu;
 mod utils;
 
 use crate::app::app::{app_autostart, app_settings};
 use crate::app::tray::create_tray;
 use crate::app_setup::setup::setup_windows;
-use crate::routes::app_window::{
+use crate::command::app_window::{
     about, loding_window_close, note_book_window, windows_close, windows_hide, windows_maximize,
     windows_minimize,
 };
-use crate::routes::file_utils::{file_manager_open_path, get_document_notebooks, up_folder_name};
-use crate::routes::note_book::{
+use crate::command::file_utils::{file_manager_open_path, get_document_notebooks, up_folder_name};
+use crate::command::file_command::{
     create_folder, create_note_file, get_note_list, get_path_childrenFoldersAndFiles,
     read_note_file, remove_file, remove_folder, save_note, up_file_name,
 };
