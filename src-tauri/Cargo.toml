@@ -41,6 +41,8 @@ tauri-plugin-os = "2"
 # 文件编码处理
 encoding_rs = "0.8"
 chardetng = "0.1"
+# 内存映射文件读取
+memmap2 = "0.9"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.44.0", features = [

@@ -59,6 +59,7 @@ pub fn get_dir_and_file(
             // 判断文件后缀 是md或者是PDF 文件才加入
             let is_md = regexUtil::validate(r#"(?:md)$"#, &name);
             let is_pdf = regexUtil::validate(r#"(?:pdf)$"#, &name);
+            let is_txt = regexUtil::validate(r#"(?:txt)$"#, &name);
             let path = path_dir_entry.to_string_lossy().to_string();
             let folder = get_directory_path(&path).unwrap_or_default();
             let md5 = generate_md5_hash(&path);
@@ -67,6 +68,8 @@ pub fn get_dir_and_file(
                 "md".to_string()
             } else if is_pdf {
                 "pdf".to_string()
+            } else if is_txt {
+                "txt".to_string()
             } else {
                 "folder".to_string()
             };
@@ -138,6 +141,7 @@ pub fn get_dir_and_file_with_depth(
             // 判断文件后缀 是md或者是PDF 文件才加入
             let is_md = regexUtil::validate(r#"(?:md)$"#, &name);
             let is_pdf = regexUtil::validate(r#"(?:pdf)$"#, &name);
+            let is_txt = regexUtil::validate(r#"(?:txt)$"#, &name);
             let path = path_dir_entry.to_string_lossy().to_string();
             let folder = get_directory_path(&path).unwrap_or_default();
             let md5 = generate_md5_hash(&path);
@@ -146,6 +150,8 @@ pub fn get_dir_and_file_with_depth(
                 "md".to_string()
             } else if is_pdf {
                 "pdf".to_string()
+            } else if is_txt {
+                "txt".to_string()
             } else {
                 "folder".to_string()
             };
@@ -167,7 +173,7 @@ pub fn get_dir_and_file_with_depth(
                     current_depth + 1,
                 )?;
                 children_dirAndFileInfo.set_children(children_dir_and_file_info);
-            } else if (is_md || is_pdf) && path_1.is_file() {
+            } else if (is_md || is_pdf || is_txt) && path_1.is_file() {
                 // 只添加 md 或 pdf 文件
                 children_dirAndFileInfo.set_children(children_dir_and_file_info);
             }

@@ -59,7 +59,9 @@ const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
         path = note_comm_router_notebookMd + child.id
       } else if (child.isfile && child.data_type == 'pdf') {
         path = note_comm_router_notebookPdf + child.id
-      }
+      } else if (child.isfile && child.data_type == 'txt') {
+      path = note_comm_router_notebookPdf + child.id
+    }
       let route2: TreeNode = {
         id: child.id,
         label: child.name,

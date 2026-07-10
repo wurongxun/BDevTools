@@ -16,6 +16,8 @@ import CodeEditor from './EditorType/CodeEditor.vue'
 import ImageEditor from './EditorType/ImageEditor.vue'
 import PdfEditor from './EditorType/PdfEditor.vue'
 import MdEditor from './EditorType/MdEditor.vue'
+import TextView from './EditorType/TextView.vue'
+
 const { routerNoteStore,  useDocumentManagerStore } = useStore()
 
 const activeDocument = computed(() => useDocumentManagerStore.activeDocument)
@@ -32,6 +34,9 @@ const currentEditorComponent = computed(() => {
   switch (doc.type) {
     case 'markdown': return MdEditor
     case 'pdf': return PdfEditor
+    case 'image': return ImageEditor
+    case 'code': return CodeEditor
+    case 'text': return TextView
     default: return CodeEditor
   }
 })

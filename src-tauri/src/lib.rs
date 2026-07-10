@@ -27,6 +27,10 @@ use crate::command::file_command::{
     create_folder, create_note_file, get_note_list, get_path_childrenFoldersAndFiles,
     read_note_file, remove_file, remove_folder, save_note, up_file_name,
 };
+use crate::command::search_log_parallel::{
+    search_log_index, search_log_jump_to, search_log_page, search_log_parallel,
+    search_log_preview, read_file_lines,
+};
 struct Payload {
     args: Vec<String>,
     cwd: String,
@@ -62,7 +66,13 @@ pub fn run() {
             windows_hide,
             windows_minimize,
             windows_maximize,
-            windows_close
+            windows_close,
+            search_log_index,
+            search_log_page,
+            search_log_parallel,
+            search_log_jump_to,
+            search_log_preview,
+            read_file_lines,
         ])
         .setup(move |app: &mut App| {
             #[cfg(all(desktop))]
