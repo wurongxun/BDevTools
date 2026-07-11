@@ -88,8 +88,15 @@ import { ref, watch, nextTick, onMounted, onActivated, onDeactivated, computed }
 import { invoke } from '@tauri-apps/api/core'
 import { Search, ArrowUp, ArrowDown, Close, ArrowLeft, ArrowRight, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 
+/**
+ * 虚拟滚动与分块加载核心配置
+ * - CHUNK_SIZE:    每次从后端加载的行数，控制单次 IO 与内存占用
+ * - OVERLAP:       相邻块之间的重叠行数，防止滚动切换时内容断层
+ * - LINE_HEIGHT:   每行固定像素高度，用于虚拟滚动中计算偏移量与可视范围
+ * - VIRTUAL_BUFFER: 可视区域上下额外渲染的行数，避免快速滚动时出现空白
+ */
 const CHUNK_SIZE = 1000
-const OVERLAP = 100
+const OVERLAP = 50
 const LINE_HEIGHT = 20
 const VIRTUAL_BUFFER = 15
 
@@ -121,8 +128,8 @@ let currentStartLine = 1
 let currentEndLine = 0
 
 let scrollTimer: ReturnType<typeof setTimeout> | null = null
-let scrollTopValue = 0
-let containerHeight = 0
+const scrollTopValue = ref(0)
+const containerHeight = ref(0)
 
 const totalContentHeight = computed(() => lines.value.length * LINE_HEIGHT)
 
@@ -136,8 +143,8 @@ const visibleItems = computed<VisibleItem[]>(() => {
   const total = lines.value.length
   if (total === 0) return []
 
-  const startIdx = Math.max(0, Math.floor(scrollTopValue / LINE_HEIGHT) - VIRTUAL_BUFFER)
-  const visibleCount = Math.ceil(containerHeight / LINE_HEIGHT)
+  const startIdx = Math.max(0, Math.floor(scrollTopValue.value / LINE_HEIGHT) - VIRTUAL_BUFFER)
+  const visibleCount = Math.ceil(containerHeight.value / LINE_HEIGHT)
   const endIdx = Math.min(total, startIdx + visibleCount + VIRTUAL_BUFFER * 2)
 
   const items: VisibleItem[] = []
@@ -352,13 +359,14 @@ function onVirtualScroll() {
   if (!viewerRef.value) return
 
   const el = viewerRef.value
-  scrollTopValue = el.scrollTop
-  containerHeight = el.clientHeight
+  scrollTopValue.value = el.scrollTop
+  containerHeight.value = el.clientHeight
 
   if (chunkLoading) return
 
   if (scrollTimer) clearTimeout(scrollTimer)
   scrollTimer = setTimeout(() => {
+    const SCROLL_THRESHOLD = 50
     const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_THRESHOLD
     const isAtTop = el.scrollTop < SCROLL_THRESHOLD
 
@@ -374,7 +382,7 @@ function scrollToLineNumber(lineNumber: number) {
   if (!viewerRef.value) return
   const idx = lineNumber - firstLineNumber.value
   if (idx < 0 || idx >= lines.value.length) return
-  const targetScroll = idx * LINE_HEIGHT - containerHeight / 2
+  const targetScroll = idx * LINE_HEIGHT - containerHeight.value / 2
   viewerRef.value.scrollTop = Math.max(0, targetScroll)
 }
 
@@ -483,7 +491,7 @@ onMounted(async () => {
     await loadFirstChunk(props.path)
   }
   if (viewerRef.value) {
-    containerHeight = viewerRef.value.clientHeight
+    containerHeight.value = viewerRef.value.clientHeight
   }
   window.addEventListener('keydown', onKeydown)
 })
@@ -496,7 +504,7 @@ onActivated(() => {
     }
   }
   if (viewerRef.value) {
-    containerHeight = viewerRef.value.clientHeight
+    containerHeight.value = viewerRef.value.clientHeight
   }
   window.addEventListener('keydown', onKeydown)
 })
