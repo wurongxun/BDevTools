@@ -9,7 +9,9 @@
             v-model="keyword"
             placeholder="搜索关键词"
             size="small"
-            @keyup.enter="doSearch"
+            @keyup.enter="onSearchKeyup"
+            @compositionstart="onCompositionStart()"
+            @compositionend="onCompositionEnd()"
             @keydown.escape="showSearchBar = false"
             class="search-input"
           >
@@ -33,6 +35,13 @@
         </div>
       </div>
     </transition>
+    <!-- 加载/搜索动画遮罩 -->
+    <div v-if="showOverlay" class="loading-overlay">
+      <div class="loading-spinner">
+        <div class="spinner-ring"></div>
+        <span class="loading-text">{{ overlayText }}</span>
+      </div>
+    </div>
     <!-- 虚拟滚动容器 -->
     <div class="code-viewer" ref="viewerRef" @scroll="onVirtualScroll">
       <div class="virtual-spacer" :style="{ height: totalContentHeight + 'px' }">
@@ -53,10 +62,10 @@
     </div>
     <!-- 块导航栏 -->
     <div v-if="totalBlocks > 1" class="block-nav">
-      <el-button size="small" @click="goToFirstBlock" :disabled="currentBlock <= 1" title="第一块 (Home)">
+      <el-button size="small" @click="goToFirstBlock" :disabled="currentBlock <= 1 || isSearching" title="第一块 (Home)">
         <el-icon><DArrowLeft /></el-icon>
       </el-button>
-      <el-button size="small" @click="goToPrevBlock" :disabled="currentBlock <= 1" title="上一块 (PageUp)">
+      <el-button size="small" @click="goToPrevBlock" :disabled="currentBlock <= 1 || isSearching" title="上一块 (PageUp)">
         <el-icon><ArrowLeft /></el-icon>
       </el-button>
       <div class="block-jump">
@@ -65,14 +74,15 @@
           :min="1"
           :max="totalBlocks"
           size="small"
+          :disabled="isSearching"
           controls-position="compact"
         />
         <span class="block-total">/ {{ totalBlocks }}</span>
       </div>
-      <el-button size="small" @click="goToNextBlock" :disabled="currentBlock >= totalBlocks" title="下一块 (PageDown)">
+      <el-button size="small" @click="goToNextBlock" :disabled="currentBlock >= totalBlocks || isSearching" title="下一块 (PageDown)">
         <el-icon><ArrowRight /></el-icon>
       </el-button>
-      <el-button size="small" @click="goToLastBlock" :disabled="currentBlock >= totalBlocks" title="最后一块 (End)">
+      <el-button size="small" @click="goToLastBlock" :disabled="currentBlock >= totalBlocks || isSearching" title="最后一块 (End)">
         <el-icon><DArrowRight /></el-icon>
       </el-button>
       <span class="line-range">行 {{ currentStartLine }}-{{ currentEndLine }}</span>
@@ -83,10 +93,10 @@
   </div>
 </template>
 
-<script setup lang="ts" name="TextView">
-import { ref, watch, nextTick, onMounted, onActivated, onDeactivated, computed } from 'vue'
+<script setup lang="ts" name="TextView">import { ref, watch, nextTick, onMounted, onActivated, onDeactivated,onBeforeUnmount, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { Search, ArrowUp, ArrowDown, Close, ArrowLeft, ArrowRight, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
+import NotificationUtil from '@/utils/NotificationUtil'
 
 /**
  * 虚拟滚动与分块加载核心配置
@@ -114,7 +124,12 @@ const totalMatches = ref(0)
 const jumpTo = ref(1)
 const totalLines = ref(0)
 const showSearchBar = ref(false)
-
+/** 搜索功能状态：是否正在搜索 */
+const isSearching = ref(false)
+/** IME 输入法组合状态 */
+let isComposing = ref(false)
+/** IME 输入法组合状态 */
+let compositionEndTime = 0
 /** 内容渲染与虚拟滚动状态：行数据、起始行号、高亮行集合、目标行、DOM 引用 */
 const lines = ref<string[]>([])
 const firstLineNumber = ref(1)
@@ -128,7 +143,7 @@ let isDeactivated = false
 let isLoaded = false
 let chunkLoading = false
 const isLoadingChunk = ref(false)
-
+const MAX_CACHED_STATES = 5
 /** 当前块的起止行号（1-based），用于块导航与重叠计算 */
 const currentStartLine = ref(1)
 const currentEndLine = ref(0)
@@ -137,6 +152,11 @@ const currentEndLine = ref(0)
 let scrollTimer: ReturnType<typeof setTimeout> | null = null
 const scrollTopValue = ref(0)
 const containerHeight = ref(0)
+let scrollGuard = false
+
+/** 加载动画遮罩状态 */
+const showOverlay = ref(false)
+const overlayText = ref('加载中...')
 
 const totalContentHeight = computed(() => lines.value.length * LINE_HEIGHT)
 
@@ -228,6 +248,7 @@ interface FileState {
 
 const savedState = new Map<string, FileState>()
 
+
 function saveCurrentState() {
   const filePath = props.path
   if (!filePath) return
@@ -247,6 +268,12 @@ function saveCurrentState() {
     endLine: currentEndLine.value
   }
   savedState.set(filePath, state)
+  if (savedState.size > MAX_CACHED_STATES) {
+    const oldestKey = savedState.keys().next().value
+    if (oldestKey !== undefined) {
+      savedState.delete(oldestKey)
+    }
+  }
 }
 
 function restoreState(filePath: string): boolean {
@@ -307,7 +334,10 @@ async function loadChunk(filePath: string, startLine: number) {
 }
 
 async function loadFirstChunk(filePath: string) {
+  showOverlay.value = true
+  overlayText.value = '加载中...'
   const ok = await loadChunk(filePath, 1)
+  showOverlay.value = false
   if (ok) {
     highlightSet.value = new Set()
     targetLineNumber.value = 0
@@ -325,14 +355,20 @@ async function loadNextChunk() {
   const nextStart = currentEndLine.value - OVERLAP + 1
   if (nextStart <= 0) return
 
+  scrollGuard = true
+  showOverlay.value = true
+  overlayText.value = '加载中...'
   const ok = await loadChunk(props.path, nextStart)
+  showOverlay.value = false
   if (ok) {
     await nextTick()
     if (viewerRef.value) {
       viewerRef.value.scrollTop = 0
     }
   }
+  setTimeout(() => { scrollGuard = false }, 300)
 }
+
 async function loadPrevChunk() {
   if (!props.path || chunkLoading) return
   if (currentStartLine.value <= 1) return
@@ -340,43 +376,69 @@ async function loadPrevChunk() {
   let prevStart = currentStartLine.value - CHUNK_SIZE + OVERLAP
   if (prevStart < 1) prevStart = 1
 
+  scrollGuard = true
+  showOverlay.value = true
+  overlayText.value = '加载中...'
   const ok = await loadChunk(props.path, prevStart)
+  showOverlay.value = false
   if (ok) {
     await nextTick()
     if (viewerRef.value) {
       viewerRef.value.scrollTop = 0
     }
   }
+  setTimeout(() => { scrollGuard = false }, 300)
 }
+
 
 function goToFirstBlock() {
   if (currentBlock.value <= 1) return
+  scrollGuard = true
+  showOverlay.value = true
+  overlayText.value = '加载中...'
   loadChunk(props.path, 1).then(() => {
+    showOverlay.value = false
     if (viewerRef.value) viewerRef.value.scrollTop = 0
+    setTimeout(() => { scrollGuard = false }, 300)
   })
 }
 
 function goToLastBlock() {
   if (currentBlock.value >= totalBlocks.value) return
   const startLine = (totalBlocks.value - 1) * CHUNK_SIZE + 1
+  scrollGuard = true
+  showOverlay.value = true
+  overlayText.value = '加载中...'
   loadChunk(props.path, startLine).then(() => {
+    showOverlay.value = false
     if (viewerRef.value) viewerRef.value.scrollTop = 0
+    setTimeout(() => { scrollGuard = false }, 300)
   })
 }
 
 function goToPrevBlock() {
   if (currentBlock.value <= 1) return
   const startLine = Math.max(1, (currentBlock.value - 2) * CHUNK_SIZE + 1)
+  scrollGuard = true
+  showOverlay.value = true
+  overlayText.value = '加载中...'
   loadChunk(props.path, startLine).then(() => {
+    showOverlay.value = false
     if (viewerRef.value) viewerRef.value.scrollTop = 0
+    setTimeout(() => { scrollGuard = false }, 300)
   })
 }
 
 function goToNextBlock() {
   if (currentBlock.value >= totalBlocks.value) return
   const startLine = currentBlock.value * CHUNK_SIZE + 1
+  scrollGuard = true
+  showOverlay.value = true
+  overlayText.value = '加载中...'
   loadChunk(props.path, startLine).then(() => {
+    showOverlay.value = false
     if (viewerRef.value) viewerRef.value.scrollTop = 0
+    setTimeout(() => { scrollGuard = false }, 300)
   })
 }
 
@@ -388,7 +450,7 @@ function onVirtualScroll() {
   scrollTopValue.value = el.scrollTop
   containerHeight.value = el.clientHeight
 
-  if (chunkLoading) return
+  if (chunkLoading || isSearching.value || scrollGuard) return
 
   if (scrollTimer) clearTimeout(scrollTimer)
   scrollTimer = setTimeout(() => {
@@ -412,25 +474,51 @@ function scrollToLineNumber(lineNumber: number) {
   viewerRef.value.scrollTop = Math.max(0, targetScroll)
 }
 
+function onCompositionStart() {
+  compositionEndTime = 0
+}
+
+function onCompositionEnd() {
+  compositionEndTime = Date.now()
+}
+
+function onSearchKeyup(e: KeyboardEvent) {
+  if (compositionEndTime > 0 && Date.now() - compositionEndTime < 500) return
+  doSearch()
+}
+
 async function doSearch() {
   if (!keyword.value || !props.path) return
+  isSearching.value = true
+  showOverlay.value = true
+  overlayText.value = '搜索中...'
   const res: any = await invoke('search_log_index', {
     filePath: props.path,
     keyword: keyword.value
   })
+  console.log('Search response:', res)
   if (res && res.code === 200) {
     searchId.value = res.data.search_id
     totalMatches.value = res.data.total_matches
-    currentMatch.value = 1
-    await loadPreview(1)
+    if (totalMatches.value > 0){
+      currentMatch.value = 1
+      await loadPreview(1)
+    }else {
+      console.log('No matches found');
+      NotificationUtil.success(res.msg)
+    }
   }
+  showOverlay.value = false
 }
 
+
 async function loadPreview(index: number) {
+  showOverlay.value = true
+  overlayText.value = '搜索中...'
   const res: any = await invoke('search_log_preview', {
     searchId: searchId.value,
     targetIndex: index,
-    contextLines: 50
+    contextLines: 500
   })
   if (res && res.code === 200) {
     const data = res.data
@@ -440,7 +528,10 @@ async function loadPreview(index: number) {
     targetLineNumber.value = data.target_line_number
     currentMatch.value = data.current_match_index
     jumpTo.value = data.current_match_index
+    currentStartLine.value = data.first_line_number
+    currentEndLine.value = data.first_line_number + lines.value.length - 1
   }
+  showOverlay.value = false
 
   await nextTick()
   scrollToLineNumber(targetLineNumber.value)
@@ -484,7 +575,11 @@ watch(
     }
   }
 )
-
+watch(showSearchBar, (val) => {
+  if (!val) {
+    isSearching.value = false
+  }
+})
 function onKeydown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
     e.preventDefault()
@@ -511,7 +606,14 @@ function onKeydown(e: KeyboardEvent) {
     goToNextBlock()
   }
 }
+function removeKeydownListener() {
+  window.removeEventListener('keydown', onKeydown)
+}
 
+function addKeydownListener() {
+  removeKeydownListener()
+  window.addEventListener('keydown', onKeydown)
+}
 onMounted(async () => {
   if (props.path) {
     await loadFirstChunk(props.path)
@@ -519,7 +621,7 @@ onMounted(async () => {
   if (viewerRef.value) {
     containerHeight.value = viewerRef.value.clientHeight
   }
-  window.addEventListener('keydown', onKeydown)
+  addKeydownListener()
 })
 
 onActivated(() => {
@@ -532,7 +634,7 @@ onActivated(() => {
   if (viewerRef.value) {
     containerHeight.value = viewerRef.value.clientHeight
   }
-  window.addEventListener('keydown', onKeydown)
+  addKeydownListener()
 })
 
 onDeactivated(() => {
@@ -542,8 +644,14 @@ onDeactivated(() => {
     scrollTimer = null
   }
   showSearchBar.value = false
+  isSearching.value = false
   saveCurrentState()
-  window.removeEventListener('keydown', onKeydown)
+  removeKeydownListener()
+})
+
+onBeforeUnmount(() => {
+  removeKeydownListener()
+  savedState.clear()
 })
 </script>
 
@@ -660,7 +768,7 @@ onDeactivated(() => {
 }
 
 .loading-tip {
-  position: absolute;
+  //position: absolute;
   bottom: 8px;
   left: 16px;
   font-size: 12px;
@@ -734,4 +842,58 @@ onDeactivated(() => {
   border-radius: 2px;
   padding: 0 2px;
 }
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  @include useTheme {
+    background: rgba(0, 0, 0, 0.35);
+  }
+}
+
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.spinner-ring {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: #409eff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 13px;
+  @include useTheme {
+    color: getVar(textColor);
+  }
+  opacity: 0.8;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
 </style>
