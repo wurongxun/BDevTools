@@ -127,11 +127,13 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     documentOrder.value.push(filePath)
     // 从磁盘加载文件内容
     try {
-      const content = await loadFileContent(filePath, type)
-      doc.content = content
-      doc.originalContent = content
-      doc.isLoading = false
-      doc.lastModified = Date.now()
+      if(type === FileType.MARKDOWN){
+        const content = await loadFileContent(filePath, type)
+        doc.content = content
+        doc.originalContent = content
+        doc.isLoading = false
+        doc.lastModified = Date.now()
+      }
     } catch (error) {
       console.error(`Failed to load file: ${filePath}`, error)
       doc.isLoading = false
