@@ -95,7 +95,7 @@ import { Search, ArrowUp, ArrowDown, Close, ArrowLeft, ArrowRight, DArrowLeft, D
  * - LINE_HEIGHT:   每行固定像素高度，用于虚拟滚动中计算偏移量与可视范围
  * - VIRTUAL_BUFFER: 可视区域上下额外渲染的行数，避免快速滚动时出现空白
  */
-const CHUNK_SIZE = 1000
+const CHUNK_SIZE = 10000
 const OVERLAP = 50
 const LINE_HEIGHT = 20
 const VIRTUAL_BUFFER = 15
@@ -104,6 +104,9 @@ const props = defineProps<{
   path: string
 }>()
 
+// ... existing code ...
+
+/** 搜索功能状态：关键词、搜索会话ID、匹配序号与总数、跳转目标、搜索栏显隐 */
 const keyword = ref('')
 const searchId = ref('')
 const currentMatch = ref(0)
@@ -112,6 +115,7 @@ const jumpTo = ref(1)
 const totalLines = ref(0)
 const showSearchBar = ref(false)
 
+/** 内容渲染与虚拟滚动状态：行数据、起始行号、高亮行集合、目标行、DOM 引用 */
 const lines = ref<string[]>([])
 const firstLineNumber = ref(1)
 const highlightSet = ref(new Set<number>())
@@ -119,19 +123,23 @@ const targetLineNumber = ref(0)
 const viewerRef = ref<HTMLElement | null>(null)
 const searchInputRef = ref()
 
+/** 加载与生命周期标志：KeepAlive 停用标记、首次加载标记、块加载互斥锁 */
 let isDeactivated = false
 let isLoaded = false
 let chunkLoading = false
 const isLoadingChunk = ref(false)
 
-let currentStartLine = 1
-let currentEndLine = 0
+/** 当前块的起止行号（1-based），用于块导航与重叠计算 */
+const currentStartLine = ref(1)
+const currentEndLine = ref(0)
 
+/** 虚拟滚动状态：滚动防抖定时器、当前滚动偏移、容器可视高度、内容总高度 */
 let scrollTimer: ReturnType<typeof setTimeout> | null = null
 const scrollTopValue = ref(0)
 const containerHeight = ref(0)
 
 const totalContentHeight = computed(() => lines.value.length * LINE_HEIGHT)
+
 
 interface VisibleItem {
   lineNumber: number
@@ -158,11 +166,27 @@ const visibleItems = computed<VisibleItem[]>(() => {
   return items
 })
 
+
+
+/**
+ * 块导航计算属性组
+ * 基于 CHUNK_SIZE 将文件划分为多个逻辑块，支持块号显示、跳转与双向绑定
+ */
+
+/**
+ * 计算文件总块数
+ * @returns {number} 总块数，文件为空时返回 1
+ */
 const totalBlocks = computed(() => {
   if (totalLines.value <= 0) return 1
   return Math.ceil(totalLines.value / CHUNK_SIZE)
 })
 
+/**
+ * 块号双向绑定计算属性
+ * 读取时返回当前所在块号，写入时跳转到指定块并将滚动条重置到顶部
+ * @param {number} val - 目标块号（1-based）
+ */
 const jumpBlock = computed({
   get: () => currentBlock.value,
   set: (val: number) => {
@@ -174,10 +198,17 @@ const jumpBlock = computed({
   }
 })
 
+/**
+ * 计算当前所在块号
+ * @returns {number} 当前块号（1-based），起始行为第 1 行时返回 1
+ */
 const currentBlock = computed(() => {
-  if (currentStartLine <= 1) return 1
-  return Math.ceil(currentStartLine / CHUNK_SIZE)
+  if (currentStartLine.value <= 1) return 1
+  return Math.ceil(currentStartLine.value / CHUNK_SIZE)
 })
+
+
+
 
 interface FileState {
   lines: string[]
@@ -212,8 +243,8 @@ function saveCurrentState() {
     keyword: keyword.value,
     searchId: searchId.value,
     scrollTop: viewerRef.value?.scrollTop || 0,
-    startLine: currentStartLine,
-    endLine: currentEndLine
+    startLine: currentStartLine.value,
+    endLine: currentEndLine.value
   }
   savedState.set(filePath, state)
 }
@@ -231,8 +262,8 @@ function restoreState(filePath: string): boolean {
   totalLines.value = state.totalLines
   keyword.value = state.keyword
   searchId.value = state.searchId
-  currentStartLine = state.startLine
-  currentEndLine = state.endLine
+  currentStartLine.value = state.startLine
+  currentEndLine.value = state.endLine
   isLoaded = true
   nextTick(() => {
     if (viewerRef.value) {
@@ -258,10 +289,10 @@ async function loadChunk(filePath: string, startLine: number) {
       lines.value = newLines
       firstLineNumber.value = data.first_line_number
       totalLines.value = data.total_lines
-      currentStartLine = startLine
-      currentEndLine = startLine + newLines.length - 1
+      currentStartLine.value = startLine
+      currentEndLine.value = startLine + newLines.length - 1
       if (!data.has_more) {
-        currentEndLine = data.total_lines
+        currentEndLine.value = data.total_lines
       }
       isLoaded = true
       return true
@@ -285,41 +316,35 @@ async function loadFirstChunk(filePath: string) {
   }
 }
 
+
+
 async function loadNextChunk() {
   if (!props.path || chunkLoading) return
-  if (currentEndLine >= totalLines.value) return
+  if (currentEndLine.value >= totalLines.value) return
 
-  const nextStart = currentEndLine - OVERLAP + 1
+  const nextStart = currentEndLine.value - OVERLAP + 1
   if (nextStart <= 0) return
-
-  const el = viewerRef.value
-  const oldScrollTop = el?.scrollTop || 0
 
   const ok = await loadChunk(props.path, nextStart)
   if (ok) {
     await nextTick()
-    if (el) {
-      const overlapLines = currentEndLine - nextStart + 1
-      const overlapHeight = overlapLines * LINE_HEIGHT
-      el.scrollTop = oldScrollTop + overlapHeight
+    if (viewerRef.value) {
+      viewerRef.value.scrollTop = 0
     }
   }
 }
-
 async function loadPrevChunk() {
   if (!props.path || chunkLoading) return
-  if (currentStartLine <= 1) return
+  if (currentStartLine.value <= 1) return
 
-  let prevStart = currentStartLine - CHUNK_SIZE + OVERLAP
+  let prevStart = currentStartLine.value - CHUNK_SIZE + OVERLAP
   if (prevStart < 1) prevStart = 1
 
   const ok = await loadChunk(props.path, prevStart)
   if (ok) {
     await nextTick()
     if (viewerRef.value) {
-      const overlapLines = currentStartLine - prevStart
-      const overlapHeight = overlapLines * LINE_HEIGHT
-      viewerRef.value.scrollTop = overlapHeight
+      viewerRef.value.scrollTop = 0
     }
   }
 }
@@ -354,6 +379,7 @@ function goToNextBlock() {
     if (viewerRef.value) viewerRef.value.scrollTop = 0
   })
 }
+
 
 function onVirtualScroll() {
   if (!viewerRef.value) return
