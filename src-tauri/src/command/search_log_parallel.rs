@@ -15,9 +15,14 @@ pub struct LogMatch {
     pub content: String,
 }
 
+#[derive(Serialize, Clone)]
+pub struct LogMatchLite {
+    pub line_number: u64,
+}
+
 #[derive(Serialize)]
 pub struct LogSearchResult {
-    pub matches: Vec<LogMatch>,
+    pub matches: Vec<LogMatchLite>,
     pub total_matches: u64,
     pub scanned_lines: u64,
     pub elapsed_ms: u64,
@@ -57,6 +62,7 @@ pub struct PageResult {
     pub total_pages: u64,
     pub total_matches: u64,
 }
+
 #[derive(Clone)]
 struct CachedSearch {
     file_path: String,
@@ -70,7 +76,23 @@ lazy_static! {
         Mutex::new(HashMap::new());
 }
 
-// ==================== 命令1：分块并行搜索（完整版） ====================
+const INDEX_CHUNK_LINES: u64 = 50000;
+fn read_line_lossy<R: BufRead>(reader: &mut R, buf: &mut Vec<u8>) -> std::io::Result<Option<String>> {
+    buf.clear();
+    let bytes_read = reader.read_until(b'\n', buf)?;
+    if bytes_read == 0 {
+        return Ok(None);
+    }
+    let mut end = bytes_read;
+    if end > 0 && buf[end - 1] == b'\n' {
+        end -= 1;
+    }
+    if end > 0 && buf[end - 1] == b'\r' {
+        end -= 1;
+    }
+    Ok(Some(String::from_utf8_lossy(&buf[..end]).to_string()))
+}
+// ==================== 命令1：流式搜索（只存行号，低内存） ====================
 
 #[tauri::command]
 pub async fn search_log_parallel(
@@ -102,43 +124,26 @@ pub async fn search_log_parallel(
         });
     }
 
-    let num_chunks = 4usize;
-    let chunk_size = file_size / num_chunks as u64;
-
-    let chunk_infos = compute_chunk_infos(&file_path, num_chunks, chunk_size, file_size)?;
-
     let keyword_lower = keyword.to_lowercase();
-    let mut handles = vec![];
+    let file = File::open(&file_path).map_err(|e| format!("打开文件失败: {}", e))?;
+    let mut reader = BufReader::with_capacity(128 * 1024, file);
+    let mut line_buf = Vec::with_capacity(1024);
 
-    for info in chunk_infos {
-        let path = file_path.clone();
-        let kw = keyword_lower.clone();
-        let handle = tokio::task::spawn_blocking(move || {
-            search_chunk_with_line_offset(&path, info, &kw)
-        });
-        handles.push(handle);
-    }
-
-    let mut all_matches: Vec<LogMatch> = Vec::new();
+    let mut matches: Vec<LogMatchLite> = Vec::new();
     let mut total_matches: u64 = 0;
-    let mut total_lines: u64 = 0;
+    let mut line_number: u64 = 0;
 
-    for handle in handles {
-        match handle.await {
-            Ok(Ok((chunk_matches, chunk_total, chunk_lines))) => {
-                total_matches += chunk_total;
-                total_lines += chunk_lines;
-                if all_matches.len() < max_results {
-                    let remaining = max_results - all_matches.len();
-                    all_matches.extend(chunk_matches.into_iter().take(remaining));
-                }
+    while let Some(line) = read_line_lossy(&mut reader, &mut line_buf)
+        .map_err(|e| format!("读取行失败: {}", e))?
+    {
+        line_number += 1;
+        if line.to_lowercase().contains(&keyword_lower) {
+            total_matches += 1;
+            if matches.len() < max_results {
+                matches.push(LogMatchLite { line_number });
             }
-            Ok(Err(e)) => return Err(format!("搜索块失败: {}", e)),
-            Err(e) => return Err(format!("任务执行失败: {}", e)),
         }
     }
-
-    all_matches.sort_by_key(|m| m.line_number);
 
     let elapsed = start.elapsed().as_millis() as u64;
 
@@ -146,15 +151,15 @@ pub async fn search_log_parallel(
         code: 200,
         msg: format!("搜索完成，共匹配 {} 处", total_matches),
         data: LogSearchResult {
-            matches: all_matches,
+            matches,
             total_matches,
-            scanned_lines: total_lines,
+            scanned_lines: line_number,
             elapsed_ms: elapsed,
         },
     })
 }
 
-// ==================== 命令2：建立搜索索引（只计数，不存内容） ====================
+// ==================== 命令2：建立搜索索引（单线程流式，低内存） ====================
 
 #[tauri::command]
 pub async fn search_log_index(
@@ -184,57 +189,61 @@ pub async fn search_log_index(
         });
     }
 
-    let num_chunks = 4usize;
-    let chunk_size = file_size / num_chunks as u64;
-    let chunk_infos = compute_chunk_infos(&file_path, num_chunks, chunk_size, file_size)?;
-
     let keyword_lower = keyword.to_lowercase();
-    let mut handles = vec![];
+    let file = File::open(&file_path).map_err(|e| format!("打开文件失败: {}", e))?;
+    let mut reader = BufReader::with_capacity(128 * 1024, file);
+    let mut line_buf = Vec::with_capacity(1024);
 
-    for (i, info) in chunk_infos.iter().enumerate() {
-        let path = file_path.clone();
-        let kw = keyword_lower.clone();
-        let byte_start = info.byte_start;
-        let byte_end = info.byte_end;
-        let line_start = info.line_start;
-
-        let handle = tokio::task::spawn_blocking(move || {
-            count_matches_in_chunk(&path, byte_start, byte_end, line_start, &kw)
-        });
-        handles.push((i, info, handle));
-    }
-
-    let mut chunks_meta: Vec<ChunkMeta> = Vec::with_capacity(num_chunks);
-    for _ in 0..num_chunks {
-        chunks_meta.push(ChunkMeta {
-            chunk_index: 0,
-            byte_start: 0,
-            byte_end: 0,
-            line_start: 0,
-            line_count: 0,
-            match_count: 0,
-        });
-    }
+    let mut chunks_meta: Vec<ChunkMeta> = Vec::new();
     let mut total_matches: u64 = 0;
     let mut total_lines: u64 = 0;
+    let mut current_chunk_lines: u64 = 0;
+    let mut current_chunk_matches: u64 = 0;
+    let mut current_chunk_byte_start: u64 = 0;
+    let mut current_line: u64 = 1;
+    let mut current_chunk_line_start: u64 = 1;
+    let mut current_byte: u64 = 0;
 
-    for (i, info, handle) in handles {
-        match handle.await {
-            Ok(Ok((match_count, line_count))) => {
-                total_matches += match_count;
-                total_lines += line_count;
-                chunks_meta[i] = ChunkMeta {
-                    chunk_index: i,
-                    byte_start: info.byte_start,
-                    byte_end: info.byte_end,
-                    line_start: info.line_start,
-                    line_count,
-                    match_count,
-                };
-            }
-            Ok(Err(e)) => return Err(format!("搜索块失败: {}", e)),
-            Err(e) => return Err(format!("任务执行失败: {}", e)),
+    while let Some(line) = read_line_lossy(&mut reader, &mut line_buf)
+        .map_err(|e| format!("读取行失败: {}", e))?
+    {
+        let line_len = line.len() as u64 + 1;
+        current_byte += line_len;
+        current_chunk_lines += 1;
+        total_lines += 1;
+
+        if line.to_lowercase().contains(&keyword_lower) {
+            current_chunk_matches += 1;
+            total_matches += 1;
         }
+
+        if current_chunk_lines >= INDEX_CHUNK_LINES {
+            chunks_meta.push(ChunkMeta {
+                chunk_index: chunks_meta.len(),
+                byte_start: current_chunk_byte_start,
+                byte_end: current_byte,
+                line_start: current_chunk_line_start,
+                line_count: current_chunk_lines,
+                match_count: current_chunk_matches,
+            });
+            current_chunk_byte_start = current_byte;
+            current_chunk_line_start = current_line + 1;
+            current_chunk_lines = 0;
+            current_chunk_matches = 0;
+        }
+
+        current_line += 1;
+    }
+
+    if current_chunk_lines > 0 {
+        chunks_meta.push(ChunkMeta {
+            chunk_index: chunks_meta.len(),
+            byte_start: current_chunk_byte_start,
+            byte_end: current_byte,
+            line_start: current_chunk_line_start,
+            line_count: current_chunk_lines,
+            match_count: current_chunk_matches,
+        });
     }
 
     let elapsed = start.elapsed().as_millis() as u64;
@@ -320,7 +329,6 @@ pub async fn search_log_jump_to(
     target_index: u64,
     context_count: Option<u64>,
 ) -> Result<ResData<Vec<LogMatch>>, String> {
-    //前后5条数据
     let context_count = context_count.unwrap_or(5);
 
     let cached = {
@@ -452,60 +460,30 @@ fn search_chunk_with_line_offset(
         .map_err(|e| format!("seek 失败: {}", e))?;
 
     let size = (info.byte_end - info.byte_start) as usize;
-    let mut buffer = vec![0u8; size];
-    file.read_exact(&mut buffer)
-        .map_err(|e| format!("读取块失败: {}", e))?;
-
-    let content = String::from_utf8_lossy(&buffer);
+    let limited = file.take(size as u64);
+    let mut buf_reader = BufReader::with_capacity(64 * 1024, limited);
+    let mut line_buf = Vec::with_capacity(1024);
 
     let mut matches = Vec::new();
     let mut line_number = info.line_start;
     let mut total_matches: u64 = 0;
+    let mut total_lines: u64 = 0;
 
-    for line in content.lines() {
+    while let Some(line) = read_line_lossy(&mut buf_reader, &mut line_buf)
+        .map_err(|e| format!("读取行失败: {}", e))?
+    {
         if line.to_lowercase().contains(keyword) {
             total_matches += 1;
             matches.push(LogMatch {
                 line_number,
-                content: line.to_string(),
+                content: line,
             });
         }
         line_number += 1;
+        total_lines += 1;
     }
-
-    let total_lines = line_number - info.line_start;
 
     Ok((matches, total_matches, total_lines))
-}
-
-fn count_matches_in_chunk(
-    file_path: &str,
-    byte_start: u64,
-    byte_end: u64,
-    _line_start: u64,
-    keyword: &str,
-) -> Result<(u64, u64), String> {
-    let mut file = File::open(file_path).map_err(|e| format!("打开文件失败: {}", e))?;
-    file.seek(SeekFrom::Start(byte_start))
-        .map_err(|e| format!("seek 失败: {}", e))?;
-
-    let size = (byte_end - byte_start) as usize;
-    let mut buffer = vec![0u8; size];
-    file.read_exact(&mut buffer)
-        .map_err(|e| format!("读取失败: {}", e))?;
-
-    let content = String::from_utf8_lossy(&buffer);
-    let mut match_count: u64 = 0;
-    let mut line_count: u64 = 0;
-
-    for line in content.lines() {
-        line_count += 1;
-        if line.to_lowercase().contains(keyword) {
-            match_count += 1;
-        }
-    }
-
-    Ok((match_count, line_count))
 }
 
 fn extract_matches_range(
@@ -566,22 +544,23 @@ fn extract_matches_from_chunk(
         .map_err(|e| format!("seek 失败: {}", e))?;
 
     let size = (chunk_meta.byte_end - chunk_meta.byte_start) as usize;
-    let mut buffer = vec![0u8; size];
-    file.read_exact(&mut buffer)
-        .map_err(|e| format!("读取失败: {}", e))?;
+    let limited = file.take(size as u64);
+    let mut buf_reader = BufReader::with_capacity(64 * 1024, limited);
+    let mut line_buf = Vec::with_capacity(1024);
 
-    let content = String::from_utf8_lossy(&buffer);
     let mut matches = Vec::new();
     let mut line_number = chunk_meta.line_start;
     let mut match_index: u64 = 0;
 
-    for line in content.lines() {
+    while let Some(line) = read_line_lossy(&mut buf_reader, &mut line_buf)
+        .map_err(|e| format!("读取行失败: {}", e))?
+    {
         if line.to_lowercase().contains(keyword) {
             match_index += 1;
             if match_index >= local_start && match_index <= local_end {
                 matches.push(LogMatch {
                     line_number,
-                    content: line.to_string(),
+                    content: line,
                 });
             }
             if match_index > local_end {
@@ -593,6 +572,7 @@ fn extract_matches_from_chunk(
 
     Ok(matches)
 }
+
 // ... existing code ...
 
 #[derive(Serialize)]
@@ -606,7 +586,7 @@ pub struct TextPreviewBlock {
     pub total_matches: u64,
 }
 
-// ==================== 命令5：文本预览（加载匹配位置附近的原始文本） ====================
+// ==================== 命令5：文本预览（流式读取，低内存） ====================
 
 #[tauri::command]
 pub async fn search_log_preview(
@@ -640,7 +620,6 @@ pub async fn search_log_preview(
     })
 }
 
-// ==================== 内部工具函数 ====================
 // ... existing code ...
 
 fn find_match_and_read_context(
@@ -692,31 +671,31 @@ fn read_preview_from_chunk(
         .map_err(|e| format!("seek 失败: {}", e))?;
 
     let size = (chunk_meta.byte_end - chunk_meta.byte_start) as usize;
-    let mut buffer = vec![0u8; size];
-    file.read_exact(&mut buffer)
-        .map_err(|e| format!("读取块失败: {}", e))?;
-
-    let content = String::from_utf8_lossy(&buffer);
-    let lines: Vec<&str> = content.lines().collect();
+    let limited = file.take(size as u64);
+    let mut buf_reader = BufReader::with_capacity(64 * 1024, limited);
+    let mut line_buf = Vec::with_capacity(1024);
 
     let mut match_line_number: u64 = 0;
     let mut match_index: u64 = 0;
+    let mut all_lines: Vec<String> = Vec::new();
 
-    for (i, line) in lines.iter().enumerate() {
+    while let Some(line) = read_line_lossy(&mut buf_reader, &mut line_buf)
+        .map_err(|e| format!("读取行失败: {}", e))?
+    {
         if line.to_lowercase().contains(keyword) {
             match_index += 1;
             if match_index == local_target {
-                match_line_number = chunk_meta.line_start + i as u64;
-                break;
+                match_line_number = chunk_meta.line_start + all_lines.len() as u64;
             }
         }
+        all_lines.push(line);
     }
 
     if match_line_number == 0 {
         return Err("块内未找到目标匹配行".to_string());
     }
 
-    let total_lines = lines.len() as u64;
+    let total_lines = all_lines.len() as u64;
     let window_start_in_chunk = if match_line_number >= chunk_meta.line_start + context_lines {
         match_line_number - chunk_meta.line_start - context_lines
     } else {
@@ -731,9 +710,9 @@ fn read_preview_from_chunk(
 
     for i in window_start_in_chunk..window_end_in_chunk {
         let abs_line = chunk_meta.line_start + i;
-        block_lines.push(lines[i as usize].to_string());
+        block_lines.push(all_lines[i as usize].clone());
 
-        if lines[i as usize].to_lowercase().contains(keyword) {
+        if all_lines[i as usize].to_lowercase().contains(keyword) {
             highlight_lines.push(abs_line);
         }
 
@@ -754,6 +733,7 @@ fn read_preview_from_chunk(
         total_matches,
     })
 }
+
 // ... existing code ...
 
 // ==================== 命令6：按行范围读取文件内容 ====================

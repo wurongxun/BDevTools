@@ -69,15 +69,15 @@
         <el-icon><ArrowLeft /></el-icon>
       </el-button>
       <div class="block-jump">
-        <el-input-number
-          v-model="jumpBlock"
-          :min="1"
-          :max="totalBlocks"
+        <el-input
+          v-model="jumpBlockInput"
+          type="number"
           size="small"
           :disabled="isSearching"
-          controls-position="compact"
+          @keyup.enter="onJumpBlockEnter"
+          class="jump-input"
         />
-        <span class="block-total">/ {{ totalBlocks }}</span>
+        <span class="block-total">/{{ totalBlocks }}</span>
       </div>
       <el-button size="small" @click="goToNextBlock" :disabled="currentBlock >= totalBlocks || isSearching" title="下一块 (PageDown)">
         <el-icon><ArrowRight /></el-icon>
@@ -89,7 +89,6 @@
       <span v-if="totalLines > 0" class="line-info">共 {{ totalLines }} 行</span>
       <span v-if="isLoadingChunk" class="loading-tip">加载中...</span>
     </div>
-
   </div>
 </template>
 
@@ -157,6 +156,9 @@ let scrollGuard = false
 /** 加载动画遮罩状态 */
 const showOverlay = ref(false)
 const overlayText = ref('加载中...')
+/** 块跳转输入值（回车才执行跳转） */
+const jumpBlockInput = ref('1')
+
 
 const totalContentHeight = computed(() => lines.value.length * LINE_HEIGHT)
 
@@ -227,6 +229,19 @@ const currentBlock = computed(() => {
   return Math.ceil(currentStartLine.value / CHUNK_SIZE)
 })
 
+
+// watch(currentBlock, (val) => {
+//   jumpBlockInput.value = String(val)
+// })
+
+function onJumpBlockEnter() {
+  const val = parseInt(jumpBlockInput.value)
+  if (isNaN(val) || val < 1 || val > totalBlocks.value) {
+    jumpBlockInput.value = String(currentBlock.value)
+    return
+  }
+  jumpBlock.value = val
+}
 
 
 
@@ -321,6 +336,7 @@ async function loadChunk(filePath: string, startLine: number) {
       if (!data.has_more) {
         currentEndLine.value = data.total_lines
       }
+      jumpBlockInput.value = String(Math.ceil(startLine / CHUNK_SIZE))
       isLoaded = true
       return true
     }
@@ -384,12 +400,11 @@ async function loadPrevChunk() {
   if (ok) {
     await nextTick()
     if (viewerRef.value) {
-      viewerRef.value.scrollTop = 0
+      viewerRef.value.scrollTop = viewerRef.value.scrollHeight
     }
   }
   setTimeout(() => { scrollGuard = false }, 300)
 }
-
 
 function goToFirstBlock() {
   if (currentBlock.value <= 1) return
@@ -492,51 +507,68 @@ async function doSearch() {
   isSearching.value = true
   showOverlay.value = true
   overlayText.value = '搜索中...'
-  const res: any = await invoke('search_log_index', {
-    filePath: props.path,
-    keyword: keyword.value
-  })
-  console.log('Search response:', res)
-  if (res && res.code === 200) {
-    searchId.value = res.data.search_id
-    totalMatches.value = res.data.total_matches
-    if (totalMatches.value > 0){
-      currentMatch.value = 1
-      await loadPreview(1)
-    }else {
-      console.log('No matches found');
-      NotificationUtil.success(res.msg)
+  try {
+    const res: any = await invoke('search_log_index', {
+      filePath: props.path,
+      keyword: keyword.value
+    })
+    if (res && res.code === 200) {
+      searchId.value = res.data.search_id
+      totalMatches.value = res.data.total_matches
+      if (totalMatches.value > 0) {
+        currentMatch.value = 1
+        await loadPreview(1)
+      } else {
+        NotificationUtil.warn('未找到匹配结果')
+        isSearching.value = false
+      }
+    } else {
+      NotificationUtil.error(res?.msg || '搜索失败')
+      isSearching.value = false
     }
+  } catch (e: any) {
+    console.error('搜索异常:', e)
+    NotificationUtil.error(e?.message || '搜索异常，请重试')
+    isSearching.value = false
+  } finally {
+    showOverlay.value = false
   }
-  showOverlay.value = false
 }
 
 
 async function loadPreview(index: number) {
   showOverlay.value = true
   overlayText.value = '搜索中...'
-  const res: any = await invoke('search_log_preview', {
-    searchId: searchId.value,
-    targetIndex: index,
-    contextLines: 500
-  })
-  if (res && res.code === 200) {
-    const data = res.data
-    lines.value = data.content.split('\n')
-    firstLineNumber.value = data.first_line_number
-    highlightSet.value = new Set(data.highlight_lines)
-    targetLineNumber.value = data.target_line_number
-    currentMatch.value = data.current_match_index
-    jumpTo.value = data.current_match_index
-    currentStartLine.value = data.first_line_number
-    currentEndLine.value = data.first_line_number + lines.value.length - 1
+  try {
+    const res: any = await invoke('search_log_preview', {
+      searchId: searchId.value,
+      targetIndex: index,
+      contextLines: 500
+    })
+    if (res && res.code === 200) {
+      const data = res.data
+      lines.value = data.content.split('\n')
+      firstLineNumber.value = data.first_line_number
+      highlightSet.value = new Set(data.highlight_lines)
+      targetLineNumber.value = data.target_line_number
+      currentMatch.value = data.current_match_index
+      jumpTo.value = data.current_match_index
+      currentStartLine.value = data.first_line_number
+      currentEndLine.value = data.first_line_number + lines.value.length - 1
+      jumpBlockInput.value = String(Math.ceil(data.first_line_number / CHUNK_SIZE))
+
+      await nextTick()
+      scrollToLineNumber(targetLineNumber.value)
+    } else {
+      NotificationUtil.error(res?.msg || '加载预览失败')
+    }
+  } catch (e: any) {
+    console.error('加载预览异常:', e)
+    NotificationUtil.error(e?.message || '加载预览异常')
+  } finally {
+    showOverlay.value = false
   }
-  showOverlay.value = false
-
-  await nextTick()
-  scrollToLineNumber(targetLineNumber.value)
 }
-
 function nextMatch() {
   if (currentMatch.value < totalMatches.value) {
     loadPreview(currentMatch.value + 1)
@@ -778,7 +810,8 @@ onBeforeUnmount(() => {
 
 .code-viewer {
   flex: 1;
-  overflow: auto;
+  overflow-x: scroll;
+  overflow-y: auto;
   font-family: 'Consolas', monospace;
   font-size: 13px;
   @include useTheme {
