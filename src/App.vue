@@ -6,6 +6,16 @@
   </div>
 </template>
 <script lang="ts" setup>
+import { onMounted } from 'vue'
+import { listen } from '@tauri-apps/api/event'
+import { load, Store } from '@tauri-apps/plugin-store'
+
+// 监听从系统文件关联打开的事件
+listen<string>('file-opened-from-os', (event) => {
+  const filePath = event.payload
+  console.log('从系统打开了文件:', filePath)
+  // 在这里处理文件打开逻辑，比如加载文件内容到编辑器
+})
 //禁止F12
 // document.onkeydown = function (event: KeyboardEvent) {
 //   // 使用 event.code 替代 keyCode
@@ -25,4 +35,16 @@
 // document.addEventListener("contextmenu", (event) => {
 //   event.preventDefault();
 // });
+let store: Store | undefined = undefined
+onMounted(async () => {
+  // 应用启动时获取全局用户信息
+  store = await load('openfile.json', {
+    autoSave: false,
+    defaults: {}
+  })
+  if (store){
+    let values = store.values()
+    console.log("app store values", values)
+  }
+})
 </script>

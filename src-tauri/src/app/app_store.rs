@@ -15,20 +15,38 @@ use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_store::StoreExt;
 
 use tauri::{path::BaseDirectory, Manager};
+use crate::utils::fileUtil::generate_md5_hash;
+
 lazy_static! {
     pub static ref APP: Mutex<App> = Mutex::new(App::new());
 }
 
 ///初始化app文件夹
 pub fn init_app_dir() -> bool {
-    if !Path::new(&crate::app::app::APP.lock().app_dir).exists() {
-        if let Ok(_) = create_dir_all(&crate::app::app::APP.lock().app_dir) {
+    if !Path::new(&crate::app::app_store::APP.lock().app_dir).exists() {
+        if let Ok(_) = create_dir_all(&crate::app::app_store::APP.lock().app_dir) {
             return true;
         }
         return false;
     }
     true
 }
+/**
+* app “关联文件” 和 “打开方式” 打开文件时存储文件路径 key:文件路径md5 val:文件详细路径;保存在 store中，前端加载完成后请求全部数据 并打开
+*/
+pub fn app_openFile(file: &str, app: &tauri::AppHandle) {
+    let store_ = app.store("openfile.json");
+    let md5 = generate_md5_hash(file);
+    match store_ {
+        Ok(store) => {
+            store.set(&md5, file );
+        }
+        Err(err) => {
+            println!("Error opening store: {}", err);
+        }
+    }
+}
+
 pub fn app_settings(app: &tauri::AppHandle) {
     let store_ = app.store("settings.json");
     match store_ {

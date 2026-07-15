@@ -72,12 +72,14 @@ struct CachedSearch {
 }
 
 lazy_static! {
-    static ref SEARCH_CACHE: Mutex<HashMap<String, CachedSearch>> =
-        Mutex::new(HashMap::new());
+    static ref SEARCH_CACHE: Mutex<HashMap<String, CachedSearch>> = Mutex::new(HashMap::new());
 }
 
 const INDEX_CHUNK_LINES: u64 = 50000;
-fn read_line_lossy<R: BufRead>(reader: &mut R, buf: &mut Vec<u8>) -> std::io::Result<Option<String>> {
+fn read_line_lossy<R: BufRead>(
+    reader: &mut R,
+    buf: &mut Vec<u8>,
+) -> std::io::Result<Option<String>> {
     buf.clear();
     let bytes_read = reader.read_until(b'\n', buf)?;
     if bytes_read == 0 {
@@ -133,8 +135,8 @@ pub async fn search_log_parallel(
     let mut total_matches: u64 = 0;
     let mut line_number: u64 = 0;
 
-    while let Some(line) = read_line_lossy(&mut reader, &mut line_buf)
-        .map_err(|e| format!("读取行失败: {}", e))?
+    while let Some(line) =
+        read_line_lossy(&mut reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
     {
         line_number += 1;
         if line.to_lowercase().contains(&keyword_lower) {
@@ -204,8 +206,8 @@ pub async fn search_log_index(
     let mut current_chunk_line_start: u64 = 1;
     let mut current_byte: u64 = 0;
 
-    while let Some(line) = read_line_lossy(&mut reader, &mut line_buf)
-        .map_err(|e| format!("读取行失败: {}", e))?
+    while let Some(line) =
+        read_line_lossy(&mut reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
     {
         let line_len = line.len() as u64 + 1;
         current_byte += line_len;
@@ -340,10 +342,7 @@ pub async fn search_log_jump_to(
     };
 
     if target_index < 1 || target_index > cached.total_matches {
-        return Err(format!(
-            "索引超出范围，共 {} 条匹配",
-            cached.total_matches
-        ));
+        return Err(format!("索引超出范围，共 {} 条匹配", cached.total_matches));
     }
 
     let start_idx = target_index.saturating_sub(context_count);
@@ -404,11 +403,7 @@ fn compute_chunk_infos(
     Ok(infos)
 }
 
-fn align_to_newline(
-    reader: &mut BufReader<File>,
-    pos: u64,
-    file_size: u64,
-) -> Result<u64, String> {
+fn align_to_newline(reader: &mut BufReader<File>, pos: u64, file_size: u64) -> Result<u64, String> {
     if pos >= file_size {
         return Ok(file_size);
     }
@@ -431,11 +426,7 @@ fn align_to_newline(
     Ok(file_size)
 }
 
-fn count_newlines(
-    reader: &mut BufReader<File>,
-    start: u64,
-    end: u64,
-) -> Result<u64, String> {
+fn count_newlines(reader: &mut BufReader<File>, start: u64, end: u64) -> Result<u64, String> {
     reader
         .seek(SeekFrom::Start(start))
         .map_err(|e| format!("seek 失败: {}", e))?;
@@ -469,8 +460,8 @@ fn search_chunk_with_line_offset(
     let mut total_matches: u64 = 0;
     let mut total_lines: u64 = 0;
 
-    while let Some(line) = read_line_lossy(&mut buf_reader, &mut line_buf)
-        .map_err(|e| format!("读取行失败: {}", e))?
+    while let Some(line) =
+        read_line_lossy(&mut buf_reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
     {
         if line.to_lowercase().contains(keyword) {
             total_matches += 1;
@@ -552,8 +543,8 @@ fn extract_matches_from_chunk(
     let mut line_number = chunk_meta.line_start;
     let mut match_index: u64 = 0;
 
-    while let Some(line) = read_line_lossy(&mut buf_reader, &mut line_buf)
-        .map_err(|e| format!("读取行失败: {}", e))?
+    while let Some(line) =
+        read_line_lossy(&mut buf_reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
     {
         if line.to_lowercase().contains(keyword) {
             match_index += 1;
@@ -605,10 +596,7 @@ pub async fn search_log_preview(
     };
 
     if target_index < 1 || target_index > cached.total_matches {
-        return Err(format!(
-            "索引超出范围，共 {} 条匹配",
-            cached.total_matches
-        ));
+        return Err(format!("索引超出范围，共 {} 条匹配", cached.total_matches));
     }
 
     let preview = find_match_and_read_context(&cached, target_index, context_lines)?;
@@ -679,8 +667,8 @@ fn read_preview_from_chunk(
     let mut match_index: u64 = 0;
     let mut all_lines: Vec<String> = Vec::new();
 
-    while let Some(line) = read_line_lossy(&mut buf_reader, &mut line_buf)
-        .map_err(|e| format!("读取行失败: {}", e))?
+    while let Some(line) =
+        read_line_lossy(&mut buf_reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
     {
         if line.to_lowercase().contains(keyword) {
             match_index += 1;
@@ -701,7 +689,8 @@ fn read_preview_from_chunk(
     } else {
         0
     };
-    let window_end_in_chunk = ((match_line_number - chunk_meta.line_start) + context_lines + 1).min(total_lines);
+    let window_end_in_chunk =
+        ((match_line_number - chunk_meta.line_start) + context_lines + 1).min(total_lines);
 
     let first_line_number = chunk_meta.line_start + window_start_in_chunk;
     let mut block_lines: Vec<String> = Vec::new();
@@ -788,7 +777,9 @@ pub async fn read_file_lines(
     let mut total_lines: u64 = 0;
 
     loop {
-        let n = reader.read(&mut buf).map_err(|e| format!("读取失败: {}", e))?;
+        let n = reader
+            .read(&mut buf)
+            .map_err(|e| format!("读取失败: {}", e))?;
         if n == 0 {
             if line_start < byte_pos {
                 total_lines = current_line;
@@ -835,10 +826,12 @@ pub async fn read_file_lines(
     let read_size = (last_byte - first_byte) as usize;
 
     let mut file2 = File::open(&file_path).map_err(|e| format!("打开文件失败: {}", e))?;
-    file2.seek(SeekFrom::Start(first_byte))
+    file2
+        .seek(SeekFrom::Start(first_byte))
         .map_err(|e| format!("seek 失败: {}", e))?;
     let mut buffer = vec![0u8; read_size];
-    file2.read_exact(&mut buffer)
+    file2
+        .read_exact(&mut buffer)
         .map_err(|e| format!("读取失败: {}", e))?;
 
     let content = String::from_utf8_lossy(&buffer).to_string();

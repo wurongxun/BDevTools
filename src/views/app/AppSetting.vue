@@ -204,7 +204,14 @@ async function dark_change() {
     }
   }
 }
-
+// 步骤1：注册应用到"打开方式"列表
+async function handleRegisterAssociation() {
+  const res = await invoke<ResponseData<any>>('register_file_association')
+  if (res.code === 200) {
+    // 步骤2：打开 Windows 默认应用设置页面
+    await invoke('open_default_apps_settings')
+  }
+}
 async function md_working_directory_change() {
   let file_directory: string | null = await open({
     multiple: false,
@@ -502,7 +509,21 @@ const app_updates_check = async () => {
             </el-button>
           </div>
         </div>
-
+        <div class="settings-item">
+          <div class="setting-info">
+            <span class="setting-label">注册应用 </span>
+            <span class="setting-description">注册应用到windows"打开方式"列表 </span>
+          </div>
+          <div class="setting-control">
+            <el-button
+              type="primary"
+              @click="handleRegisterAssociation"
+              plain
+            >
+              注册
+            </el-button>
+          </div>
+        </div>
         <div class="settings-item">
           <div class="setting-info">
             <span class="setting-label">清除缓存</span>

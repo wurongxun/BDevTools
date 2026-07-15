@@ -59,7 +59,26 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "createUpdaterArtifacts": false
+    "createUpdaterArtifacts": false,
+    "fileAssociations": [
+      {
+        "ext": ["md"],
+        "mimeType": "text/markdown",
+        "description": "Markdown"
+      },{
+        "ext": ["txt"],
+        "mimeType": "text/plain",
+        "description": "txt"
+      },{
+        "ext": ["log"],
+        "mimeType": "text/x-log",
+        "description": "log"
+      },{
+        "ext": ["."],
+        "mimeType": "text/plain",
+        "description": "log"
+      }
+    ]
   },
   "plugins": {
     "updater": {

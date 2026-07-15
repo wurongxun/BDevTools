@@ -1,35 +1,38 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 use serde_json::json;
-use tauri::App;
 use tauri::AppHandle;
+use tauri::Manager;
+use tauri::{App, Emitter};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
 use tauri_plugin_window_state::{StateFlags, WindowExt};
 
 mod app;
 mod app_setup;
+mod command;
 mod entity;
 mod response;
-mod command;
 mod system_menu;
 mod utils;
 
-use crate::app::app::{app_autostart, app_settings};
+use crate::app::app_store::{app_autostart, app_settings,app_openFile};
 use crate::app::tray::create_tray;
 use crate::app_setup::setup::setup_windows;
 use crate::command::app_window::{
     about, loding_window_close, note_book_window, windows_close, windows_hide, windows_maximize,
     windows_minimize,
 };
-use crate::command::file_utils::{file_manager_open_path, get_document_notebooks, up_folder_name};
 use crate::command::file_command::{
     create_folder, create_note_file, get_note_list, get_path_childrenFoldersAndFiles,
     read_note_file, remove_file, remove_folder, save_note, up_file_name,
 };
+use crate::command::file_utils::{file_manager_open_path, get_document_notebooks, up_folder_name};
+use crate::command::file_association::{register_file_association, open_default_apps_settings};
+
 use crate::command::search_log_parallel::{
-    search_log_index, search_log_jump_to, search_log_page, search_log_parallel,
-    search_log_preview, read_file_lines,
+    read_file_lines, search_log_index, search_log_jump_to, search_log_page, search_log_parallel,
+    search_log_preview,
 };
 struct Payload {
     args: Vec<String>,
@@ -39,6 +42,7 @@ struct Payload {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {}))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
@@ -73,6 +77,9 @@ pub fn run() {
             search_log_jump_to,
             search_log_preview,
             read_file_lines,
+            read_file_lines,
+            register_file_association,
+            open_default_apps_settings
         ])
         .setup(move |app: &mut App| {
             #[cfg(all(desktop))]
@@ -81,7 +88,39 @@ pub fn run() {
                 create_tray(handle)?;
                 //app_autostart(handle);
             }
+            let mut builder = tauri::Builder::default();
+            #[cfg(desktop)]
+            {
+                builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+                    let _ = app.get_webview_window("main")
+                        .expect("no main window")
+                        .set_focus();
+                }));
+            }
+            // 获取命令行参数，检查是否有文件关联打开的路径
+            let args: Vec<String> = std::env::args().collect();
+            let handle = app.handle().clone();
+            if args.len() > 1 {
+                let file_path = args[1..]
+                    .iter()
+                    .find(|arg| {
+                        let ext = std::path::Path::new(arg)
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .unwrap_or("");
+                        //全部返回
+                        true
+                        //matches!(ext.to_lowercase().as_str(), "md" | "png" | "jpg" | "jpeg" | "pdf")
+                    })
+                    .cloned();
 
+                if let Some(path) = file_path {
+                    println!("打开文件 path {:?}", path);
+                    app_openFile(&path, &app.handle());
+                    let _ = handle.emit("file-opened-from-os", path);
+
+                }
+            }
             let mut main_window = match WebviewWindowBuilder::new(
                 app,
                 "main".to_string(),

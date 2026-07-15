@@ -1,7 +1,7 @@
 use crate::response::resp_data::{ResData, ResDataNoData};
 use crate::utils::fileUtil::read_dir_info;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle,Manager};
+use tauri::{AppHandle, Manager};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 // 获取目录下笔记
@@ -48,9 +48,9 @@ pub async fn read_note_file(
     path: String,
 ) -> Result<ResData<String>, String> {
     // 首先读取原始字节
-    let bytes = tokio::fs::read(&path).await.map_err(|err| {
-        format!("读取文件失败: {}", err)
-    })?;
+    let bytes = tokio::fs::read(&path)
+        .await
+        .map_err(|err| format!("读取文件失败: {}", err))?;
 
     // 使用 chardetng 检测文件编码
     let mut detector = chardetng::EncodingDetector::new();
@@ -70,7 +70,6 @@ pub async fn read_note_file(
 }
 
 // ... existing code ...
-
 
 // 创建本地文件夹
 #[tauri::command]

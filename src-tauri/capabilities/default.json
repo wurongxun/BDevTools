@@ -9,6 +9,8 @@
     "dialog:default",
     "fs:default",
     "opener:allow-open-path",
+    "opener:allow-open-url",
+    "opener:allow-reveal-item-in-dir",
     "core:window:allow-is-decorated",
     "core:window:allow-is-resizable",
     "core:window:allow-is-maximized",

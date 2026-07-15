@@ -1,10 +1,10 @@
 // src-tauri/src/command/log_search.rs
 
 use crate::response::resp_data::ResData;
+use serde::Serialize;
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use serde::Serialize;
 
 #[derive(Serialize, Clone)]
 pub struct LogMatch {
@@ -43,7 +43,9 @@ pub async fn search_log_file(
     let max_results = max_results.unwrap_or(1000);
     let start = std::time::Instant::now();
 
-    let file = File::open(&file_path).await.map_err(|e| format!("打开文件失败: {}", e))?;
+    let file = File::open(&file_path)
+        .await
+        .map_err(|e| format!("打开文件失败: {}", e))?;
     // 使用较大的缓冲区（256KB），减少系统调用次数
     let reader = BufReader::with_capacity(256 * 1024, file);
     let mut lines = reader.lines();
@@ -54,7 +56,11 @@ pub async fn search_log_file(
 
     let keyword_lower = keyword.to_lowercase();
 
-    while let Some(line) = lines.next_line().await.map_err(|e| format!("读取失败: {}", e))? {
+    while let Some(line) = lines
+        .next_line()
+        .await
+        .map_err(|e| format!("读取失败: {}", e))?
+    {
         line_number += 1;
 
         // 大小写不敏感匹配
