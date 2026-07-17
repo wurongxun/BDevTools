@@ -1,31 +1,34 @@
 <template>
-  <div class="main-box" :class="{ 'is-resizing': isDragging }">
-    <aside
-      ref="sideBoxRef"
-      class="side-box"
-      :class="{ 'is-collapse': isCollapse }"
-      :style="!isCollapse ? { width: sidebarWidth + 'px', minWidth: sidebarWidth + 'px', maxWidth: sidebarWidth + 'px' } : {}"
-    >
-      <app-sidebar />
-    </aside>
-    <div
-      v-show="!isCollapse"
-      class="resize-handle"
-      :class="{ 'is-dragging': isDragging }"
-      @mousedown="onResizeStart"
-    >
-      <div class="resize-handle-line"></div>
+  <div class="main-box">
+    <AppNavbar />
+    <div class="main-area" :class="{ 'is-resizing': isDragging }">
+      <aside
+        ref="sideBoxRef"
+        class="side-box"
+        :class="{ 'is-collapse': isCollapse }"
+        :style="!isCollapse ? { width: sidebarWidth + 'px', minWidth: sidebarWidth + 'px', maxWidth: sidebarWidth + 'px' } : {}"
+      >
+        <app-sidebar />
+      </aside>
+      <div
+        v-show="!isCollapse"
+        class="resize-handle"
+        :class="{ 'is-dragging': isDragging }"
+        @mousedown="onResizeStart"
+      >
+        <div class="resize-handle-line"></div>
+      </div>
+      <main ref="mainContentRef" class="app-content" :class="{ 'is-collapse': isCollapse, 'has-sidebar': !isCollapse && windowWidth >= 1024 }">
+        <app-editor-main></app-editor-main>
+      </main>
     </div>
-    <main ref="mainContentRef" class="app-content" :class="{ 'is-collapse': isCollapse, 'has-sidebar': !isCollapse && windowWidth >= 1024 }">
-      <app-navbar class="app-navbar"></app-navbar>
-      <app-editor-main></app-editor-main>
-    </main>
   </div>
 </template>
 
 <script setup lang="ts" name="Layout">
-import AppEditorMain from './components/AppEditorMain/index.vue'
 import AppNavbar from './components/AppNavbar/index.vue'
+import AppEditorMain from './components/AppEditorMain/index.vue'
+import AppHeader from './components/AppHeader/index.vue'
 import AppSidebar from './components/AppSidebar/index.vue'
 import useStore from '@/store/index'
 import { storeToRefs } from 'pinia'
@@ -34,6 +37,9 @@ import { useResizeObserver } from '@vueuse/core'
 
 const { system } = useStore()
 const { isCollapse } = storeToRefs(system)
+
+
+
 
 const sideBoxRef = ref<HTMLElement | null>(null)
 const mainContentRef = ref<HTMLElement | null>(null)
@@ -204,103 +210,111 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped lang="scss">
-@use '@/styles/variables.scss' as *;
+
+<style scoped lang="scss">@use '@/styles/variables.scss' as *;
 @use '@/styles/theme.scss';
 
 .main-box {
   display: flex;
+  flex-direction: column;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
   box-sizing: border-box;
 
-  &.is-resizing {
-    .side-box,
-    .app-content {
-      transition: none !important;
-    }
-  }
-
-  .side-box {
-    flex-shrink: 0;
-    width: $menu-width;
-    min-width: $menu-width;
-    max-width: $menu-width;
-    height: 100%;
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 1000;
-    box-sizing: border-box;
-    overflow: hidden;
-
-    @include theme.useTheme {
-      background-color: theme.getVar('bgColor');
-      border-right: none;
-    }
-
-    &.is-collapse {
-      width: 0;
-      min-width: 0;
-      max-width: 0;
-      opacity: 0;
-    }
-  }
-
-  .resize-handle {
-    flex-shrink: 0;
-    width: 1px;
-    cursor: col-resize;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1001;
-    position: relative;
-    transition: background-color 0.2s;
-
-    @include theme.useTheme {
-      background-color: theme.getVar('borderColor');
-    }
-
-    &:hover,
-    &.is-dragging {
-      @include theme.useTheme {
-        background-color: $theme-color;
-      }
-    }
-
-    .resize-handle-line {
-      width: 2px;
-      height: 30px;
-      border-radius: 1px;
-      opacity: 0;
-      transition: opacity 0.2s;
-
-      @include theme.useTheme {
-        background-color: $theme-color;
-      }
-    }
-
-    &:hover .resize-handle-line,
-    &.is-dragging .resize-handle-line {
-      opacity: 1;
-    }
-  }
-
-  .app-content {
+  .main-area {
     flex: 1;
-    min-width: 0;
     display: flex;
-    flex-direction: column;
-    height: 100%;
+    min-height: 0;
     overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-sizing: border-box;
 
-    &.has-sidebar {
-      margin-left: 0;
+    &.is-resizing {
+      .side-box,
+      .app-content {
+        transition: none !important;
+      }
+    }
+
+    .side-box {
+      flex-shrink: 0;
+      width: $menu-width;
+      min-width: $menu-width;
+      max-width: $menu-width;
+      height: 100%;
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 1000;
+      box-sizing: border-box;
+      overflow: hidden;
+
+      @include theme.useTheme {
+        background-color: theme.getVar('bgColor');
+        border-right: none;
+      }
+
+      &.is-collapse {
+        width: 0;
+        min-width: 0;
+        max-width: 0;
+        opacity: 0;
+      }
+    }
+
+    .resize-handle {
+      flex-shrink: 0;
+      width: 1px;
+      cursor: col-resize;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1001;
+      position: relative;
+      transition: background-color 0.2s;
+
+      @include theme.useTheme {
+        background-color: theme.getVar('borderColor');
+      }
+
+      &:hover,
+      &.is-dragging {
+        @include theme.useTheme {
+          background-color: $theme-color;
+        }
+      }
+
+      .resize-handle-line {
+        width: 2px;
+        height: 30px;
+        border-radius: 1px;
+        opacity: 0;
+        transition: opacity 0.2s;
+
+        @include theme.useTheme {
+          background-color: $theme-color;
+        }
+      }
+
+      &:hover .resize-handle-line,
+      &.is-dragging .resize-handle-line {
+        opacity: 1;
+      }
+    }
+
+    .app-content {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-sizing: border-box;
+
+      &.has-sidebar {
+        margin-left: 0;
+      }
     }
   }
 }

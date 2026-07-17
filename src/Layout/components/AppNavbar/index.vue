@@ -1,29 +1,32 @@
 <template>
   <header class="topbar-box" data-tauri-drag-region>
-    <toggle-switch></toggle-switch>
-    <div class="bread-crumb-box">
-      <bread-crumb></bread-crumb>
+    <div class="logo-box">
+      <el-image class="logo" fit="contain" :src="logoSrc" />
     </div>
-    <functional-area></functional-area>
+    <div class="menu-box">
+      <menu-bar></menu-bar>
+    </div>
+    <div class="functional-area-box">
+      <functional-area></functional-area>
+    </div>
   </header>
 </template>
 
 <script lang="ts" setup name="AppNavbar">
-import ToggleSwitch from './components/ToggleSwitch.vue'
-import BreadCrumb from './components/BreadCrumb.vue'
 import FunctionalArea from './components/FunctionalArea/index.vue'
+import MenuBar from './components/MenuBar/index.vue'
+import useStore from '@/store'
+import logoSrc from '@/assets/logo/64x64.png'
 </script>
 
 <style scoped lang="scss">
-@use '@/styles/variables.scss' as *;
+@use '@/styles/variables.scss' as variables;
 @use '@/styles/theme.scss';
 
 .topbar-box {
   height: $header-height;
   display: flex;
   align-items: center;
-  //padding-left: 12px;
-  //padding-right: 12px;
   gap: 8px;
 
   @include theme.useTheme {
@@ -32,17 +35,63 @@ import FunctionalArea from './components/FunctionalArea/index.vue'
 
   .bread-crumb-box {
     flex: 1;
-    min-width: 0; // 防止面包屑溢出
+    min-width: 0;
     overflow: hidden;
   }
 }
 
-// 移动端适配
 @media screen and (max-width: 768px) {
   .topbar-box {
     padding-left: 12px;
     padding-right: 8px;
     gap: 6px;
   }
+}
+
+.logo-box {
+  user-select: none;
+  overflow: hidden;
+  height: $header-height;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  margin-bottom: 1px;
+
+  &.is-collapse {
+    width: variables.$collapse-width;
+  }
+
+  .icon {
+    margin: 15px;
+    flex-shrink: 0;
+  }
+
+  .title {
+    font-size: 16px;
+    white-space: nowrap;
+
+    &.shrink-title {
+      display: none;
+    }
+  }
+}
+
+.logo {
+  width: 30px;
+  height: 30px;
+  padding: 2px 2px;
+}
+
+.menu-box {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.functional-area-box {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 </style>
