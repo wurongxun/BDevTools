@@ -15,6 +15,9 @@ use std::{
 use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_store::StoreExt;
+use std::fs;
+use std::io::Read;
+use chardetng::EncodingDetector;
 
 #[tauri::command]
 pub async fn my_read_file(path: std::path::PathBuf) -> String {
@@ -128,3 +131,21 @@ pub async fn up_folder_name(
         }
     }
 }
+// 检测文件编码
+#[tauri::command]
+pub async fn detect_file_encoding(path: &str) -> Result<ResData<String>, Box<dyn std::error::Error>> {
+    let mut file = fs::File::open(path)?;
+    let mut sample = [0u8; 8192];
+    let bytes_read = file.read(&mut sample)?;
+
+    let mut detector = EncodingDetector::new(chardetng::Iso2022JpDetection::Allow);
+    detector.feed(&sample[..bytes_read], bytes_read == 0);
+    let encoding = detector.guess(None, chardetng::Utf8Detection::Allow);
+
+    Ok(ResData {
+        code: 200,
+        msg: "检测成功".to_string(),
+        data: encoding.name().to_string(),
+    })
+}
+

@@ -7,6 +7,7 @@ import { ResponseData } from '@/entity/entitys'
 import { md5 } from '@/utils/Md5Utils'
 import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting'
 import NotificationUtil from '@/utils/NotificationUtil'
+import { load } from '@tauri-apps/plugin-store'
 // 文件类型枚举
 export enum FileType {
   CODE = 'code',
@@ -97,6 +98,7 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
    * 打开或创建文档
    */
   async function openDocument(filePath: string, fileType?: FileType) {
+    addAppOpenFile(filePath);
     // 如果文档已打开，直接激活
     if (documents.value.has(filePath)) {
       setActiveDocument(filePath)
@@ -255,6 +257,9 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
    * 关闭文档
    */
   function closeDocument(filePath: string) {
+    //删除打开方式 保存的文件
+    deleteAppOpenFile(filePath)
+    //删除打开记录
     const doc = documents.value.get(filePath)
     if (!doc) return
 
@@ -289,6 +294,31 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     documentOrder.value = newOrder
   }
 
+  async function deleteAppOpenFile(filePath: string) {
+    var key = md5(filePath)
+    console.log("deleteAppOpenFile "+key)
+    // 应用启动时获取全局用户信息
+    let store = await load('openfile.json', {
+      autoSave: false,
+      defaults: {}
+    })
+    if (store) {
+      store.delete(key)
+    }
+  }
+
+  async function addAppOpenFile(filePath: string) {
+    var key = md5(filePath)
+    console.log("addAppOpenFile "+key)
+    // 应用启动时获取全局用户信息
+    let store = await load('openfile.json', {
+      autoSave: false,
+      defaults: {}
+    })
+    if (store) {
+      store.set(key, filePath)
+    }
+  }
   /**
    * 撤销关闭文档
    */

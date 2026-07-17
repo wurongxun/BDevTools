@@ -112,7 +112,8 @@ export function md5(input: string): string {
     const hexTab = '0123456789abcdef'
     let str = ''
     for (let i = 0; i < binarray.length * 32; i += 8) {
-      str += hexTab.charAt((binarray[i >> 5] >>> i % 32) & 0xf) + hexTab.charAt((binarray[i >> 5] >>> (i % 32 + 4)) & 0xf)
+      const byte = (binarray[i >> 5] >>> (i % 32)) & 0xff
+      str += hexTab.charAt((byte >>> 4) & 0xf) + hexTab.charAt(byte & 0xf)
     }
     return str
   }

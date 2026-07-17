@@ -1,6 +1,7 @@
 use crate::response::resp_data::{ResData, ResDataNoData};
 use crate::utils::fileUtil::read_dir_info;
 use std::path::{Path, PathBuf};
+use chardetng::EncodingDetector;
 use tauri::{AppHandle, Manager};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -52,10 +53,9 @@ pub async fn read_note_file(
         .await
         .map_err(|err| format!("读取文件失败: {}", err))?;
 
-    // 使用 chardetng 检测文件编码
-    let mut detector = chardetng::EncodingDetector::new();
-    detector.feed(&bytes, true);
-    let encoding = detector.guess(None, true);
+    let mut detector = EncodingDetector::new(chardetng::Iso2022JpDetection::Allow);
+    detector.feed(&bytes[..], bytes.is_empty());
+    let encoding = detector.guess(None, chardetng::Utf8Detection::Allow);
 
     // 根据检测到的编码解码文件内容
     let (cow_text, _encoding_used, had_errors) = encoding.decode(&bytes);

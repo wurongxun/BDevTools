@@ -29,7 +29,7 @@ log = "0.4.0"
 md5 = "0.8"
 hex = "0.4"
 #透明及磨砂背景
-window-vibrancy = "0.4.0"
+window-vibrancy = "0.7.1"
 #窗口阴影功能
 window-shadows = "0.2.1"
 tauri-plugin-fs = "2"
@@ -40,7 +40,7 @@ tauri-plugin-store = "2"
 tauri-plugin-os = "2"
 # 文件编码处理
 encoding_rs = "0.8"
-chardetng = "0.1"
+chardetng = "1.0.0"
 # 内存映射文件读取
 memmap2 = "0.9"
 

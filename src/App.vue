@@ -9,7 +9,8 @@
 import { onMounted } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import { load, Store } from '@tauri-apps/plugin-store'
-
+import useStore from '@/store'
+const { routerNoteStore, useDocumentManagerStore } = useStore()
 // 监听从系统文件关联打开的事件
 listen<string>('file-opened-from-os', (event) => {
   const filePath = event.payload
@@ -43,8 +44,22 @@ onMounted(async () => {
     defaults: {}
   })
   if (store){
-    let values = store.values()
+    var keys = store.keys()
+    store.entries().then((entries) => {
+      console.log("app store entries", entries)
+    })
+    console.log("app store keys", keys)
+    let values:Promise<String[]> =store.values()
     console.log("app store values", values)
+    await values.then((value) => {
+      for (let i in value) {
+        console.log(i, value[i])
+        var s = value[i].toString()
+        if (s){
+          useDocumentManagerStore.openDocument(s)
+        }
+      }
+    })
   }
 })
 </script>
