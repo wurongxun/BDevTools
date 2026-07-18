@@ -27,12 +27,12 @@ use crate::command::file_command::{
     create_folder, create_note_file, get_note_list, get_path_childrenFoldersAndFiles,
     read_note_file, remove_file, remove_folder, save_note, up_file_name,
 };
-use crate::command::file_utils::{file_manager_open_path, get_document_notebooks, up_folder_name};
+use crate::command::file_utils::{file_manager_open_path, get_document_notebooks, up_folder_name,detect_file_encoding};
 use crate::command::file_association::{register_file_association, open_default_apps_settings};
 
 use crate::command::search_log_parallel::{
-    read_file_lines, search_log_index, search_log_jump_to, search_log_page, search_log_parallel,
-    search_log_preview,
+    read_file_lines, count_file_lines, search_log_index, search_log_jump_to, search_log_page,
+    search_log_parallel, search_log_preview,
 };
 struct Payload {
     args: Vec<String>,
@@ -77,7 +77,8 @@ pub fn run() {
             search_log_jump_to,
             search_log_preview,
             read_file_lines,
-            read_file_lines,
+            count_file_lines,
+            detect_file_encoding,
             register_file_association,
             open_default_apps_settings
         ])

@@ -173,7 +173,7 @@ pub fn get_dir_and_file_with_depth(
                     current_depth + 1,
                 )?;
                 children_dirAndFileInfo.set_children(children_dir_and_file_info);
-            } else if (is_md || is_pdf || is_txt) && path_1.is_file() {
+            } else if  path_1.is_file() {
                 // 只添加 md 或 pdf 文件
                 children_dirAndFileInfo.set_children(children_dir_and_file_info);
             }

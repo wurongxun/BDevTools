@@ -108,10 +108,7 @@ export const routerNoteStore = defineStore('routerNoteStore', {
           .then((red_note: RouteRecordRaw[]) => {
             // 处理获取到的路由数据
             console.log('setRoutes ===============bred_note', red_note)
-            for (let i = 0; i < red_note.length; i++) {
-              let item = red_note[i]
-              router.addRoute('Layout', item)
-            }
+
           })
           .catch((error) => {
             console.error('获取路由信息失败:', error)

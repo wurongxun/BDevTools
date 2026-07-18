@@ -61,8 +61,8 @@
       </div>
     </div>
     <!-- 块导航栏 -->
-    <div v-if="totalBlocks > 1" class="block-nav">
-      <el-button size="small" @click="goToFirstBlock" :disabled="currentBlock <= 1 || isSearching" title="第一块 (Home)">
+    <div class="block-nav">
+      <el-button size="small" @click="goToFirstBlock" :disabled="currentBlock <= 1 || totalBlocks <= 1 || isSearching" title="第一块 (Home)">
         <el-icon><DArrowLeft /></el-icon>
       </el-button>
       <el-button size="small" @click="goToPrevBlock" :disabled="currentBlock <= 1 || isSearching" title="上一块 (PageUp)">
@@ -73,7 +73,7 @@
           v-model="jumpBlockInput"
           type="number"
           size="small"
-          :disabled="isSearching"
+          :disabled="totalBlocks <= 1 || isSearching"
           @keyup.enter="onJumpBlockEnter"
           class="jump-input"
         />
@@ -86,6 +86,17 @@
         <el-icon><DArrowRight /></el-icon>
       </el-button>
       <span class="line-range">行 {{ currentStartLine }}-{{ currentEndLine }}</span>
+      <el-dropdown trigger="click" @command="onEncodingChange" class="encoding-selector">
+        <span class="encoding-label">{{ currentEncoding }}</span>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item v-for="enc in encodingOptions" :key="enc" :command="enc"
+                              :class="{ 'is-active': enc === currentEncoding }">
+              {{ enc }}
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <span v-if="totalLines > 0" class="line-info">共 {{ totalLines }} 行</span>
       <span v-if="isLoadingChunk" class="loading-tip">加载中...</span>
     </div>
@@ -96,7 +107,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { Search, ArrowUp, ArrowDown, Close, ArrowLeft, ArrowRight, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import NotificationUtil from '@/utils/NotificationUtil'
-
 /**
  * 虚拟滚动与分块加载核心配置
  * - CHUNK_SIZE:    每次从后端加载的行数，控制单次 IO 与内存占用
@@ -104,7 +114,7 @@ import NotificationUtil from '@/utils/NotificationUtil'
  * - LINE_HEIGHT:   每行固定像素高度，用于虚拟滚动中计算偏移量与可视范围
  * - VIRTUAL_BUFFER: 可视区域上下额外渲染的行数，避免快速滚动时出现空白
  */
-const CHUNK_SIZE = 10000
+const CHUNK_SIZE = 100000
 const OVERLAP = 50
 const LINE_HEIGHT = 20
 const VIRTUAL_BUFFER = 15
@@ -143,6 +153,41 @@ let isLoaded = false
 let chunkLoading = false
 const isLoadingChunk = ref(false)
 const MAX_CACHED_STATES = 5
+
+
+// ========== 块预取缓存 ==========
+interface ChunkCacheEntry {
+  lines: string[]
+  firstLineNumber: number
+  startLine: number
+  endLine: number
+  hasMore: boolean
+}
+const chunkCache = new Map<string, ChunkCacheEntry>()
+const MAX_CHUNK_CACHE = 5
+
+function getCacheKey(path: string, startLine: number): string {
+  return `${path}::${startLine}`
+}
+
+function getCachedChunk(path: string, startLine: number): ChunkCacheEntry | undefined {
+  return chunkCache.get(getCacheKey(path, startLine))
+}
+
+function setCacheChunk(path: string, startLine: number, entry: ChunkCacheEntry) {
+  const key = getCacheKey(path, startLine)
+  if (chunkCache.has(key)) chunkCache.delete(key)
+  chunkCache.set(key, entry)
+  if (chunkCache.size > MAX_CHUNK_CACHE) {
+    const oldest = chunkCache.keys().next().value
+    if (oldest !== undefined) chunkCache.delete(oldest)
+  }
+}
+
+function clearChunkCache() {
+  chunkCache.clear()
+}
+
 /** 当前块的起止行号（1-based），用于块导航与重叠计算 */
 const currentStartLine = ref(1)
 const currentEndLine = ref(0)
@@ -158,6 +203,10 @@ const showOverlay = ref(false)
 const overlayText = ref('加载中...')
 /** 块跳转输入值（回车才执行跳转） */
 const jumpBlockInput = ref('1')
+
+// ========== 编码相关 ==========
+const currentEncoding = ref('UTF-8')
+const encodingOptions = ['UTF-8', 'GBK', 'GB18030', 'BIG5', 'UTF-16LE', 'UTF-16BE', 'Shift_JIS', 'EUC-JP', 'EUC-KR', 'ASCII']
 
 
 const totalContentHeight = computed(() => lines.value.length * LINE_HEIGHT)
@@ -317,27 +366,54 @@ function restoreState(filePath: string): boolean {
 
 async function loadChunk(filePath: string, startLine: number) {
   if (isLoadingChunk.value) return
+
+  const cached = getCachedChunk(filePath, startLine)
+  if (cached) {
+    lines.value = cached.lines
+    firstLineNumber.value = cached.firstLineNumber
+    currentStartLine.value = cached.startLine
+    currentEndLine.value = cached.endLine
+    jumpBlockInput.value = String(Math.ceil(startLine / CHUNK_SIZE))
+    isLoaded = true
+    return true
+  }
+
   chunkLoading = true;
   isLoadingChunk.value = true
   try {
     const res: any = await invoke('read_file_lines', {
       filePath,
       startLine,
-      lineCount: CHUNK_SIZE
+      lineCount: CHUNK_SIZE,
+      encoding: currentEncoding.value
     })
     if (res && res.code === 200) {
       const data = res.data
       const newLines = data.content.split('\n').filter((l: string) => l.length > 0 || true)
       lines.value = newLines
       firstLineNumber.value = data.first_line_number
-      totalLines.value = data.total_lines
+      if (data.total_lines > 0) {
+        totalLines.value = data.total_lines
+      }
       currentStartLine.value = startLine
       currentEndLine.value = startLine + newLines.length - 1
       if (!data.has_more) {
-        currentEndLine.value = data.total_lines
+        currentEndLine.value = startLine + newLines.length - 1
+        if (totalLines.value <= 0) {
+          totalLines.value = startLine + newLines.length - 1
+        }
       }
       jumpBlockInput.value = String(Math.ceil(startLine / CHUNK_SIZE))
       isLoaded = true
+
+      setCacheChunk(filePath, startLine, {
+        lines: newLines,
+        firstLineNumber: data.first_line_number,
+        startLine: currentStartLine.value,
+        endLine: currentEndLine.value,
+        hasMore: data.has_more
+      })
+
       return true
     }
   } catch (e) {
@@ -359,6 +435,7 @@ async function loadFirstChunk(filePath: string) {
     targetLineNumber.value = 0
     currentMatch.value = 0
     totalMatches.value = 0
+    prefetchAdjacent(filePath, 1)
   }
 }
 
@@ -366,7 +443,7 @@ async function loadFirstChunk(filePath: string) {
 
 async function loadNextChunk() {
   if (!props.path || chunkLoading) return
-  if (currentEndLine.value >= totalLines.value) return
+  if (totalLines.value > 0 && currentEndLine.value >= totalLines.value) return
 
   const nextStart = currentEndLine.value - OVERLAP + 1
   if (nextStart <= 0) return
@@ -381,6 +458,7 @@ async function loadNextChunk() {
     if (viewerRef.value) {
       viewerRef.value.scrollTop = 0
     }
+    prefetchAdjacent(props.path, nextStart)
   }
   setTimeout(() => { scrollGuard = false }, 300)
 }
@@ -402,6 +480,7 @@ async function loadPrevChunk() {
     if (viewerRef.value) {
       viewerRef.value.scrollTop = viewerRef.value.scrollHeight
     }
+    prefetchAdjacent(props.path, prevStart)
   }
   setTimeout(() => { scrollGuard = false }, 300)
 }
@@ -411,9 +490,10 @@ function goToFirstBlock() {
   scrollGuard = true
   showOverlay.value = true
   overlayText.value = '加载中...'
-  loadChunk(props.path, 1).then(() => {
+  loadChunk(props.path, 1).then((ok) => {
     showOverlay.value = false
-    if (viewerRef.value) viewerRef.value.scrollTop = 0
+    if (ok && viewerRef.value) viewerRef.value.scrollTop = 0
+    if (ok) prefetchAdjacent(props.path, 1)
     setTimeout(() => { scrollGuard = false }, 300)
   })
 }
@@ -424,9 +504,10 @@ function goToLastBlock() {
   scrollGuard = true
   showOverlay.value = true
   overlayText.value = '加载中...'
-  loadChunk(props.path, startLine).then(() => {
+  loadChunk(props.path, startLine).then((ok) => {
     showOverlay.value = false
-    if (viewerRef.value) viewerRef.value.scrollTop = 0
+    if (ok && viewerRef.value) viewerRef.value.scrollTop = 0
+    if (ok) prefetchAdjacent(props.path, startLine)
     setTimeout(() => { scrollGuard = false }, 300)
   })
 }
@@ -437,9 +518,10 @@ function goToPrevBlock() {
   scrollGuard = true
   showOverlay.value = true
   overlayText.value = '加载中...'
-  loadChunk(props.path, startLine).then(() => {
+  loadChunk(props.path, startLine).then((ok) => {
     showOverlay.value = false
-    if (viewerRef.value) viewerRef.value.scrollTop = 0
+    if (ok && viewerRef.value) viewerRef.value.scrollTop = 0
+    if (ok) prefetchAdjacent(props.path, startLine)
     setTimeout(() => { scrollGuard = false }, 300)
   })
 }
@@ -450,12 +532,62 @@ function goToNextBlock() {
   scrollGuard = true
   showOverlay.value = true
   overlayText.value = '加载中...'
-  loadChunk(props.path, startLine).then(() => {
+  loadChunk(props.path, startLine).then((ok) => {
     showOverlay.value = false
-    if (viewerRef.value) viewerRef.value.scrollTop = 0
+    if (ok && viewerRef.value) viewerRef.value.scrollTop = 0
+    if (ok) prefetchAdjacent(props.path, startLine)
     setTimeout(() => { scrollGuard = false }, 300)
   })
 }
+
+// ========== 预取相邻块（后台静默加载，不阻塞UI） ==========
+async function prefetchAdjacent(filePath: string, currentStart: number) {
+  const nextStart = currentStart + CHUNK_SIZE
+  const prevStart = Math.max(1, currentStart - CHUNK_SIZE)
+
+  const tasks: Promise<void>[] = []
+
+  if (totalLines.value <= 0 || nextStart <= totalLines.value) {
+    if (!getCachedChunk(filePath, nextStart)) {
+      tasks.push(prefetchOneChunk(filePath, nextStart))
+    }
+  }
+
+  if (prevStart < currentStart && !getCachedChunk(filePath, prevStart)) {
+    tasks.push(prefetchOneChunk(filePath, prevStart))
+  }
+
+  await Promise.all(tasks)
+}
+
+async function prefetchOneChunk(filePath: string, startLine: number) {
+  try {
+    const res: any = await invoke('read_file_lines', {
+      filePath,
+      startLine,
+      lineCount: CHUNK_SIZE,
+      encoding: currentEncoding.value
+    })
+    if (res && res.code === 200) {
+      const data = res.data
+      const newLines = data.content.split('\n').filter((l: string) => l.length > 0 || true)
+      if (data.total_lines > 0) {
+        totalLines.value = data.total_lines
+      }
+      const endLine = startLine + newLines.length - 1
+      setCacheChunk(filePath, startLine, {
+        lines: newLines,
+        firstLineNumber: data.first_line_number,
+        startLine,
+        endLine: data.has_more ? endLine : data.total_lines || endLine,
+        hasMore: data.has_more
+      })
+    }
+  } catch (e) {
+    console.warn('预取块失败:', startLine, e)
+  }
+}
+
 
 
 function onVirtualScroll() {
@@ -597,16 +729,22 @@ function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+
 watch(
   () => props.path,
   async (newPath) => {
     if (isDeactivated) return
     if (!newPath) return
+    clearChunkCache()
+    currentEncoding.value = 'UTF-8'
     if (!restoreState(newPath)) {
       await loadFirstChunk(newPath)
     }
+    countTotalLinesAsync(newPath)
+    detectFileEncoding(newPath)
   }
 )
+
 watch(showSearchBar, (val) => {
   if (!val) {
     isSearching.value = false
@@ -649,11 +787,14 @@ function addKeydownListener() {
 onMounted(async () => {
   if (props.path) {
     await loadFirstChunk(props.path)
+    countTotalLinesAsync(props.path)
+    detectFileEncoding(props.path)
   }
   if (viewerRef.value) {
     containerHeight.value = viewerRef.value.clientHeight
   }
   addKeydownListener()
+  window.addEventListener('encoding-change', onGlobalEncodingChange)
 })
 
 onActivated(() => {
@@ -684,7 +825,72 @@ onDeactivated(() => {
 onBeforeUnmount(() => {
   removeKeydownListener()
   savedState.clear()
+  clearChunkCache()
+  window.removeEventListener('encoding-change', onGlobalEncodingChange)
 })
+
+// ========== 异步统计总行数（不阻塞首次显示） ==========
+async function countTotalLinesAsync(filePath: string) {
+  try {
+    const res: any = await invoke('count_file_lines', { filePath })
+    if (res && res.code === 200 && res.data > 0) {
+      totalLines.value = res.data
+    }
+  } catch (e) {
+    console.warn('统计行数失败:', e)
+  }
+}
+
+// ========== 编码检测与切换 ==========
+async function detectFileEncoding(filePath: string) {
+  try {
+    const res: any = await invoke('detect_file_encoding', { path: filePath })
+    if (res && res.code === 200 && res.data) {
+      const detected = normalizeEncodingName(res.data)
+      currentEncoding.value = detected
+    }
+  } catch (e) {
+    console.warn('编码检测失败:', e)
+  }
+}
+
+function normalizeEncodingName(name: string): string {
+  const upper = name.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  if (upper.includes('UTF8')) return 'UTF-8'
+  if (upper.includes('GB18030')) return 'GB18030'
+  if (upper.includes('GBK') || upper === 'GB2312' || upper === 'CP936') return 'GBK'
+  if (upper.includes('BIG5')) return 'BIG5'
+  if (upper.includes('UTF16LE')) return 'UTF-16LE'
+  if (upper.includes('UTF16BE')) return 'UTF-16BE'
+  if (upper.includes('SHIFTJIS') || upper.includes('SJIS')) return 'Shift_JIS'
+  if (upper.includes('EUCJP')) return 'EUC-JP'
+  if (upper.includes('EUCKR')) return 'EUC-KR'
+  if (upper.includes('ASCII')) return 'ASCII'
+  return 'UTF-8'
+}
+
+function onEncodingChange(enc: string) {
+  if (enc === currentEncoding.value) return
+  switchEncoding(enc)
+}
+
+function onGlobalEncodingChange(e: Event) {
+  const enc = (e as CustomEvent).detail.encoding
+  if (enc && enc !== currentEncoding.value) {
+    switchEncoding(enc)
+  }
+}
+
+async function switchEncoding(enc: string) {
+  currentEncoding.value = enc
+  clearChunkCache()
+  if (props.path) {
+    showOverlay.value = true
+    overlayText.value = '切换编码中...'
+    await loadChunk(props.path, currentStartLine.value > 1 ? currentStartLine.value : 1)
+    showOverlay.value = false
+  }
+}
 </script>
 
 <style scoped lang="scss">@use '@/styles/theme.scss' as *;
@@ -759,7 +965,7 @@ onBeforeUnmount(() => {
   padding: 6px 12px;
   @include useTheme {
     background-color: getVar(bgColor);
-    //border-bottom: 1px solid getVar(borderColor);
+    border-top: 1px solid getVar(borderColor);
   }
   flex-shrink: 0;
 }
@@ -787,12 +993,29 @@ onBeforeUnmount(() => {
   }
 }
 
+.encoding-selector {
+  margin-left: auto;
+  cursor: pointer;
+}
+
+.encoding-label {
+  font-size: 12px;
+  @include useTheme {
+    color: getVar(textColor);
+    opacity: 0.7;
+  }
+  &:hover {
+    @include useTheme {
+      color: getVar(textColor);
+      opacity: 1;
+    }
+  }
+}
+
 .line-info {
-  position: absolute;
-  bottom: 8px;
-  right: 16px;
   font-size: 12px;
   white-space: nowrap;
+  margin-left: 8px;
   @include useTheme {
     color: getVar(textColor);
     opacity: 0.5;
@@ -800,12 +1023,10 @@ onBeforeUnmount(() => {
 }
 
 .loading-tip {
-  //position: absolute;
-  bottom: 8px;
-  left: 16px;
   font-size: 12px;
   color: #f5c542;
   white-space: nowrap;
+  margin-left: 4px;
 }
 
 .code-viewer {

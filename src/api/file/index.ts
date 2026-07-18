@@ -5,11 +5,14 @@ import { tauri_request } from '@/utils/tauri_request'
 import { defineAsyncComponent, ref } from 'vue'
 import { RouteRecordRaw, RouteComponent } from 'vue-router'
 import { load, Store } from '@tauri-apps/plugin-store'
-import { note_comm_router, note_comm_router_notebookMd, note_comm_router_notebookPdf } from '@/setting'
+import {
+  note_comm_router,
+  note_comm_router_notebookMd,
+  note_comm_router_notebookPdf
+} from '@/setting'
 import { id } from 'element-plus/es/locales.mjs'
 import useStore from '@/store/index'
 import router from '@/router/index'
-
 
 export const get_notebooks_Api = async () => {
   let notebooks_data = ref<NotebookInfo | null>(null)
@@ -60,8 +63,8 @@ const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
       } else if (child.isfile && child.data_type == 'pdf') {
         path = note_comm_router_notebookPdf + child.id
       } else if (child.isfile && child.data_type == 'txt') {
-      path = note_comm_router_notebookPdf + child.id
-    }
+        path = note_comm_router_notebookPdf + child.id
+      }
       let route2: TreeNode = {
         id: child.id,
         label: child.name,
@@ -90,7 +93,10 @@ const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
   return children_val
 }
 
-const File_treeNode_child = (notebooks_children: Array<NotebookInfo>, searchData_val: Array<TreeNode>): Array<TreeNode> => {
+const File_treeNode_child = (
+  notebooks_children: Array<NotebookInfo>,
+  searchData_val: Array<TreeNode>
+): Array<TreeNode> => {
   let children_val: Array<TreeNode> = new Array<TreeNode>()
   if (notebooks_children && notebooks_children.length > 0) {
     console.log('get_notebooks_tree_child notebooks_children', notebooks_children)
@@ -117,7 +123,6 @@ const File_treeNode_child = (notebooks_children: Array<NotebookInfo>, searchData
         children: child.isfile ? [] : child_child_val
       }
       if (child.isfile) {
-
         searchData_val.push(route2)
       }
 

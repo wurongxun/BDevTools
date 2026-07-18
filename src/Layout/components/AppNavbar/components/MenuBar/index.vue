@@ -45,7 +45,8 @@ import { ResponseData } from '@/Types/entitys'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { get_notebooks_Api } from '@/api/file'
 import useStore from '@/store'
-const {useDocumentManagerStore } = useStore()
+import { open } from '@tauri-apps/plugin-dialog'
+const {useDocumentManagerStore,routerNoteStore } = useStore()
 const router = useRouter()
 const activeMenu = ref<string | null>(null)
 let store: Store | undefined
@@ -62,32 +63,39 @@ interface Menu {
   label: string
   items: MenuItem[]
 }
+// items: [
+//   { label: '新建文件', shortcut: 'Ctrl+N', command: 'newFile' },
+//   { label: '打开文件', shortcut: 'Ctrl+O', command: 'openFile' },
+//   { label: '新建文件夹', command: 'newFolder' },
+//   { divider: true, label: '', command: '' },
+//   { label: '保存', shortcut: 'Ctrl+S', command: 'save' },
+//   { label: '另存为', shortcut: 'Ctrl+Shift+S', command: 'saveAs' },
+//   { divider: true, label: '', command: '' },
+//   { label: '设置', command: 'settings' },
+// ]
 
+// ,
+// {
+//   label: '编码(N)',
+//     items: [
+//   { label: 'UTF-8', command: 'encodingUtf8' },
+//   { label: 'GBK', command: 'encodingGbk' },
+//   { label: 'UTF-16', command: 'encodingUtf16' },
+//   { label: 'ASCII', command: 'encodingAscii' },
+// ]
+// }
 const menus: Menu[] = [
   {
-    label: '文件',
+    label: '文件(F)',
     items: [
-      { label: '新建文件', shortcut: 'Ctrl+N', command: 'newFile' },
       { label: '打开文件', shortcut: 'Ctrl+O', command: 'openFile' },
-      { label: '新建文件夹', command: 'newFolder' },
-      { divider: true, label: '', command: '' },
-      { label: '保存', shortcut: 'Ctrl+S', command: 'save' },
-      { label: '另存为', shortcut: 'Ctrl+Shift+S', command: 'saveAs' },
+      { label: '更换工作目录', shortcut: 'Ctrl+O', command: 'openWorkingDirectory' },
       { divider: true, label: '', command: '' },
       { label: '设置', command: 'settings' },
     ]
   },
   {
-    label: '编码',
-    items: [
-      { label: 'UTF-8', command: 'encodingUtf8' },
-      { label: 'GBK', command: 'encodingGbk' },
-      { label: 'UTF-16', command: 'encodingUtf16' },
-      { label: 'ASCII', command: 'encodingAscii' },
-    ]
-  },
-  {
-    label: '帮助',
+    label: '帮助(H)',
     items: [
       { label: '帮助', command: 'help' },
       { label: '关于', command: 'about' }
@@ -141,6 +149,26 @@ const handleMenuCommand = async (item: MenuItem) => {
       }
       break
     }
+    case 'openWorkingDirectory': {
+      let file_directory: string | null = await open({
+        multiple: false,
+        directory: true
+      })
+      if (!store){
+        store = await load('settings.json', {
+          autoSave: false,
+          defaults: {}
+        })
+      }
+      if (store) {
+        await store.set('md_working_directory', { value: file_directory })
+        await store.save();
+        await get_notebooks_Api();
+      }
+
+      break
+    }
+
     case 'newFolder': {
       const dir = await getWorkingDirectory()
       if (!dir) {

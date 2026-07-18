@@ -133,11 +133,11 @@ pub async fn up_folder_name(
 }
 // 检测文件编码
 #[tauri::command]
-pub async fn detect_file_encoding(path: &str) -> Result<ResData<String>, Box<dyn std::error::Error>> {
-    let mut file = fs::File::open(path)?;
+pub async fn detect_file_encoding(path: String) -> Result<ResData<String>, String> {
+    let mut file = fs::File::open(&path).map_err(|e| e.to_string())?;
     let mut sample = [0u8; 8192];
-    let bytes_read = file.read(&mut sample)?;
-
+    let bytes_read = file.read(&mut sample).map_err(|e| e.to_string())?;
+    
     let mut detector = EncodingDetector::new(chardetng::Iso2022JpDetection::Allow);
     detector.feed(&sample[..bytes_read], bytes_read == 0);
     let encoding = detector.guess(None, chardetng::Utf8Detection::Allow);

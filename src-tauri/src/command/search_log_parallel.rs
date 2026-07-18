@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
-
+use encoding_rs::Encoding;
 // ==================== 数据结构 ====================
 
 #[derive(Serialize, Clone)]
@@ -564,7 +564,7 @@ fn extract_matches_from_chunk(
     Ok(matches)
 }
 
-// ... existing code ...
+
 
 #[derive(Serialize)]
 pub struct TextPreviewBlock {
@@ -608,7 +608,7 @@ pub async fn search_log_preview(
     })
 }
 
-// ... existing code ...
+
 
 fn find_match_and_read_context(
     cached: &CachedSearch,
@@ -723,9 +723,10 @@ fn read_preview_from_chunk(
     })
 }
 
-// ... existing code ...
+
 
 // ==================== 命令6：按行范围读取文件内容 ====================
+
 
 #[derive(Serialize)]
 pub struct FileLinesResult {
@@ -735,11 +736,29 @@ pub struct FileLinesResult {
     pub has_more: bool,
 }
 
+fn resolve_encoding(name: &str) -> &'static Encoding {
+    match name.to_uppercase().as_str() {
+        "UTF-8" | "UTF8" => &encoding_rs::UTF_8,
+        "GBK" | "GB2312" | "GB18030" | "CP936" => &encoding_rs::GBK,
+        "BIG5" => &encoding_rs::BIG5,
+        "UTF-16LE" => &encoding_rs::UTF_16LE,
+        "UTF-16BE" => &encoding_rs::UTF_16BE,
+        "SHIFT_JIS" | "SHIFT-JIS" => &encoding_rs::SHIFT_JIS,
+        "EUC-JP" => &encoding_rs::EUC_JP,
+        "EUC-KR" => &encoding_rs::EUC_KR,
+        "ASCII" => &encoding_rs::UTF_8,
+        _ => {
+            Encoding::for_label(name.as_bytes()).unwrap_or(&encoding_rs::UTF_8)
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn read_file_lines(
     file_path: String,
     start_line: Option<u64>,
     line_count: Option<u64>,
+    encoding: Option<String>,
 ) -> Result<ResData<FileLinesResult>, String> {
     if !Path::new(&file_path).exists() {
         return Err("文件不存在".to_string());
@@ -747,6 +766,7 @@ pub async fn read_file_lines(
 
     let start_line = start_line.unwrap_or(1);
     let line_count = line_count.unwrap_or(1000);
+    let encoding = resolve_encoding(&encoding.unwrap_or_else(|| "UTF-8".to_string()));
 
     let file_size = std::fs::metadata(&file_path)
         .map_err(|e| format!("获取文件大小失败: {}", e))?
@@ -769,12 +789,12 @@ pub async fn read_file_lines(
     let mut reader = BufReader::with_capacity(256 * 1024, file);
 
     let mut current_line: u64 = 1;
-    let mut line_bytes: Vec<(u64, u64)> = Vec::new();
+    let mut line_bytes: Vec<(u64, u64)> = Vec::with_capacity(line_count as usize);
     let mut byte_pos: u64 = 0;
     let mut line_start: u64 = 0;
+    let mut found_end = false;
 
     let mut buf = [0u8; 8192];
-    let mut total_lines: u64 = 0;
 
     loop {
         let n = reader
@@ -782,11 +802,11 @@ pub async fn read_file_lines(
             .map_err(|e| format!("读取失败: {}", e))?;
         if n == 0 {
             if line_start < byte_pos {
-                total_lines = current_line;
                 if current_line >= start_line && current_line < start_line + line_count {
                     line_bytes.push((line_start, byte_pos));
                 }
             }
+            found_end = true;
             break;
         }
 
@@ -797,16 +817,19 @@ pub async fn read_file_lines(
                 }
                 current_line += 1;
                 line_start = byte_pos + i as u64 + 1;
+
+                if current_line >= start_line + line_count {
+                    found_end = true;
+                    break;
+                }
             }
         }
         byte_pos += n as u64;
-    }
 
-    if total_lines == 0 {
-        total_lines = current_line;
+        if found_end {
+            break;
+        }
     }
-
-    let has_more = start_line + line_count <= total_lines;
 
     if line_bytes.is_empty() {
         return Ok(ResData {
@@ -815,7 +838,7 @@ pub async fn read_file_lines(
             data: FileLinesResult {
                 content: String::new(),
                 first_line_number: start_line,
-                total_lines,
+                total_lines: 0,
                 has_more: false,
             },
         });
@@ -834,7 +857,9 @@ pub async fn read_file_lines(
         .read_exact(&mut buffer)
         .map_err(|e| format!("读取失败: {}", e))?;
 
-    let content = String::from_utf8_lossy(&buffer).to_string();
+    let (cow, _encoding_used, _had_errors) = encoding.decode(&buffer);
+    let content = cow.into_owned();
+    let has_more = !found_end || current_line > start_line + line_count;
 
     Ok(ResData {
         code: 200,
@@ -842,8 +867,40 @@ pub async fn read_file_lines(
         data: FileLinesResult {
             content,
             first_line_number: start_line,
-            total_lines,
+            total_lines: 0,
             has_more,
         },
+    })
+}
+
+// ==================== 命令7：快速统计文件总行数 ====================
+
+#[tauri::command]
+pub async fn count_file_lines(
+    file_path: String,
+) -> Result<ResData<u64>, String> {
+    if !Path::new(&file_path).exists() {
+        return Err("文件不存在".to_string());
+    }
+
+    let file = File::open(&file_path).map_err(|e| format!("打开文件失败: {}", e))?;
+    let mut reader = BufReader::with_capacity(512 * 1024, file);
+    let mut count: u64 = 0;
+    let mut buf = [0u8; 65536];
+
+    loop {
+        let n = reader
+            .read(&mut buf)
+            .map_err(|e| format!("读取失败: {}", e))?;
+        if n == 0 {
+            break;
+        }
+        count += buf[..n].iter().filter(|&&b| b == b'\n').count() as u64;
+    }
+
+    Ok(ResData {
+        code: 200,
+        msg: "success".to_string(),
+        data: count,
     })
 }

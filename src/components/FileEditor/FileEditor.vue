@@ -35,7 +35,7 @@ const currentEditorComponent = computed(() => {
     case 'markdown': return MdEditor
     case 'pdf': return PdfEditor
     case 'image': return ImageEditor
-    case 'code': return CodeEditor
+    case 'code': return TextView
     case 'text': return TextView
     default: return CodeEditor
   }
