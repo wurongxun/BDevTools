@@ -30,7 +30,7 @@ import logoSrc from '@/assets/logo/64x64.png'
   gap: 8px;
 
   @include theme.useTheme {
-    //border-bottom: 1px solid theme.getVar('borderColor');
+    border-bottom: 1px solid theme.getVar('borderColor');
   }
 
   .bread-crumb-box {

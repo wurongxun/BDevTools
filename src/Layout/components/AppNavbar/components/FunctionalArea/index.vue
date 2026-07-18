@@ -23,63 +23,63 @@
 
 
     <!-- 消息 -->
-    <el-popover
-      placement="bottom-end"
-      :width="350"
-      trigger="click"
-      popper-class="message-popover"
-      :offset="12"
-      :show-arrow="false"
-    >
-      <template #reference>
-        <el-badge :is-dot="is_dot" :max="99">
-          <el-icon class="fa-icon">
-            <Message />
-          </el-icon>
-        </el-badge>
-      </template>
-      <div class="message-container">
-        <div class="message-header">
-          <h3>消息中心</h3>
-          <el-button link type="primary" size="small" @click="markAllAsRead">全部已读</el-button>
-        </div>
-        <el-tabs v-model="activeName" class="message-tabs">
-          <el-tab-pane :label="`未读 (${unreadCount})`" name="wait">
-            <div v-if="messageList.length === 0" class="empty-state">
-              <el-empty description="暂无未读消息" :image-size="80" />
-            </div>
-            <el-scrollbar v-else max-height="300px">
-              <div
-                v-for="(item, index) in messageList"
-                :key="index"
-                class="message-item"
-                @click="readMessage(index)"
-              >
-                <div class="message-title">{{ item.title }}</div>
-                <div class="message-text">{{ item.content }}</div>
-                <div class="message-time">{{ item.time || '刚刚' }}</div>
-              </div>
-            </el-scrollbar>
-          </el-tab-pane>
-          <el-tab-pane :label="`已读 (${readCount})`" name="done">
-            <div v-if="readMessageList.length === 0" class="empty-state">
-              <el-empty description="暂无已读消息" :image-size="80" />
-            </div>
-            <el-scrollbar v-else max-height="300px">
-              <div
-                v-for="(item, index) in readMessageList"
-                :key="index"
-                class="message-item read"
-              >
-                <div class="message-title">{{ item.title }}</div>
-                <div class="message-text">{{ item.content }}</div>
-                <div class="message-time">{{ item.time }}</div>
-              </div>
-            </el-scrollbar>
-          </el-tab-pane>
-        </el-tabs>
-      </div>
-    </el-popover>
+<!--    <el-popover-->
+<!--      placement="bottom-end"-->
+<!--      :width="350"-->
+<!--      trigger="click"-->
+<!--      popper-class="message-popover"-->
+<!--      :offset="12"-->
+<!--      :show-arrow="false"-->
+<!--    >-->
+<!--      <template #reference>-->
+<!--        <el-badge :is-dot="is_dot" :max="99">-->
+<!--          <el-icon class="fa-icon">-->
+<!--            <Message />-->
+<!--          </el-icon>-->
+<!--        </el-badge>-->
+<!--      </template>-->
+<!--      <div class="message-container">-->
+<!--        <div class="message-header">-->
+<!--          <h3>消息中心</h3>-->
+<!--          <el-button link type="primary" size="small" @click="markAllAsRead">全部已读</el-button>-->
+<!--        </div>-->
+<!--        <el-tabs v-model="activeName" class="message-tabs">-->
+<!--          <el-tab-pane :label="`未读 (${unreadCount})`" name="wait">-->
+<!--            <div v-if="messageList.length === 0" class="empty-state">-->
+<!--              <el-empty description="暂无未读消息" :image-size="80" />-->
+<!--            </div>-->
+<!--            <el-scrollbar v-else max-height="300px">-->
+<!--              <div-->
+<!--                v-for="(item, index) in messageList"-->
+<!--                :key="index"-->
+<!--                class="message-item"-->
+<!--                @click="readMessage(index)"-->
+<!--              >-->
+<!--                <div class="message-title">{{ item.title }}</div>-->
+<!--                <div class="message-text">{{ item.content }}</div>-->
+<!--                <div class="message-time">{{ item.time || '刚刚' }}</div>-->
+<!--              </div>-->
+<!--            </el-scrollbar>-->
+<!--          </el-tab-pane>-->
+<!--          <el-tab-pane :label="`已读 (${readCount})`" name="done">-->
+<!--            <div v-if="readMessageList.length === 0" class="empty-state">-->
+<!--              <el-empty description="暂无已读消息" :image-size="80" />-->
+<!--            </div>-->
+<!--            <el-scrollbar v-else max-height="300px">-->
+<!--              <div-->
+<!--                v-for="(item, index) in readMessageList"-->
+<!--                :key="index"-->
+<!--                class="message-item read"-->
+<!--              >-->
+<!--                <div class="message-title">{{ item.title }}</div>-->
+<!--                <div class="message-text">{{ item.content }}</div>-->
+<!--                <div class="message-time">{{ item.time }}</div>-->
+<!--              </div>-->
+<!--            </el-scrollbar>-->
+<!--          </el-tab-pane>-->
+<!--        </el-tabs>-->
+<!--      </div>-->
+<!--    </el-popover>-->
 
     <!-- 主题切换 -->
     <el-icon class="fa-icon" @click="dark_change" v-show="!isDark">
