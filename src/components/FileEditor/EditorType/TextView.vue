@@ -759,7 +759,7 @@ onBeforeUnmount(() => {
   padding: 6px 12px;
   @include useTheme {
     background-color: getVar(bgColor);
-    border-bottom: 1px solid getVar(borderColor);
+    //border-bottom: 1px solid getVar(borderColor);
   }
   flex-shrink: 0;
 }

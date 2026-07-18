@@ -81,9 +81,7 @@ const loadingSteps = [
 const MIN_DISPLAY_TIME = 3000 // 3秒
 
 onMounted(async () => {
-  debugger
   const startTime = Date.now()
-
   try {
     const version = import.meta.env.PACKAGE_VERSION || '1.0.0'
     appVersion.value = version

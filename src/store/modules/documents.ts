@@ -360,7 +360,6 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
   async function reloadDocument(filePath: string) {
     const doc = documents.value.get(filePath)
     if (!doc) return
-
     try {
       doc.isLoading = true
       const content = await loadFileContent(filePath, doc.type)

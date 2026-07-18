@@ -44,7 +44,8 @@ import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/Types/entitys'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { get_notebooks_Api } from '@/api/file'
-
+import useStore from '@/store'
+const {useDocumentManagerStore } = useStore()
 const router = useRouter()
 const activeMenu = ref<string | null>(null)
 let store: Store | undefined
@@ -132,10 +133,11 @@ const handleMenuCommand = async (item: MenuItem) => {
       const { open } = await import('@tauri-apps/plugin-dialog')
       const selected = await open({
         multiple: false,
-        filters: [{ name: 'Markdown', extensions: ['md', 'txt'] }]
+        filters: [{ name: 'Markdown', extensions: ['*'] }]
       })
       if (selected) {
         console.log('[MenuBar] Open file:', selected)
+        useDocumentManagerStore.openDocument(selected);
       }
       break
     }

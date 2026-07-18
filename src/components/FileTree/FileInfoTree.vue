@@ -543,11 +543,19 @@ defineExpose({
 })
 </script>
 
-<style scoped lang="scss">
+<style lang="scss">
+@use '@/styles/theme.scss' as theme;
+@use 'sass:color';
+
 .file-tree-container {
   position: relative;
   height: 100%;
   user-select: none;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+    color: theme.getVar('textColor');
+  }
 }
 
 .empty-tree-actions {
@@ -563,6 +571,11 @@ defineExpose({
     justify-content: center;
     gap: 8px;
 
+    @include theme.useTheme {
+      background-color: theme.getVar('bgColor');
+      border-color: theme.getVar('borderColor');
+    }
+
     .svg-icon {
       font-size: 24px;
       color: var(--el-color-primary);
@@ -571,11 +584,9 @@ defineExpose({
       &:hover {
         color: var(--el-color-primary-light-4);
       }
-
     }
   }
 }
-
 
 .custom-tree-node {
   display: flex;
@@ -606,6 +617,10 @@ defineExpose({
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
 }
 
 .node-actions {
@@ -624,7 +639,9 @@ defineExpose({
   transition: background-color 0.2s;
 
   &:hover {
-    background-color: var(--el-fill-color-light);
+    @include theme.useTheme {
+      background-color: theme.getVar('hoverColor');
+    }
   }
 
   &.add-file {
@@ -639,22 +656,58 @@ defineExpose({
 .dialog-footer {
   text-align: right;
 }
-</style>
 
-<style>
-/* 全局样式，确保右键菜单显示在最上层 */
+.el-tree {
+  background-color: transparent;
+  color: inherit;
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
+
+  .el-tree-node__content {
+    transition: background-color 0.15s;
+
+    @include theme.useTheme {
+      background-color: theme.getVar('bgColor');
+      color: theme.getVar('textColor');
+    }
+
+    &:hover {
+      @include theme.useTheme {
+        background-color: theme.getVar('hoverColor');
+      }
+    }
+  }
+
+  .el-tree-node.is-current > .el-tree-node__content {
+    @include theme.useTheme {
+      background-color: theme.getVar('hoverColor');
+    }
+  }
+
+  .el-tree-node__expand-icon {
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+    }
+  }
+}
+
 .file-tree-context-menu {
   position: fixed;
   z-index: 999999999 !important;
-  background: var(--el-bg-color-overlay);
-  border: 1px solid var(--el-border-color-light);
   border-radius: var(--el-border-radius-base);
   box-shadow: var(--el-box-shadow-light);
   padding: 6px 0;
   min-width: 180px;
   list-style: none;
   margin: 0;
-  color: var(--el-text-color-regular);
+
+  @include theme.useTheme {
+    background: theme.getVar('bgColor');
+    border: 1px solid theme.getVar('borderColor');
+    color: theme.getVar('textColor');
+  }
 }
 
 .file-tree-context-menu .context-menu-item {
@@ -663,10 +716,16 @@ defineExpose({
   display: flex;
   align-items: center;
   font-size: var(--el-font-size-base);
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
 }
 
 .file-tree-context-menu .context-menu-item:hover {
-  background-color: var(--el-fill-color-light);
+  @include theme.useTheme {
+    background-color: theme.getVar('hoverColor');
+  }
 }
 
 .file-tree-context-menu .context-menu-item .context-menu-icon {
@@ -681,7 +740,10 @@ defineExpose({
 .file-tree-context-menu .context-menu-item .el-icon {
   width: 1em;
   height: 1em;
-  color: var(--el-text-color-regular);
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
 }
 
 .settings-item {
@@ -689,7 +751,10 @@ defineExpose({
   justify-content: space-between;
   align-items: center;
   padding: 15px 0;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+
+  @include theme.useTheme {
+    border-bottom: 1px solid theme.getVar('borderColor');
+  }
 
   &:last-child {
     border-bottom: none;
@@ -712,14 +777,19 @@ defineExpose({
 .setting-label {
   display: block;
   font-size: 1rem;
-  color: var(--el-text-color-primary);
-  font-weight: 500;
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
 }
 
 .setting-description {
   display: block;
   font-size: 0.85rem;
-  color: var(--el-text-color-secondary);
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
 }
 
 .directory-display {
@@ -727,10 +797,13 @@ defineExpose({
   align-items: center;
   gap: 8px;
   padding: 10px;
-  background-color: var(--el-fill-color-light);
   border-radius: 4px;
   font-family: monospace;
   font-size: 0.9rem;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+  }
 }
 
 .folder-icon {
@@ -738,7 +811,9 @@ defineExpose({
 }
 
 .setting-working-directory {
-  color: var(--el-text-color-primary);
-  word-break: break-all;
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
 }
 </style>
+

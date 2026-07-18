@@ -543,6 +543,7 @@ function handleDragEnd() {
   min-width: 120px;
   max-width: 200px;
   height: 100%;
+  flex-shrink: 0;
   background-color: #2d2d2d;
   border-right: 1px solid #1e1e1e;
   color: #969696;
@@ -553,12 +554,11 @@ function handleDragEnd() {
   position: relative;
 
   @include theme.useTheme {
-     background-color: color.adjust(theme.getVar('bgColor'), $lightness:3%);
+    background-color: color.adjust(theme.getVar('bgColor'), $lightness:3%);
     border-right-color: theme.getVar('borderColor');
     color: color.adjust(theme.getVar('textColor'), $lightness: -30%);
   }
 }
-
 /* 活跃标签页样式 */
 .tab-active {
   background-color: #1e1e1e;
@@ -951,6 +951,6 @@ function handleDragEnd() {
 }
 
 .tab-drag-over {
-  border-left: 2px solid #007acc;
+  border-left: 1px solid #007acc;
 }
 </style>
