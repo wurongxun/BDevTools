@@ -154,6 +154,9 @@ const handleMenuCommand = async (item: MenuItem) => {
         multiple: false,
         directory: true
       })
+      if (file_directory == null){
+        return
+      }
       if (!store){
         store = await load('settings.json', {
           autoSave: false,
@@ -172,7 +175,7 @@ const handleMenuCommand = async (item: MenuItem) => {
     case 'newFolder': {
       const dir = await getWorkingDirectory()
       if (!dir) {
-        NotificationUtil.warning('请先选择工作目录')
+        NotificationUtil.warn('请先选择工作目录')
         return
       }
       const name = prompt('请输入文件夹名：')

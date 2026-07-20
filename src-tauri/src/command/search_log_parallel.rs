@@ -79,7 +79,7 @@ const INDEX_CHUNK_LINES: u64 = 50000;
 fn read_line_lossy<R: BufRead>(
     reader: &mut R,
     buf: &mut Vec<u8>,
-) -> std::io::Result<Option<String>> {
+) -> std::io::Result<Option<(String, usize)>> {
     buf.clear();
     let bytes_read = reader.read_until(b'\n', buf)?;
     if bytes_read == 0 {
@@ -92,7 +92,8 @@ fn read_line_lossy<R: BufRead>(
     if end > 0 && buf[end - 1] == b'\r' {
         end -= 1;
     }
-    Ok(Some(String::from_utf8_lossy(&buf[..end]).to_string()))
+    let line = String::from_utf8_lossy(&buf[..end]).to_string();
+    Ok(Some((line, bytes_read)))
 }
 // ==================== 命令1：流式搜索（只存行号，低内存） ====================
 
@@ -135,7 +136,7 @@ pub async fn search_log_parallel(
     let mut total_matches: u64 = 0;
     let mut line_number: u64 = 0;
 
-    while let Some(line) =
+    while let Some((line, _bytes_read)) =
         read_line_lossy(&mut reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
     {
         line_number += 1;
@@ -206,11 +207,10 @@ pub async fn search_log_index(
     let mut current_chunk_line_start: u64 = 1;
     let mut current_byte: u64 = 0;
 
-    while let Some(line) =
+    while let Some((line, raw_bytes)) =
         read_line_lossy(&mut reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
     {
-        let line_len = line.len() as u64 + 1;
-        current_byte += line_len;
+        current_byte += raw_bytes as u64;
         current_chunk_lines += 1;
         total_lines += 1;
 
@@ -460,7 +460,7 @@ fn search_chunk_with_line_offset(
     let mut total_matches: u64 = 0;
     let mut total_lines: u64 = 0;
 
-    while let Some(line) =
+    while let Some((line, _)) =
         read_line_lossy(&mut buf_reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
     {
         if line.to_lowercase().contains(keyword) {
@@ -543,7 +543,7 @@ fn extract_matches_from_chunk(
     let mut line_number = chunk_meta.line_start;
     let mut match_index: u64 = 0;
 
-    while let Some(line) =
+    while let Some((line, _)) =
         read_line_lossy(&mut buf_reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
     {
         if line.to_lowercase().contains(keyword) {
@@ -667,7 +667,7 @@ fn read_preview_from_chunk(
     let mut match_index: u64 = 0;
     let mut all_lines: Vec<String> = Vec::new();
 
-    while let Some(line) =
+    while let Some((line, _)) =
         read_line_lossy(&mut buf_reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
     {
         if line.to_lowercase().contains(keyword) {

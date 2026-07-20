@@ -671,11 +671,13 @@ async function doSearch() {
 async function loadPreview(index: number) {
   showOverlay.value = true
   overlayText.value = '搜索中...'
+  console.log('[loadPreview]', index, searchId.value)
+  console.log('[loadPreview]', searchId.value)
   try {
     const res: any = await invoke('search_log_preview', {
       searchId: searchId.value,
       targetIndex: index,
-      contextLines: 500
+      contextLines: CHUNK_SIZE
     })
     if (res && res.code === 200) {
       const data = res.data
