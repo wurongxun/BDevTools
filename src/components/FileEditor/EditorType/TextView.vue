@@ -133,6 +133,7 @@ const totalMatches = ref(0)
 const jumpTo = ref(1)
 const totalLines = ref(0)
 const showSearchBar = ref(false)
+const matchLineNumbers = ref<number[]>([])
 /** 搜索功能状态：是否正在搜索 */
 const isSearching = ref(false)
 /** IME 输入法组合状态 */
@@ -642,11 +643,13 @@ async function doSearch() {
   try {
     const res: any = await invoke('search_log_index', {
       filePath: props.path,
-      keyword: keyword.value
+      keyword: keyword.value,
+      encoding: currentEncoding.value
     })
     if (res && res.code === 200) {
       searchId.value = res.data.search_id
       totalMatches.value = res.data.total_matches
+      matchLineNumbers.value = res.data.match_line_numbers || []
       if (totalMatches.value > 0) {
         currentMatch.value = 1
         await loadPreview(1)
@@ -668,7 +671,38 @@ async function doSearch() {
 }
 
 
+function navigateInBlock(targetLine: number, matchIndex: number) {
+  const kw = keyword.value.toLowerCase()
+  const startLine = Math.max(currentStartLine.value, targetLine - CHUNK_SIZE)
+  const endLine = Math.min(currentEndLine.value, targetLine + CHUNK_SIZE)
+  const startIdx = startLine - firstLineNumber.value
+  const endIdx = endLine - firstLineNumber.value + 1
+  lines.value = lines.value.slice(startIdx, endIdx)
+  firstLineNumber.value = startLine
+  currentStartLine.value = startLine
+  currentEndLine.value = startLine + lines.value.length - 1
+  const newHighlight = new Set<number>()
+  for (let i = 0; i < lines.value.length; i++) {
+    if (lines.value[i].toLowerCase().includes(kw)) {
+      newHighlight.add(startLine + i)
+    }
+  }
+  highlightSet.value = newHighlight
+  targetLineNumber.value = targetLine
+  currentMatch.value = matchIndex
+  jumpTo.value = matchIndex
+  jumpBlockInput.value = String(Math.ceil(startLine / CHUNK_SIZE))
+  nextTick(() => scrollToLineNumber(targetLine))
+}
+
 async function loadPreview(index: number) {
+  if (matchLineNumbers.value.length > 0 && index >= 1 && index <= matchLineNumbers.value.length) {
+    const targetLine = matchLineNumbers.value[index - 1]
+    if (targetLine >= currentStartLine.value && targetLine <= currentEndLine.value) {
+      navigateInBlock(targetLine, index)
+      return
+    }
+  }
   showOverlay.value = true
   overlayText.value = '搜索中...'
   console.log('[loadPreview]', index, searchId.value)
@@ -676,8 +710,9 @@ async function loadPreview(index: number) {
   try {
     const res: any = await invoke('search_log_preview', {
       searchId: searchId.value,
-      targetIndex: index,
-      contextLines: CHUNK_SIZE
+      targetIndex: Number(index),
+      contextLines: CHUNK_SIZE,
+      encoding: currentEncoding.value
     })
     if (res && res.code === 200) {
       const data = res.data
@@ -715,8 +750,8 @@ function prevMatch() {
   }
 }
 
-function jumpToMatch(val: number) {
-  loadPreview(val)
+function jumpToMatch(val: number | string) {
+  loadPreview(Number(val))
 }
 
 function highlightText(line: string): string {

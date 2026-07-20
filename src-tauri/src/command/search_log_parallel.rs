@@ -45,6 +45,7 @@ pub struct SearchIndex {
     pub scanned_lines: u64,
     pub elapsed_ms: u64,
     pub chunks: Vec<ChunkMeta>,
+    pub match_line_numbers: Vec<u64>,
 }
 
 #[derive(Deserialize)]
@@ -79,6 +80,7 @@ const INDEX_CHUNK_LINES: u64 = 50000;
 fn read_line_lossy<R: BufRead>(
     reader: &mut R,
     buf: &mut Vec<u8>,
+    encoding: Option<&'static Encoding>,
 ) -> std::io::Result<Option<(String, usize)>> {
     buf.clear();
     let bytes_read = reader.read_until(b'\n', buf)?;
@@ -92,7 +94,13 @@ fn read_line_lossy<R: BufRead>(
     if end > 0 && buf[end - 1] == b'\r' {
         end -= 1;
     }
-    let line = String::from_utf8_lossy(&buf[..end]).to_string();
+    let line = match encoding {
+        Some(enc) if enc.name() != "utf-8" => {
+            let (cow, _, _) = enc.decode(&buf[..end]);
+            cow.into_owned()
+        }
+        _ => String::from_utf8_lossy(&buf[..end]).to_string(),
+    };
     Ok(Some((line, bytes_read)))
 }
 // ==================== 命令1：流式搜索（只存行号，低内存） ====================
@@ -137,7 +145,7 @@ pub async fn search_log_parallel(
     let mut line_number: u64 = 0;
 
     while let Some((line, _bytes_read)) =
-        read_line_lossy(&mut reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
+        read_line_lossy(&mut reader, &mut line_buf, None).map_err(|e| format!("读取行失败: {}", e))?
     {
         line_number += 1;
         if line.to_lowercase().contains(&keyword_lower) {
@@ -168,6 +176,7 @@ pub async fn search_log_parallel(
 pub async fn search_log_index(
     file_path: String,
     keyword: String,
+    encoding: Option<String>,
 ) -> Result<ResData<SearchIndex>, String> {
     if !Path::new(&file_path).exists() {
         return Err("文件不存在".to_string());
@@ -188,6 +197,7 @@ pub async fn search_log_index(
                 scanned_lines: 0,
                 elapsed_ms: 0,
                 chunks: vec![],
+                match_line_numbers: vec![],
             },
         });
     }
@@ -196,6 +206,7 @@ pub async fn search_log_index(
     let file = File::open(&file_path).map_err(|e| format!("打开文件失败: {}", e))?;
     let mut reader = BufReader::with_capacity(128 * 1024, file);
     let mut line_buf = Vec::with_capacity(1024);
+    let file_encoding = encoding.as_deref().map(|e| resolve_encoding(e));
 
     let mut chunks_meta: Vec<ChunkMeta> = Vec::new();
     let mut total_matches: u64 = 0;
@@ -206,9 +217,10 @@ pub async fn search_log_index(
     let mut current_line: u64 = 1;
     let mut current_chunk_line_start: u64 = 1;
     let mut current_byte: u64 = 0;
+    let mut match_line_numbers: Vec<u64> = Vec::new();
 
     while let Some((line, raw_bytes)) =
-        read_line_lossy(&mut reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
+        read_line_lossy(&mut reader, &mut line_buf, file_encoding).map_err(|e| format!("读取行失败: {}", e))?
     {
         current_byte += raw_bytes as u64;
         current_chunk_lines += 1;
@@ -217,6 +229,7 @@ pub async fn search_log_index(
         if line.to_lowercase().contains(&keyword_lower) {
             current_chunk_matches += 1;
             total_matches += 1;
+            match_line_numbers.push(total_lines);
         }
 
         if current_chunk_lines >= INDEX_CHUNK_LINES {
@@ -273,6 +286,7 @@ pub async fn search_log_index(
             scanned_lines: total_lines,
             elapsed_ms: elapsed,
             chunks: chunks_meta,
+            match_line_numbers,
         },
     })
 }
@@ -461,7 +475,7 @@ fn search_chunk_with_line_offset(
     let mut total_lines: u64 = 0;
 
     while let Some((line, _)) =
-        read_line_lossy(&mut buf_reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
+        read_line_lossy(&mut buf_reader, &mut line_buf, None).map_err(|e| format!("读取行失败: {}", e))?
     {
         if line.to_lowercase().contains(keyword) {
             total_matches += 1;
@@ -544,7 +558,7 @@ fn extract_matches_from_chunk(
     let mut match_index: u64 = 0;
 
     while let Some((line, _)) =
-        read_line_lossy(&mut buf_reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
+        read_line_lossy(&mut buf_reader, &mut line_buf, None).map_err(|e| format!("读取行失败: {}", e))?
     {
         if line.to_lowercase().contains(keyword) {
             match_index += 1;
@@ -584,8 +598,10 @@ pub async fn search_log_preview(
     search_id: String,
     target_index: u64,
     context_lines: Option<u64>,
+    encoding: Option<String>,
 ) -> Result<ResData<TextPreviewBlock>, String> {
     let context_lines = context_lines.unwrap_or(50);
+    let file_encoding = encoding.as_deref().map(|e| resolve_encoding(e));
 
     let cached = {
         let cache = SEARCH_CACHE.lock();
@@ -599,8 +615,7 @@ pub async fn search_log_preview(
         return Err(format!("索引超出范围，共 {} 条匹配", cached.total_matches));
     }
 
-    let preview = find_match_and_read_context(&cached, target_index, context_lines)?;
-
+    let preview = find_match_and_read_context(&cached, target_index, context_lines, file_encoding)?;
     Ok(ResData {
         code: 200,
         msg: "success".to_string(),
@@ -614,6 +629,7 @@ fn find_match_and_read_context(
     cached: &CachedSearch,
     target_index: u64,
     context_lines: u64,
+    encoding: Option<&'static Encoding>,
 ) -> Result<TextPreviewBlock, String> {
     let mut cumulative: u64 = 0;
 
@@ -639,6 +655,7 @@ fn find_match_and_read_context(
             target_index,
             cached.total_matches,
             context_lines,
+            encoding,
         );
     }
 
@@ -653,6 +670,7 @@ fn read_preview_from_chunk(
     global_target: u64,
     total_matches: u64,
     context_lines: u64,
+    encoding: Option<&'static Encoding>,
 ) -> Result<TextPreviewBlock, String> {
     let mut file = File::open(file_path).map_err(|e| format!("打开文件失败: {}", e))?;
     file.seek(SeekFrom::Start(chunk_meta.byte_start))
@@ -668,7 +686,7 @@ fn read_preview_from_chunk(
     let mut all_lines: Vec<String> = Vec::new();
 
     while let Some((line, _)) =
-        read_line_lossy(&mut buf_reader, &mut line_buf).map_err(|e| format!("读取行失败: {}", e))?
+        read_line_lossy(&mut buf_reader, &mut line_buf, encoding).map_err(|e| format!("读取行失败: {}", e))?
     {
         if line.to_lowercase().contains(keyword) {
             match_index += 1;
