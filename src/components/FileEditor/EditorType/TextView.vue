@@ -23,10 +23,10 @@
             <el-button size="small" @click="prevMatch" :disabled="currentMatch <= 1">
               <el-icon><ArrowUp /></el-icon>
             </el-button>
+            <el-input v-model="jumpTo" :min="1" :max="totalMatches" size="small" @change="jumpToMatch" controls-position="compact" />
             <el-button size="small" @click="nextMatch" :disabled="currentMatch >= totalMatches">
               <el-icon><ArrowDown /></el-icon>
             </el-button>
-            <el-input-number v-model="jumpTo" :min="1" :max="totalMatches" size="small" @change="jumpToMatch" controls-position="compact" />
             <span class="match-count">{{ currentMatch }} / {{ totalMatches }}</span>
           </div>
           <el-button size="small" text @click="showSearchBar = false">
@@ -937,7 +937,7 @@ async function switchEncoding(enc: string) {
 
 .match-count {
   font-size: 12px;
-  min-width: 60px;
+  min-width: 90px;
   text-align: center;
   @include useTheme {
     color: getVar(textColor);
