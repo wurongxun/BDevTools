@@ -30,6 +30,7 @@ let dark = ref<boolean>(false)
 let theme = ref<string>('white')
 let language = ref<string>('')
 let md_working_directory = ref<string>('')
+let read_lines = ref<number>(50000)
 let has_update = ref<boolean>(false)
 let update_info = ref<{
   version?: string;
@@ -122,6 +123,11 @@ onMounted(async () => {
   if (md_working_directory_val !== undefined) {
     md_working_directory.value = md_working_directory_val.value
     userStore.setMdWorkingDirectory(md_working_directory_val.value)
+  }
+  let read_lines_val = await store.get<{ value: number }>('read_lines')
+  if (read_lines_val !== undefined) {
+    read_lines.value = Number(read_lines_val.value)
+    userStore.setReadLines(Number(read_lines_val.value))
   }
   let update_reminder_val = await store.get<{ value: boolean }>('update_reminder')
   if (update_reminder_val !== undefined) {
@@ -222,6 +228,19 @@ async function md_working_directory_change() {
       await store.save()
     }
     const routerNote = routerNoteStore.setRoutes()
+
+}
+
+async function onReadLines() {
+
+
+    if (store) {
+      await store.set('read_lines', { value: read_lines.value })
+      await store.save();
+      userStore.setReadLines(read_lines.value)
+    }
+
+
 
 }
 
@@ -490,8 +509,8 @@ const app_updates_check = async () => {
         <div class="settings-item">
           <div class="setting-info">
             <div class="setting-header">
-              <span class="setting-label">MarkDown编辑器</span>
-              <span class="setting-description">MarkDown编辑器工作目录</span>
+              <span class="setting-label">编辑器</span>
+              <span class="setting-description">编辑器工作目录</span>
             </div>
             <div class="directory-display">
               <el-icon class="folder-icon">
@@ -507,6 +526,24 @@ const app_updates_check = async () => {
               </el-icon>
               更换工作目录
             </el-button>
+          </div>
+        </div>
+        <div class="settings-item">
+          <div class="setting-info">
+            <span class="setting-label">文本默认读取行数</span>
+            <span class="setting-description">编辑器打开文件时默认读取的行数，建议最大值不超过20万行，行数直接影响内存占用，请谨慎设置</span>
+          </div>
+          <div class="setting-control">
+            <div class="read-lines-control">
+              <el-input
+                v-model="read_lines"
+                placeholder="默认读取行数"
+                @keyup.enter="onReadLines"                style="width: 180px"
+              />
+              <el-button type="primary" @click="onReadLines" plain>
+                确认
+              </el-button>
+            </div>
           </div>
         </div>
         <div class="settings-item">
@@ -659,6 +696,12 @@ const app_updates_check = async () => {
 .setting-control {
   flex-shrink: 0;
   margin-left: 20px;
+}
+
+.read-lines-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .el-button {

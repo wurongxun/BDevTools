@@ -1,5 +1,5 @@
 <template>
-  <div class="menu-bar">
+  <div class="menu-bar" >
     <div
       v-for="menu in menus"
       :key="menu.label"

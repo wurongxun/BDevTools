@@ -107,6 +107,9 @@
 import { invoke } from '@tauri-apps/api/core'
 import { Search, ArrowUp, ArrowDown, Close, ArrowLeft, ArrowRight, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import NotificationUtil from '@/utils/NotificationUtil'
+import { load, Store } from '@tauri-apps/plugin-store'
+import useStore from '@/store'
+const {appConfig } = useStore();
 /**
  * 虚拟滚动与分块加载核心配置
  * - CHUNK_SIZE:    每次从后端加载的行数，控制单次 IO 与内存占用
@@ -114,7 +117,10 @@ import NotificationUtil from '@/utils/NotificationUtil'
  * - LINE_HEIGHT:   每行固定像素高度，用于虚拟滚动中计算偏移量与可视范围
  * - VIRTUAL_BUFFER: 可视区域上下额外渲染的行数，避免快速滚动时出现空白
  */
-const CHUNK_SIZE = 100000
+let CHUNK_SIZE = computed(() => appConfig.read_lines)
+// 计算属性
+const read_lines = computed(() => appConfig.read_lines)
+
 const OVERLAP = 50
 const LINE_HEIGHT = 20
 const VIRTUAL_BUFFER = 15
@@ -123,7 +129,7 @@ const props = defineProps<{
   path: string
 }>()
 
-// ... existing code ...
+let store: Store | undefined = undefined
 
 /** 搜索功能状态：关键词、搜索会话ID、匹配序号与总数、跳转目标、搜索栏显隐 */
 const keyword = ref('')
@@ -251,7 +257,7 @@ const visibleItems = computed<VisibleItem[]>(() => {
  */
 const totalBlocks = computed(() => {
   if (totalLines.value <= 0) return 1
-  return Math.ceil(totalLines.value / CHUNK_SIZE)
+  return Math.ceil(totalLines.value / CHUNK_SIZE.value)
 })
 
 /**
@@ -263,7 +269,7 @@ const jumpBlock = computed({
   get: () => currentBlock.value,
   set: (val: number) => {
     if (val < 1 || val > totalBlocks.value) return
-    const startLine = (val - 1) * CHUNK_SIZE + 1
+    const startLine = (val - 1) * CHUNK_SIZE.value + 1
     loadChunk(props.path, startLine).then(() => {
       if (viewerRef.value) viewerRef.value.scrollTop = 0
     })
@@ -276,7 +282,7 @@ const jumpBlock = computed({
  */
 const currentBlock = computed(() => {
   if (currentStartLine.value <= 1) return 1
-  return Math.ceil(currentStartLine.value / CHUNK_SIZE)
+  return Math.ceil(currentStartLine.value / CHUNK_SIZE.value)
 })
 
 
@@ -374,7 +380,7 @@ async function loadChunk(filePath: string, startLine: number) {
     firstLineNumber.value = cached.firstLineNumber
     currentStartLine.value = cached.startLine
     currentEndLine.value = cached.endLine
-    jumpBlockInput.value = String(Math.ceil(startLine / CHUNK_SIZE))
+    jumpBlockInput.value = String(Math.ceil(startLine / CHUNK_SIZE.value))
     isLoaded = true
     return true
   }
@@ -385,7 +391,7 @@ async function loadChunk(filePath: string, startLine: number) {
     const res: any = await invoke('read_file_lines', {
       filePath,
       startLine,
-      lineCount: CHUNK_SIZE,
+      lineCount: Number(CHUNK_SIZE.value),
       encoding: currentEncoding.value
     })
     if (res && res.code === 200) {
@@ -404,7 +410,7 @@ async function loadChunk(filePath: string, startLine: number) {
           totalLines.value = startLine + newLines.length - 1
         }
       }
-      jumpBlockInput.value = String(Math.ceil(startLine / CHUNK_SIZE))
+      jumpBlockInput.value = String(Math.ceil(startLine / CHUNK_SIZE.value))
       isLoaded = true
 
       setCacheChunk(filePath, startLine, {
@@ -468,7 +474,7 @@ async function loadPrevChunk() {
   if (!props.path || chunkLoading) return
   if (currentStartLine.value <= 1) return
 
-  let prevStart = currentStartLine.value - CHUNK_SIZE + OVERLAP
+  let prevStart = currentStartLine.value - CHUNK_SIZE.value + OVERLAP
   if (prevStart < 1) prevStart = 1
 
   scrollGuard = true
@@ -501,7 +507,7 @@ function goToFirstBlock() {
 
 function goToLastBlock() {
   if (currentBlock.value >= totalBlocks.value) return
-  const startLine = (totalBlocks.value - 1) * CHUNK_SIZE + 1
+  const startLine = (totalBlocks.value - 1) * CHUNK_SIZE.value + 1
   scrollGuard = true
   showOverlay.value = true
   overlayText.value = '加载中...'
@@ -515,7 +521,7 @@ function goToLastBlock() {
 
 function goToPrevBlock() {
   if (currentBlock.value <= 1) return
-  const startLine = Math.max(1, (currentBlock.value - 2) * CHUNK_SIZE + 1)
+  const startLine = Math.max(1, (currentBlock.value - 2) * CHUNK_SIZE.value + 1)
   scrollGuard = true
   showOverlay.value = true
   overlayText.value = '加载中...'
@@ -529,7 +535,7 @@ function goToPrevBlock() {
 
 function goToNextBlock() {
   if (currentBlock.value >= totalBlocks.value) return
-  const startLine = currentBlock.value * CHUNK_SIZE + 1
+  const startLine = currentBlock.value * CHUNK_SIZE.value + 1
   scrollGuard = true
   showOverlay.value = true
   overlayText.value = '加载中...'
@@ -543,8 +549,8 @@ function goToNextBlock() {
 
 // ========== 预取相邻块（后台静默加载，不阻塞UI） ==========
 async function prefetchAdjacent(filePath: string, currentStart: number) {
-  const nextStart = currentStart + CHUNK_SIZE
-  const prevStart = Math.max(1, currentStart - CHUNK_SIZE)
+  const nextStart = currentStart + CHUNK_SIZE.value
+  const prevStart = Math.max(1, currentStart - CHUNK_SIZE.value)
 
   const tasks: Promise<void>[] = []
 
@@ -566,7 +572,7 @@ async function prefetchOneChunk(filePath: string, startLine: number) {
     const res: any = await invoke('read_file_lines', {
       filePath,
       startLine,
-      lineCount: CHUNK_SIZE,
+      lineCount: Number(CHUNK_SIZE.value),
       encoding: currentEncoding.value
     })
     if (res && res.code === 200) {
@@ -673,8 +679,8 @@ async function doSearch() {
 
 function navigateInBlock(targetLine: number, matchIndex: number) {
   const kw = keyword.value.toLowerCase()
-  const startLine = Math.max(currentStartLine.value, targetLine - CHUNK_SIZE)
-  const endLine = Math.min(currentEndLine.value, targetLine + CHUNK_SIZE)
+  const startLine = Math.max(currentStartLine.value, targetLine - CHUNK_SIZE.value)
+  const endLine = Math.min(currentEndLine.value, targetLine + CHUNK_SIZE.value)
   const startIdx = startLine - firstLineNumber.value
   const endIdx = endLine - firstLineNumber.value + 1
   lines.value = lines.value.slice(startIdx, endIdx)
@@ -691,7 +697,7 @@ function navigateInBlock(targetLine: number, matchIndex: number) {
   targetLineNumber.value = targetLine
   currentMatch.value = matchIndex
   jumpTo.value = matchIndex
-  jumpBlockInput.value = String(Math.ceil(startLine / CHUNK_SIZE))
+  jumpBlockInput.value = String(Math.ceil(startLine / CHUNK_SIZE.value))
   nextTick(() => scrollToLineNumber(targetLine))
 }
 
@@ -711,7 +717,7 @@ async function loadPreview(index: number) {
     const res: any = await invoke('search_log_preview', {
       searchId: searchId.value,
       targetIndex: Number(index),
-      contextLines: CHUNK_SIZE,
+      contextLines: Number(CHUNK_SIZE.value),
       encoding: currentEncoding.value
     })
     if (res && res.code === 200) {
@@ -724,7 +730,7 @@ async function loadPreview(index: number) {
       jumpTo.value = data.current_match_index
       currentStartLine.value = data.first_line_number
       currentEndLine.value = data.first_line_number + lines.value.length - 1
-      jumpBlockInput.value = String(Math.ceil(data.first_line_number / CHUNK_SIZE))
+      jumpBlockInput.value = String(Math.ceil(data.first_line_number / CHUNK_SIZE.value))
 
       await nextTick()
       scrollToLineNumber(targetLineNumber.value)
@@ -822,6 +828,11 @@ function addKeydownListener() {
   window.addEventListener('keydown', onKeydown)
 }
 onMounted(async () => {
+  //初始化行数
+  store = await load('settings.json', {
+    autoSave: false,
+    defaults: {}
+  })
   if (props.path) {
     await loadFirstChunk(props.path)
     countTotalLinesAsync(props.path)
@@ -831,7 +842,8 @@ onMounted(async () => {
     containerHeight.value = viewerRef.value.clientHeight
   }
   addKeydownListener()
-  window.addEventListener('encoding-change', onGlobalEncodingChange)
+  window.addEventListener('encoding-change', onGlobalEncodingChange);
+
 })
 
 onActivated(() => {

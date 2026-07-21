@@ -9,6 +9,7 @@ export const appConfigInfo = defineStore('app_Config', {
     appConfig: [] as Array<SettingMap>,
     language: 'zh-CN',
     md_working_directory: '',
+    read_lines: 50000,
     theme: 'light',
     autoStart: false,
     update_reminder: false
@@ -36,6 +37,10 @@ export const appConfigInfo = defineStore('app_Config', {
       if (md_working_directory_val !== undefined) {
        
         this.setMdWorkingDirectory(md_working_directory_val.value);
+      }
+      let read_lines_val = await store.get<{ value: number }>('read_lines');
+      if (read_lines_val !== undefined) {
+        this.setReadLines(Number(read_lines_val.value))
       }
       let update_reminder_val = await store.get<{ value: boolean }>('update_reminder');
       if (update_reminder_val !== undefined) {
@@ -70,6 +75,9 @@ export const appConfigInfo = defineStore('app_Config', {
     },
     setMdWorkingDirectory(md_working_directory: string) {
       this.md_working_directory = md_working_directory
+    },
+    setReadLines(read_lines: number) {
+      this.read_lines = read_lines
     },
     setTheme(theme: string) {
       this.theme = theme
