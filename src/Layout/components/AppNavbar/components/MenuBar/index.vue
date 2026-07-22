@@ -120,7 +120,7 @@ const handleMenuCommand = async (item: MenuItem) => {
     case 'newFile': {
       const dir = await getWorkingDirectory()
       if (!dir) {
-        NotificationUtil.war('请先选择工作目录')
+        NotificationUtil.warn('请先选择工作目录')
         return
       }
       const name = prompt('请输入文件名：')

@@ -1,5 +1,6 @@
 {
   "include": ["env.d.ts", "window.d.ts", "shims-vue.d.ts", "vue-router-types.d.ts", "src/**/*", "src/**/*.vue", "mock"],
+  "exclude": ["src/icons/index.ts"],
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {

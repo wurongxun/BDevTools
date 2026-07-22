@@ -6,7 +6,7 @@
   //   "types": ["node"],
   //   "ignoreDeprecations": "5.0"
   // }
-   "include": ["vite.config.*", "vitest.config.*", "cypress.config.*", "playwright.config.*"],
+  "include": ["vite.config.*", "vitest.config.*", "cypress.config.*", "playwright.config.*", "src/icons/index.ts"],
   "compilerOptions": {
     "composite": true,
     "types": ["node"],
