@@ -1,6 +1,5 @@
 <template>
   <header class="topbar-box" data-tauri-drag-region>
-    <Back v-if="!isEditorRoute" />
     <div class="logo-box">
       <el-image class="logo" fit="contain" :src="logoSrc" />
     </div>
@@ -15,14 +14,8 @@
 
 <script lang="ts" setup name="AppNavbar">import FunctionalArea from './components/FunctionalArea/index.vue'
 import MenuBar from './components/MenuBar/index.vue'
-import Back from './components/Back.vue'
 import useStore from '@/store'
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
 import logoSrc from '@/assets/logo/64x64.png'
-
-const route = useRoute()
-const isEditorRoute = computed(() => !route.path.startsWith('/App'))
 </script>
 
 <style scoped lang="scss">

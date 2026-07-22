@@ -19,12 +19,12 @@
         <div class="resize-handle-line"></div>
       </div>
       <main ref="mainContentRef" class="app-content" :class="{ 'is-collapse': isCollapse, 'has-sidebar': !isCollapse && windowWidth >= 1024 }">
-        <div v-show="isEditorRoute" class="editor-wrapper">
+        <div class="editor-wrapper">
           <app-editor-main></app-editor-main>
         </div>
-        <div v-show="!isEditorRoute" class="page-wrapper">
-          <router-view></router-view>
-        </div>
+<!--        <div class="page-wrapper">-->
+<!--          <router-view></router-view>-->
+<!--        </div>-->
       </main>
     </div>
   </div>
@@ -37,17 +37,15 @@ import AppHeader from './components/AppHeader/index.vue'
 import AppSidebar from './components/AppSidebar/index.vue'
 import useStore from '@/store/index'
 import { storeToRefs } from 'pinia'
-import { watch, nextTick, onMounted, onUnmounted, ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { watch, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 
-const route = useRoute()
 const { system } = useStore()
 const { isCollapse } = storeToRefs(system)
 
-const isEditorRoute = computed(() => {
-  return !route.path.startsWith('/App')
-})
+// const isEditorRoute = computed(() => {
+//   return !route.path.startsWith('/App')
+// })
 
 
 

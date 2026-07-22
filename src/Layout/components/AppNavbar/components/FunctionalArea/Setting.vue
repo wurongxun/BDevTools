@@ -38,36 +38,28 @@
   </el-dropdown>
 </template>
 
-<script setup lang="ts">
-import useStore from '@/store/index'
+<script setup lang="ts">import useStore from '@/store/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useI18n } from "vue-i18n";
 import { Setting, InfoFilled, QuestionFilled } from '@element-plus/icons-vue'
+import { openAppWindow } from '@/utils/WindowUtils'
 
 const { t, locale } = useI18n()
 
 const { user } = useStore()
-const router = useRouter()
 const { userInfo } = storeToRefs(user)
 
 const onStting = () => {
-  router.push({
-    path: '/AppSetting'
-  })
+  openAppWindow('/AppSetting')
 }
 
 const onAbout = () => {
-  router.push({
-    path: '/AppAbout'
-  })
+  openAppWindow('/AppAbout')
 }
 
 const onHelp = () => {
-  router.push({
-    path: '/AppHelp'
-  })
+  openAppWindow('/AppHelp')
 }
 
 const handleCommand = (command: string | number | object) => {

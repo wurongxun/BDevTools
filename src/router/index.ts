@@ -31,46 +31,6 @@ export const constantRoutes: Array<RouteRecordRaw> = [
         path: '/home/homePage',
         meta: { title: '首页', icon: 'House', keepAlive: true, affix: true },
         component: () => import('@/views/Home/index.vue')
-      },
-      {
-        path: '/App',
-        component: () => import('@/views/Common/Common.vue'),
-        meta: { hidden: true },
-        children: [
-          {
-            path: '/AppSetting',
-            name: 'AppSetting',
-            component: () => import('@/views/app/AppSetting.vue'),
-            meta: {
-              title: '设置',
-              noTagView: true,
-              i18n: 'settings.name',
-              transition: 'scroll-x-transition'
-            }
-          },
-          {
-            path: '/AppAbout',
-            name: 'AppAbout',
-            component: () => import('@/views/app/AppAbout.vue'),
-            meta: {
-              title: '关于',
-              noTagView: true,
-              i18n: 'about.name',
-              transition: 'scroll-x-transition'
-            }
-          },
-          {
-            path: '/AppHelp',
-            name: 'AppHelp',
-            component: () => import('@/views/app/AppHelp.vue'),
-            meta: {
-              title: '帮助',
-              i18n: 'help.name',
-              noTagView: true,
-              transition: 'scroll-x-transition'
-            }
-          }
-        ]
       }
     ]
   },
@@ -107,3 +67,45 @@ const router = createRouter({
 })
 
 export default router
+
+// ,
+// {
+//   path: '/App',
+//     component: () => import('@/views/Common/Common.vue'),
+//   meta: { title: 'App', icon: 'error-handle', noBreadCrumbs: true },
+//   children: [
+//     {
+//       path: '/AppSetting',
+//       name: 'AppSetting',
+//       component: () => import('@/views/app/AppSetting.vue'),
+//       meta: {
+//         title: '设置',
+//         noTagView: true,
+//         i18n: 'settings.name',
+//         transition: 'scroll-x-transition'
+//       }
+//     },
+//     {
+//       path: '/AppAbout',
+//       name: 'AppAbout',
+//       component: () => import('@/views/app/AppAbout.vue'),
+//       meta: {
+//         title: '关于',
+//         noTagView: true,
+//         i18n: 'about.name',
+//         transition: 'scroll-x-transition'
+//       }
+//     },
+//     {
+//       path: '/AppHelp',
+//       name: 'AppHelp',
+//       component: () => import('@/views/app/AppHelp.vue'),
+//       meta: {
+//         title: '帮助',
+//         i18n: 'help.name',
+//         noTagView: true,
+//         transition: 'scroll-x-transition'
+//       }
+//     }
+//   ]
+// }

@@ -115,13 +115,13 @@ onMounted(async () => {
 
 <style scoped>
 .about-container {
+  width: 100%;
   height: 100%;
   padding: 0px;
   box-sizing: border-box;
   overflow-y: auto;
-  /* 隐藏滚动条但仍保持滚动功能 */
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE 10+ */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 /* 隐藏 Webkit 浏览器的滚动条 */
@@ -135,8 +135,9 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .info-section {

@@ -195,7 +195,6 @@ const handleInitialization = async () => {
 // 初始化应用
 const initializeApp = async () => {
   try {
-    const routerNote = await routerNoteStore.setRoutes()
     await permission.getPermissions()
     console.log('App initialized successfully')
   } catch (error) {

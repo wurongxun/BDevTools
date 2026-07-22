@@ -232,16 +232,11 @@ async function md_working_directory_change() {
 }
 
 async function onReadLines() {
-
-
     if (store) {
       await store.set('read_lines', { value: read_lines.value })
       await store.save();
       userStore.setReadLines(read_lines.value)
     }
-
-
-
 }
 
 // 添加清除缓存和浏览器缓存的函数
@@ -401,28 +396,28 @@ const app_updates_check = async () => {
           </div>
         </div>
 
-        <div class="settings-item">
-          <div class="setting-info">
-            <span class="setting-label">{{ $t('settings.theme') }}</span>
-            <span class="setting-description">切换主题</span>
-          </div>
-          <div class="setting-control">
-            <el-select
-              v-model="theme"
-              @change="theme_change"
-              placeholder="选择主题"
-              style="width: 180px"
-            >
-              <el-option
-                v-for="item in theme_options"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-                :disabled="item.disabled"
-              />
-            </el-select>
-          </div>
-        </div>
+<!--        <div class="settings-item">-->
+<!--          <div class="setting-info">-->
+<!--            <span class="setting-label">{{ $t('settings.theme') }}</span>-->
+<!--            <span class="setting-description">切换主题</span>-->
+<!--          </div>-->
+<!--          <div class="setting-control">-->
+<!--            <el-select-->
+<!--              v-model="theme"-->
+<!--              @change="theme_change"-->
+<!--              placeholder="选择主题"-->
+<!--              style="width: 180px"-->
+<!--            >-->
+<!--              <el-option-->
+<!--                v-for="item in theme_options"-->
+<!--                :key="item.value"-->
+<!--                :label="item.label"-->
+<!--                :value="item.value"-->
+<!--                :disabled="item.disabled"-->
+<!--              />-->
+<!--            </el-select>-->
+<!--          </div>-->
+<!--        </div>-->
 
         <div class="settings-item">
           <div class="setting-info">
@@ -548,7 +543,7 @@ const app_updates_check = async () => {
         </div>
         <div class="settings-item">
           <div class="setting-info">
-            <span class="setting-label">注册应用 </span>
+            <span class="setting-label">注册 </span>
             <span class="setting-description">注册应用到windows"打开方式"列表 </span>
           </div>
           <div class="setting-control">
@@ -592,8 +587,6 @@ const app_updates_check = async () => {
   overflow-y: auto;
   padding: 20px;
   box-sizing: border-box;
-
-  // 隐藏滚动条
   scrollbar-width: none;
   -ms-overflow-style: none;
 
@@ -605,8 +598,7 @@ const app_updates_check = async () => {
 }
 
 .settings-content {
-  max-width: 800px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .settings-section {

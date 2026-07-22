@@ -133,7 +133,7 @@ import useStore from '@/store'
 import { TreeNode } from '@/Types/entitys'
 import WindowMaximizationIcon from '@/components/Icon/WindowMaximizationIcon.vue'
 import WindowRestoreIcon from '@/components/Icon/WindowRestoreIcon.vue'
-
+import { openAppWindow } from '@/utils/WindowUtils'
 const store = useStore()
 const router = useRouter()
 const { t } = useI18n()
@@ -234,8 +234,8 @@ const markAllAsRead = () => {
 
 // ========== 设置 ==========
 const handleSettingCommand = (command: string) => {
-  const routes: Record<string, string> = { setting: '/AppSetting', about: '/AppAbout', help: '/AppHelp' }
-  if (routes[command]) router.push({ path: routes[command] })
+  const pages: Record<string, string> = { setting: '/AppSetting', about: '/AppAbout', help: '/AppHelp' }
+  if (pages[command]) openAppWindow(pages[command])
 }
 
 // ========== 窗口控制 ==========

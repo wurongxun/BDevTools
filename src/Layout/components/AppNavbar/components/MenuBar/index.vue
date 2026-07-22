@@ -46,6 +46,7 @@ import NotificationUtil from '@/utils/NotificationUtil'
 import { get_notebooks_Api } from '@/api/file'
 import useStore from '@/store'
 import { open } from '@tauri-apps/plugin-dialog'
+import { openAppWindow } from '@/utils/WindowUtils'
 const {useDocumentManagerStore,routerNoteStore } = useStore()
 const router = useRouter()
 const activeMenu = ref<string | null>(null)
@@ -119,7 +120,7 @@ const handleMenuCommand = async (item: MenuItem) => {
     case 'newFile': {
       const dir = await getWorkingDirectory()
       if (!dir) {
-        NotificationUtil.warning('请先选择工作目录')
+        NotificationUtil.war('请先选择工作目录')
         return
       }
       const name = prompt('请输入文件名：')
@@ -202,7 +203,7 @@ const handleMenuCommand = async (item: MenuItem) => {
       break
     }
     case 'settings': {
-      router.push({ path: '/AppSetting' })
+      openAppWindow('/AppSetting')
       break
     }
     case 'encodingUtf8':
@@ -215,15 +216,11 @@ const handleMenuCommand = async (item: MenuItem) => {
       break
     }
     case 'help': {
-      router.push({
-        path: '/AppHelp'
-      })
+      openAppWindow('/AppHelp')
       break
     }
     case 'about': {
-      router.push({
-        path: '/AppAbout'
-      })
+      openAppWindow('/AppAbout')
       break
     }
   }
