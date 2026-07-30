@@ -122,7 +122,9 @@ let CHUNK_SIZE = computed(() => appConfig.read_lines)
 const read_lines = computed(() => appConfig.read_lines)
 
 const OVERLAP = 50
+
 const LINE_HEIGHT = 20
+//渲染行数，用于虚拟滚动计算与渲染
 const VIRTUAL_BUFFER = 15
 
 const props = defineProps<{
@@ -171,7 +173,7 @@ interface ChunkCacheEntry {
   hasMore: boolean
 }
 const chunkCache = new Map<string, ChunkCacheEntry>()
-const MAX_CHUNK_CACHE = 5
+const MAX_CHUNK_CACHE = 3
 
 function getCacheKey(path: string, startLine: number): string {
   return `${path}::${startLine}`
@@ -299,7 +301,25 @@ function onJumpBlockEnter() {
   jumpBlock.value = val
 }
 
-
+// 文件内容相关:
+//
+//   lines - 文件的所有行内容
+// firstLineNumber - 第一行的行号(用于分块加载时的行号显示)
+// totalLines - 文件总行数
+// 搜索相关:
+//
+//   highlightSet - 需要高亮的行号集合(搜索匹配的行)
+// keyword - 搜索关键词
+// searchId - 搜索会话ID
+// currentMatch - 当前匹配的序号
+// totalMatches - 匹配总数
+// targetLineNumber - 目标行号
+// 视图位置相关:
+//
+//   jumpTo - 要跳转到的行号
+// scrollTop - 滚动条位置
+// startLine - 当前显示范围的起始行
+// endLine - 当前显示范围的结束行
 
 interface FileState {
   lines: string[]
