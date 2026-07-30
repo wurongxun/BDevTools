@@ -3,7 +3,8 @@ import { Window } from '@tauri-apps/api/window'
 const PAGE_CONFIGS: Record<string, { title: string; width: number; height: number }> = {
   '/AppSetting': { title: '设置', width: 800, height: 650 },
   '/AppAbout': { title: '关于', width: 800, height: 650 },
-  '/AppHelp': { title: '帮助', width: 800, height: 650 }
+  '/AppHelp': { title: '帮助', width: 800, height: 650 },
+  '/AppTerminal': { title: '终端', width: 900, height: 600 }
 }
 
 export async function openAppWindow(path: string) {

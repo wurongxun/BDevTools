@@ -24,6 +24,12 @@ export const childRoutes: Array<RouteRecordRaw> = [
         name: 'AppHelp',
         component: () => import('@/views/app/AppHelp.vue'),
         meta: { title: '帮助' }
+      },
+      {
+        path: '/AppTerminal',
+        name: 'AppTerminal',
+        component: () => import('@/views/app/AppTerminal.vue'),
+        meta: { title: '终端' }
       }
     ]
   }

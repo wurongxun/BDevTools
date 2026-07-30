@@ -14,7 +14,8 @@ const { t } = useI18n();
 const pageTitles: Record<string, string> = {
   '/AppSetting': '设置',
   '/AppAbout': '关于',
-  '/AppHelp': '帮助'
+  '/AppHelp': '帮助',
+  '/AppTerminal': '终端'
 }
 
 const pageTitle = ref(pageTitles[route.path] || '')

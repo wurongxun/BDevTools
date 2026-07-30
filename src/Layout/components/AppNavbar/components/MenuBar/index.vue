@@ -5,7 +5,7 @@
       :key="menu.label"
       class="menu-item"
       :class="{ 'is-active': activeMenu === menu.label }"
-      @click="toggleMenu(menu.label)"
+      @click="handleMenuClick(menu)"
       @mouseenter="handleMouseEnter(menu.label)"
     >
       <span>{{ menu.label }}</span>
@@ -63,6 +63,7 @@ interface MenuItem {
 interface Menu {
   label: string
   items: MenuItem[]
+  action?: string
 }
 // items: [
 //   { label: '新建文件', shortcut: 'Ctrl+N', command: 'newFile' },
@@ -96,6 +97,11 @@ const menus: Menu[] = [
     ]
   },
   {
+    label: '终端(T)',
+    items: [],
+    action: 'newTerminal'
+  },
+  {
     label: '帮助(H)',
     items: [
       { label: '帮助', command: 'help' },
@@ -111,7 +117,13 @@ const getWorkingDirectory = async (): Promise<string> => {
   const val = await store.get<{ value: string }>('md_working_directory')
   return val?.value || ''
 }
-
+const handleMenuClick = (menu: Menu) => {
+  if (menu.action) {
+    handleMenuCommand({ label: '', command: menu.action })
+    return
+  }
+  toggleMenu(menu.label)
+}
 const handleMenuCommand = async (item: MenuItem) => {
   closeMenu()
   if (item.disabled) return
@@ -221,6 +233,10 @@ const handleMenuCommand = async (item: MenuItem) => {
     }
     case 'about': {
       openAppWindow('/AppAbout')
+      break
+    }
+    case 'newTerminal': {
+      openAppWindow('/AppTerminal')
       break
     }
   }
