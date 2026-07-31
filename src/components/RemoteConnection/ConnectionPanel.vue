@@ -1,8 +1,5 @@
 <template>
-  <div class="connection-panel" v-show="showConnectionPanel">
-    <!-- Tab 栏 -->
-    <ConnectionTabBar />
-
+  <div class="connection-panel">
     <!-- Tab 内容区域 -->
     <div class="connection-content">
       <template v-for="tab in tabs" :key="tab.id">
@@ -37,9 +34,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import useStore from '@/store'
-import ConnectionTabBar from './ConnectionTabBar.vue'
 import TerminalView from './Terminal/TerminalView.vue'
 import FtpView from './Ftp/FtpView.vue'
 import type { RemoteConnection } from '@/entity/entitys'
@@ -48,18 +44,11 @@ const { useConnectionStore } = useStore()
 
 const tabs = computed(() => useConnectionStore.tabs)
 const activeTabId = computed(() => useConnectionStore.activeTabId)
-const showConnectionPanel = computed(() => useConnectionStore.showConnectionPanel)
 const connections = computed(() => useConnectionStore.connections)
 
 function getConnection(connectionId: number): RemoteConnection | null {
   return connections.value.find(c => c.id === connectionId) || null
 }
-
-onMounted(() => {
-  useConnectionStore.loadConnections()
-  useConnectionStore.setupSshOutputListener()
-  useConnectionStore.setupTransferProgressListener()
-})
 </script>
 
 <style scoped lang="scss">

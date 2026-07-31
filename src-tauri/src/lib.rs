@@ -15,8 +15,9 @@ mod entity;
 mod response;
 mod system_menu;
 mod utils;
+mod sqlite ;
 
-use crate::app::app_store::{app_autostart, app_settings,app_openFile};
+use crate::app::app_store::{app_autostart, app_settings,app_openFile, APP};
 use crate::app::tray::create_tray;
 use crate::app_setup::setup::setup_windows;
 use crate::command::app_window::{
@@ -29,11 +30,21 @@ use crate::command::file_command::{
 };
 use crate::command::file_utils::{file_manager_open_path, get_document_notebooks, up_folder_name,detect_file_encoding};
 use crate::command::file_association::{register_file_association, open_default_apps_settings};
+use crate::command::remote_conn::{
+    ssh_connect, ssh_write, ssh_disconnect, ssh_resize_pty,
+    sftp_connect, sftp_disconnect, sftp_list_dir, sftp_mkdir, sftp_remove,
+    sftp_upload, sftp_download, local_list_dir,
+};
 
 use crate::command::search_log_parallel::{
     read_file_lines, count_file_lines, search_log_index, search_log_jump_to, search_log_page,
     search_log_parallel, search_log_preview,
 };
+use crate::sqlite::ssh_connection::{
+    connection_create, connection_delete, connection_edit, connection_list,
+};
+
+
 struct Payload {
     args: Vec<String>,
     cwd: String,
@@ -51,6 +62,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             get_document_notebooks,
             file_manager_open_path,
@@ -80,9 +92,27 @@ pub fn run() {
             count_file_lines,
             detect_file_encoding,
             register_file_association,
-            open_default_apps_settings
+            open_default_apps_settings,
+            ssh_connect,
+            ssh_write,
+            ssh_disconnect,
+            ssh_resize_pty,
+            sftp_connect,
+            sftp_disconnect,
+            sftp_list_dir,
+            sftp_mkdir,
+            sftp_remove,
+            sftp_upload,
+            sftp_download,
+            local_list_dir,
+            connection_create,
+            connection_delete,
+            connection_edit,
+            connection_list,
         ])
         .setup(move |app: &mut App| {
+            // 初始化 app_dir
+            APP.lock().update_app_dir(app.handle());
             #[cfg(all(desktop))]
             {
                 let handle = app.handle();

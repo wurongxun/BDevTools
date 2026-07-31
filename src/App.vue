@@ -1,74 +1,67 @@
 <template>
   <div id="app">
-    <Layout v-if="!isChildWindow">
-      <router-view />
-    </Layout>
-    <router-view v-else />
+    <!-- 未登录 → 登录页 -->
+    <LoginView v-if="!isLoggedIn" @login-success="handleLoginSuccess" />
+    <!-- 已登录 → 主界面 -->
+    <Layout v-else />
   </div>
 </template>
-<script lang="ts" setup>import { onMounted, ref } from 'vue'
-import { listen } from '@tauri-apps/api/event'
+
+<script lang="ts" setup>
+import { ref, onMounted } from 'vue'
 import { load, Store } from '@tauri-apps/plugin-store'
 import useStore from '@/store'
 import Layout from '@/Layout/index.vue'
+import LoginView from '@/views/login/index.vue'
 
-const isChildWindow = ref(false)
+const { useDocumentManagerStore, user } = useStore()
 
-function checkWindow() {
-  const hash = window.location.hash
-  isChildWindow.value = hash.startsWith('#/App')
+const isLoggedIn = ref(false)
+
+/**
+ * 检查登录状态（从 Cookie 读取 token）
+ */
+function checkLoginState() {
+  isLoggedIn.value = !!user.hasToken()
 }
-checkWindow()
 
-const { routerNoteStore, useDocumentManagerStore } = useStore()
-listen<string>('file-opened-from-os', (event) => {
-  const filePath = event.payload
-  console.log('从系统打开了文件:', filePath)
-})
+/**
+ * 登录成功回调
+ */
+function handleLoginSuccess() {
+  isLoggedIn.value = true
+  initApp()
+}
 
-let store: Store | undefined = undefined
-onMounted(async () => {
-  store = await load('openfile.json', {
-    autoSave: false,
-    defaults: {}
-  })
-  if (store){
-    var keys = store.keys()
-    store.entries().then((entries) => {
-      console.log("app store entries", entries)
+/**
+ * 初始化应用数据
+ */
+async function initApp() {
+  // 加载 store 中保存的文件路径
+  let store: Store | undefined = undefined
+  try {
+    store = await load('openfile.json', {
+      autoSave: false,
+      defaults: {}
     })
-    console.log("app store keys", keys)
-    let values:Promise<String[]> =store.values()
-    console.log("app store values", values)
-    await values.then((value) => {
-      for (let i in value) {
-        console.log(i, value[i])
-        var s = value[i].toString()
-        if (s){
+    if (store) {
+      const entries = await store.entries()
+      for (const [, value] of entries) {
+        const s = String(value)
+        if (s) {
           useDocumentManagerStore.openDocument(s)
         }
       }
-    })
-  }
-  const routerNote = await routerNoteStore.setRoutes()
-})
-//禁止F12
-document.onkeydown = function (event: KeyboardEvent) {
-  // 使用 event.code 替代 keyCode
-  if (event.code === 'F12') {
-    event.preventDefault()
-    return false
-  }
-  // 对于 Enter 键，使用 event.key 或 event.code
-  if (event.key === 'Enter' || event.code === 'Enter') {
-    // 注意：这里修改keyCode在现代浏览器中可能无效
-    // 如果需要阻止默认行为，应直接使用 event.preventDefault()
-    // 或者根据具体需求处理
+    }
+  } catch (e) {
+    console.warn('加载 openfile.json 失败:', e)
   }
 }
 
-//禁止右键和检查
-document.addEventListener("contextmenu", (event) => {
-  event.preventDefault();
-});
+onMounted(() => {
+  checkLoginState()
+  if (isLoggedIn.value) {
+    initApp()
+  }
+})
 </script>

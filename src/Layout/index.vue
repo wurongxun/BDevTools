@@ -22,9 +22,6 @@
         <div class="editor-wrapper">
           <app-editor-main></app-editor-main>
         </div>
-<!--        <div class="page-wrapper">-->
-<!--          <router-view></router-view>-->
-<!--        </div>-->
       </main>
     </div>
   </div>

@@ -7,6 +7,8 @@ import { appConfigInfo } from './modules/appConfigInfo'
 // import { useNoteStore } from './modules/noteTem'
 import { routerNoteStore } from './modules/routerNote'
 import { useDocumentManagerStore } from './modules/documents'
+import { useConnectionStore } from './modules/connection'
+import { useFtpStore } from './modules/ftp'
 const pinia = createPinia()
 
 export default function useStore() {
@@ -17,7 +19,9 @@ export default function useStore() {
     errorStore: errorInfoStore(pinia),
     appConfig: appConfigInfo(pinia),
     routerNoteStore: routerNoteStore(pinia),
-    useDocumentManagerStore: useDocumentManagerStore(pinia)
+    useDocumentManagerStore: useDocumentManagerStore(pinia),
+    useConnectionStore: useConnectionStore(pinia),
+    useFtpStore: useFtpStore(pinia)
   }
 }
 //noteTem: useNoteStore(pinia),

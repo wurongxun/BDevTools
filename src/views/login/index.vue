@@ -54,14 +54,16 @@
 
 <script setup lang="ts" name="SplashScreen">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { Document } from '@element-plus/icons-vue'
 import { title, login_desc } from '@/setting'
 import useStore from '@/store'
 import Cookies from 'js-cookie'
 
-const router = useRouter()
-const { user, routerNoteStore, permission } = useStore()
+const emit = defineEmits<{
+  'login-success': []
+}>()
+
+const { user } = useStore()
 const loadingText = ref('正在启动...')
 const progress = ref(0)
 const appVersion = ref('1.0.0')
@@ -151,55 +153,28 @@ const handleInitialization = async () => {
 
   // 初始化应用数据
   try {
-    if (user.hasUserInfo()) {
-      await initializeApp()
-    } else if (user.hasToken()) {
-      try {
-        await user.getUserInfo()
-      } catch (error) {
-        console.warn('Failed to get user info, using default:', error)
-        // 如果获取用户信息失败，设置默认用户信息
-        user.userInfo = {
-          account: 'local_user',
-          nickName: '本地用户',
-          phone: '',
-          avatar: '',
-          email: '',
-          postTitle: ''
-        }
+    if (!user.hasUserInfo()) {
+      // 设置默认用户信息
+      user.userInfo = {
+        account: 'local_user',
+        nickName: '本地用户',
+        phone: '',
+        avatar: '',
+        email: '',
+        postTitle: ''
       }
-      await initializeApp()
     }
 
-    // 短暂延迟后跳转，让用户看到"启动完成"
+    // 短暂延迟后通知父组件登录成功
     setTimeout(() => {
-      router.replace('/home/homePage').catch(err => {
-        console.error('Navigation failed:', err)
-        // 如果 replace 失败，尝试 push
-        router.push('/home/homePage').catch(e => {
-          console.error('Force navigation failed:', e)
-        })
-      })
+      emit('login-success')
     }, 500)
   } catch (error) {
     console.error('App initialization failed:', error)
-    // 初始化失败，仍然跳转到首页
+    // 初始化失败，仍然通知登录成功
     setTimeout(() => {
-      router.replace('/home/homePage').catch(err => {
-        console.error('Navigation failed:', err)
-      })
+      emit('login-success')
     }, 500)
-  }
-}
-
-// 初始化应用
-const initializeApp = async () => {
-  try {
-    await permission.getPermissions()
-    console.log('App initialized successfully')
-  } catch (error) {
-    console.error('Initialize app error:', error)
-    throw error
   }
 }
 

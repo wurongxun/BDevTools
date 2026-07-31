@@ -396,7 +396,8 @@ const handleCreateNote = () => {
 <style scoped>
 .box {
   width: 100%;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   margin: 0;
   overflow: hidden;
   box-shadow: -1px 9px 10px 3px rgba(0, 0, 0, 0.11);
@@ -430,7 +431,9 @@ const handleCreateNote = () => {
 
 .mid {
   flex: 1;
-  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   box-shadow: -1px 4px 5px 3px rgba(0, 0, 0, 0.11);
 }
 
@@ -482,7 +485,8 @@ const handleCreateNote = () => {
 }
 
 .editor-wrapper {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -493,7 +497,8 @@ const handleCreateNote = () => {
 }
 
 .editor-placeholder {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;

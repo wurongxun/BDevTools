@@ -1,6 +1,6 @@
 /*! # sqlite连接管理模块*/
 use crate::{entity::structs::Payload, response::response::Response};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use log::info;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
@@ -11,11 +11,36 @@ use uuid::Uuid;
 /// 创建数据库连接
 fn create_sqlite_connection() -> Result<Connection> {
     println!("create_sqlite_connection start");
-    let database = PathBuf::from(&crate::app::app::APP.lock().app_dir).join("app.db");
-    //println!("create_sqlite_connection database: {:?}",database);
+    let app_dir = PathBuf::from(&crate::app::app_store::APP.lock().app_dir);
+    // 确保目录存在
+    if !app_dir.exists() {
+        std::fs::create_dir_all(&app_dir)?;
+    }
+    let database = app_dir.join("app.db");
+    println!("create_sqlite_connection database: {:?}", database);
     let conn = Connection::open(database)?;
+    // 初始化表结构
+    init_tables(&conn)?;
     println!("create_sqlite_connection end");
     Ok(conn)
+}
+
+/// 初始化数据库表
+fn init_tables(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS connections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            address TEXT NOT NULL,
+            port INTEGER NOT NULL DEFAULT 22,
+            username TEXT NOT NULL,
+            password TEXT NOT NULL,
+            agreement TEXT NOT NULL DEFAULT 'ssh',
+            favorites_name TEXT NOT NULL DEFAULT 'default',
+            affix INTEGER NOT NULL DEFAULT 0
+        );"
+    )?;
+    Ok(())
 }
 /// 封装一个方法，获取连接
 pub fn exec<F, T>(func: F) -> Result<T>

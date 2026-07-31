@@ -18,6 +18,7 @@ export async function openAppWindow(path: string) {
     if (existing) {
       const win = existing as unknown as Window
       await win.show()
+      await win.unminimize();
       await win.setFocus()
       return
     }

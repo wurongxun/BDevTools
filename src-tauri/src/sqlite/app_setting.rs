@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use log::info;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};

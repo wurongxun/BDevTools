@@ -5,3 +5,4 @@ mod log_search_file;
 mod log_search_mmap;
 pub(crate) mod search_log_parallel;
 pub(crate) mod file_association;
+pub mod remote_conn;

@@ -1,7 +1,7 @@
 /*! # sqlite连接管理模块*/
 use crate::sqlite::sqlite::exec;
 use crate::{entity::structs::Payload, response::response::Response};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use log::info;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
