@@ -244,6 +244,39 @@ export const useFtpStore = defineStore('ftp', () => {
   }
 
   /**
+   * 重命名远程文件/目录
+   */
+  async function renameRemoteFile(tabId: string, sessionId: string, oldPath: string, newPath: string) {
+    try {
+      const res = await invoke<any>('sftp_rename', { sessionId, oldPath, newPath })
+      if (res.code === 200) {
+        NotificationUtil.success('重命名成功')
+        const panel = panels.value.get(tabId)
+        if (panel) {
+          await listRemoteFiles(tabId, sessionId, panel.remotePath)
+        }
+      } else {
+        NotificationUtil.error(res.msg || '重命名失败')
+      }
+    } catch (error) {
+      console.error('Failed to rename remote file:', error)
+      NotificationUtil.error('重命名失败')
+    }
+  }
+
+  /**
+   * 检测 SFTP 连接状态
+   */
+  async function checkSftpConnection(sessionId: string): Promise<boolean> {
+    try {
+      const res = await invoke<any>('sftp_check', { sessionId })
+      return res.code === 200 && res.data === true
+    } catch {
+      return false
+    }
+  }
+
+  /**
    * 更新传输进度（由事件监听触发）
    */
   function updateTransferProgress(tabId: string, taskId: string, progress: number, transferredSize: number, speed: string) {
@@ -303,6 +336,8 @@ export const useFtpStore = defineStore('ftp', () => {
     downloadFiles,
     createRemoteDir,
     deleteRemoteFile,
+    renameRemoteFile,
+    checkSftpConnection,
     updateTransferProgress,
     selectRemoteFiles,
     selectLocalFiles,

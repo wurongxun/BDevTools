@@ -57,6 +57,11 @@ export interface DocumentState {
   lastModified: number         // 最后修改时间戳
   isReadOnly: boolean          // 是否只读
   isLoading: boolean           // 是否正在加载
+  // 远程文件元信息
+  isRemote?: boolean           // 是否为远程文件
+  remotePath?: string          // 远程路径
+  sessionId?: string           // SFTP 会话 ID
+  localTempPath?: string       // 本地临时文件路径
 }
 
 export const useDocumentManagerStore = defineStore('documentManager', () => {
@@ -73,8 +78,14 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
   // 最近关闭的文档（用于撤销关闭）
   const recentlyClosed = ref<Array<{ document: DocumentState; index: number }>>([])
 
+  // 收藏文件列表（持久化到 localStorage）
+  const favoriteFiles = ref<string[]>([])
+  // 最近打开文件列表（持久化到 localStorage）
+  const recentFiles = ref<string[]>([])
+
   // 最大缓存文档数（超出则销毁最旧的）
   const MAX_CACHED_DOCUMENTS = 20
+  const MAX_RECENT_FILES = 30
 
   // 计算属性：获取当前激活的文档
   const activeDocument = computed(() => {
@@ -94,11 +105,68 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     return Array.from(documents.value.values()).some(doc => doc.isDirty)
   })
 
+  // ===== 收藏管理 =====
+  function loadFavorites() {
+    try {
+      const saved = localStorage.getItem('file-favorites')
+      if (saved) favoriteFiles.value = JSON.parse(saved)
+    } catch { /* ignore */ }
+  }
+  function saveFavorites() {
+    try {
+      localStorage.setItem('file-favorites', JSON.stringify(favoriteFiles.value))
+    } catch { /* ignore */ }
+  }
+  function toggleFavorite(filePath: string) {
+    const idx = favoriteFiles.value.indexOf(filePath)
+    if (idx >= 0) {
+      favoriteFiles.value.splice(idx, 1)
+    } else {
+      favoriteFiles.value.push(filePath)
+    }
+    saveFavorites()
+  }
+  function isFavorite(filePath: string) {
+    return favoriteFiles.value.includes(filePath)
+  }
+
+  // ===== 最近打开管理 =====
+  function loadRecentFiles() {
+    try {
+      const saved = localStorage.getItem('file-recent')
+      if (saved) recentFiles.value = JSON.parse(saved)
+    } catch { /* ignore */ }
+  }
+  function saveRecentFiles() {
+    try {
+      localStorage.setItem('file-recent', JSON.stringify(recentFiles.value))
+    } catch { /* ignore */ }
+  }
+  function addRecentFile(filePath: string) {
+    // 移除重复项，添加到最前
+    recentFiles.value = recentFiles.value.filter(p => p !== filePath)
+    recentFiles.value.unshift(filePath)
+    // 限制数量
+    if (recentFiles.value.length > MAX_RECENT_FILES) {
+      recentFiles.value = recentFiles.value.slice(0, MAX_RECENT_FILES)
+    }
+    saveRecentFiles()
+  }
+  function removeRecentFile(filePath: string) {
+    recentFiles.value = recentFiles.value.filter(p => p !== filePath)
+    saveRecentFiles()
+  }
+  function clearRecentFiles() {
+    recentFiles.value = []
+    saveRecentFiles()
+  }
+
   /**
    * 打开或创建文档
    */
   async function openDocument(filePath: string, fileType?: FileType) {
     addAppOpenFile(filePath);
+    addRecentFile(filePath)
     // 如果文档已打开，直接激活
     if (documents.value.has(filePath)) {
       setActiveDocument(filePath)
@@ -145,6 +213,101 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     setActiveDocument(filePath)
     // 检查是否需要清理缓存
     cleanupDocumentCache()
+  }
+
+  /**
+   * 打开远程文档（通过 SFTP 下载到临时目录后打开）
+   */
+  async function openRemoteDocument(options: {
+    key: string
+    localTempPath: string
+    remotePath: string
+    sessionId: string
+    fileName: string
+  }) {
+    const { key, localTempPath, remotePath, sessionId, fileName } = options
+
+    // 如果已打开，直接激活
+    if (documents.value.has(key)) {
+      setActiveDocument(key)
+      return
+    }
+
+    const type = detectFileType(fileName)
+    const doc: DocumentState = {
+      key,
+      id: key,
+      name: `[远程] ${fileName}`,
+      type,
+      content: null,
+      originalContent: null,
+      isDirty: false,
+      language: detectLanguage(fileName),
+      encoding: 'utf-8',
+      viewState: {},
+      lastModified: Date.now(),
+      isReadOnly: false,
+      isLoading: true,
+      isRemote: true,
+      remotePath,
+      sessionId,
+      localTempPath
+    }
+
+    documents.value.set(key, doc)
+    documentOrder.value.push(key)
+
+    // 从本地临时文件读取内容
+    try {
+      const content = await loadFileContent(localTempPath, type)
+      doc.content = content
+      doc.originalContent = content
+      doc.isLoading = false
+    } catch (error) {
+      console.error(`Failed to load remote file: ${remotePath}`, error)
+      doc.isLoading = false
+    }
+
+    setActiveDocument(key)
+    cleanupDocumentCache()
+  }
+
+  /**
+   * 保存远程文档（上传回远程服务器）
+   */
+  async function saveRemoteDocument(filePath: string): Promise<boolean> {
+    const doc = documents.value.get(filePath)
+    if (!doc || !doc.isRemote || !doc.localTempPath || !doc.remotePath || !doc.sessionId) return false
+    if (doc.content === doc.originalContent) return true
+
+    try {
+      // 先写入本地临时文件
+      await invoke('save_note', {
+        path: doc.localTempPath,
+        mdText: doc.content
+      })
+      // 上传到远程服务器
+      const taskId = `autosave-${Date.now()}`
+      const res = await invoke<any>('sftp_upload', {
+        sessionId: doc.sessionId,
+        localPath: doc.localTempPath,
+        remotePath: doc.remotePath,
+        taskId
+      })
+      if (res.code === 200) {
+        doc.originalContent = doc.content
+        doc.isDirty = false
+        doc.lastModified = Date.now()
+        return true
+      } else {
+        NotificationUtil.error('远程保存失败: ' + (res.msg || '未知错误'))
+        return false
+      }
+    } catch (error) {
+      console.error(`Failed to save remote file: ${doc.remotePath}`, error)
+      NotificationUtil.error('远程保存失败')
+      return false
+    }
   }
 
   /**
@@ -211,7 +374,14 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
    */
   async function saveDocument(filePath: string): Promise<boolean> {
     const doc = documents.value.get(filePath)
-    if (!doc || !doc.content||doc.content==doc.originalContent) return true;
+    if (!doc) return true
+
+    // 远程文档走远程保存逻辑
+    if (doc.isRemote) {
+      return await saveRemoteDocument(filePath)
+    }
+
+    if (!doc.content||doc.content==doc.originalContent) return true;
 
     try {
       // await invoke('save_file', {
@@ -543,6 +713,8 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     activeDocumentPath,
     documentOrder,
     recentlyClosed,
+    favoriteFiles,
+    recentFiles,
     // 计算属性
     activeDocument,
     documentList,
@@ -550,10 +722,12 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
 
     // 方法
     openDocument,
+    openRemoteDocument,
     setActiveDocument,
     updateDocumentContent,
     updateViewState,
     saveDocument,
+    saveRemoteDocument,
     saveAllDocuments,
     closeDocument,
     undoClose,
@@ -563,6 +737,15 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     reorderDocuments,
     createNewDocument,
     renameDocument,
-    getDocumentStatus
+    getDocumentStatus,
+    // 收藏
+    loadFavorites,
+    toggleFavorite,
+    isFavorite,
+    // 最近打开
+    loadRecentFiles,
+    addRecentFile,
+    removeRecentFile,
+    clearRecentFiles
   }
 })

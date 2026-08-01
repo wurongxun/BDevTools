@@ -22,6 +22,8 @@ pub struct SshSubMenu {
     pub agreement: String,
     pub favorites_name: String,
     pub affix: bool,
+    pub auth_type: String,
+    pub private_key_path: String,
 }
 
 /// 创建一个连接
@@ -36,7 +38,7 @@ pub async fn connection_create(mut map: SshSubMenu) -> Response<Option<bool>> {
             return Err(anyhow!("连接已存在！")); 
         }
         let conns = conn.execute(
-      "insert into connections(name,address,port,username,password,agreement,favorites_name,affix) values(?1,?2,?3,?4,?5,?6,?7,?8)",
+      "insert into connections(name,address,port,username,password,agreement,favorites_name,affix,auth_type,private_key_path) values(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
       params![
         map.name,
         map.address,
@@ -46,6 +48,8 @@ pub async fn connection_create(mut map: SshSubMenu) -> Response<Option<bool>> {
         map.agreement,
         map.favorites_name,
         map.affix,
+        map.auth_type,
+        map.private_key_path,
       ],
     )?;
         Ok(conns > 0)
@@ -96,15 +100,29 @@ pub async fn connection_delete(id: String) -> Response<bool> {
 /// 编辑一个连接
 #[command]
 pub async fn connection_edit(map: SshSubMenu) -> Response<bool> {
-    let _ = exec(|conn| {
-        let _ = conn.execute(
-            "replace into connections(id,name,address,port,password) values(?1,?2,?3,?4,?5,?6,?7,?8)",
-            params![map.id, map.name, map.address, map.port, map.password, map.agreement,
-            map.favorites_name,map.affix]
+    let res = exec(|conn| {
+        let affected = conn.execute(
+            "UPDATE connections SET name=?1, address=?2, port=?3, username=?4, password=?5, agreement=?6, favorites_name=?7, affix=?8, auth_type=?9, private_key_path=?10 WHERE id=?11",
+            params![
+                map.name,
+                map.address,
+                map.port,
+                map.username,
+                map.password,
+                map.agreement,
+                map.favorites_name,
+                map.affix,
+                map.auth_type,
+                map.private_key_path,
+                map.id,
+            ]
         )?;
-        Ok(())
+        Ok(affected > 0)
     });
-    Response::new(200, true, "修改成功！")
+    match res {
+        Ok(_) => Response::new(200, true, "修改成功！"),
+        Err(e) => Response::new(300, false, &format!("修改失败：{}", e)),
+    }
 }
 
 /// 查询连接列表
@@ -130,6 +148,8 @@ pub async fn connection_list() -> Response<Vec<SshSubMenu>> {
                 agreement: row.get("agreement")?,
                 favorites_name: row.get("favorites_name")?,
                 affix: row.get("affix")?,
+                auth_type: row.get("auth_type").unwrap_or_else(|_| "password".to_string()),
+                private_key_path: row.get("private_key_path").unwrap_or_default(),
             })
         }
         Ok(vec)

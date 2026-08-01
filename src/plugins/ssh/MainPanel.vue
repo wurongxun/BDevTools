@@ -8,8 +8,12 @@
 import { onMounted } from 'vue'
 import useStore from '@/store'
 import ConnectionPanel from './components/RemoteConnection/ConnectionPanel.vue'
+import { useRemoteAutoSave } from './composables/useRemoteAutoSave'
 
 const { useConnectionStore } = useStore()
+
+// 启动远程文件自动保存
+useRemoteAutoSave()
 
 onMounted(() => {
   useConnectionStore.loadConnections()

@@ -25,15 +25,15 @@ use crate::command::app_window::{
     windows_minimize,
 };
 use crate::command::file_command::{
-    create_folder, create_note_file, get_note_list, get_path_childrenFoldersAndFiles,
+    create_folder, create_note_file, ensure_dir, get_note_list, get_path_childrenFoldersAndFiles,
     read_note_file, remove_file, remove_folder, save_note, up_file_name,
 };
 use crate::command::file_utils::{file_manager_open_path, get_document_notebooks, up_folder_name,detect_file_encoding};
 use crate::command::file_association::{register_file_association, open_default_apps_settings};
 use crate::command::remote_conn::{
-    ssh_connect, ssh_write, ssh_disconnect, ssh_resize_pty,
+    ssh_connect, ssh_write, ssh_disconnect, ssh_resize_pty, ssh_check,
     sftp_connect, sftp_disconnect, sftp_list_dir, sftp_mkdir, sftp_remove,
-    sftp_upload, sftp_download, local_list_dir,
+    sftp_upload, sftp_download, local_list_dir, sftp_rename, get_app_dir, sftp_check,
 };
 
 use crate::command::search_log_parallel::{
@@ -69,6 +69,7 @@ pub fn run() {
             get_note_list,
             read_note_file,
             create_folder,
+            ensure_dir,
             create_note_file,
             get_path_childrenFoldersAndFiles,
             save_note,
@@ -97,14 +98,18 @@ pub fn run() {
             ssh_write,
             ssh_disconnect,
             ssh_resize_pty,
+            ssh_check,
             sftp_connect,
             sftp_disconnect,
+            sftp_check,
             sftp_list_dir,
             sftp_mkdir,
             sftp_remove,
             sftp_upload,
             sftp_download,
             local_list_dir,
+            sftp_rename,
+            get_app_dir,
             connection_create,
             connection_delete,
             connection_edit,

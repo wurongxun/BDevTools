@@ -5,6 +5,16 @@ use chardetng::EncodingDetector;
 use tauri::{AppHandle, Manager};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
+
+/// 确保目录存在（递归创建）
+#[tauri::command]
+pub async fn ensure_dir(path: String) -> Result<ResData<String>, String> {
+    match tokio::fs::create_dir_all(&path).await {
+        Ok(_) => Ok(ResData { code: 200, msg: "ok".to_string(), data: String::new() }),
+        Err(e) => Ok(ResData { code: 500, msg: format!("创建目录失败: {}", e), data: String::new() }),
+    }
+}
+
 // 获取目录下笔记
 #[tauri::command]
 pub async fn get_note_list(

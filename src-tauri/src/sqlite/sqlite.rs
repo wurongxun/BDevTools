@@ -37,9 +37,14 @@ fn init_tables(conn: &Connection) -> Result<()> {
             password TEXT NOT NULL,
             agreement TEXT NOT NULL DEFAULT 'ssh',
             favorites_name TEXT NOT NULL DEFAULT 'default',
-            affix INTEGER NOT NULL DEFAULT 0
+            affix INTEGER NOT NULL DEFAULT 0,
+            auth_type TEXT NOT NULL DEFAULT 'password',
+            private_key_path TEXT NOT NULL DEFAULT ''
         );"
     )?;
+    // 迁移：为已有表添加新列（忽略已存在错误）
+    let _ = conn.execute_batch("ALTER TABLE connections ADD COLUMN auth_type TEXT NOT NULL DEFAULT 'password';");
+    let _ = conn.execute_batch("ALTER TABLE connections ADD COLUMN private_key_path TEXT NOT NULL DEFAULT '';");
     Ok(())
 }
 /// 封装一个方法，获取连接

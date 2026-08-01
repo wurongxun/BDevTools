@@ -65,6 +65,7 @@ const xtermContainer = ref<HTMLElement>()
 let terminal: Terminal | null = null
 let fitAddon: FitAddon | null = null
 let sshSessionId: string | null = null
+let connectionCheckTimer: ReturnType<typeof setInterval> | null = null
 
 const status = computed(() => props.tab.status)
 const connectionName = computed(() => props.connection.name)
@@ -112,7 +113,7 @@ function initTerminal() {
   terminal.open(xtermContainer.value)
   fitAddon.fit()
 
-  // 监听终端输入
+  // 监听终端输入（ onData 处理所有按键包括特殊键的转义序列）
   terminal.onData((data) => {
     if (sshSessionId && status.value === ConnectionStatus.CONNECTED) {
       invoke('ssh_write', {
@@ -124,6 +125,9 @@ function initTerminal() {
     }
   })
 
+  // 确保终端可以接收焦点
+  terminal.textarea?.setAttribute('tabindex', '0')
+
   // 监听后端 SSH 输出
   window.addEventListener('ssh-output', handleSshOutput as EventListener)
 
@@ -133,6 +137,7 @@ function initTerminal() {
   // 显示欢迎信息
   terminal.writeln(`\x1b[33m欢迎使用远程终端连接\x1b[0m`)
   terminal.writeln(`\x1b[36m主机: ${props.connection.address}:${props.connection.port}\x1b[0m`)
+  terminal.writeln(`\x1b[36m用户: ${props.connection.username}\x1b[0m`)
   terminal.writeln(`\x1b[90m点击 "连接" 按钮开始连接...\x1b[0m`)
   terminal.writeln('')
 }
@@ -164,23 +169,31 @@ async function connect() {
       host: props.connection.address,
       port: props.connection.port,
       username: props.connection.username,
-      password: props.connection.password
+      password: props.connection.password,
+      authType: props.connection.auth_type || 'password',
+      privateKeyPath: props.connection.private_key_path || ''
     })
 
     if (res.code === 200) {
       sshSessionId = res.data
       useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.CONNECTED)
-      terminal.writeln(`\x1b[32m连接成功!\x1b[0m\r\n`)
-      terminal.focus()
 
-      // 初始适配终端大小
+      // 初始适配终端大小后再连接 shell，确保 PTY 尺寸正确
       nextTick(() => {
         if (fitAddon) {
           fitAddon.fit()
           const dims = { cols: terminal!.cols, rows: terminal!.rows }
           invoke('ssh_resize_pty', { sessionId: sshSessionId, ...dims }).catch(() => {})
         }
+        // 确保终端获得焦点，可以接收键盘输入
+        terminal!.focus()
       })
+
+      terminal.writeln(`\x1b[32m✓ 已连接到 ${props.connection.username}@${props.connection.address}\x1b[0m`)
+      terminal.writeln('')
+
+      // 启动连接状态定时检测
+      startConnectionCheck()
     } else {
       useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.ERROR)
       terminal.writeln(`\x1b[31m连接失败: ${res.msg}\x1b[0m`)
@@ -192,6 +205,7 @@ async function connect() {
 }
 
 async function disconnect() {
+  stopConnectionCheck()
   if (sshSessionId) {
     try {
       await invoke('ssh_disconnect', { sessionId: sshSessionId })
@@ -231,6 +245,33 @@ function handleResize() {
   }
 }
 
+// 定时检测 SSH 连接状态
+function startConnectionCheck() {
+  stopConnectionCheck()
+  connectionCheckTimer = setInterval(async () => {
+    if (!sshSessionId || status.value !== ConnectionStatus.CONNECTED) return
+    try {
+      const res = await invoke<any>('ssh_check', { sessionId: sshSessionId })
+      if (res.code !== 200 || !res.data) {
+        useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.DISCONNECTED)
+        terminal?.writeln('\r\n\x1b[31m SSH 连接已断开\x1b[0m')
+        stopConnectionCheck()
+      }
+    } catch {
+      useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.DISCONNECTED)
+      terminal?.writeln('\r\n\x1b[31m⚠ SSH 连接已断开\x1b[0m')
+      stopConnectionCheck()
+    }
+  }, 15000) // 每 15 秒检测一次
+}
+
+function stopConnectionCheck() {
+  if (connectionCheckTimer) {
+    clearInterval(connectionCheckTimer)
+    connectionCheckTimer = null
+  }
+}
+
 onMounted(() => {
   nextTick(() => {
     initTerminal()
@@ -238,6 +279,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  stopConnectionCheck()
   window.removeEventListener('ssh-output', handleSshOutput as EventListener)
   window.removeEventListener('resize', handleResize)
 

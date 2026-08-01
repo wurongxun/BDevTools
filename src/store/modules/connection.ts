@@ -26,6 +26,8 @@ export const useConnectionStore = defineStore('connection', () => {
   const activeTabId = ref<string | null>(null)
   // 是否显示连接管理面板
   const showConnectionPanel = ref(false)
+  // 分组名称及顺序（持久化到 localStorage）
+  const connectionGroups = ref<string[]>([])
 
   // 计算属性
   const activeTab = computed(() => {
@@ -39,6 +41,88 @@ export const useConnectionStore = defineStore('connection', () => {
   })
 
   /**
+   * 加载分组（从 localStorage）
+   */
+  function loadGroups() {
+    try {
+      const saved = localStorage.getItem('ssh-connection-groups')
+      if (saved) {
+        connectionGroups.value = JSON.parse(saved)
+      } else {
+        // 从连接中自动提取分组
+        const names = new Set<string>()
+        for (const conn of connections.value) {
+          names.add(conn.favorites_name || '默认分组')
+        }
+        connectionGroups.value = Array.from(names)
+        saveGroups()
+      }
+    } catch {
+      connectionGroups.value = []
+    }
+  }
+
+  function saveGroups() {
+    try {
+      localStorage.setItem('ssh-connection-groups', JSON.stringify(connectionGroups.value))
+    } catch { /* ignore */ }
+  }
+
+  function addGroup(name: string) {
+    if (!name || connectionGroups.value.includes(name)) return false
+    connectionGroups.value.push(name)
+    saveGroups()
+    return true
+  }
+
+  function renameGroup(oldName: string, newName: string) {
+    if (!newName || oldName === newName) return false
+    const idx = connectionGroups.value.indexOf(oldName)
+    if (idx < 0) return false
+    if (connectionGroups.value.includes(newName)) return false
+    connectionGroups.value[idx] = newName
+    // 更新所有属于该分组的连接
+    for (const conn of connections.value) {
+      if (conn.favorites_name === oldName) {
+        conn.favorites_name = newName
+        updateConnection(conn)
+      }
+    }
+    saveGroups()
+    return true
+  }
+
+  function deleteGroup(name: string) {
+    const idx = connectionGroups.value.indexOf(name)
+    if (idx < 0) return false
+    connectionGroups.value.splice(idx, 1)
+    // 将该分组下的连接移到“默认分组”
+    for (const conn of connections.value) {
+      if (conn.favorites_name === name) {
+        conn.favorites_name = '默认分组'
+        updateConnection(conn)
+      }
+    }
+    saveGroups()
+    return true
+  }
+
+  function reorderGroups(newOrder: string[]) {
+    connectionGroups.value = newOrder
+    saveGroups()
+  }
+
+  /**
+   * 移动连接到指定分组
+   */
+  function moveConnectionToGroup(connId: number, groupName: string) {
+    const conn = connections.value.find(c => c.id === connId)
+    if (!conn) return
+    conn.favorites_name = groupName
+    updateConnection(conn)
+  }
+
+  /**
    * 从数据库加载连接列表
    */
   async function loadConnections() {
@@ -49,6 +133,10 @@ export const useConnectionStore = defineStore('connection', () => {
           ...item,
           status: 'disconnected' as ConnectionStatus
         }))
+        // 加载连接后，如果没有分组数据则自动提取
+        if (connectionGroups.value.length === 0) {
+          loadGroups()
+        }
       }
     } catch (error) {
       console.error('Failed to load connections:', error)
@@ -225,11 +313,18 @@ export const useConnectionStore = defineStore('connection', () => {
     tabs,
     activeTabId,
     showConnectionPanel,
+    connectionGroups,
     // 计算属性
     activeTab,
     activeConnection,
     // 方法
     loadConnections,
+    loadGroups,
+    addGroup,
+    renameGroup,
+    deleteGroup,
+    reorderGroups,
+    moveConnectionToGroup,
     addConnection,
     updateConnection,
     deleteConnection,

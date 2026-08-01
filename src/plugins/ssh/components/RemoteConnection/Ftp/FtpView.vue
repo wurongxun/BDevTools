@@ -17,9 +17,37 @@
       <el-button size="small" @click="handleDeleteSelected" :disabled="!isConnected || selectedRemoteFiles.length === 0">
         <el-icon><Delete /></el-icon> 删除
       </el-button>
+      <el-button size="small" @click="handleRename" :disabled="!isConnected || selectedRemoteFiles.length !== 1">
+        <el-icon><EditPen /></el-icon> 重命名
+      </el-button>
       <el-button size="small" @click="handleRefresh" :disabled="!isConnected">
         <el-icon><Refresh /></el-icon> 刷新
       </el-button>
+      <!-- 书签下拉 -->
+      <el-dropdown trigger="click" :disabled="!isConnected">
+        <el-button size="small">
+          <el-icon><Star /></el-icon> 书签<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+        </el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item
+              v-for="(bm, idx) in bookmarks"
+              :key="idx"
+              @click="navigateToBookmark(bm.path)"
+            >
+              <span style="flex:1">{{ bm.name }}</span>
+              <el-icon
+                style="margin-left:8px;color:#888"
+                @click.stop="handleRemoveBookmark(bm.path)"
+                title="删除书签"
+              ><Close /></el-icon>
+            </el-dropdown-item>
+            <el-dropdown-item v-if="bookmarks.length === 0" disabled>
+              暂无书签，右键目录可保存
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
     </div>
 
     <!-- 双栏文件管理器 -->
@@ -36,6 +64,9 @@
               placeholder="本地路径"
             />
             <el-button size="small" @click="browseLocalPath">浏览</el-button>
+            <el-button size="small" @click="goUpLocalDir" title="上一级">
+              <el-icon><ArrowUp /></el-icon>
+            </el-button>
           </div>
         </div>
         <div class="file-list">
@@ -70,6 +101,18 @@
       <div class="ftp-panel remote-panel">
         <div class="panel-header">
           <span class="panel-title">远程文件</span>
+          <!-- 面包屑导航 -->
+          <div class="breadcrumb" v-if="isConnected">
+            <span
+              v-for="(part, idx) in breadcrumbParts"
+              :key="idx"
+              class="breadcrumb-item"
+              @click="navigateToBreadcrumb(idx)"
+            >
+              {{ part }}
+              <span v-if="idx < breadcrumbParts.length - 1" class="breadcrumb-sep">/</span>
+            </span>
+          </div>
           <div class="panel-path">
             <el-input
               v-model="remotePath"
@@ -78,6 +121,9 @@
               placeholder="远程路径"
               :disabled="!isConnected"
             />
+            <el-button size="small" @click="goUpDir" :disabled="!isConnected || remotePath === '/'" title="上一级">
+              <el-icon><ArrowUp /></el-icon>
+            </el-button>
           </div>
         </div>
         <div class="file-list">
@@ -102,6 +148,7 @@
             }"
             @click="handleRemoteFileClick(file, $event)"
             @dblclick="handleRemoteFileDblClick(file)"
+            @contextmenu="handleRemoteFileContext(file, $event)"
           >
             <span class="file-icon">
               {{ file.isDirectory ? '📁' : getFileIcon(file.name) }}
@@ -122,18 +169,35 @@
 
     <!-- 传输面板 -->
     <TransferPanel :tab-id="tab.id" />
+
+    <!-- 右键上下文菜单 -->
+    <teleport to="body">
+      <div
+        v-if="contextMenuVisible"
+        class="ftp-context-menu"
+        :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }"
+        @click.stop
+      >
+        <div class="context-menu-item" @click="handleSaveBookmark">
+          <el-icon><Star /></el-icon> 保存为书签
+        </div>
+      </div>
+    </teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { desktopDir, dirname } from '@tauri-apps/api/path'
 import { open } from '@tauri-apps/plugin-dialog'
-import { Upload, Download, FolderAdd, Delete, Refresh } from '@element-plus/icons-vue'
+import { Upload, Download, FolderAdd, Delete, Refresh, EditPen, ArrowUp, ArrowDown, Star, Close } from '@element-plus/icons-vue'
 import { ElMessageBox, ElInput } from 'element-plus'
 import useStore from '@/store'
 import { ConnectionStatus } from '@/entity/entitys'
 import type { ConnectionTab, RemoteConnection, FtpFileItem } from '@/entity/entitys'
+import { useDocumentManagerStore } from '@/store/modules/documents'
+import NotificationUtil from '@/utils/NotificationUtil'
 import TransferPanel from '../TransferPanel.vue'
 
 const props = defineProps<{
@@ -144,23 +208,76 @@ const props = defineProps<{
 const { useConnectionStore, useFtpStore } = useStore()
 
 const isConnecting = ref(false)
-const localPath = ref('')
-const remotePath = ref('/')
-const selectedLocalFiles = ref<string[]>([])
-const selectedRemoteFiles = ref<string[]>([])
 
 const panel = computed(() => useFtpStore.getPanel(props.tab.id))
 const isConnected = computed(() => props.tab.status === ConnectionStatus.CONNECTED)
+
+// remotePath / localPath 直接读写 store panel，消除双源不同步
+const remotePath = computed({
+  get: () => panel.value?.remotePath || '/',
+  set: (v: string) => { if (panel.value) panel.value.remotePath = v }
+})
+const localPath = computed({
+  get: () => panel.value?.localPath || '',
+  set: (v: string) => { if (panel.value) panel.value.localPath = v }
+})
+
+const selectedLocalFiles = ref<string[]>([])
+const selectedRemoteFiles = ref<string[]>([])
+
 const localFiles = computed(() => panel.value?.localFiles || [])
 const remoteFiles = computed(() => panel.value?.remoteFiles || [])
 
-let sftpSessionId: string | null = null
+// 面包屑导航
+const breadcrumbParts = computed(() => {
+  const path = remotePath.value
+  if (!path || path === '/') return ['根目录']
+  return path.split('/').filter(Boolean)
+})
 
-onMounted(() => {
+let sftpSessionId: string | null = null
+let connectionCheckTimer: ReturnType<typeof setInterval> | null = null
+
+// 书签
+interface Bookmark { name: string; path: string }
+const bookmarks = ref<Bookmark[]>([])
+const contextMenuVisible = ref(false)
+const contextMenuX = ref(0)
+const contextMenuY = ref(0)
+const contextMenuTarget = ref<FtpFileItem | null>(null)
+
+// 加载书签
+function loadBookmarks() {
+  try {
+    const key = `ftp-bookmarks-${props.connection.address}:${props.connection.username}`
+    const saved = localStorage.getItem(key)
+    if (saved) bookmarks.value = JSON.parse(saved)
+  } catch { /* ignore */ }
+}
+function saveBookmarks() {
+  try {
+    const key = `ftp-bookmarks-${props.connection.address}:${props.connection.username}`
+    localStorage.setItem(key, JSON.stringify(bookmarks.value))
+  } catch { /* ignore */ }
+}
+
+onMounted(async () => {
   useFtpStore.initPanel(props.tab.id)
+  loadBookmarks()
+  window.addEventListener('click', handleGlobalClick)
+  // 本地目录默认读取桌面目录
+  try {
+    const desktop = await desktopDir()
+    localPath.value = desktop
+    await useFtpStore.listLocalFiles(props.tab.id, desktop)
+  } catch {
+    // fallback: 不加载
+  }
 })
 
 onUnmounted(() => {
+  stopConnectionCheck()
+  window.removeEventListener('click', handleGlobalClick)
   if (sftpSessionId) {
     invoke('sftp_disconnect', { sessionId: sftpSessionId }).catch(() => {})
   }
@@ -179,7 +296,9 @@ async function handleConnect() {
       host: props.connection.address,
       port: props.connection.port,
       username: props.connection.username,
-      password: props.connection.password
+      password: props.connection.password,
+      authType: props.connection.auth_type || 'password',
+      privateKeyPath: props.connection.private_key_path || ''
     })
 
     if (res.code === 200) {
@@ -189,6 +308,8 @@ async function handleConnect() {
       if (sftpSessionId) {
         await useFtpStore.listRemoteFiles(props.tab.id, sftpSessionId, '/')
       }
+      // 启动连接状态定时检测
+      startConnectionCheck()
     } else {
       useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.ERROR)
     }
@@ -299,16 +420,179 @@ function handleRemoteFileDblClick(file: FtpFileItem) {
   if (file.isDirectory && sftpSessionId) {
     remotePath.value = file.path
     useFtpStore.listRemoteFiles(props.tab.id, sftpSessionId, file.path)
+  } else if (!file.isDirectory && sftpSessionId) {
+    // 双击打开远程文件
+    handleOpenRemoteFile(file)
+  }
+}
+
+async function handleOpenRemoteFile(file: FtpFileItem) {
+  if (!sftpSessionId) return
+  try {
+    // 获取应用数据目录
+    const dirRes = await invoke<any>('get_app_dir')
+    if (dirRes.code !== 200) return
+    const appDir = dirRes.data
+    // 构造本地临时路径
+    const fileName = file.name
+    const relativePath = file.path.startsWith('/') ? file.path.substring(1) : file.path
+    const localDir = `${appDir}/tmp/${sftpSessionId}`
+    const localFilePath = `${localDir}/${relativePath.replace(/\//g, '_')}`
+    // 确保临时目录存在
+    await invoke('ensure_dir', { path: localDir })
+    // 下载文件到临时目录
+    const taskId = `download-${Date.now()}`
+    const dlRes = await invoke<any>('sftp_download', {
+      sessionId: sftpSessionId,
+      remotePath: file.path,
+      localPath: localFilePath,
+      taskId
+    })
+    if (dlRes.code === 200) {
+      // 打开远程文档
+      const docStore = useDocumentManagerStore()
+      const remoteKey = `remote:${sftpSessionId}:${file.path}`
+      await docStore.openRemoteDocument({
+        key: remoteKey,
+        localTempPath: localFilePath,
+        remotePath: file.path,
+        sessionId: sftpSessionId,
+        fileName: fileName
+      })
+    } else {
+      NotificationUtil.error('下载远程文件失败: ' + dlRes.msg)
+    }
+  } catch (error) {
+    console.error('Open remote file error:', error)
+    NotificationUtil.error('打开远程文件失败')
+  }
+}
+
+async function handleRename() {
+  if (!sftpSessionId || selectedRemoteFiles.value.length !== 1) return
+  const oldPath = selectedRemoteFiles.value[0]
+  const oldName = oldPath.split('/').pop() || ''
+  try {
+    const { value } = await ElMessageBox.prompt('请输入新名称', '重命名', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputValue: oldName
+    })
+    if (value && value !== oldName) {
+      const parentPath = oldPath.substring(0, oldPath.lastIndexOf('/'))
+      const newPath = `${parentPath}/${value}`
+      await useFtpStore.renameRemoteFile(props.tab.id, sftpSessionId, oldPath, newPath)
+      selectedRemoteFiles.value = []
+    }
+  } catch {
+    // cancelled
   }
 }
 
 function goUpDir() {
   if (!sftpSessionId) return
-  const parts = remotePath.value.split('/').filter(Boolean)
+  const currentPath = remotePath.value
+  if (!currentPath || currentPath === '/' || currentPath === '') return
+  const parts = currentPath.split('/').filter(Boolean)
   parts.pop()
-  const parentPath = '/' + parts.join('/')
-  remotePath.value = parentPath || '/'
+  const parentPath = parts.length > 0 ? '/' + parts.join('/') : '/'
+  remotePath.value = parentPath
+  useFtpStore.listRemoteFiles(props.tab.id, sftpSessionId, parentPath)
+}
+
+async function goUpLocalDir() {
+  const currentPath = localPath.value
+  if (!currentPath) return
+  try {
+    const parent = await dirname(currentPath)
+    if (parent && parent !== currentPath) {
+      localPath.value = parent
+      await useFtpStore.listLocalFiles(props.tab.id, parent)
+    }
+  } catch {
+    // fallback: 手动截取
+    const idx = Math.max(currentPath.lastIndexOf('/'), currentPath.lastIndexOf('\\'))
+    if (idx > 0) {
+      const parent = currentPath.substring(0, idx)
+      localPath.value = parent
+      await useFtpStore.listLocalFiles(props.tab.id, parent)
+    }
+  }
+}
+
+function navigateToBreadcrumb(idx: number) {
+  if (!sftpSessionId) return
+  const parts = breadcrumbParts.value
+  // 点击“根目录”回到 /
+  if (parts[idx] === '根目录') {
+    remotePath.value = '/'
+  } else {
+    remotePath.value = '/' + parts.slice(0, idx + 1).join('/')
+  }
   useFtpStore.listRemoteFiles(props.tab.id, sftpSessionId, remotePath.value)
+}
+
+function navigateToBookmark(path: string) {
+  if (!sftpSessionId) return
+  remotePath.value = path
+  useFtpStore.listRemoteFiles(props.tab.id, sftpSessionId, path)
+}
+
+// 右键菜单
+function handleRemoteFileContext(file: FtpFileItem, event: MouseEvent) {
+  event.preventDefault()
+  if (!file.isDirectory) return
+  contextMenuTarget.value = file
+  contextMenuX.value = event.clientX
+  contextMenuY.value = event.clientY
+  contextMenuVisible.value = true
+}
+
+function handleSaveBookmark() {
+  const file = contextMenuTarget.value
+  if (!file || !file.isDirectory) return
+  const name = file.name
+  // 检查是否已存在
+  if (bookmarks.value.some(b => b.path === file.path)) {
+    NotificationUtil.error('该目录已在书签中')
+    contextMenuVisible.value = false
+    return
+  }
+  bookmarks.value.push({ name, path: file.path })
+  saveBookmarks()
+  NotificationUtil.success(`已保存书签: ${name}`)
+  contextMenuVisible.value = false
+}
+
+function handleRemoveBookmark(path: string) {
+  bookmarks.value = bookmarks.value.filter(b => b.path !== path)
+  saveBookmarks()
+}
+
+// 点击外部关闭右键菜单
+function handleGlobalClick() {
+  contextMenuVisible.value = false
+}
+
+// 定时检测连接状态
+function startConnectionCheck() {
+  stopConnectionCheck()
+  connectionCheckTimer = setInterval(async () => {
+    if (!sftpSessionId || !isConnected.value) return
+    const alive = await useFtpStore.checkSftpConnection(sftpSessionId)
+    if (!alive) {
+      useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.DISCONNECTED)
+      NotificationUtil.error('SFTP 连接已断开')
+      stopConnectionCheck()
+    }
+  }, 30000) // 每 30 秒检测一次
+}
+
+function stopConnectionCheck() {
+  if (connectionCheckTimer) {
+    clearInterval(connectionCheckTimer)
+    connectionCheckTimer = null
+  }
 }
 
 function navigateLocalDir() {
@@ -420,6 +704,39 @@ function formatSize(bytes: number): string {
   }
 }
 
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  color: #888;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.breadcrumb-item {
+  cursor: pointer;
+  white-space: nowrap;
+  color: #6699cc;
+
+  &:hover {
+    color: #88bbff;
+    text-decoration: underline;
+  }
+}
+
+.breadcrumb-sep {
+  color: #555;
+  margin: 0 2px;
+  cursor: default;
+
+  &:hover {
+    color: #555;
+    text-decoration: none;
+  }
+}
+
 .panel-path {
   flex: 1;
   display: flex;
@@ -512,5 +829,37 @@ function formatSize(bytes: number): string {
   height: 100px;
   color: #666;
   font-size: 13px;
+}
+
+.ftp-context-menu {
+  position: fixed;
+  z-index: 9999;
+  background-color: #2d2d2d;
+  border: 1px solid #454545;
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 160px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+    border-color: theme.getVar('borderColor');
+  }
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #ccc;
+  cursor: pointer;
+  transition: background-color 0.15s;
+
+  &:hover {
+    background-color: rgba(0, 122, 204, 0.3);
+    color: #fff;
+  }
 }
 </style>

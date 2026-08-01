@@ -26,6 +26,7 @@ struct SshSessionInner {
 
 /// SSH 文件项
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct RemoteFileItem {
     pub name: String,
     pub path: String,
@@ -46,8 +47,12 @@ pub async fn ssh_connect(
     port: u16,
     username: String,
     password: String,
+    auth_type: Option<String>,
+    private_key_path: Option<String>,
 ) -> Response<Option<String>> {
     let session_id = format!("ssh-{}", uuid::Uuid::new_v4());
+    let auth = auth_type.unwrap_or_else(|| "password".to_string());
+    let key_path = private_key_path.unwrap_or_default();
 
     let result = tokio::task::spawn_blocking({
         let session_id = session_id.clone();
@@ -59,17 +64,29 @@ pub async fn ssh_connect(
             let mut session = Session::new()?;
             session.set_tcp_stream(tcp);
             session.handshake()?;
-            session.userauth_password(&username, &password)?;
+
+            // 根据认证方式选择认证
+            if auth == "pubkey" && !key_path.is_empty() {
+                session.userauth_pubkey_file(
+                    &username,
+                    None,
+                    Path::new(&key_path),
+                    None,
+                )?;
+            } else {
+                session.userauth_password(&username, &password)?;
+            }
 
             if !session.authenticated() {
-                return Err(anyhow::anyhow!("认证失败，请检查用户名和密码"));
+                return Err(anyhow::anyhow!("认证失败，请检查用户名和{}", if auth == "pubkey" { "私钥" } else { "密码" }));
             }
 
             let mut channel = session.channel_session()?;
             channel.request_pty("xterm-256color", None, Some((120, 40, 0, 0)))?;
             channel.shell()?;
-            // ssh2::Channel 不支持 set_blocking，通过 session 级别设置
-            // 非阻塞读取在后台线程中通过超时机制实现
+            // 通过 session 设置非阻塞模式，影响该 session 的所有 channel
+            // 避免 read 阻塞导致 shell prompt 无法显示
+            session.set_blocking(false);
 
             let inner = Arc::new(Mutex::new(SshSessionInner {
                 session,
@@ -88,20 +105,20 @@ pub async fn ssh_connect(
             thread::spawn(move || {
                 let mut buf = [0u8; 4096];
                 loop {
-                    {
-                        let guard = inner_read.lock().unwrap();
-                        if guard.channel.is_none() {
-                            break;
-                        }
-                    }
-                    // 尝试读取
                     let data = {
                         let mut guard = inner_read.lock().unwrap();
+                        if guard.channel.is_none() {
+                            break; // 通道已关闭，退出读取线程
+                        }
                         if let Some(ref mut ch) = guard.channel {
-                            let mut s = String::new();
-                            match ch.read_to_string(&mut s) {
-                                Ok(_) if !s.is_empty() => Some(s),
-                                _ => None,
+                            match ch.read(&mut buf) {
+                                Ok(0) => None, // EOF
+                                Ok(n) => {
+                                    let text = String::from_utf8_lossy(&buf[..n]).to_string();
+                                    Some(text)
+                                }
+                                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => None, // 无数据
+                                Err(_) => None, // 其他错误
                             }
                         } else {
                             None
@@ -113,9 +130,9 @@ pub async fn ssh_connect(
                             "tabId": tab_id,
                             "data": output
                         }));
-                    } else {
-                        thread::sleep(Duration::from_millis(50));
                     }
+                    // 无数据时短暂休眠，避免 CPU 空转
+                    thread::sleep(Duration::from_millis(20));
                 }
             });
 
@@ -139,7 +156,10 @@ pub async fn ssh_write(session_id: String, data: String) -> Response<bool> {
         let mut guard = inner.lock().unwrap();
         if let Some(ref mut ch) = guard.channel {
             match ch.write_all(data.as_bytes()) {
-                Ok(_) => Response::new(200, true, "写入成功"),
+                Ok(_) => {
+                    let _ = ch.flush();
+                    Response::new(200, true, "写入成功")
+                }
                 Err(e) => Response::new(300, false, &format!("写入失败: {}", e)),
             }
         } else {
@@ -154,14 +174,24 @@ pub async fn ssh_write(session_id: String, data: String) -> Response<bool> {
 #[command]
 pub async fn ssh_disconnect(session_id: String) -> Response<bool> {
     let mut sessions = SSH_SESSIONS.lock().unwrap();
-    if let Some(inner) = sessions.remove(&session_id) {
-        let mut guard = inner.lock().unwrap();
-        if let Some(mut ch) = guard.channel.take() {
-            let _ = ch.close();
-        }
+    if sessions.remove(&session_id).is_some() {
         Response::new(200, true, "已断开")
     } else {
         Response::new(300, false, "会话不存在")
+    }
+}
+
+/// SSH 连接状态检测
+#[command]
+pub async fn ssh_check(session_id: String) -> Response<bool> {
+    let sessions = SSH_SESSIONS.lock().unwrap();
+    match sessions.get(&session_id) {
+        Some(inner) => {
+            let guard = inner.lock().unwrap();
+            let alive = guard.channel.is_some() && guard.session.authenticated();
+            Response::new(200, alive, if alive { "连接正常" } else { "连接已断开" })
+        }
+        None => Response::new(300, false, "会话不存在"),
     }
 }
 
@@ -196,15 +226,30 @@ pub async fn sftp_connect(
     port: u16,
     username: String,
     password: String,
+    auth_type: Option<String>,
+    private_key_path: Option<String>,
 ) -> Response<Option<String>> {
     let session_id = format!("sftp-{}", uuid::Uuid::new_v4());
+    let auth = auth_type.unwrap_or_else(|| "password".to_string());
+    let key_path = private_key_path.unwrap_or_default();
 
     let result = tokio::task::spawn_blocking(move || -> Result<String> {
         let tcp = TcpStream::connect(format!("{}:{}", host, port))?;
         let mut session = Session::new()?;
         session.set_tcp_stream(tcp);
         session.handshake()?;
-        session.userauth_password(&username, &password)?;
+
+        // 根据认证方式选择认证
+        if auth == "pubkey" && !key_path.is_empty() {
+            session.userauth_pubkey_file(
+                &username,
+                None,
+                Path::new(&key_path),
+                None,
+            )?;
+        } else {
+            session.userauth_password(&username, &password)?;
+        }
 
         if !session.authenticated() {
             return Err(anyhow::anyhow!("SFTP 认证失败"));
@@ -233,6 +278,22 @@ pub async fn sftp_disconnect(session_id: String) -> Response<bool> {
     let mut sessions = SFTP_SESSIONS.lock().unwrap();
     sessions.remove(&session_id);
     Response::new(200, true, "已断开")
+}
+
+/// SFTP 连接状态检测
+#[command]
+pub async fn sftp_check(session_id: String) -> Response<bool> {
+    let sessions = SFTP_SESSIONS.lock().unwrap();
+    match sessions.get(&session_id) {
+        Some(sess) => {
+            // 尝试创建 SFTP 句柄来检测连接是否存活
+            match sess.sftp() {
+                Ok(_sftp) => Response::new(200, true, "连接正常"),
+                Err(_) => Response::new(300, false, "连接已断开"),
+            }
+        }
+        None => Response::new(300, false, "会话不存在"),
+    }
 }
 
 /// SFTP 列出目录
@@ -554,4 +615,40 @@ pub async fn local_list_dir(path: String) -> Response<Vec<RemoteFileItem>> {
         Ok(Err(e)) => Response::new(300, Vec::new(), &format!("列出文件失败: {}", e)),
         Err(e) => Response::new(300, Vec::new(), &format!("执行异常: {}", e)),
     }
+}
+
+/// SFTP 重命名文件/目录
+#[command]
+pub async fn sftp_rename(
+    session_id: String,
+    old_path: String,
+    new_path: String,
+) -> Response<bool> {
+    let sess = {
+        let sessions = SFTP_SESSIONS.lock().unwrap();
+        sessions.get(&session_id).cloned()
+    };
+    if let Some(sess) = sess {
+        let result = tokio::task::spawn_blocking(move || -> Result<bool> {
+            let sftp = sess.sftp()?;
+            sftp.rename(Path::new(&old_path), Path::new(&new_path), None)?;
+            Ok(true)
+        })
+        .await;
+
+        match result {
+            Ok(Ok(_)) => Response::new(200, true, "重命名成功"),
+            Ok(Err(e)) => Response::new(300, false, &format!("重命名失败: {}", e)),
+            Err(e) => Response::new(300, false, &format!("执行异常: {}", e)),
+        }
+    } else {
+        Response::new(300, false, "会话不存在")
+    }
+}
+
+/// 获取应用数据目录路径
+#[command]
+pub async fn get_app_dir() -> Response<String> {
+    let app_dir = &crate::app::app_store::APP.lock().app_dir;
+    Response::new(200, app_dir.to_string_lossy().to_string(), "成功")
 }

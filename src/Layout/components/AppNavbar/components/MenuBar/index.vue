@@ -91,7 +91,7 @@ const menus: Menu[] = [
     label: '文件(F)',
     items: [
       { label: '打开文件', shortcut: 'Ctrl+O', command: 'openFile' },
-      { label: '更换工作目录', shortcut: 'Ctrl+O', command: 'openWorkingDirectory' },
+      { label: '更换工作区', shortcut: 'Ctrl+O', command: 'openWorkingDirectory' },
       { divider: true, label: '', command: '' },
       { label: '设置', command: 'settings' },
     ]

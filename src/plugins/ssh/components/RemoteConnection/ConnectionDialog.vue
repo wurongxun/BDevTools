@@ -43,17 +43,50 @@
         <el-input v-model="form.username" placeholder="登录用户名" />
       </el-form-item>
 
-      <el-form-item label="密码" prop="password">
+      <el-form-item label="认证方式" prop="auth_type">
+        <el-radio-group v-model="form.auth_type">
+          <el-radio-button value="password">密码</el-radio-button>
+          <el-radio-button value="pubkey">私钥</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+
+      <el-form-item v-if="form.auth_type === 'pubkey'" label="私钥文件" prop="private_key_path">
+        <div style="display: flex; gap: 8px; width: 100%">
+          <el-input
+            v-model="form.private_key_path"
+            placeholder="选择私钥文件路径"
+            readonly
+            style="flex: 1"
+          />
+          <el-button size="default" @click="handleSelectKeyFile">浏览</el-button>
+        </div>
+      </el-form-item>
+
+      <el-form-item :label="form.auth_type === 'pubkey' ? '密码(可选)' : '密码'" prop="password">
         <el-input
           v-model="form.password"
           type="password"
-          placeholder="登录密码"
+          :placeholder="form.auth_type === 'pubkey' ? '私钥密码（可选）' : '登录密码'"
           show-password
         />
       </el-form-item>
 
       <el-form-item label="分组" prop="favorites_name">
-        <el-input v-model="form.favorites_name" placeholder="连接分组名称（可选）" />
+        <el-select
+          v-model="form.favorites_name"
+          placeholder="选择分组（可选）"
+          clearable
+          filterable
+          allow-create
+          style="width: 100%"
+        >
+          <el-option
+            v-for="g in groupOptions"
+            :key="g"
+            :label="g"
+            :value="g"
+          />
+        </el-select>
       </el-form-item>
 
       <el-form-item label="置顶">
@@ -71,17 +104,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
+import { open } from '@tauri-apps/plugin-dialog'
 import useStore from '@/store'
 import { ConnectionType } from '@/entity/entitys'
 import type { RemoteConnection } from '@/entity/entitys'
 
 const { useConnectionStore } = useStore()
 
+const groupOptions = computed(() => useConnectionStore.connectionGroups)
+
 const props = defineProps<{
   modelValue: boolean
   editData?: RemoteConnection | null
+  defaultGroup?: string
 }>()
 
 const emit = defineEmits<{
@@ -100,8 +137,10 @@ const defaultForm = () => ({
   username: '',
   password: '',
   agreement: ConnectionType.SSH,
-  favorites_name: '',
-  affix: false
+  favorites_name: props.defaultGroup || '',
+  affix: false,
+  auth_type: 'password' as 'password' | 'pubkey',
+  private_key_path: ''
 })
 
 const form = reactive(defaultForm())
@@ -154,6 +193,17 @@ async function handleSubmit() {
     handleClose()
   } finally {
     submitting.value = false
+  }
+}
+
+async function handleSelectKeyFile() {
+  const selected = await open({
+    multiple: false,
+    directory: false,
+    filters: [{ name: 'Key Files', extensions: ['pem', 'key', 'rsa', 'ed25519', 'pub'] }]
+  })
+  if (selected) {
+    form.private_key_path = selected
   }
 }
 </script>

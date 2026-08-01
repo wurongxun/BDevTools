@@ -1,20 +1,20 @@
 <template>
   <div class="app-main" :style="{ height: appMainHeight }">
     <el-header class="app-header">
-      <!-- 动态渲染当前激活插件的 Tab 栏 -->
+      <!-- 动态渲染所有插件的 Tab 栏（v-show 保持存活，切换不重建） -->
       <template v-for="plugin in pluginManager.plugins" :key="plugin.id">
         <component
           :is="plugin.tabBar"
-          v-if="pluginManager.activeToolId.value === plugin.id && plugin.tabBar"
+          v-show="pluginManager.activeToolId.value === plugin.id && plugin.tabBar"
         />
       </template>
     </el-header>
     <el-main class="app-main-content">
-      <!-- 动态渲染当前激活插件的主面板 -->
+      <!-- 动态渲染所有插件的主面板（v-show 保持存活，切换不重建） -->
       <template v-for="plugin in pluginManager.plugins" :key="plugin.id">
         <component
           :is="plugin.mainPanel"
-          v-if="pluginManager.activeToolId.value === plugin.id"
+          v-show="pluginManager.activeToolId.value === plugin.id"
         />
       </template>
     </el-main>

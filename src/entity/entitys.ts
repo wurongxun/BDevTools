@@ -110,6 +110,8 @@ export interface RemoteConnection {
   agreement: ConnectionType
   favorites_name: string
   affix: boolean
+  auth_type: 'password' | 'pubkey'
+  private_key_path: string
   status?: ConnectionStatus
 }
 
