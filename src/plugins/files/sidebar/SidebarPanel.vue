@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, h, onMounted, onUnmounted, ref } from 'vue'
-import FileInfoTree from '@/components/FileTree/FileInfoTree.vue'
+import FileInfoTree from './FileInfoTree.vue'
 import useStore from '@/store'
 import { useRouter, useRoute } from 'vue-router'
 import { tauri_request } from '@/utils/tauri_request'
