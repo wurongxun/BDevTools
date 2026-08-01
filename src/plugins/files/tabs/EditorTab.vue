@@ -1,157 +1,142 @@
 <template>
-  <div class="tab-bar-container">
+  <TabBarContainer ref="tabBarContainer">
     <!-- 左滚动按钮 -->
-    <button
-      v-show="canScrollLeft"
-      class="scroll-btn scroll-btn-left"
-      @click="scrollLeft"
-    >
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-        <path d="M10.5 3L5.5 8l5 5" stroke="currentColor" stroke-width="1.5" fill="none"/>
-      </svg>
-    </button>
-    <!-- 标签页容器 -->
-    <div
-      ref="tabContainer"
-      class="tab-list"
-      @wheel.prevent="handleWheel"
-    >
-      <div
-        v-for="doc in documentList"
-        :key="doc.id"
-        :ref="el => setTabRef(doc.id, el)"
-        class="tab-item"
-        :class="{
-          'tab-active': doc.id === activeDocumentId,
-          'tab-modified': doc.isDirty,
-          'tab-dragging': dragState.draggedTab === doc.id,
-          'tab-drag-over': dragState.dragOverTab === doc.id
-        }"
-        draggable="true"
-        @click="handleTabClick(doc.id)"
-        @mousedown.middle.prevent="handleTabClose(doc.id)"
-        @dragstart="handleDragStart($event, doc.id)"
-        @dragover="handleDragOver($event, doc.id)"
-        @drop="handleDrop($event, doc.id)"
-        @dragend="handleDragEnd"
-        @mouseenter="showTooltip($event, doc.id)"
-        @mouseleave="hideTooltip"
-      >
-        <!-- 文件图标 -->
-        <span class="tab-icon">
-          <FileIcon :type="doc.type" />
-        </span>
-
-        <!-- 文件名 -->
-        <span class="tab-label">{{ doc.name }}</span>
-
-        <!-- 修改指示器 -->
-        <span v-if="doc.isDirty" class="tab-dirty-indicator">●</span>
-
-        <!-- 关闭按钮 -->
-        <button
-          class="tab-close"
-          @click.stop="handleTabClose(doc.id)"
-          title="关闭"
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-            <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    <!-- 右滚动按钮 -->
-    <button
-      v-show="canScrollRight"
-      class="scroll-btn scroll-btn-right"
-      @click="scrollRight"
-    >
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-        <path d="M5.5 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" fill="none"/>
-      </svg>
-    </button>
-
-    <!-- 收纳按钮 - 显示所有文件下拉菜单 -->
-    <div class="dropdown-wrapper" ref="dropdownWrapper">
+    <template #prepend>
       <button
-        class="dropdown-btn"
-        @click="toggleDropdown"
-        title="显示所有打开的文件"
+        v-show="canScrollLeft"
+        class="scroll-btn scroll-btn-left"
+        @click="scrollLeft"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M4 6h8M4 8h8M4 10h8" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M10.5 3L5.5 8l5 5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+        </svg>
+      </button>
+    </template>
+
+    <!-- Tab 列表 -->
+    <TabBarItem
+      v-for="doc in documentList"
+      :key="doc.id"
+      :ref="el => setTabRef(doc.id, el)"
+      :active="doc.id === activeDocumentId"
+      :draggable="true"
+      :dragging="dragState.draggedTab === doc.id"
+      :drag-over="dragState.dragOverTab === doc.id"
+      @click="handleTabClick(doc.id)"
+      @close="handleTabClose(doc.id)"
+      @dragstart="handleDragStart($event, doc.id)"
+      @dragover="handleDragOver($event, doc.id)"
+      @drop="handleDrop($event, doc.id)"
+      @dragend="handleDragEnd"
+      @mouseenter="showTooltip($event, doc.id)"
+      @mouseleave="hideTooltip"
+    >
+      <!-- 文件图标 -->
+      <span class="tab-icon">
+        <FileIcon :type="doc.type" />
+      </span>
+      <!-- 文件名 -->
+      <span class="tab-label">{{ doc.name }}</span>
+      <!-- 修改指示器 -->
+      <span v-if="doc.isDirty" class="tab-dirty-indicator">●</span>
+      <!-- 关闭按钮 -->
+      <TabCloseButton @click="handleTabClose(doc.id)" />
+    </TabBarItem>
+
+    <!-- 右滚动按钮 + 下拉菜单 -->
+    <template #append>
+      <button
+        v-show="canScrollRight"
+        class="scroll-btn scroll-btn-right"
+        @click="scrollRight"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M5.5 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" fill="none"/>
         </svg>
       </button>
 
-      <!-- 下拉菜单 -->
-      <div
-        v-show="showDropdown"
-        class="dropdown-menu"
-        :style="dropdownStyle"
-      >
-        <div class="dropdown-header">
-          <span>打开的文件 ({{ documentList.length }})</span>
-          <button
-            v-if="documentList.length > 1"
-            class="close-all-btn"
-            @click="closeAllTabs"
-            title="关闭全部"
-          >
-            关闭全部
-          </button>
-        </div>
-        <div class="dropdown-list">
-          <div
-            v-for="doc in documentList"
-            :key="doc.id"
-            class="dropdown-item"
-            :class="{
-              'dropdown-item-active': doc.id === activeDocumentId,
-              'dropdown-item-modified': doc.isDirty
-            }"
-            @click="selectFromDropdown(doc.id)"
-          >
-            <span class="dropdown-icon">
-              <FileIcon :type="doc.type" />
-            </span>
-            <span class="dropdown-name">{{ doc.name }}</span>
-            <span v-if="doc.isDirty" class="dropdown-dirty">●</span>
+      <!-- 收纳按钮 - 显示所有文件下拉菜单 -->
+      <div class="dropdown-wrapper" ref="dropdownWrapper">
+        <button
+          class="dropdown-btn"
+          @click="toggleDropdown"
+          title="显示所有打开的文件"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M4 6h8M4 8h8M4 10h8" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+        </button>
+
+        <!-- 下拉菜单 -->
+        <div
+          v-show="showDropdown"
+          class="dropdown-menu"
+          :style="dropdownStyle"
+        >
+          <div class="dropdown-header">
+            <span>打开的文件 ({{ documentList.length }})</span>
             <button
-              class="dropdown-close"
-              @click.stop="closeFromDropdown(doc.id)"
-              title="关闭"
+              v-if="documentList.length > 1"
+              class="close-all-btn"
+              @click="closeAllTabs"
+              title="关闭全部"
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5"/>
-              </svg>
+              关闭全部
             </button>
+          </div>
+          <div class="dropdown-list">
+            <div
+              v-for="doc in documentList"
+              :key="doc.id"
+              class="dropdown-item"
+              :class="{
+                'dropdown-item-active': doc.id === activeDocumentId,
+                'dropdown-item-modified': doc.isDirty
+              }"
+              @click="selectFromDropdown(doc.id)"
+            >
+              <span class="dropdown-icon">
+                <FileIcon :type="doc.type" />
+              </span>
+              <span class="dropdown-name">{{ doc.name }}</span>
+              <span v-if="doc.isDirty" class="dropdown-dirty">●</span>
+              <button
+                class="dropdown-close"
+                @click.stop="closeFromDropdown(doc.id)"
+                title="关闭"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                  <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Tooltip 提示框 -->
-    <div
-      v-show="tooltipVisible"
-      class="file-path-tooltip"
-      :style="tooltipStyle"
-    >
-      {{ tooltipText }}
-    </div>
-  </div>
+      <!-- Tooltip 提示框 -->
+      <div
+        v-show="tooltipVisible"
+        class="file-path-tooltip"
+        :style="tooltipStyle"
+      >
+        {{ tooltipText }}
+      </div>
+    </template>
+  </TabBarContainer>
 </template>
 
 <script setup lang="ts">
 import useStore from '@/store'
 const {useDocumentManagerStore } = useStore()
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { TabBarContainer, TabBarItem, TabCloseButton } from '@/components/TabBar'
 import FileIcon from './FileIcon.vue'
 
 const docStore = useDocumentManagerStore;
 
-// 响应式数据
-const tabContainer = ref<HTMLElement | null>(null)
+// TabBar 容器引用
+const tabBarContainer = ref<InstanceType<typeof TabBarContainer> | null>(null)
 const tabRefs = ref<Map<string, HTMLElement>>(new Map())
 const canScrollLeft = ref(false)
 const canScrollRight = ref(false)
@@ -220,11 +205,16 @@ function handleTabClose(docId: string) {
   docStore.closeDocument(docId)
 }
 
+// 获取 tab 列表容器
+function getTabListEl(): HTMLElement | null {
+  return tabBarContainer.value?.tabListRef || null
+}
+
 // 滚动到指定标签页
 function scrollToTab(docId: string) {
   nextTick(() => {
     const tab = tabRefs.value.get(docId)
-    const container = tabContainer.value
+    const container = getTabListEl()
     if (!tab || !container) return
 
     const tabRect = tab.getBoundingClientRect()
@@ -243,7 +233,7 @@ function scrollToTab(docId: string) {
 
 // 向左滚动
 function scrollLeft() {
-  const container = tabContainer.value
+  const container = getTabListEl()
   if (!container) return
 
   container.scrollBy({
@@ -254,7 +244,7 @@ function scrollLeft() {
 
 // 向右滚动
 function scrollRight() {
-  const container = tabContainer.value
+  const container = getTabListEl()
   if (!container) return
 
   container.scrollBy({
@@ -263,20 +253,14 @@ function scrollRight() {
   })
 }
 
-// 处理鼠标滚轮
-function handleWheel(event: WheelEvent) {
-  const container = tabContainer.value
-  if (!container) return
-
-  // 将垂直滚动转换为水平滚动
-  container.scrollLeft += event.deltaY
-
+// 处理鼠标滚轮（TabBarContainer 已处理滚动转换，此处仅更新按钮状态）
+function handleWheel() {
   updateScrollButtons()
 }
 
 // 更新滚动按钮状态
 function updateScrollButtons() {
-  const container = tabContainer.value
+  const container = getTabListEl()
   if (!container) return
 
   const { scrollLeft, scrollWidth, clientWidth } = container
@@ -354,7 +338,7 @@ watch(activeDocumentId, (newId) => {
 
 // 监听滚动事件
 onMounted(() => {
-  const container = tabContainer.value
+  const container = getTabListEl()
   if (container) {
     container.addEventListener('scroll', updateScrollButtons, { passive: true })
     updateScrollButtons()
@@ -368,7 +352,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  const container = tabContainer.value
+  const container = getTabListEl()
   if (container) {
     container.removeEventListener('scroll', updateScrollButtons)
   }
@@ -459,20 +443,6 @@ function handleDragEnd() {
 <style scoped lang="scss">
 @use '@/styles/theme.scss' as theme;
 @use 'sass:color';
-.tab-bar-container {
-  display: flex;
-  align-items: stretch;
-  height: 36px;
-  background-color: #252526;
-  border-bottom: 1px solid #1e1e1e;
-  user-select: none;
-  position: relative;
-
-  @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
-    border-bottom-color: theme.getVar('borderColor');
-  }
-}
 
 /* 滚动按钮样式 */
 .scroll-btn {
@@ -513,86 +483,6 @@ function handleDragEnd() {
   }
 }
 
-/* 标签页列表容器 */
-.tab-list {
-  flex: 1;
-  display: flex;
-  align-items: stretch;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth;
-
-  /* 隐藏滚动条 - 兼容多种浏览器 */
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
-}
-
-/* WebKit 浏览器隐藏滚动条 */
-.tab-list::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-/* 单个标签页 */
-.tab-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  min-width: 120px;
-  max-width: 200px;
-  height: 100%;
-  flex-shrink: 0;
-  background-color: #2d2d2d;
-  border-right: 1px solid #1e1e1e;
-  color: #969696;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background-color 0.15s;
-  white-space: nowrap;
-  position: relative;
-
-  @include theme.useTheme {
-    background-color: color.adjust(theme.getVar('bgColor'), $lightness:3%);
-    border-right-color: theme.getVar('borderColor');
-    color: color.adjust(theme.getVar('textColor'), $lightness: -30%);
-  }
-}
-/* 活跃标签页样式 */
-.tab-active {
-  background-color: #1e1e1e;
-  color: #ffffff;
-  border-bottom: 2px solid #007acc;
-
-  @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
-    color: theme.getVar('textColor');
-    border-bottom-color: #007acc;
-  }
-}
-
-.tab-active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background-color: #007acc;
-}
-
-/* 非活跃标签页悬停效果 */
-.tab-item:not(.tab-active):hover {
-  background-color: #2a2d2e;
-  color: #cccccc;
-
-  @include theme.useTheme {
-     background-color: color.adjust(theme.getVar('bgColor'), $lightness:8%);
-    color: theme.getVar('textColor');
-  }
-}
-
 /* 文件图标 */
 .tab-icon {
   flex-shrink: 0;
@@ -617,49 +507,6 @@ function handleDragEnd() {
   color: #e2b714;
   font-size: 16px;
   line-height: 1;
-}
-
-/* 关闭按钮 */
-.tab-close {
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  border-radius: 4px;
-  color: #969696;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s, background-color 0.15s;
-
-  @include theme.useTheme {
-    color: color.adjust(theme.getVar('textColor'), $lightness: -30%);
-  }
-}
-
-.tab-item:hover .tab-close {
-  opacity: 1;
-}
-
-.tab-close:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-
-  @include theme.useTheme {
-    background-color: rgba(255, 255, 255, 0.15);
-    color: theme.getVar('textColor');
-  }
-}
-
-/* 拖拽时的占位符样式 */
-.tab-drag-placeholder {
-  width: 2px;
-  height: 100%;
-  background-color: #007acc;
-  flex-shrink: 0;
 }
 
 /* 下拉菜单包装器 */
@@ -938,19 +785,5 @@ function handleDragEnd() {
   .file-path-tooltip {
     max-width: 300px !important;
   }
-}
-
-/* 添加拖拽相关样式 */
-.tab-dragging {
-  opacity: 0.5;
-  background-color: #3e3e3e;
-
-  @include theme.useTheme {
-     background-color: color.adjust(theme.getVar('bgColor'), $lightness:15%);
-  }
-}
-
-.tab-drag-over {
-  border-left: 1px solid #007acc;
 }
 </style>

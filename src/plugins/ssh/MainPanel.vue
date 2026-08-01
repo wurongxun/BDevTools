@@ -7,7 +7,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import useStore from '@/store'
-import ConnectionPanel from '@/components/RemoteConnection/ConnectionPanel.vue'
+import ConnectionPanel from './components/RemoteConnection/ConnectionPanel.vue'
 
 const { useConnectionStore } = useStore()
 

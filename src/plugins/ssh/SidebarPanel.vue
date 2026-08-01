@@ -96,7 +96,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { Plus, ArrowRight, MoreFilled } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
-import ConnectionDialog from '@/components/RemoteConnection/ConnectionDialog.vue'
+import ConnectionDialog from './components/RemoteConnection/ConnectionDialog.vue'
 import useStore from '@/store'
 import type { RemoteConnection } from '@/entity/entitys'
 

@@ -3,7 +3,7 @@ import { Connection } from '@element-plus/icons-vue'
 import type { ToolPlugin } from '@/core/pluginManager'
 import SidebarPanel from './SidebarPanel.vue'
 import MainPanel from './MainPanel.vue'
-import ConnectionTabBar from '@/components/RemoteConnection/ConnectionTabBar.vue'
+import ConnectionTabBar from './components/RemoteConnection/ConnectionTabBar.vue'
 
 export default {
   id: 'ssh',
