@@ -43,7 +43,9 @@ import { load, Store } from '@tauri-apps/plugin-store'
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/Types/entitys'
 import NotificationUtil from '@/utils/NotificationUtil'
-import { get_notebooks_Api } from '@/api/file'
+import { changeWorkspace } from '@/utils/index'
+
+import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openAppWindow } from '@/utils/WindowUtils'
@@ -86,6 +88,12 @@ interface Menu {
 //   { label: 'ASCII', command: 'encodingAscii' },
 // ]
 // }
+
+  // {
+  //   label: '终端(T)',
+  //   items: [],
+  //   action: 'newTerminal'
+  // },
 const menus: Menu[] = [
   {
     label: '文件(F)',
@@ -96,11 +104,7 @@ const menus: Menu[] = [
       { label: '设置', command: 'settings' },
     ]
   },
-  {
-    label: '终端(T)',
-    items: [],
-    action: 'newTerminal'
-  },
+
   {
     label: '帮助(H)',
     items: [
@@ -143,7 +147,7 @@ const handleMenuCommand = async (item: MenuItem) => {
         })
         if (res?.code === 200) {
           NotificationUtil.success('文件创建成功')
-          await get_notebooks_Api()
+          await get_file_Api()
         } else {
           NotificationUtil.error(res?.msg || '创建失败')
         }
@@ -163,25 +167,7 @@ const handleMenuCommand = async (item: MenuItem) => {
       break
     }
     case 'openWorkingDirectory': {
-      let file_directory: string | null = await open({
-        multiple: false,
-        directory: true
-      })
-      if (file_directory == null){
-        return
-      }
-      if (!store){
-        store = await load('settings.json', {
-          autoSave: false,
-          defaults: {}
-        })
-      }
-      if (store) {
-        await store.set('md_working_directory', { value: file_directory })
-        await store.save();
-        await get_notebooks_Api();
-      }
-
+      await changeWorkspace();
       break
     }
 
@@ -199,7 +185,7 @@ const handleMenuCommand = async (item: MenuItem) => {
         })
         if (res?.code === 200) {
           NotificationUtil.success('文件夹创建成功')
-          await get_notebooks_Api()
+          await get_file_Api()
         } else {
           NotificationUtil.error(res?.msg || '创建失败')
         }
@@ -215,7 +201,7 @@ const handleMenuCommand = async (item: MenuItem) => {
       break
     }
     case 'settings': {
-      openAppWindow('/AppSetting')
+      openAppWindow('/App/setting')
       break
     }
     case 'encodingUtf8':
@@ -228,15 +214,15 @@ const handleMenuCommand = async (item: MenuItem) => {
       break
     }
     case 'help': {
-      openAppWindow('/AppHelp')
+      openAppWindow('/App/help')
       break
     }
     case 'about': {
-      openAppWindow('/AppAbout')
+      openAppWindow('/App/about')
       break
     }
     case 'newTerminal': {
-      openAppWindow('/AppTerminal')
+      openAppWindow('/App/terminal')
       break
     }
   }

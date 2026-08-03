@@ -5,17 +5,31 @@ $themes: (
     appMainBgColor: #f1f1f1,
     bgColor: #fff,
     textColor: #212121,
+    textSecondary: #666,
     shadowColor: #eee,
     borderColor: #e6e6e6,
-    hoverColor: #ecf5ff
+    hoverColor: #ecf5ff,
+    sidebarBg: #f0f0f0,
+    activityBarBg: #e8e8e8,
+    activityBarHover: #dcdcdc,
+    activityBarActive: #212121,
+    fontSize: 14px,
+    fontSizeSmall: 12px
   ),
   dark: (
     appMainBgColor: #494949,
     bgColor: #2b2b2b,
     textColor: #fff,
+    textSecondary: #999,
     shadowColor: #2e2d2d,
     borderColor: #424141,
-    hoverColor: #18222c
+    hoverColor: #18222c,
+    sidebarBg: #252525,
+    activityBarBg: #1e1e1e,
+    activityBarHover: rgba(255, 255, 255, 0.06),
+    activityBarActive: #fff,
+    fontSize: 14px,
+    fontSizeSmall: 12px
   )
 );
 

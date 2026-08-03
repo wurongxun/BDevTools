@@ -1,17 +1,17 @@
 import { WebviewWindow,getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { Window } from '@tauri-apps/api/window'
 const PAGE_CONFIGS: Record<string, { title: string; width: number; height: number }> = {
-  '/AppSetting': { title: '设置', width: 800, height: 650 },
-  '/AppAbout': { title: '关于', width: 800, height: 650 },
-  '/AppHelp': { title: '帮助', width: 800, height: 650 },
-  '/AppTerminal': { title: '终端', width: 900, height: 600 }
+  '/App/setting': { title: '设置', width: 800, height: 650 },
+  '/App/about': { title: '关于', width: 800, height: 650 },
+  '/App/help': { title: '帮助', width: 800, height: 650 },
+  '/App/terminal': { title: '终端', width: 900, height: 600 }
 }
 
 export async function openAppWindow(path: string) {
   const config = PAGE_CONFIGS[path]
   if (!config) return
 
-  const windowLabel = `app-window-${path.replace('/', '')}`
+  const windowLabel = `app-window-${path.replace(/\//g, '-')}`
 
   try {
     const existing = await WebviewWindow.getByLabel(windowLabel)
@@ -29,7 +29,9 @@ export async function openAppWindow(path: string) {
     width: config.width,
     height: config.height,
     resizable: true,
-    center: true,
+    center: false,
+    x: 100,
+    y: 100,
     decorations: false,
     visible: false,
     url: `index.html#${path}`

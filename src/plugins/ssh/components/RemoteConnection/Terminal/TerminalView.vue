@@ -52,6 +52,7 @@ import '@xterm/xterm/css/xterm.css'
 import useStore from '@/store'
 import { ConnectionStatus } from '@/entity/entitys'
 import type { ConnectionTab, RemoteConnection } from '@/entity/entitys'
+import { isDark } from '@/composables/useDark'
 
 const props = defineProps<{
   tab: ConnectionTab
@@ -80,6 +81,51 @@ const statusText = computed(() => {
   }
 })
 
+// xterm 终端主题
+const terminalThemes = {
+  dark: {
+    background: '#1e1e1e',
+    foreground: '#d4d4d4',
+    cursor: '#d4d4d4',
+    selectionBackground: 'rgba(255, 255, 255, 0.3)',
+    black: '#000000',
+    red: '#cd3131',
+    green: '#0dbc79',
+    yellow: '#e5e510',
+    blue: '#2472c8',
+    magenta: '#bc3fbc',
+    cyan: '#11a8cd',
+    white: '#e5e5e5'
+  },
+  light: {
+    background: '#ffffff',
+    foreground: '#383a42',
+    cursor: '#383a42',
+    selectionBackground: 'rgba(0, 0, 0, 0.2)',
+    black: '#383a42',
+    red: '#e45649',
+    green: '#50a14f',
+    yellow: '#c18401',
+    blue: '#0184bc',
+    magenta: '#a626a4',
+    cyan: '#0997b3',
+    white: '#fafafa'
+  }
+}
+
+function getTerminalTheme() {
+  return isDark.value ? terminalThemes.dark : terminalThemes.light
+}
+
+function applyTerminalTheme() {
+  if (!terminal) return
+  const theme = getTerminalTheme()
+  // 通过新对象赋值确保 xterm.js 触发响应式更新
+  terminal.options.theme = { ...theme }
+  // 强制刷新终端渲染
+  terminal.refresh(0, terminal.rows - 1)
+}
+
 function initTerminal() {
   if (!xtermContainer.value) return
 
@@ -88,20 +134,7 @@ function initTerminal() {
     cursorStyle: 'block',
     fontSize: 14,
     fontFamily: "'Consolas', 'Courier New', monospace",
-    theme: {
-      background: '#1e1e1e',
-      foreground: '#d4d4d4',
-      cursor: '#d4d4d4',
-      selectionBackground: 'rgba(255, 255, 255, 0.3)',
-      black: '#000000',
-      red: '#cd3131',
-      green: '#0dbc79',
-      yellow: '#e5e510',
-      blue: '#2472c8',
-      magenta: '#bc3fbc',
-      cyan: '#11a8cd',
-      white: '#e5e5e5'
-    },
+    theme: getTerminalTheme(),
     scrollback: 5000,
     convertEol: true
   })
@@ -278,6 +311,11 @@ onMounted(() => {
   })
 })
 
+// 监听主题切换，更新终端配色
+watch(isDark, () => {
+  applyTerminalTheme()
+})
+
 onUnmounted(() => {
   stopConnectionCheck()
   window.removeEventListener('ssh-output', handleSshOutput as EventListener)
@@ -301,7 +339,10 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: #1e1e1e;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+  }
 }
 
 .terminal-toolbar {
@@ -375,6 +416,16 @@ onUnmounted(() => {
 
   :deep(.xterm-viewport) {
     overflow-y: auto !important;
+  }
+
+  // 亮色模式下强制覆盖 xterm 内联背景
+  html.light & :deep(.xterm-viewport) {
+    background-color: #ffffff !important;
+  }
+
+  // 暗黑模式下强制覆盖 xterm 内联背景
+  html.dark & :deep(.xterm-viewport) {
+    background-color: #1e1e1e !important;
   }
 }
 </style>

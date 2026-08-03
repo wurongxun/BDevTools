@@ -45,12 +45,10 @@ import { pluginManager } from '@/core/pluginManager'
   flex-direction: column;
   width: 48px;
   flex-shrink: 0;
-  background-color: #252525;
-  border-right: 1px solid #2d2d2d;
 
   @include theme.useTheme {
-    background-color: theme.getVar('sidebarBg');
-    border-right-color: theme.getVar('borderColor');
+    background-color: theme.getVar('activityBarBg');
+    border-right: 1px solid theme.getVar('borderColor');
   }
 }
 
@@ -61,26 +59,25 @@ import { pluginManager } from '@/core/pluginManager'
   width: 100%;
   height: 48px;
   cursor: pointer;
-  color: #888;
   transition: all 0.15s;
   border-left: 2px solid transparent;
 
-  &:hover {
-    color: #ccc;
-  }
-
   @include theme.useTheme {
     color: theme.getVar('textSecondary');
+
+    &:hover {
+      color: theme.getVar('textColor');
+      background-color: theme.getVar('activityBarHover');
+    }
   }
 }
 
 .activity-item-active {
-  color: #fff !important;
   border-left-color: #007acc;
 
   @include theme.useTheme {
-    color: theme.getVar('textColor') !important;
-    border-left-color: #007acc;
+    color: theme.getVar('activityBarActive') !important;
+    background-color: theme.getVar('activityBarHover');
   }
 }
 
@@ -96,6 +93,10 @@ import { pluginManager } from '@/core/pluginManager'
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('sidebarBg');
+  }
 }
 
 .panel-content {

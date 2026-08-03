@@ -51,15 +51,15 @@ const { user } = useStore()
 const { userInfo } = storeToRefs(user)
 
 const onStting = () => {
-  openAppWindow('/AppSetting')
+  openAppWindow('/App/setting')
 }
 
 const onAbout = () => {
-  openAppWindow('/AppAbout')
+  openAppWindow('/App/about')
 }
 
 const onHelp = () => {
-  openAppWindow('/AppHelp')
+  openAppWindow('/App/help')
 }
 
 const handleCommand = (command: string | number | object) => {

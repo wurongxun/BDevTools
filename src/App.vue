@@ -2,21 +2,31 @@
   <div id="app">
     <!-- 未登录 → 登录页 -->
     <LoginView v-if="!isLoggedIn" @login-success="handleLoginSuccess" />
-    <!-- 已登录 → 主界面 -->
+    <!-- 已登录 → 根据路由判断渲染组件 -->
+    <Common v-else-if="isAppWindow" />
     <Layout v-else />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { load, Store } from '@tauri-apps/plugin-store'
 import useStore from '@/store'
 import Layout from '@/Layout/index.vue'
+import Common from '@/views/Common/Common.vue'
 import LoginView from '@/views/login/index.vue'
 
+const route = useRoute()
 const { useDocumentManagerStore, user } = useStore()
 
 const isLoggedIn = ref(false)
+
+// 判断当前路由是否为 App 窗口路由
+const isAppWindow = computed(() => {
+  const path = route.path
+  return path === '/App/setting' || path === '/App/about' || path === '/App/help' || path === '/App/terminal'
+})
 
 /**
  * 检查登录状态（从 Cookie 读取 token）

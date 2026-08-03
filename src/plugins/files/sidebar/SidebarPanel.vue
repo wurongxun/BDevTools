@@ -19,7 +19,7 @@ const MAX_FILENAME_LENGTH = 255
 let store: Store | undefined = undefined
 const router = useRouter()
 const route = useRoute()
-const { routerNoteStore, useDocumentManagerStore, appConfig } = useStore()
+const { routerNoteStore, useDocumentManagerStore } = useStore()
 
 // 树数据排序
 const tree_node = computed(() => sortTreeData(routerNoteStore.tree_node))
@@ -37,54 +37,6 @@ const sortTreeData = (data: TreeNode[]): TreeNode[] => {
         }
         return node
     })
-}
-
-// ===== 文档/收藏/最近 =====
-const favoriteFiles = computed(() => useDocumentManagerStore.favoriteFiles)
-const recentFiles = computed(() => useDocumentManagerStore.recentFiles)
-
-// 工作目录名称
-const workspaceName = computed(() => {
-    const dir = appConfig.getMdWorkingDirectory
-    if (!dir) return '工作区'
-    const parts = dir.replace(/\\/g, '/').split('/')
-    return parts.filter(Boolean).pop() || '工作区'
-})
-
-// 分组展开状态
-const expandedSections = ref<Set<string>>(new Set(['workspace']))
-
-function toggleSection(key: string) {
-    if (expandedSections.value.has(key)) {
-        expandedSections.value.delete(key)
-    } else {
-        expandedSections.value.add(key)
-    }
-}
-
-// 收藏文件名（取最后一级）
-function favoriteName(path: string): string {
-    return path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || path
-}
-
-// 点击收藏文件
-function handleFavoriteClick(path: string) {
-    useDocumentManagerStore.openDocument(path)
-}
-
-// 移除收藏
-function handleRemoveFavorite(path: string) {
-    useDocumentManagerStore.toggleFavorite(path)
-}
-
-// 点击最近文件
-function handleRecentClick(path: string) {
-    useDocumentManagerStore.openDocument(path)
-}
-
-// 清除最近列表
-function handleClearRecent() {
-    useDocumentManagerStore.clearRecentFiles()
 }
 
 // ===== Autoscroll 联动 =====
@@ -106,7 +58,7 @@ onMounted(async () => {
             defaults: {}
         })
     }
-    // 加载收藏和最近打开
+    // 加载收藏和最近打开（由 FileInfoTree 内部处理显示）
     useDocumentManagerStore.loadFavorites()
     useDocumentManagerStore.loadRecentFiles()
     // 确保文件树数据已加载
@@ -306,14 +258,11 @@ function handleHeaderCommand(cmd: string) {
     switch (cmd) {
         case 'closeAll': handleCloseAllEditors(); break
         case 'refresh': handleRefresh(); break
-        case 'clearRecent': handleClearRecent(); break
+        case 'clearRecent': useDocumentManagerStore.clearRecentFiles(); break
     }
 }
 
-function handleAddRootFile() { fileTreeRef.value?.addRootFile() }
-function handleAddRootFolder() { fileTreeRef.value?.addRootFolder() }
-function handleCollapseAll() { fileTreeRef.value?.collapseAll() }
-function handleToggleSearch() { fileTreeRef.value?.setSearchVisible() }
+
 </script>
 
 <template>
@@ -339,117 +288,19 @@ function handleToggleSearch() { fileTreeRef.value?.setSearchVisible() }
             </el-dropdown>
         </div>
 
-        <!-- 面板内容 -->
-        <div class="explorer-body">
-            <!-- 收藏 -->
-            <div class="section" v-if="favoriteFiles.length > 0">
-                <div class="section-header" @click="toggleSection('favorites')">
-                    <svg class="section-chevron" :class="{ expanded: expandedSections.has('favorites') }" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M6 4l4 4-4 4" />
-                    </svg>
-                    <span class="section-label">收藏</span>
-                    <span class="section-count">{{ favoriteFiles.length }}</span>
-                </div>
-                <div class="section-content" v-show="expandedSections.has('favorites')">
-                    <div
-                        v-for="path in favoriteFiles"
-                        :key="path"
-                        class="favorite-item"
-                        @click="handleFavoriteClick(path)"
-                    >
-                        <span class="favorite-star">★</span>
-                        <span class="favorite-name" :title="path">{{ favoriteName(path) }}</span>
-                        <span class="favorite-remove" @click.stop="handleRemoveFavorite(path)" title="取消收藏">×</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 最近打开 -->
-            <div class="section" v-if="recentFiles.length > 0">
-                <div class="section-header" @click="toggleSection('recent')">
-                    <svg class="section-chevron" :class="{ expanded: expandedSections.has('recent') }" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M6 4l4 4-4 4" />
-                    </svg>
-                    <span class="section-label">最近打开</span>
-                    <span class="section-count">{{ recentFiles.length }}</span>
-                </div>
-                <div class="section-content" v-show="expandedSections.has('recent')">
-                    <div
-                        v-for="path in recentFiles"
-                        :key="path"
-                        class="recent-item"
-                        @click="handleRecentClick(path)"
-                    >
-                        <span class="recent-icon">
-                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                                <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5" />
-                                <path d="M8 4v4l3 2" fill="none" stroke="currentColor" stroke-width="1.5" />
-                            </svg>
-                        </span>
-                        <span class="recent-name" :title="path">{{ favoriteName(path) }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 工作区文件夹 -->
-            <div class="section">
-                <div class="section-header workspace-header" @click="toggleSection('workspace')">
-                    <svg class="section-chevron" :class="{ expanded: expandedSections.has('workspace') }" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M6 4l4 4-4 4" />
-                    </svg>
-                    <span class="section-label workspace-label">{{ workspaceName }}</span>
-                    <div class="workspace-toolbar">
-                        <span class="toolbar-btn" @click.stop="handleToggleSearch" title="搜索文件">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <circle cx="7" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="1.3" />
-                                <line x1="10" y1="10" x2="13.5" y2="13.5" stroke="currentColor" stroke-width="1.3" />
-                            </svg>
-                        </span>
-                        <span class="toolbar-btn" @click.stop="handleAddRootFile" title="新建文件">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M2 2h8l4 4v8H2V2z" fill="none" stroke="currentColor" stroke-width="1.2" />
-                                <path d="M10 2v4h4" fill="none" stroke="currentColor" stroke-width="1.2" />
-                                <line x1="8" y1="7" x2="8" y2="13" stroke="currentColor" stroke-width="1.2" />
-                                <line x1="5" y1="10" x2="11" y2="10" stroke="currentColor" stroke-width="1.2" />
-                            </svg>
-                        </span>
-                        <span class="toolbar-btn" @click.stop="handleAddRootFolder" title="新建文件夹">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M1 4l2-2h4l2 2h5v8H1V4z" fill="none" stroke="currentColor" stroke-width="1.2" />
-                                <line x1="8" y1="6" x2="8" y2="12" stroke="currentColor" stroke-width="1.2" />
-                                <line x1="5" y1="9" x2="11" y2="9" stroke="currentColor" stroke-width="1.2" />
-                            </svg>
-                        </span>
-                        <span class="toolbar-btn" @click.stop="handleRefresh" title="刷新">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M13 8a5 5 0 1 1-1.5-3.5" fill="none" stroke="currentColor" stroke-width="1.3" />
-                                <path d="M11.5 2v3h3" fill="none" stroke="currentColor" stroke-width="1.3" />
-                            </svg>
-                        </span>
-                        <span class="toolbar-btn" @click.stop="handleCollapseAll" title="折叠全部文件夹">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <rect x="2" y="2" width="12" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2" />
-                                <line x1="2" y1="6" x2="14" y2="6" stroke="currentColor" stroke-width="1.2" />
-                                <line x1="5" y1="9" x2="11" y2="9" stroke="currentColor" stroke-width="1" />
-                                <line x1="5" y1="11.5" x2="9" y2="11.5" stroke="currentColor" stroke-width="1" />
-                            </svg>
-                        </span>
-                    </div>
-                </div>
-                <div class="section-content" v-show="expandedSections.has('workspace')">
-                    <file-info-tree
-                        ref="fileTreeRef"
-                        :data="tree_node"
-                        :loading="isLoading"
-                        @node-click="handleNodeClick"
-                        @refresh="handleRefresh"
-                        @add-file="handleAddFile"
-                        @add-folder="handleAddFolder"
-                        @delete-node="handleDeleteNode"
-                        @rename-node="handleRenameNode"
-                    />
-                </div>
-            </div>
+        <!-- 文件树 -->
+        <div class="file-tree-section">
+            <file-info-tree
+                ref="fileTreeRef"
+                :data="tree_node"
+                :loading="isLoading"
+                @node-click="handleNodeClick"
+                @refresh="handleRefresh"
+                @add-file="handleAddFile"
+                @add-folder="handleAddFolder"
+                @delete-node="handleDeleteNode"
+                @rename-node="handleRenameNode"
+            />
         </div>
     </div>
 </template>
@@ -481,7 +332,6 @@ function handleToggleSearch() { fileTreeRef.value?.setSearchVisible() }
 }
 
 .explorer-title {
-    font-size: 11px;
     font-weight: 600;
     color: #bbb;
     text-transform: uppercase;
@@ -489,6 +339,7 @@ function handleToggleSearch() { fileTreeRef.value?.setSearchVisible() }
 
     @include theme.useTheme {
         color: theme.getVar('textColor');
+        font-size: theme.getVar('fontSizeSmall');
     }
 }
 
@@ -503,216 +354,12 @@ function handleToggleSearch() { fileTreeRef.value?.setSearchVisible() }
     }
 }
 
-// ===== 主体 =====
-.explorer-body {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin;
-
-    &::-webkit-scrollbar { width: 6px; }
-    &::-webkit-scrollbar-thumb {
-        background-color: rgba(155, 155, 155, 0.2);
-        border-radius: 3px;
-        &:hover { background-color: rgba(155, 155, 155, 0.4); }
-    }
-    &::-webkit-scrollbar-track { background: transparent; }
-}
-
-// ===== 分组 =====
-.section {
-    margin-bottom: 0;
-}
-
-.section-header {
+// ===== 文件树区域 =====
+.file-tree-section {
     display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    cursor: pointer;
-    user-select: none;
-    font-size: 11px;
-    font-weight: 600;
-    color: #bbb;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    transition: background-color 0.1s;
-
-    &:hover {
-        background-color: rgba(255, 255, 255, 0.05);
-    }
-
-    @include theme.useTheme {
-        color: theme.getVar('textColor');
-    }
-}
-
-.section-chevron {
-    width: 12px;
-    height: 12px;
-    flex-shrink: 0;
-    color: #888;
-    transition: transform 0.15s ease;
-
-    &.expanded {
-        transform: rotate(90deg);
-    }
-}
-
-.section-label {
+    flex-direction: column;
     flex: 1;
+    min-height: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.workspace-label {
-    text-transform: none;
-    font-weight: 500;
-    letter-spacing: 0;
-    font-size: 12px;
-}
-
-// 工作区 header：hover 时显示工具栏
-.workspace-header {
-    position: relative;
-
-    .workspace-toolbar {
-        display: flex;
-        align-items: center;
-        gap: 2px;
-        opacity: 0;
-        transition: opacity 0.15s;
-        flex-shrink: 0;
-    }
-
-    &:hover .workspace-toolbar {
-        opacity: 1;
-    }
-}
-
-.section-count {
-    font-size: 10px;
-    font-weight: 400;
-    color: #666;
-    background-color: rgba(255, 255, 255, 0.06);
-    padding: 0 5px;
-    border-radius: 8px;
-    flex-shrink: 0;
-}
-
-.section-content {
-    padding-left: 0;
-}
-
-.section-empty {
-    padding: 6px 12px 6px 28px;
-    font-size: 12px;
-    color: #555;
-    font-style: italic;
-}
-
-
-
-// ===== 收藏列表 =====
-.favorite-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 8px 3px 20px;
-    cursor: pointer;
-    transition: background-color 0.1s;
-    font-size: 13px;
-
-    &:hover {
-        background-color: rgba(255, 255, 255, 0.06);
-
-        .favorite-remove {
-            opacity: 1;
-        }
-    }
-}
-
-.favorite-star {
-    color: #e5c07b;
-    font-size: 12px;
-    flex-shrink: 0;
-}
-
-.favorite-name {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: #ccc;
-
-    @include theme.useTheme {
-        color: theme.getVar('textColor');
-    }
-}
-
-.favorite-remove {
-    opacity: 0;
-    color: #888;
-    font-size: 14px;
-    flex-shrink: 0;
-    transition: all 0.1s;
-    padding: 0 2px;
-
-    &:hover {
-        color: #e06c75;
-    }
-}
-
-// ===== 最近打开列表 =====
-.recent-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 8px 3px 20px;
-    cursor: pointer;
-    transition: background-color 0.1s;
-    font-size: 13px;
-
-    &:hover {
-        background-color: rgba(255, 255, 255, 0.06);
-    }
-}
-
-.recent-icon {
-    flex-shrink: 0;
-    color: #666;
-    display: flex;
-    align-items: center;
-}
-
-.recent-name {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: #999;
-
-    @include theme.useTheme {
-        color: theme.getVar('textColor');
-    }
-}
-
-// ===== 工具栏按钮 =====
-.toolbar-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 4px;
-    color: #888;
-    cursor: pointer;
-    transition: all 0.1s;
-
-    &:hover {
-        color: #ccc;
-        background-color: rgba(255, 255, 255, 0.1);
-    }
 }
 </style>

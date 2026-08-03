@@ -1,51 +1,18 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useI18n } from "vue-i18n";
 import { useRoute } from 'vue-router';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { saveWindowState, StateFlags } from '@tauri-apps/plugin-window-state';
-import { Close, Minus } from '@element-plus/icons-vue';
-import WindowMaximizationIcon from '@/components/Icon/WindowMaximizationIcon.vue'
-import WindowRestoreIcon from '@/components/Icon/WindowRestoreIcon.vue'
+import WindowControls from '@/components/WindowControls.vue'
 
 const route = useRoute();
-const { t } = useI18n();
 
 const pageTitles: Record<string, string> = {
-  '/AppSetting': '设置',
-  '/AppAbout': '关于',
-  '/AppHelp': '帮助',
-  '/AppTerminal': '终端'
+  '/App/setting': '设置',
+  '/App/about': '关于',
+  '/App/help': '帮助',
+  '/App/terminal': '终端'
 }
 
 const pageTitle = ref(pageTitles[route.path] || '')
-const isMaximized = ref(false)
-
-const handleMinimize = async () => {
-  try {
-    await getCurrentWindow().minimize()
-  } catch (e) {
-    console.error('最小化失败:', e)
-  }
-}
-
-const handleToggleMaximize = async () => {
-  try {
-    const win = getCurrentWindow()
-    await win.toggleMaximize()
-    isMaximized.value = !isMaximized.value
-  } catch (e) {
-    console.error('最大化切换失败:', e)
-  }
-}
-
-const handleClose = async () => {
-  try {
-    await getCurrentWindow().close()
-  } catch (e) {
-    console.error('关闭窗口失败:', e)
-  }
-}
 </script>
 
 <template>
@@ -53,24 +20,7 @@ const handleClose = async () => {
     <header class="common-topbar" data-tauri-drag-region>
       <span class="common-topbar-title">{{ pageTitle }}</span>
       <div class="common-topbar-spacer" data-tauri-drag-region></div>
-      <div class="common-window-controls">
-        <el-tooltip content="最小化" placement="bottom">
-          <el-icon class="common-ctrl-btn" @click="handleMinimize">
-            <Minus />
-          </el-icon>
-        </el-tooltip>
-        <el-tooltip :content="isMaximized ? '还原' : '最大化'" placement="bottom">
-          <el-icon class="common-ctrl-btn" @click="handleToggleMaximize">
-            <WindowRestoreIcon v-if="isMaximized" />
-            <WindowMaximizationIcon v-else />
-          </el-icon>
-        </el-tooltip>
-        <el-tooltip content="关闭" placement="bottom">
-          <el-icon class="common-ctrl-btn common-ctrl-close" @click="handleClose">
-            <Close />
-          </el-icon>
-        </el-tooltip>
-      </div>
+      <WindowControls />
     </header>
     <main class="app-container">
       <keep-alive>
@@ -121,33 +71,6 @@ const handleClose = async () => {
 .common-topbar-spacer {
   flex: 1;
   min-width: 0;
-}
-
-.common-window-controls {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.common-ctrl-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  margin-right: 12px;
-  cursor: pointer;
-  color: inherit;
-  transition: color 0.2s;
-  flex-shrink: 0;
-
-  &:hover {
-    color: $theme-color;
-  }
-}
-
-.common-ctrl-close:hover {
-  color: #e81123;
 }
 
 .app-container {

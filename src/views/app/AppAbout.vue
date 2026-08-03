@@ -65,7 +65,6 @@
 
 <script setup>
 import { ref, onMounted, reactive } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
 import { getName, getTauriVersion, getVersion } from '@tauri-apps/api/app';
 import { arch, platform, type, version } from '@tauri-apps/plugin-os';
 import coffeeImage from '@/assets/coffee.jpg';
@@ -79,24 +78,6 @@ const data = reactive({
   osType: "",
   osVersion: ""
 });
-
-const handleWinMin = async () => {
-  try {
-    const res = await invoke('windows_hide', { label: "about-window" });
-    console.log(res);
-  } catch (error) {
-    console.error('最小化窗口失败:', error);
-  }
-};
-
-const handleWinClose = async () => {
-  try {
-    const res = await invoke('windows_close', { label: "about-window" });
-    console.log(res);
-  } catch (error) {
-    console.error('关闭窗口失败:', error);
-  }
-};
 
 onMounted(async () => {
   try {

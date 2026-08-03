@@ -14,7 +14,7 @@ import { id } from 'element-plus/es/locales.mjs'
 import useStore from '@/store/index'
 import router from '@/router/index'
 
-export const get_notebooks_Api = async () => {
+export const get_file_Api = async () => {
   let notebooks_data = ref<NotebookInfo | null>(null)
   let md_working_directory = ref<string>('')
   let store: Store | undefined = undefined
@@ -32,7 +32,7 @@ export const get_notebooks_Api = async () => {
     //值 返回ResponseData 对象，包含data、code、msg参数 例如：data {"id":"1752761254929","parent_id":"","path":"C:\\Users\\kun15\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[]}
     let data_: NotebookInfo = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
     notebooks_data.value = data_
-    FileTreeNodeHandler(data_)
+    FileTreeNodeHandler(data_, md_working_directory.value)
     let data: RouteRecordRaw[] = [] as RouteRecordRaw[]
     return data
   } else {
@@ -41,15 +41,17 @@ export const get_notebooks_Api = async () => {
   }
 }
 
-const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
-  let children_val: Array<TreeNode> = new Array<TreeNode>()
+const FileTreeNodeHandler = (notebooks_data: NotebookInfo, workingDirectory: string = ''): TreeNode[] => {
+  let root: Array<TreeNode> = new Array<TreeNode>()
   let searchData_val: Array<TreeNode> = new Array<TreeNode>()
   let notebooks_children: NotebookInfo[] = notebooks_data.children
+  let children_val: Array<TreeNode> = []
+
   if (notebooks_children && notebooks_children.length > 0) {
     for (let i = 0; i < notebooks_children.length; i++) {
       let child: NotebookInfo = notebooks_children[i]
       let child_child: Array<NotebookInfo> = child.children
-      let child_child_val: Array<TreeNode> = new Array<TreeNode>()
+      let child_child_val: Array<TreeNode> = []
       if (child_child && child_child.length > 0) {
         let children: Array<TreeNode> = File_treeNode_child(child_child, searchData_val)
         for (let j = 0; j < children.length; j++) {
@@ -75,22 +77,39 @@ const FileTreeNodeHandler = (notebooks_data: NotebookInfo): TreeNode[] => {
         filePath: child.path,
         isfile: child.isfile,
         value: child.name,
+        name: child.name,
         children: child.isfile ? [] : child_child_val
       }
-      // 由于两个数组包含的是对同一对象的引用，所以：
-      // ✅ 清空数组操作是独立的
-      // ❌ 修改对象属性会影响两个数组中的对象
-      // ✅ 删除数组元素操作是独立的
       if (child.isfile) {
         searchData_val.push(route2)
       }
       children_val.push(route2)
     }
   }
+
+  // 使用工作区完整路径作为根节点标签
+  let rootLabel = workingDirectory || notebooks_data.path || notebooks_data.name || '工作区'
+
+  let root_data: TreeNode = {
+    id: notebooks_data.id,
+    label: rootLabel,
+    isFolder: true,
+    type: notebooks_data.data_type as TreeNode['type'],
+    routerPath: notebooks_data.path,
+    folder: workingDirectory || notebooks_data.folder,
+    filePath: notebooks_data.path,
+    isfile: false,
+    value: notebooks_data.name,
+    name: notebooks_data.name,
+    children: children_val,
+    isRoot: true
+  }
+  root.push(root_data)
+
   const { routerNoteStore } = useStore()
-  routerNoteStore.addTreeNode(children_val)
+  routerNoteStore.addTreeNode(root)
   routerNoteStore.addSearchData(searchData_val)
-  return children_val
+  return root
 }
 
 const File_treeNode_child = (
@@ -120,6 +139,7 @@ const File_treeNode_child = (
         filePath: child.path,
         isfile: child.isfile,
         value: child.name,
+        name: child.name,
         children: child.isfile ? [] : child_child_val
       }
       if (child.isfile) {

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import type { RouteRecordRaw } from 'vue-router'
 import { getMenu } from '@/api/user'
-import { get_notebooks_Api } from '@/api/file'
+import { get_file_Api } from '@/api/file'
 import useStore from '@/store/index'
 import { constantRoutes } from '@/router/index'
 import router from '@/router/index'
@@ -104,7 +104,7 @@ export const routerNoteStore = defineStore('routerNoteStore', {
 
         this.tree_node = []
         // 异步调用接口，主线程无需等待
-        get_notebooks_Api()
+        get_file_Api()
           .then((red_note: RouteRecordRaw[]) => {
             // 处理获取到的路由数据
             console.log('setRoutes ===============bred_note', red_note)

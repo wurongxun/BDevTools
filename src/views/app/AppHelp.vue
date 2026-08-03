@@ -1,10 +1,5 @@
 <template>
   <div class="help-container">
-    <div class="help-header">
-      <h1>帮助中心</h1>
-      <p>欢迎使用我们的产品，这里为您提供全面的使用指南和问题解答</p>
-    </div>
-
     <div class="help-content">
       <!-- 侧边导航 -->
       <div class="help-sidebar">
@@ -205,25 +200,6 @@ onMounted(() => {
   overflow: hidden;
 }
 
-.help-header {
-  /* background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); */
-  /* color: white; */
-  padding: 20px;
-  text-align: center;
-}
-
-.help-header h1 {
-  margin: 0 0 10px 0;
-  font-size: 2.5rem;
-  font-weight: 300;
-}
-
-.help-header p {
-  margin: 0;
-  font-size: 1.1rem;
-  opacity: 0.9;
-}
-
 .help-content {
   display: flex;
   flex: 1;
@@ -373,14 +349,6 @@ onMounted(() => {
   
   .features-grid {
     grid-template-columns: 1fr;
-  }
-  
-  .help-header {
-    padding: 20px;
-  }
-  
-  .help-header h1 {
-    font-size: 2rem;
   }
 }
 </style>

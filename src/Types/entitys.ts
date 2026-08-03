@@ -102,7 +102,9 @@ interface TreeNode {
   folder: string,
   filePath: string,
   isfile: boolean,
-  value?: string
+  name: string,
+  value?: string,
+  isRoot?: boolean
   [key: string]: any
 }
 // 定义笔记数据接口

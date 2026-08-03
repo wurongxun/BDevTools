@@ -1,70 +1,105 @@
 <template>
   <div class="file-tree-container">
-    <!-- 搜索过滤 -->
-    <div class="tree-search" v-if="showSearch">
-      <el-input
-        v-model="searchQuery"
-        size="small"
-        placeholder="过滤文件名..."
-        clearable
-        prefix-icon="Search"
-        @input="handleSearch"
-      />
-    </div>
+    <!-- 固定顶部区域 -->
+    <div class="fixed-top-area">
+      <!-- 收藏 -->
+      <div class="section" v-if="favoriteFiles.length > 0">
+        <div class="section-header" @click="toggleSection('favorites')">
+          <svg class="section-chevron" :class="{ expanded: expandedSections.has('favorites') }" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M6 4l4 4-4 4" />
+          </svg>
+          <span class="section-label">收藏</span>
+          <span class="section-count">{{ favoriteFiles.length }}</span>
+        </div>
+        <div class="section-content" v-show="expandedSections.has('favorites')">
+          <div v-for="path in favoriteFiles" :key="path" class="favorite-item" @click="handleFavoriteClick(path)">
+            <span class="favorite-star">★</span>
+            <span class="favorite-name" :title="path">{{ favoriteName(path) }}</span>
+            <span class="favorite-remove" @click.stop="handleRemoveFavorite(path)" title="取消收藏">×</span>
+          </div>
+        </div>
+      </div>
 
-    <el-tree
-      v-show="filteredTreeData.length > 0"
-      ref="treeRef"
-      :data="filteredTreeData"
-      node-key="id"
-      :props="defaultProps"
-      :expand-on-click-node="false"
-      :allow-drop="handleAllowDrop"
-      @node-drop="handleNodeDrop"
-      draggable
-      highlight-current
-      @node-contextmenu="handleNodeContextMenu"
-      @node-click="handleNodeClick"
-    >
-      <template #default="{ node, data }">
-        <div
-          class="custom-tree-node"
-          @mouseenter="onNodeMouseEnter(data)"
-          @mouseleave="onNodeMouseLeave"
-          :class="{ 'node-is-favorite': isFavoriteNode(data) }"
-        >
+      <!-- 最近打开 -->
+      <div class="section" v-if="recentFiles.length > 0">
+        <div class="section-header" @click="toggleSection('recent')">
+          <svg class="section-chevron" :class="{ expanded: expandedSections.has('recent') }" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M6 4l4 4-4 4" />
+          </svg>
+          <span class="section-label">最近打开</span>
+          <span class="section-count">{{ recentFiles.length }}</span>
+        </div>
+        <div class="section-content" v-show="expandedSections.has('recent')">
+          <div v-for="path in recentFiles" :key="path" class="recent-item" @click="handleRecentClick(path)">
+            <span class="recent-icon">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5" />
+                <path d="M8 4v4l3 2" fill="none" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+            </span>
+            <span class="recent-name" :title="path">{{ favoriteName(path) }}</span>
+          </div>
+        </div>
+      </div>
+      <!-- 根节点（固定不滚动） -->
+      <div class="root-node-fixed" v-if="rootNodeData" @mouseenter="onNodeMouseEnter(rootNodeData)" @mouseleave="onNodeMouseLeave">
+        <div class="custom-tree-node" :class="{ 'node-is-favorite': isFavoriteNode(rootNodeData) }">
           <span class="node-label">
-            <el-icon class="node-icon">
-              <component :is="getNodeIcon(data)" />
-            </el-icon>
-            <span class="node-text" :title="node.label">{{ node.label }}</span>
+            <el-icon class="node-icon"><Folder /></el-icon>
+            <span class="node-text root-node-text" :title="rootNodeData.label">{{ rootNodeData.name }}</span>
           </span>
-
-          <span v-show="hoveredNodeId === data.id" class="node-actions">
-            <template v-if="data.isFolder">
-              <el-icon class="action-icon" @click.stop="handleAddFile(data)" title="新建文件">
-                <DocumentAdd />
-              </el-icon>
-              <el-icon class="action-icon" @click.stop="handleAddFolder(data)" title="新建文件夹">
-                <FolderAdd />
-              </el-icon>
-            </template>
+          <span v-show="hoveredNodeId === rootNodeData.id" class="node-actions">
+             <el-icon class="action-icon" @click.stop="toggleSearch" title="搜索文件"><Search /></el-icon>
+            <el-icon class="action-icon" @click.stop="handleRefresh" title="刷新"><Refresh /></el-icon>
+            <el-icon class="action-icon" @click.stop="collapseAll" title="折叠全部文件夹">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M4.5 3.5L1 7l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M11.5 3.5L15 7l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                <line x1="8" y1="2" x2="8" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              </svg>
+            </el-icon>
+            <el-icon class="action-icon" @click.stop="handleAddFile(rootNodeData)" title="新建文件"><DocumentAdd /></el-icon>
+            <el-icon class="action-icon" @click.stop="handleAddFolder(rootNodeData)" title="新建文件夹"><FolderAdd /></el-icon>
           </span>
         </div>
-      </template>
-    </el-tree>
-
-    <!-- 空状态 -->
-    <div v-show="filteredTreeData.length === 0" class="empty-tree-actions">
-      <div class="empty-hint" v-if="searchQuery">无匹配文件</div>
-      <template v-else>
-        <el-card class="button-card" @click="handleAddRootFile">
-          <el-icon class="svg-icon"><DocumentAdd /></el-icon>
-        </el-card>
-        <el-card class="button-card" @click="handleAddRootFolder">
-          <el-icon class="svg-icon"><FolderAdd /></el-icon>
-        </el-card>
-      </template>
+        <!-- 搜索过滤（点击展开） -->
+      <div class="tree-search" v-show="showSearch">
+        <el-input v-model="searchQuery" size="small" placeholder="过滤文件名..." clearable prefix-icon="Search" @input="handleSearch" />
+      </div>
+      </div>
+    </div>
+    <!-- 可滚动树区域（仅子节点） -->
+    <div class="tree-scroll-area">
+      <el-tree v-show="treeChildrenData.length > 0" ref="treeRef" :data="treeChildrenData" node-key="id"
+        :props="defaultProps" :expand-on-click-node="true" :allow-drop="handleAllowDrop" @node-drop="handleNodeDrop"
+        draggable highlight-current @node-contextmenu="handleNodeContextMenu" @node-click="handleNodeClick">
+        <template #default="{ node, data }">
+          <div class="custom-tree-node" @mouseenter="onNodeMouseEnter(data)" @mouseleave="onNodeMouseLeave"
+            :class="{ 'node-is-favorite': isFavoriteNode(data) }">
+            <span class="node-label">
+              <el-icon class="node-icon" v-if="!data.isFolder">
+                <component :is="getNodeIcon(data)" />
+              </el-icon>
+              <span class="node-text" :title="node.label">{{ node.label }}</span>
+            </span>
+            <span v-show="hoveredNodeId === data.id" class="node-actions">
+              <template v-if="data.isFolder">
+                <el-icon class="action-icon" @click.stop="handleAddFile(data)" title="新建文件"><DocumentAdd /></el-icon>
+                <el-icon class="action-icon" @click.stop="handleAddFolder(data)" title="新建文件夹"><FolderAdd /></el-icon>
+                <el-icon class="action-icon action-danger" @click.stop="handleDeleteNode(data)" title="删除"><Delete /></el-icon>
+              </template>
+              <template v-else>
+                <el-icon class="action-icon action-danger" @click.stop="handleDeleteNode(data)" title="删除"><Delete /></el-icon>
+              </template>
+            </span>
+          </div>
+        </template>
+      </el-tree>
+      <!-- 空状态 -->
+      <div v-show="treeChildrenData.length === 0" class="empty-tree-actions">
+        <div class="empty-hint" @click="changeWorkspace()">请选择工作区</div>
+      
+      </div>
     </div>
 
     <!-- 重命名对话框 -->
@@ -87,51 +122,69 @@
 
     <!-- 右键菜单 -->
     <teleport to="body">
-      <div
-        v-if="contextMenuVisible"
-        class="tree-context-menu"
-        :style="{ left: menuX + 'px', top: menuY + 'px' }"
-        @click.stop
-      >
+      <div v-if="contextMenuVisible" class="tree-context-menu" :style="{ left: menuX + 'px', top: menuY + 'px' }"
+        @click.stop>
         <template v-if="contextNode?.isFolder">
           <div class="ctx-item" @click="showCreateDialog('file')">
-            <el-icon><DocumentAdd /></el-icon> 新建文件
+            <el-icon>
+              <DocumentAdd />
+            </el-icon> 新建文件
           </div>
           <div class="ctx-item" @click="showCreateDialog('folder')">
-            <el-icon><FolderAdd /></el-icon> 新建文件夹
+            <el-icon>
+              <FolderAdd />
+            </el-icon> 新建文件夹
           </div>
           <div class="ctx-divider" />
           <div class="ctx-item" @click="handleCopyPath">
-            <el-icon><DocumentCopy /></el-icon> 复制路径
+            <el-icon>
+              <DocumentCopy />
+            </el-icon> 复制路径
           </div>
           <div class="ctx-item" @click="handleOpenInExplorer">
-            <el-icon><FolderOpened /></el-icon> 在文件管理器中显示
+            <el-icon>
+              <FolderOpened />
+            </el-icon> 在文件管理器中显示
           </div>
           <div class="ctx-divider" />
           <div class="ctx-item" @click="showRenameDialog">
-            <el-icon><Edit /></el-icon> 重命名
+            <el-icon>
+              <Edit />
+            </el-icon> 重命名
           </div>
           <div class="ctx-item ctx-danger" @click="handleDelete">
-            <el-icon><Delete /></el-icon> 删除
+            <el-icon>
+              <Delete />
+            </el-icon> 删除
           </div>
         </template>
         <template v-else>
           <div class="ctx-item" @click="handleCopyPath">
-            <el-icon><DocumentCopy /></el-icon> 复制路径
+            <el-icon>
+              <DocumentCopy />
+            </el-icon> 复制路径
           </div>
           <div class="ctx-item" @click="handleToggleFavorite">
-            <el-icon><Star /></el-icon> {{ isFavoriteNode(contextNode!) ? '取消收藏' : '添加收藏' }}
+            <el-icon>
+              <Star />
+            </el-icon> {{ isFavoriteNode(contextNode!) ? '取消收藏' : '添加收藏' }}
           </div>
           <div class="ctx-divider" />
           <div class="ctx-item" @click="handleOpenInExplorer">
-            <el-icon><FolderOpened /></el-icon> 在文件管理器中显示
+            <el-icon>
+              <FolderOpened />
+            </el-icon> 在文件管理器中显示
           </div>
           <div class="ctx-divider" />
           <div class="ctx-item" @click="showRenameDialog">
-            <el-icon><Edit /></el-icon> 重命名
+            <el-icon>
+              <Edit />
+            </el-icon> 重命名
           </div>
           <div class="ctx-item ctx-danger" @click="handleDelete">
-            <el-icon><Delete /></el-icon> 删除
+            <el-icon>
+              <Delete />
+            </el-icon> 删除
           </div>
         </template>
       </div>
@@ -160,7 +213,8 @@ import {
   Search,
   Picture,
   Notebook,
-  Grid
+  Grid,
+  Refresh
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import NotificationUtil from '@/utils/NotificationUtil'
@@ -168,9 +222,32 @@ import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/entity/entitys'
 import useStore from '@/store/index'
 import { TreeNode } from '@/Types/entitys'
+import { changeWorkspace } from '@/utils/index'
 
 const { appConfig, useDocumentManagerStore } = useStore()
 let md_working_directory = ref<string>('')
+
+// ===== 收藏/最近打开 =====
+const favoriteFiles = computed(() => useDocumentManagerStore.favoriteFiles)
+const recentFiles = computed(() => useDocumentManagerStore.recentFiles)
+const expandedSections = ref<Set<string>>(new Set(['favorites', 'recent']))
+
+function toggleSection(key: string) {
+  if (expandedSections.value.has(key)) expandedSections.value.delete(key)
+  else expandedSections.value.add(key)
+}
+function favoriteName(path: string): string {
+  return path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || path
+}
+function handleFavoriteClick(path: string) {
+  useDocumentManagerStore.openDocument(path)
+}
+function handleRemoveFavorite(path: string) {
+  useDocumentManagerStore.toggleFavorite(path)
+}
+function handleRecentClick(path: string) {
+  useDocumentManagerStore.openDocument(path)
+}
 
 // Props & Emits
 const props = defineProps<{
@@ -191,6 +268,11 @@ const emit = defineEmits<{
 const showSearch = ref(false)
 const searchQuery = ref('')
 const searchLower = computed(() => searchQuery.value.toLowerCase())
+
+function toggleSearch() {
+  showSearch.value = !showSearch.value
+  if (!showSearch.value) searchQuery.value = ''
+}
 
 function handleSearch() {
   // 搜索时自动展开所有匹配节点
@@ -246,6 +328,21 @@ function compactFolders(nodes: TreeNode[]): TreeNode[] {
 }
 
 const treeData = computed(() => compactFolders(props.data))
+
+// 分离根节点和子节点
+const rootNodeData = computed<TreeNode | null>(() => {
+  const filtered = filteredTreeData.value
+  if (filtered.length > 0 && filtered[0].isRoot) return filtered[0]
+  // 没有 isRoot 标记时，取第一个节点作为根
+  if (filtered.length > 0 && filtered[0].isFolder) return filtered[0]
+  return null
+})
+const treeChildrenData = computed<TreeNode[]>(() => {
+  const root = rootNodeData.value
+  if (root && root.children) return root.children
+  // 没有根节点时返回全部过滤数据
+  return filteredTreeData.value
+})
 
 // 过滤后的树数据
 const filteredTreeData = computed(() => {
@@ -403,6 +500,12 @@ function handleDelete() {
   closeContextMenu()
 }
 
+// hover 删除按钮：设置 contextNode 后触发删除
+function handleDeleteNode(data: TreeNode) {
+  contextNode.value = data
+  handleDelete()
+}
+
 // ===== 创建文件/文件夹 =====
 function showCreateDialog(mode: 'file' | 'folder') {
   if (!contextNode.value) return
@@ -451,6 +554,7 @@ function handleAddRootFile() {
     folder: md_working_directory.value,
     filePath: '',
     isfile: false,
+    name: md_working_directory.value,
     children: [],
     value: md_working_directory.value,
   }
@@ -471,6 +575,7 @@ function handleAddRootFolder() {
     folder: md_working_directory.value,
     filePath: '',
     isfile: false,
+    name: md_working_directory.value,
     value: md_working_directory.value,
     children: []
   }
@@ -616,11 +721,45 @@ onBeforeUnmount(() => {
 .file-tree-container {
   position: relative;
   height: 100%;
+  display: flex;
+  flex-direction: column;
   user-select: none;
 
   @include theme.useTheme {
     background-color: theme.getVar('bgColor');
     color: theme.getVar('textColor');
+  }
+}
+
+// ===== 工具栏 =====
+.tree-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+
+  .toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    color: #888;
+    cursor: pointer;
+    transition: all 0.15s;
+
+    &:hover {
+      color: #ccc;
+      @include theme.useTheme {
+        background-color: theme.getVar('hoverColor');
+      }
+    }
+
+    &.active {
+      color: #007acc;
+    }
   }
 }
 
@@ -637,6 +776,209 @@ onBeforeUnmount(() => {
     .el-input__inner {
       color: theme.getVar('textColor');
     }
+  }
+}
+
+// ===== 固定顶部区域 =====
+.fixed-top-area {
+  flex-shrink: 0;
+  overflow: hidden;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+    border-bottom: 1px solid theme.getVar('borderColor');
+  }
+}
+
+// ===== 根节点固定 =====
+.root-node-fixed {
+  padding: 2px 8px;
+  cursor: pointer;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+  }
+
+  &:hover {
+    @include theme.useTheme {
+      background-color: theme.getVar('hoverColor');
+    }
+  }
+}
+
+.root-node-text {
+  font-weight: 600;
+  @include theme.useTheme {
+    font-size: theme.getVar('fontSize');
+  }
+}
+
+// ===== 可滚动树区域 =====
+.tree-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar { width: 6px; }
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(155, 155, 155, 0.2);
+    border-radius: 3px;
+    &:hover { background-color: rgba(155, 155, 155, 0.4); }
+  }
+  &::-webkit-scrollbar-track { background: transparent; }
+}
+
+// ===== 分组 =====
+.section {
+  margin-bottom: 0;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: background-color 0.1s;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+    font-size: theme.getVar('fontSizeSmall');
+  }
+}
+
+.section-chevron {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: #888;
+  transition: transform 0.15s ease;
+
+  &.expanded {
+    transform: rotate(90deg);
+  }
+}
+
+.section-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section-count {
+  font-weight: 400;
+  background-color: rgba(255, 255, 255, 0.06);
+  padding: 0 5px;
+  border-radius: 8px;
+  flex-shrink: 0;
+
+  @include theme.useTheme {
+    font-size: theme.getVar('fontSizeSmall');
+    color: theme.getVar('textSecondary');
+  }
+}
+
+.section-content {
+  padding-left: 0;
+}
+
+// ===== 收藏列表 =====
+.favorite-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 20px;
+  cursor: pointer;
+  transition: background-color 0.1s;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    .favorite-remove { opacity: 1; }
+  }
+
+  @include theme.useTheme {
+    font-size: theme.getVar('fontSize');
+  }
+}
+
+.favorite-star {
+  color: #e5c07b;
+  flex-shrink: 0;
+
+  @include theme.useTheme {
+    font-size: theme.getVar('fontSizeSmall');
+  }
+}
+
+.favorite-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
+}
+
+.favorite-remove {
+  opacity: 0;
+  color: #888;
+  flex-shrink: 0;
+  transition: all 0.1s;
+  padding: 0 2px;
+
+  &:hover { color: #e06c75; }
+
+  @include theme.useTheme {
+    font-size: theme.getVar('fontSize');
+  }
+}
+
+// ===== 最近打开列表 =====
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 20px;
+  cursor: pointer;
+  transition: background-color 0.1s;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+  }
+
+  @include theme.useTheme {
+    font-size: theme.getVar('fontSize');
+  }
+}
+
+.recent-icon {
+  flex-shrink: 0;
+  color: #666;
+  display: flex;
+  align-items: center;
+}
+
+.recent-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
   }
 }
 
@@ -663,7 +1005,10 @@ onBeforeUnmount(() => {
       font-size: 24px;
       color: var(--el-color-primary);
       transition: color 0.2s;
-      &:hover { color: var(--el-color-primary-light-4); }
+
+      &:hover {
+        color: var(--el-color-primary-light-4);
+      }
     }
   }
 }
@@ -671,8 +1016,11 @@ onBeforeUnmount(() => {
 .empty-hint {
   text-align: center;
   padding: 20px;
-  color: #555;
-  font-size: 13px;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+    font-size: theme.getVar('fontSize');
+  }
 }
 
 // ===== 树节点 =====
@@ -708,6 +1056,7 @@ onBeforeUnmount(() => {
 
   @include theme.useTheme {
     color: theme.getVar('textColor');
+    font-size: theme.getVar('fontSize');
   }
 }
 
@@ -733,8 +1082,20 @@ onBeforeUnmount(() => {
 
   &:hover {
     color: #ccc;
+
     @include theme.useTheme {
       background-color: theme.getVar('hoverColor');
+    }
+  }
+}
+
+// 删除按钮：hover 时显示红色
+.action-danger {
+  &:hover {
+    color: #e06c75 !important;
+
+    @include theme.useTheme {
+      background-color: rgba(224, 108, 117, 0.15) !important;
     }
   }
 }
@@ -767,7 +1128,6 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   padding: 6px 16px;
-  font-size: 13px;
   color: #ccc;
   cursor: pointer;
   transition: background-color 0.1s;
@@ -777,11 +1137,18 @@ onBeforeUnmount(() => {
     color: #fff;
   }
 
-  .el-icon { font-size: 14px; }
+  @include theme.useTheme {
+    font-size: theme.getVar('fontSize');
+  }
+
+  .el-icon {
+    font-size: 1em;
+  }
 }
 
 .ctx-danger {
   color: #e06c75;
+
   &:hover {
     background-color: rgba(224, 108, 117, 0.2);
     color: #e06c75;
@@ -822,7 +1189,7 @@ onBeforeUnmount(() => {
     }
   }
 
-  .el-tree-node.is-current > .el-tree-node__content {
+  .el-tree-node.is-current>.el-tree-node__content {
     @include theme.useTheme {
       background-color: theme.getVar('hoverColor');
     }

@@ -41,7 +41,8 @@ const links = ref<TreeNode[]>([{
   routerPath: '',
   folder: '',
   filePath: '',
-  isfile: false
+  isfile: false,
+  name: '哈哈哈'
 }, {
   id: '',
   label: '你好',
@@ -50,7 +51,8 @@ const links = ref<TreeNode[]>([{
   routerPath: '',
   folder: '',
   filePath: '',
-  isfile: false
+  isfile: false,
+  name: '你好'
 }])
 const querySearch = (queryString: string, cb: (arg: any) => void) => {
   console.log('queryString', queryString)

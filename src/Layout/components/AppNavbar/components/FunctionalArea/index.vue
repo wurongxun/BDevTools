@@ -1,7 +1,7 @@
 <template>
   <div class="functional-area">
     <!-- 搜索 -->
-    <div class="fa-item search-item" :class="{ 'is-expanded': isSearch }">
+    <!-- <div class="fa-item search-item" :class="{ 'is-expanded': isSearch }">
       <el-icon class="fa-icon" @click="onSearchRoutes">
         <Search />
       </el-icon>
@@ -17,7 +17,7 @@
           @select="handleSelect"
         />
       </div>
-    </div>
+    </div> -->
 
 
 
@@ -101,22 +101,7 @@
       </svg>
     </div>
     <!-- 窗口控制 -->
-    <el-tooltip content="最小化" placement="bottom">
-      <el-icon class="fa-icon" @click="handleWinMin">
-        <Minus />
-      </el-icon>
-    </el-tooltip>
-    <el-tooltip :content="visible ? '还原' : '最大化'" placement="bottom">
-      <el-icon class="fa-icon" @click="windowChange">
-        <WindowRestoreIcon v-if="visible" />
-        <WindowMaximizationIcon v-else />
-      </el-icon>
-    </el-tooltip>
-    <el-tooltip content="关闭" placement="bottom">
-      <el-icon class="fa-icon" @click="windowHide">
-        <Close />
-      </el-icon>
-    </el-tooltip>
+    <WindowControls />
   </div>
 </template>
 
@@ -124,15 +109,12 @@
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import { Close, Minus, Search, Setting, InfoFilled, QuestionFilled, Sunny, Moon, Message } from '@element-plus/icons-vue'
-import { getCurrentWindow } from '@tauri-apps/api/window'
-import { saveWindowState, StateFlags } from '@tauri-apps/plugin-window-state'
+import { Search, Sunny, Moon, Message } from '@element-plus/icons-vue'
 import { load, Store } from '@tauri-apps/plugin-store'
 import { isDark, toggleDark } from '@/composables/useDark'
 import useStore from '@/store'
 import { TreeNode } from '@/Types/entitys'
-import WindowMaximizationIcon from '@/components/Icon/WindowMaximizationIcon.vue'
-import WindowRestoreIcon from '@/components/Icon/WindowRestoreIcon.vue'
+import WindowControls from '@/components/WindowControls.vue'
 import { openAppWindow } from '@/utils/WindowUtils'
 const store = useStore()
 const router = useRouter()
@@ -234,20 +216,8 @@ const markAllAsRead = () => {
 
 // ========== 设置 ==========
 const handleSettingCommand = (command: string) => {
-  const pages: Record<string, string> = { setting: '/AppSetting', about: '/AppAbout', help: '/AppHelp' }
+  const pages: Record<string, string> = { setting: '/App/setting', about: '/App/about', help: '/App/help' }
   if (pages[command]) openAppWindow(pages[command])
-}
-
-// ========== 窗口控制 ==========
-const visible = ref(false)
-const handleWinMin = async () => { await getCurrentWindow().minimize() }
-const windowChange = async () => {
-  await getCurrentWindow().toggleMaximize()
-  visible.value = !visible.value
-}
-const windowHide = async () => {
-  saveWindowState(StateFlags.ALL)
-  await getCurrentWindow().hide()
 }
 </script>
 
