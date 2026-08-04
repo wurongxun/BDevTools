@@ -11,7 +11,8 @@ export async function openAppWindow(path: string) {
   const config = PAGE_CONFIGS[path]
   if (!config) return
 
-  const windowLabel = `app-window-${path.replace(/\//g, '-')}`
+  // 生成窗口标签：/App/setting → app-window-App-setting
+  const windowLabel = `app-window-${path.replace(/^\//, '').replace(/\//g, '-')}`
 
   try {
     const existing = await WebviewWindow.getByLabel(windowLabel)

@@ -15,6 +15,7 @@ import registerDirectives from '@/directives/index'
 import errorHandler from './errorHandler'
 import i18n from '../src/locales'
 import { registerBuiltinPlugins } from '@/plugins'
+import '@/permission'
 
 async function initializeApp() {
   // 注册内置工具插件

@@ -1,7 +1,6 @@
 import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import Layout from '@/Layout/index.vue'
-import Common from '@/views/Common/Common.vue'
 
 /**
  * @param path: 路由的访问路径
@@ -58,37 +57,6 @@ export const constantRoutes: Array<RouteRecordRaw> = [
     path: '/login',
     meta: { title: '登录', hidden: true, noTagView: true },
     component: () => import('@/views/login/index.vue')
-  },
-  {
-    path: '/App',
-    component: Common,
-    meta: { hidden: true },
-    children: [
-      {
-        path: 'setting',
-        name: 'AppSetting',
-        component: () => import('@/views/app/AppSetting.vue'),
-        meta: { title: '设置' }
-      },
-      {
-        path: 'about',
-        name: 'AppAbout',
-        component: () => import('@/views/app/AppAbout.vue'),
-        meta: { title: '关于' }
-      },
-      {
-        path: 'help',
-        name: 'AppHelp',
-        component: () => import('@/views/app/AppHelp.vue'),
-        meta: { title: '帮助' }
-      },
-      {
-        path: 'terminal',
-        name: 'AppTerminal',
-        component: () => import('@/views/app/AppTerminal.vue'),
-        meta: { title: '终端' }
-      }
-    ]
   }
 ]
 
@@ -99,45 +67,3 @@ const router = createRouter({
 })
 
 export default router
-
-// ,
-// {
-//   path: '/App',
-//     component: () => import('@/views/Common/Common.vue'),
-//   meta: { title: 'App', icon: 'error-handle', noBreadCrumbs: true },
-//   children: [
-//     {
-//       path: '/AppSetting',
-//       name: 'AppSetting',
-//       component: () => import('@/views/app/AppSetting.vue'),
-//       meta: {
-//         title: '设置',
-//         noTagView: true,
-//         i18n: 'settings.name',
-//         transition: 'scroll-x-transition'
-//       }
-//     },
-//     {
-//       path: '/AppAbout',
-//       name: 'AppAbout',
-//       component: () => import('@/views/app/AppAbout.vue'),
-//       meta: {
-//         title: '关于',
-//         noTagView: true,
-//         i18n: 'about.name',
-//         transition: 'scroll-x-transition'
-//       }
-//     },
-//     {
-//       path: '/AppHelp',
-//       name: 'AppHelp',
-//       component: () => import('@/views/app/AppHelp.vue'),
-//       meta: {
-//         title: '帮助',
-//         i18n: 'help.name',
-//         noTagView: true,
-//         transition: 'scroll-x-transition'
-//       }
-//     }
-//   ]
-// }

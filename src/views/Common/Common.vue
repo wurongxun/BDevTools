@@ -1,18 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRoute } from 'vue-router';
 import WindowControls from '@/components/WindowControls.vue'
 
-const route = useRoute();
-
-const pageTitles: Record<string, string> = {
-  '/App/setting': '设置',
-  '/App/about': '关于',
-  '/App/help': '帮助',
-  '/App/terminal': '终端'
-}
-
-const pageTitle = ref(pageTitles[route.path] || '')
+defineProps<{
+  pageComponent: any
+  pageTitle: string
+}>()
 </script>
 
 <template>
@@ -23,10 +15,7 @@ const pageTitle = ref(pageTitles[route.path] || '')
       <WindowControls />
     </header>
     <main class="app-container">
-      <keep-alive>
-        <router-view v-if="route.meta.keepAlive" :key="route.fullPath" />
-        <router-view v-else :key="'normal-' + route.fullPath" />
-      </keep-alive>
+      <component :is="pageComponent" v-if="pageComponent" />
     </main>
   </div>
 </template>
