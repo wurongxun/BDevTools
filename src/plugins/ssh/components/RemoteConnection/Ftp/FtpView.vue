@@ -134,7 +134,7 @@
             @dblclick="goUpDir"
           >
             <span class="file-icon">📂</span>
-            <span class="file-name">..</span>
+            <span class="file-name">...</span>
             <span class="file-size"></span>
             <span class="file-time"></span>
           </div>
@@ -415,7 +415,6 @@ function handleRemoteFileClick(file: FtpFileItem, event: MouseEvent) {
     selectedRemoteFiles.value = [file.path]
   }
 }
-
 function handleRemoteFileDblClick(file: FtpFileItem) {
   if (file.isDirectory && sftpSessionId) {
     remotePath.value = file.path
@@ -488,15 +487,18 @@ async function handleRename() {
     // cancelled
   }
 }
-
+//上一个文件夹（远程）
 function goUpDir() {
   if (!sftpSessionId) return
   const currentPath = remotePath.value
+  console.log("goUpDir currentPath",currentPath)
   if (!currentPath || currentPath === '/' || currentPath === '') return
-  const parts = currentPath.split('/').filter(Boolean)
+  const parts = currentPath.replace(/\\/g, '/').split('/').filter(Boolean)
   parts.pop()
+  console.log("goUpDir parts",parts)
   const parentPath = parts.length > 0 ? '/' + parts.join('/') : '/'
   remotePath.value = parentPath
+  console.log("goUpDir",props.tab.id, sftpSessionId, parentPath)
   useFtpStore.listRemoteFiles(props.tab.id, sftpSessionId, parentPath)
 }
 

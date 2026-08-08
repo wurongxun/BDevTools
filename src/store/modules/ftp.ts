@@ -56,6 +56,7 @@ export const useFtpStore = defineStore('ftp', () => {
 
     try {
       const res = await invoke<any>('sftp_list_dir', { sessionId, path })
+      console.log("listRemoteFiles ",path,res)
       if (res.code === 200) {
         panel.remoteFiles = res.data
         panel.remotePath = path

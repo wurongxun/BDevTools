@@ -320,7 +320,7 @@ pub async fn sftp_list_dir(
                     .unwrap_or_default()
                     .to_string_lossy()
                     .to_string();
-                let file_path = path_buf.to_string_lossy().to_string();
+                let file_path = path_buf.to_string_lossy().replace('\\', "/");
                 let is_dir = stat.is_dir();
                 let size = stat.size.unwrap_or(0);
 
