@@ -8,6 +8,7 @@ import { md5 } from '@/utils/Md5Utils'
 import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { load } from '@tauri-apps/plugin-store'
+import type { OpenFileInfo } from '@/Types/workspace'
 // 文件类型枚举
 export enum FileType {
   CODE = 'code',
@@ -695,6 +696,19 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
   }
 
   /**
+   * 导出文档快照数据（用于会话快照）
+   */
+  function exportOpenFiles(): OpenFileInfo[] {
+    return documentList.value.map(doc => ({
+      path: doc.id,
+      is_dirty: doc.isDirty,
+      cursor_line: doc.viewState.cursor?.line ?? 0,
+      cursor_col: doc.viewState.cursor?.column ?? 0,
+      scroll_top: doc.viewState.scrollTop ?? 0
+    }))
+  }
+
+  /**
    * 获取文档的保存状态描述
    */
   function getDocumentStatus(filePath: string): string {
@@ -738,6 +752,7 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     createNewDocument,
     renameDocument,
     getDocumentStatus,
+    exportOpenFiles,
     // 收藏
     loadFavorites,
     toggleFavorite,

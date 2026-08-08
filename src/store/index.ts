@@ -9,6 +9,8 @@ import { routerNoteStore } from './modules/routerNote'
 import { useDocumentManagerStore } from './modules/documents'
 import { useConnectionStore } from './modules/connection'
 import { useFtpStore } from './modules/ftp'
+import { useWorkspaceStore } from './modules/workspace'
+import { useSessionStore } from './modules/session'
 const pinia = createPinia()
 
 export default function useStore() {
@@ -21,7 +23,9 @@ export default function useStore() {
     routerNoteStore: routerNoteStore(pinia),
     useDocumentManagerStore: useDocumentManagerStore(pinia),
     useConnectionStore: useConnectionStore(pinia),
-    useFtpStore: useFtpStore(pinia)
+    useFtpStore: useFtpStore(pinia),
+    useWorkspaceStore: useWorkspaceStore(pinia),
+    useSessionStore: useSessionStore(pinia)
   }
 }
 //noteTem: useNoteStore(pinia),

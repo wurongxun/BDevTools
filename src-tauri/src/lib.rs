@@ -15,7 +15,10 @@ mod entity;
 mod response;
 mod system_menu;
 mod utils;
-mod sqlite ;
+mod sqlite;
+mod window_manager;
+mod workspace;
+mod session;
 
 use crate::app::app_store::{app_autostart, app_settings,app_openFile, APP};
 use crate::app::tray::create_tray;
@@ -42,6 +45,18 @@ use crate::command::search_log_parallel::{
 };
 use crate::sqlite::ssh_connection::{
     connection_create, connection_delete, connection_edit, connection_list,
+};
+use crate::window_manager::commands::{
+    create_editor_window, get_window_list, close_window, focus_window,
+    get_window_count, update_window_position_cmd,
+};
+use crate::workspace::commands::{
+    workspace_list, workspace_get, workspace_create, workspace_update,
+    workspace_delete, workspace_get_default,
+};
+use crate::session::commands::{
+    session_save, session_load, session_load_all, session_list,
+    session_delete, session_clear,
 };
 
 
@@ -114,10 +129,34 @@ pub fn run() {
             connection_delete,
             connection_edit,
             connection_list,
+            // 窗口管理
+            create_editor_window,
+            get_window_list,
+            close_window,
+            focus_window,
+            get_window_count,
+            update_window_position_cmd,
+            // 工作区管理
+            workspace_list,
+            workspace_get,
+            workspace_create,
+            workspace_update,
+            workspace_delete,
+            workspace_get_default,
+            // 会话管理
+            session_save,
+            session_load,
+            session_load_all,
+            session_list,
+            session_delete,
+            session_clear,
         ])
         .setup(move |app: &mut App| {
             // 初始化 app_dir
             APP.lock().update_app_dir(app.handle());
+            // 初始化工作区和会话目录
+            crate::workspace::config::ensure_workspaces_dir();
+            crate::session::snapshot::ensure_sessions_dir();
             #[cfg(all(desktop))]
             {
                 let handle = app.handle();
@@ -194,6 +233,17 @@ pub fn run() {
             //     Err(err) => return Err(Box::new(err)),
             // };
             main_window.restore_state(StateFlags::all()); // will restore the window's state from disk
+            // 注册主窗口到全局注册表
+            {
+                let meta = crate::window_manager::registry::create_window_meta(
+                    "main".to_string(),
+                    crate::entity::window::WindowRole::Main,
+                    None,
+                    "MdViewer".to_string(),
+                    0.0, 0.0, 960.0, 640.0,
+                );
+                crate::window_manager::registry::register_window(meta);
+            }
             app_settings(&app.handle());
             main_window.show().unwrap();
             Ok(())

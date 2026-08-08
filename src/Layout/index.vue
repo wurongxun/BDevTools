@@ -37,7 +37,7 @@ import { storeToRefs } from 'pinia'
 import { watch, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 
-const { system } = useStore()
+const { system, useWorkspaceStore } = useStore()
 const { isCollapse } = storeToRefs(system)
 
 // const isEditorRoute = computed(() => {
@@ -189,6 +189,9 @@ useResizeObserver(sideBoxRef, async (entries) => {
 // 组件挂载时触发初始化事件并设置初始状态
 onMounted(async () => {
   await nextTick()
+
+  // 加载工作区列表（用于菜单显示，currentWorkspace 由 App.vue 负责加载）
+  await useWorkspaceStore.loadAllWorkspaces()
 
   // 如果初始窗口宽度小于 720px，自动隐藏侧边栏
   if (windowWidth.value < 720 && !isCollapse.value) {
