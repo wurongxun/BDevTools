@@ -12,9 +12,8 @@ use std::{
     error::Error,
     path::{Path, PathBuf},
 };
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
-use tauri_plugin_store::StoreExt;
 use std::fs;
 use std::io::Read;
 use chardetng::EncodingDetector;
@@ -47,37 +46,15 @@ pub async fn file_manager_open_path(app_handle: tauri::AppHandle, path: String) 
     }
 }
 #[tauri::command]
-pub async fn get_document_notebooks(app_handle: tauri::AppHandle) -> ResData<String> {
-    //查看配置
-    let store_ = app_handle.store("settings.json");
-    match store_ {
-        Ok(store) => {
-            let md_working_directory_val = store.get("md_working_directory");
-            match md_working_directory_val {
-                Some(md_working_directory) => {
-                    // 修复：正确获取 JSON 对象中的 "value" 字段
-                    if let Some(directory_obj) = md_working_directory.as_object() {
-                        if let Some(value_field) = directory_obj.get("value") {
-                            if let Some(directory_path) = value_field.as_str() {
-                                // 添加判断是否为空字符串
-                                if !directory_path.is_empty() {
-                                    // 获取目录下的所有文件和文件夹
-                                    return md_notebooks(&app_handle, directory_path);
-                                }
-                            }
-                        }
-                    }
-                    return default_document_data(app_handle);
-                }
-                None => {
-                    return default_document_data(app_handle);
-                }
-            }
-        }
-        Err(e) => {
-            return default_document_data(app_handle);
+pub async fn get_document_notebooks(app_handle: tauri::AppHandle, working_directory: Option<String>) -> ResData<String> {
+    // 优先使用前端传入的 per-window 工作目录参数
+    if let Some(dir) = working_directory {
+        if !dir.is_empty() {
+            return md_notebooks(&app_handle, &dir);
         }
     }
+    // 未传入目录时返回默认空数据，不再从全局 settings.json 读取
+    default_document_data(app_handle)
 }
 /**
  * 更新文件夹名称

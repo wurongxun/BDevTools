@@ -4,35 +4,28 @@ import request from '@/utils/request/index'
 import { tauri_request } from '@/utils/tauri_request'
 import { defineAsyncComponent, ref } from 'vue'
 import { RouteRecordRaw, RouteComponent } from 'vue-router'
-import { load, Store } from '@tauri-apps/plugin-store'
 import {
   note_comm_router,
   note_comm_router_notebookMd,
   note_comm_router_notebookPdf
 } from '@/setting'
-import { id } from 'element-plus/es/locales.mjs'
 import useStore from '@/store/index'
 import router from '@/router/index'
 
 export const get_file_Api = async () => {
+  const { routerNoteStore } = useStore()
+  // 从当前窗口的 Pinia 状态读取工作目录（per-window 隔离）
+  const workingDir = routerNoteStore.workingDirectory || ''
+
   let notebooks_data = ref<NotebookInfo | null>(null)
-  let md_working_directory = ref<string>('')
-  let store: Store | undefined = undefined
-  store = await load('settings.json', {
-    autoSave: false,
-    defaults: {}
+  // 将 per-window 工作目录传给 Rust 命令，不再从全局 settings.json 读取
+  let res = await tauri_request<ResponseData<NotebookInfo>>('get_document_notebooks', {
+    workingDirectory: workingDir || null
   })
-  //获取文件信息
-  let md_working_directory_val = await store.get<{ value: string }>('md_working_directory')
-  if (md_working_directory_val !== undefined) {
-    md_working_directory.value = md_working_directory_val.value
-  }
-  let res = await tauri_request<ResponseData<NotebookInfo>>('get_document_notebooks', {})
   if (res && typeof res === 'object' && 'code' in res && res.code == 200) {
-    //值 返回ResponseData 对象，包含data、code、msg参数 例如：data {"id":"1752761254929","parent_id":"","path":"C:\\Users\\kun15\\Documents\\notebooks","name":"notebooks","isfile":false,"children":[]}
     let data_: NotebookInfo = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
     notebooks_data.value = data_
-    FileTreeNodeHandler(data_, md_working_directory.value)
+    FileTreeNodeHandler(data_, workingDir)
     let data: RouteRecordRaw[] = [] as RouteRecordRaw[]
     return data
   } else {

@@ -59,10 +59,12 @@ export async function openAppWindow(path: string) {
  * @param workspaceId 可选的工作区 ID，绑定到新窗口
  */
 export async function createEditorWindow(workspaceId?: string): Promise<WindowMeta | null> {
+  console.log('[createEditorWindow] 开始调用, workspaceId=', workspaceId)
   try {
     const res = await invoke<ResponseData<WindowMeta>>('create_editor_window', {
       workspaceId: workspaceId ?? null
     })
+    console.log('[createEditorWindow] 响应:', res)
     if (res.code === 200) {
       return res.data
     }

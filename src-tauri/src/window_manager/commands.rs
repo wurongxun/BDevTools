@@ -12,11 +12,13 @@ pub async fn create_editor_window(
     app: tauri::AppHandle,
     workspace_id: Option<String>,
 ) -> Response<WindowMeta> {
+    println!("[create_editor_window] 命令被调用, workspace_id={:?}", workspace_id);
     let uuid = Uuid::new_v4().to_string();
     // 截取 uuid 前 8 位作为简短标识
     let short_id = &uuid[..8];
     let label = format!("editor-{}", short_id);
     let title = format!("编辑器 - {}", short_id);
+    println!("[create_editor_window] 准备创建窗口: label={}", label);
 
     // 创建 WebviewWindow
     let window = WebviewWindowBuilder::new(
@@ -70,6 +72,7 @@ pub async fn create_editor_window(
             Response::new(200, meta, "编辑器窗口创建成功")
         }
         Err(err) => {
+            println!("[create_editor_window] 窗口创建失败: {}", err);
             Response::new(500, WindowMeta {
                 label: String::new(),
                 role: WindowRole::Editor,

@@ -86,7 +86,9 @@ export const routerNoteStore = defineStore('routerNoteStore', {
     return {
       tree_node: [] as TreeNode[],
       search_data: [] as TreeNode[],
-      routes_loading: false
+      routes_loading: false,
+      /** 当前窗口绑定的工作目录（per-window 隔离） */
+      workingDirectory: ''
     }
   },
   getters: {
@@ -94,8 +96,12 @@ export const routerNoteStore = defineStore('routerNoteStore', {
     getRoutesLoading: (state) => state.routes_loading
   },
   actions: {
+    /** 设置当前窗口的工作目录 */
+    setWorkingDirectory(dir: string) {
+      this.workingDirectory = dir
+    },
     /**
-     * @description 动态比对添加路由权限
+     * @description 数组扁平化， 同时修改路由name为[父元素name -> name]
      * @returns RouteRecordRaw[]
      */
     async setRoutes() {

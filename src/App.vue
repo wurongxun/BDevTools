@@ -20,7 +20,7 @@ import Common from '@/views/Common/Common.vue'
 import LoginView from '@/views/login/index.vue'
 import type { WindowRole } from '@/Types/workspace'
 
-const { useDocumentManagerStore, user, useWorkspaceStore, useSessionStore } = useStore()
+const { useDocumentManagerStore, user, useWorkspaceStore, useSessionStore, routerNoteStore } = useStore()
 
 const isLoggedIn = ref(false)
 const windowRole = ref<WindowRole>('main')
@@ -69,21 +69,13 @@ async function initWindow() {
 }
 
 /**
- * 初始化编辑器窗口：加载工作区 + 恢复会话
+ * 初始化编辑器窗口：新窗口完全隔离，不加载旧窗口数据
  */
 async function initEditorWindow() {
   if (windowRole.value !== 'editor') return
 
-  // 加载默认工作区
-  await useWorkspaceStore.loadCurrentWorkspace(null)
-
-  // 尝试恢复会话
-  const snapshot = await useSessionStore.loadCurrentWindowSnapshot()
-  if (snapshot && snapshot.open_files.length > 0) {
-    await useSessionStore.restoreFromSnapshot(snapshot)
-  }
-
-  // 启动自动保存
+  // 新窗口从空白状态开始，不加载旧窗口的工作区和会话数据
+  // 仅启动自动保存，用于保存当前窗口自身的状态
   useSessionStore.startAutoSave()
 }
 
@@ -146,6 +138,20 @@ async function initApp() {
   if (windowRole.value === 'editor') {
     await initEditorWindow()
     return
+  }
+
+  // 主窗口：从 settings.json 初始化 per-window 工作目录
+  try {
+    const settingsStore = await load('settings.json', {
+      autoSave: false,
+      defaults: {}
+    })
+    const mdDir = await settingsStore.get<{ value: string }>('md_working_directory')
+    if (mdDir?.value) {
+      routerNoteStore.setWorkingDirectory(mdDir.value)
+    }
+  } catch (e) {
+    console.warn('加载工作目录设置失败:', e)
   }
 
   // 主窗口：从 openfile.json 加载文件（向后兼容）

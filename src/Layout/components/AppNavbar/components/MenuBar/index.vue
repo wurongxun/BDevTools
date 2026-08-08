@@ -48,7 +48,7 @@ import { changeWorkspace } from '@/utils/index'
 import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
 import { open } from '@tauri-apps/plugin-dialog'
-import { openAppWindow } from '@/utils/WindowUtils'
+import { openAppWindow, createEditorWindow } from '@/utils/WindowUtils'
 const {useDocumentManagerStore,routerNoteStore } = useStore()
 const router = useRouter()
 const activeMenu = ref<string | null>(null)
@@ -99,7 +99,8 @@ const menus: Menu[] = [
     label: '文件(F)',
     items: [
       { label: '打开文件', shortcut: 'Ctrl+O', command: 'openFile' },
-      { label: '更换工作区', shortcut: 'Ctrl+O', command: 'openWorkingDirectory' },
+      { label: '新建窗口', shortcut: 'Ctrl+Shift+N', command: 'newWindow' },
+      { label: '打开目录', shortcut: 'Ctrl+O', command: 'openWorkingDirectory' },
       { divider: true, label: '', command: '' },
       { label: '设置', command: 'settings' },
     ]
@@ -219,6 +220,15 @@ const handleMenuCommand = async (item: MenuItem) => {
     }
     case 'about': {
       openAppWindow('/App/about')
+      break
+    }
+    case 'newWindow': {
+      const meta = await createEditorWindow()
+      if (meta) {
+        NotificationUtil.success(`编辑器窗口已创建: ${meta.label}`)
+      } else {
+        NotificationUtil.error('创建编辑器窗口失败，请查看控制台日志')
+      }
       break
     }
     case 'newTerminal': {

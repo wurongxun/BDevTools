@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { Check, Close, Folder, FolderChecked } from '@element-plus/icons-vue'
+import { onMounted, reactive, ref, computed } from 'vue'
+import { Check, Close, Plus, Delete, Edit } from '@element-plus/icons-vue'
 import { invoke } from '@tauri-apps/api/core'
 import { ResponseData, SettingIdValueName, SettingMap } from '@/entity/entitys'
 import { useI18n } from 'vue-i18n'
@@ -17,11 +17,15 @@ import { TreeNode } from '@/Types/entitys'
 import { useRouter, useRoute, LocationQueryRaw, RouteParamsRaw } from 'vue-router'
 import { check as check_, Update, DownloadEvent } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { pluginManager } from '@/core/pluginManager'
 
-const { appConfig, routerNoteStore } = useStore()
+const { appConfig } = useStore()
 const router = useRouter()
 const route = useRoute()
 const { t, locale } = useI18n()
+
+/** 当前激活的设置页签 */
+const activeSettingTab = ref<'app' | 'window'>('app')
 const userStore = appConfig
 let store: Store | undefined = undefined
 let autostart = ref<boolean>(false)
@@ -29,7 +33,6 @@ let update_reminder = ref<boolean>(false)
 let dark = ref<boolean>(false)
 let theme = ref<string>('white')
 let language = ref<string>('')
-let md_working_directory = ref<string>('')
 let read_lines = ref<number>(50000)
 let has_update = ref<boolean>(false)
 let update_info = ref<{
@@ -119,11 +122,6 @@ onMounted(async () => {
     language.value = language_val.value
     userStore.setLanguage(language_val.value)
   }
-  let md_working_directory_val = await store.get<{ value: string }>('md_working_directory')
-  if (md_working_directory_val !== undefined) {
-    md_working_directory.value = md_working_directory_val.value
-    userStore.setMdWorkingDirectory(md_working_directory_val.value)
-  }
   let read_lines_val = await store.get<{ value: number }>('read_lines')
   if (read_lines_val !== undefined) {
     read_lines.value = Number(read_lines_val.value)
@@ -143,6 +141,9 @@ onMounted(async () => {
     dark.value = dark_val.value
     userStore.setDark(dark.value)
   }
+
+  // 加载窗口预设
+  await loadWindowPresets()
 })
 
 function show_setting() {}
@@ -218,18 +219,6 @@ async function handleRegisterAssociation() {
     await invoke('open_default_apps_settings')
   }
 }
-async function md_working_directory_change() {
-  let file_directory: string | null = await open({
-    multiple: false,
-    directory: true
-  })
-    if (store) {
-      await store.set('md_working_directory', { value: file_directory })
-      await store.save()
-    }
-    const routerNote = routerNoteStore.setRoutes()
-
-}
 
 async function onReadLines() {
     if (store) {
@@ -248,6 +237,160 @@ const clear_cache = () => {
 const clear_browser_cache = () => {
   // 实现清除浏览器缓存的逻辑
   console.log('清除浏览器缓存')
+}
+
+// ==================== 窗口预设管理 ====================
+
+/** 窗口预设配置 */
+interface WindowPresetConfig {
+  id: string
+  name: string
+  enabledPlugins: string[]
+  width: number
+  height: number
+  openOnStartup: boolean
+  focusMode: boolean
+}
+
+const windowPresets = ref<WindowPresetConfig[]>([])
+const showWindowEditDialog = ref(false)
+const editingPreset = ref<WindowPresetConfig | null>(null)
+const isCreatingPreset = ref(false)
+
+/** 可选的窗口尺寸 */
+const sizeOptions = [
+  { label: '小 (800×600)', width: 800, height: 600 },
+  { label: '中 (1024×768)', width: 1024, height: 768 },
+  { label: '大 (1280×900)', width: 1280, height: 900 },
+  { label: '超大 (1920×1080)', width: 1920, height: 1080 },
+  { label: '自定义', width: 0, height: 0 }
+]
+const selectedSizeLabel = ref('中 (1024×768)')
+
+/** 所有已注册的插件 */
+const registeredPlugins = computed(() => pluginManager.plugins)
+
+/** 当前编辑的预设是否为新建 */
+const editingIsNew = computed(() => isCreatingPreset.value)
+
+/** 当前尺寸是否为自定义 */
+const isCustomSize = computed(() => {
+  if (!editingPreset.value) return false
+  return !sizeOptions.some(s => s.width === editingPreset.value!.width && s.height === editingPreset.value!.height && s.width > 0)
+})
+
+/** 至少有一个窗口开启了启动时打开 */
+const hasStartupWindow = computed(() => windowPresets.value.some(p => p.openOnStartup))
+
+/** 加载窗口预设 */
+async function loadWindowPresets() {
+  if (!store) return
+  const val = await store.get<WindowPresetConfig[]>('window_presets')
+  if (val && Array.isArray(val)) {
+    windowPresets.value = val
+  }
+}
+
+/** 保存窗口预设 */
+async function saveWindowPresets() {
+  if (!store) return
+  await store.set('window_presets', windowPresets.value)
+  await store.save()
+}
+
+/** 添加新窗口预设 */
+function addWindowPreset() {
+  isCreatingPreset.value = true
+  editingPreset.value = {
+    id: 'window-' + Date.now(),
+    name: '新窗口',
+    enabledPlugins: registeredPlugins.value.map(p => p.id),
+    width: 1024,
+    height: 768,
+    openOnStartup: false,
+    focusMode: false
+  }
+  selectedSizeLabel.value = '中 (1024×768)'
+  showWindowEditDialog.value = true
+}
+
+/** 编辑窗口预设 */
+function editWindowPreset(preset: WindowPresetConfig) {
+  isCreatingPreset.value = false
+  editingPreset.value = { ...preset, enabledPlugins: [...preset.enabledPlugins] }
+  const matched = sizeOptions.find(s => s.width === preset.width && s.height === preset.height && s.width > 0)
+  selectedSizeLabel.value = matched?.label || '自定义'
+  showWindowEditDialog.value = true
+}
+
+/** 删除窗口预设 */
+async function removeWindowPreset(id: string) {
+  const preset = windowPresets.value.find(p => p.id === id)
+  if (preset?.openOnStartup && windowPresets.value.filter(p => p.openOnStartup).length <= 1) {
+    NotificationUtil.error('至少保留一个启动时打开的窗口')
+    return
+  }
+  windowPresets.value = windowPresets.value.filter(p => p.id !== id)
+  await saveWindowPresets()
+}
+
+/** 保存编辑的窗口预设 */
+async function saveEditingPreset() {
+  if (!editingPreset.value) return
+  if (!editingPreset.value.name.trim()) {
+    NotificationUtil.error('请输入窗口名称')
+    return
+  }
+  if (editingPreset.value.focusMode && editingPreset.value.enabledPlugins.length !== 1) {
+    NotificationUtil.error('专注模式下只能选择一个插件')
+    return
+  }
+  if (editingPreset.value.enabledPlugins.length === 0) {
+    NotificationUtil.error('至少选择一个插件')
+    return
+  }
+
+  if (isCreatingPreset.value) {
+    windowPresets.value.push({ ...editingPreset.value })
+  } else {
+    const idx = windowPresets.value.findIndex(p => p.id === editingPreset.value!.id)
+    if (idx !== -1) {
+      windowPresets.value[idx] = { ...editingPreset.value }
+    }
+  }
+  await saveWindowPresets()
+  showWindowEditDialog.value = false
+  editingPreset.value = null
+}
+
+/** 尺寸选择变化 */
+function onSizeChange(label: string) {
+  const opt = sizeOptions.find(s => s.label === label)
+  if (opt && opt.width > 0 && editingPreset.value) {
+    editingPreset.value.width = opt.width
+    editingPreset.value.height = opt.height
+  }
+}
+
+/** 切换插件选中状态 */
+function togglePlugin(pluginId: string) {
+  if (!editingPreset.value) return
+  const idx = editingPreset.value.enabledPlugins.indexOf(pluginId)
+  if (idx === -1) {
+    editingPreset.value.enabledPlugins.push(pluginId)
+  } else {
+    editingPreset.value.enabledPlugins.splice(idx, 1)
+  }
+}
+
+/** 切换专注模式 */
+function toggleFocusMode(val: boolean) {
+  if (!editingPreset.value) return
+  editingPreset.value.focusMode = val
+  if (val && editingPreset.value.enabledPlugins.length > 1) {
+    // 专注模式开启时只保留第一个插件
+    editingPreset.value.enabledPlugins = [editingPreset.value.enabledPlugins[0]]
+  }
 }
 
 // 提取公共的缓存处理函数
@@ -357,11 +500,32 @@ const app_updates_check = async () => {
 </script>
 
 <template>
-  <div class="settings-container">
-    <div class="settings-content">
-      <!-- 通用设置 -->
-      <div class="settings-section">
-        <h2 class="section-title">{{ $t('settings.name') }}</h2>
+  <div class="settings-layout">
+    <!-- 左侧导航 -->
+    <div class="settings-nav">
+      <div
+        class="settings-nav-item"
+        :class="{ active: activeSettingTab === 'app' }"
+        @click="activeSettingTab = 'app'"
+      >
+        应用设置
+      </div>
+      <div
+        class="settings-nav-item"
+        :class="{ active: activeSettingTab === 'window' }"
+        @click="activeSettingTab = 'window'"
+      >
+        窗口设置
+      </div>
+    </div>
+
+    <!-- 右侧内容区 -->
+    <div class="settings-main">
+      <!-- 应用设置 -->
+      <div v-show="activeSettingTab === 'app'" class="settings-content">
+        <!-- 通用设置 -->
+        <div class="settings-section">
+          <h2 class="section-title">{{ $t('settings.name') }}</h2>
 
         <div class="settings-item">
           <div class="setting-info">
@@ -503,28 +667,6 @@ const app_updates_check = async () => {
 
         <div class="settings-item">
           <div class="setting-info">
-            <div class="setting-header">
-              <span class="setting-label">编辑器</span>
-              <span class="setting-description">编辑器工作目录</span>
-            </div>
-            <div class="directory-display">
-              <el-icon class="folder-icon">
-                <Folder />
-              </el-icon>
-              <span class="setting-working-directory">{{ md_working_directory || '未设置' }}</span>
-            </div>
-          </div>
-          <div class="setting-control">
-            <el-button type="primary" @click="md_working_directory_change" plain>
-              <el-icon>
-                <FolderChecked />
-              </el-icon>
-              更换工作目录
-            </el-button>
-          </div>
-        </div>
-        <div class="settings-item">
-          <div class="setting-info">
             <span class="setting-label">文本默认读取行数</span>
             <span class="setting-description">编辑器打开文件时默认读取的行数，建议最大值不超过20万行，行数直接影响内存占用，请谨慎设置</span>
           </div>
@@ -576,12 +718,184 @@ const app_updates_check = async () => {
           </div>
         </div>
       </div>
+
+      </div>
+
+      <!-- 窗口设置 -->
+      <div v-show="activeSettingTab === 'window'" class="settings-content">
+        <div class="settings-section">
+          <h2 class="section-title">窗口</h2>
+          <p class="section-desc">配置应用启动时自动打开的窗口，以及每个窗口的功能和布局。</p>
+
+        <!-- 窗口预设列表 -->
+        <div class="window-preset-list">
+          <div
+            v-for="preset in windowPresets"
+            :key="preset.id"
+            class="window-preset-card"
+          >
+            <div class="preset-info">
+              <div class="preset-name-row">
+                <span class="preset-name">{{ preset.name }}</span>
+                <el-tag v-if="preset.openOnStartup" size="small" type="success">启动时打开</el-tag>
+                <el-tag v-if="preset.focusMode" size="small" type="warning">专注模式</el-tag>
+              </div>
+              <div class="preset-meta">
+                <span>插件: {{ preset.enabledPlugins.join(', ') }}</span>
+                <span class="preset-sep">|</span>
+                <span>{{ preset.width }} × {{ preset.height }}</span>
+              </div>
+            </div>
+            <div class="preset-actions">
+              <el-button size="small" @click="editWindowPreset(preset)" :icon="Edit" circle />
+              <el-button size="small" @click="removeWindowPreset(preset.id)" :icon="Delete" circle type="danger" />
+            </div>
+          </div>
+
+          <div v-if="windowPresets.length === 0" class="window-preset-empty">
+            暂未配置窗口预设，点击下方按钮添加
+          </div>
+        </div>
+
+        <el-button type="primary" @click="addWindowPreset" plain>
+          <el-icon><Plus /></el-icon>
+          添加窗口
+        </el-button>
+        </div>
+      </div>
     </div>
+
+    <!-- 窗口编辑弹窗 -->
+    <el-dialog
+      v-model="showWindowEditDialog"
+      :title="editingIsNew ? '添加窗口' : '编辑窗口'"
+      width="520px"
+      :close-on-click-modal="false"
+      append-to-body
+    >
+      <div v-if="editingPreset" class="window-edit-form">
+        <!-- 窗口名称 -->
+        <div class="form-item">
+          <label class="form-label">窗口名称</label>
+          <el-input v-model="editingPreset.name" placeholder="输入窗口名称" />
+        </div>
+
+        <!-- 启用插件 -->
+        <div class="form-item">
+          <label class="form-label">启用插件</label>
+          <div class="plugin-checkbox-list">
+            <el-checkbox
+              v-for="plugin in registeredPlugins"
+              :key="plugin.id"
+              :model-value="editingPreset.enabledPlugins.includes(plugin.id)"
+              :disabled="editingPreset.focusMode && !editingPreset.enabledPlugins.includes(plugin.id)"
+              @change="togglePlugin(plugin.id)"
+            >
+              {{ plugin.label }}
+            </el-checkbox>
+          </div>
+        </div>
+
+        <!-- 窗口尺寸 -->
+        <div class="form-item">
+          <label class="form-label">窗口尺寸</label>
+          <el-select v-model="selectedSizeLabel" @change="onSizeChange" style="width: 100%">
+            <el-option v-for="opt in sizeOptions" :key="opt.label" :label="opt.label" :value="opt.label" />
+          </el-select>
+          <div v-if="isCustomSize" class="custom-size-inputs">
+            <el-input-number v-model="editingPreset.width" :min="400" :max="3840" placeholder="宽" />
+            <span class="size-sep">×</span>
+            <el-input-number v-model="editingPreset.height" :min="300" :max="2160" placeholder="高" />
+          </div>
+        </div>
+
+        <!-- 启动时打开 -->
+        <div class="form-item form-item-row">
+          <div class="form-label-group">
+            <label class="form-label">启动时打开</label>
+            <span class="form-hint">应用启动时自动打开此窗口，至少保留一个</span>
+          </div>
+          <el-switch
+            v-model="editingPreset.openOnStartup"
+            :disabled="!editingPreset.openOnStartup && !hasStartupWindow"
+            inline-prompt
+            :active-icon="Check"
+            :inactive-icon="Close"
+          />
+        </div>
+
+        <!-- 专注模式 -->
+        <div class="form-item form-item-row">
+          <div class="form-label-group">
+            <label class="form-label">专注模式</label>
+            <span class="form-hint">只保留一个插件，左侧边栏默认隐藏</span>
+          </div>
+          <el-switch
+            :model-value="editingPreset.focusMode"
+            @change="toggleFocusMode"
+            inline-prompt
+            :active-icon="Check"
+            :inactive-icon="Close"
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="showWindowEditDialog = false">取消</el-button>
+        <el-button type="primary" @click="saveEditingPreset">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <style lang="scss" scoped>
-.settings-container {
+.settings-layout {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  overflow: hidden;
+}
+
+.settings-nav {
+  width: 160px;
+  flex-shrink: 0;
+  padding: 16px 8px;
+  border-right: 1px solid var(--el-border-color-light);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-nav-item {
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  color: var(--el-text-color-regular);
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+
+  &:hover {
+    background: var(--el-fill-color-light);
+    color: var(--el-text-color-primary);
+  }
+
+  &.active {
+    background: var(--el-color-primary-light-9);
+    color: var(--el-color-primary);
+    font-weight: 500;
+  }
+}
+
+.settings-main {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-content {
   width: 100%;
   height: 100%;
   overflow-y: auto;
@@ -595,10 +909,6 @@ const app_updates_check = async () => {
     height: 0;
     background: transparent;
   }
-}
-
-.settings-content {
-  width: 100%;
 }
 
 .settings-section {
@@ -637,12 +947,6 @@ const app_updates_check = async () => {
   gap: 8px;
 }
 
-.setting-header {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .setting-label {
   display: block;
   font-size: 1rem;
@@ -662,27 +966,6 @@ const app_updates_check = async () => {
   color: var(--el-color-success);
   margin-top: 4px;
   font-weight: 500;
-}
-
-.directory-display {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 10px;
-  background-color: var(--el-fill-color-light);
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 0.9rem;
-}
-
-.folder-icon {
-  color: var(--el-color-primary);
-}
-
-.setting-working-directory {
-  color: var(--el-text-color-primary);
-  word-break: break-all;
 }
 
 .setting-control {
@@ -706,7 +989,12 @@ const app_updates_check = async () => {
 }
 
 @media (max-width: 768px) {
-  .settings-container {
+  .settings-nav {
+    width: 120px;
+    padding: 12px 6px;
+  }
+
+  .settings-content {
     padding: 15px;
   }
 
@@ -726,5 +1014,134 @@ const app_updates_check = async () => {
   .section-title {
     font-size: 1.2rem;
   }
+}
+
+// ==================== 窗口预设样式 ====================
+
+.section-desc {
+  font-size: 0.9rem;
+  color: var(--el-text-color-secondary);
+  margin: -12px 0 16px 0;
+}
+
+.window-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.window-preset-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--el-border-color-light);
+  transition: border-color 0.2s;
+
+  &:hover {
+    border-color: var(--el-color-primary);
+  }
+}
+
+.preset-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.preset-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.preset-name {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+}
+
+.preset-meta {
+  font-size: 0.85rem;
+  color: var(--el-text-color-secondary);
+}
+
+.preset-sep {
+  margin: 0 6px;
+  opacity: 0.4;
+}
+
+.preset-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.window-preset-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--el-text-color-placeholder);
+  font-size: 0.9rem;
+}
+
+// 编辑弹窗表单
+.window-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  &.form-item-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.form-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+}
+
+.form-label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.form-hint {
+  font-size: 0.8rem;
+  color: var(--el-text-color-secondary);
+}
+
+.plugin-checkbox-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.custom-size-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+
+  .el-input-number {
+    flex: 1;
+  }
+}
+
+.size-sep {
+  color: var(--el-text-color-secondary);
+  font-size: 0.9rem;
 }
 </style>
