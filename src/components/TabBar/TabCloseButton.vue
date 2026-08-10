@@ -55,9 +55,8 @@ defineEmits<{
   }
 
   &:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-
     @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
       color: theme.getVar('textColor');
     }
   }

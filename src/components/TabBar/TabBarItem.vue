@@ -93,7 +93,7 @@ const emit = defineEmits<{
   @include theme.useTheme {
     background-color: theme.getVar('bgColor');
     color: theme.getVar('textColor');
-    border-bottom: 2px solid #007acc;
+    border-bottom: 2px solid theme.getVar('hoverColor');
   }
 
   &::after {
@@ -103,7 +103,7 @@ const emit = defineEmits<{
     left: 0;
     right: 0;
     height: 2px;
-    background-color: #007acc;
+    background-color: theme.getVar('hoverColor');
   }
 }
 

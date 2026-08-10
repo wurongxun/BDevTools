@@ -100,9 +100,8 @@ function isPanelVisible(pluginId: string): boolean {
 }
 
 .activity-item-active {
-  border-left-color: #007acc;
-
   @include theme.useTheme {
+    border-left-color: theme.getVar('hoverColor');
     color: theme.getVar('activityBarActive') !important;
     background-color: theme.getVar('activityBarHover');
   }

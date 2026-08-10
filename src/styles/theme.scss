@@ -13,21 +13,26 @@ $themes: (
     activityBarBg: #e8e8e8,
     activityBarHover: #dcdcdc,
     activityBarActive: #212121,
+    scrollbarThumb: #c1c1c1,
+    scrollbarTrack: #f1f1f1,
     fontSize: 14px,
     fontSizeSmall: 12px
   ),
   dark: (
-    appMainBgColor: #494949,
-    bgColor: #2b2b2b,
-    textColor: #fff,
-    textSecondary: #999,
-    shadowColor: #2e2d2d,
-    borderColor: #424141,
-    hoverColor: #18222c,
-    sidebarBg: #252525,
-    activityBarBg: #1e1e1e,
-    activityBarHover: rgba(255, 255, 255, 0.06),
-    activityBarActive: #fff,
+    // IDEA Darcula 风格配色
+    appMainBgColor: #2d3137, // 主背景色 IDEA_DARK_BG
+    bgColor: #3c3f41,        // 面板/对话框背景 IDEA_TITLE_BAR_BG
+    textColor: #bbbbbb,      // 文字颜色 浅灰色
+    textSecondary: #888888,  // 次要文字
+    shadowColor: #1a1a1a,    // 阴影色
+    borderColor: #373a3c,    // 边框颜色 IDEA_BORDER_COLOR
+    hoverColor: #4b6eaf,     // 悬停/选中高亮 IDEA_MENU_HOVER
+    sidebarBg: #323537,      // 侧边栏背景 IDEA_TOOLBAR_BG
+    activityBarBg: #3c3f41,  // 活动栏背景 IDEA_TITLE_BAR_BG
+    activityBarHover: #4b6eaf, // 活动栏悬停 IDEA_MENU_HOVER
+    activityBarActive: #bbbbbb, // 活动栏激活色
+    scrollbarThumb: #505355, // 滚动条滑块 中灰
+    scrollbarTrack: #323537, // 滚动条轨道 深灰
     fontSize: 14px,
     fontSizeSmall: 12px
   )
@@ -40,6 +45,17 @@ $currentTheme: light;
     $currentTheme: $key !global;
     html[class='#{$key}'] & {
       @content;
+    }
+  }
+}
+
+// 生成主题 CSS 变量（用于 :root 级别的全局变量）
+@mixin themeVars() {
+  @each $key, $value in $themes {
+    html.#{$key} {
+      @each $prop, $val in $value {
+        --#{$prop}: #{$val};
+      }
     }
   }
 }

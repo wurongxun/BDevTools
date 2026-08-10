@@ -103,7 +103,7 @@
     </div>
 
     <!-- 重命名对话框 -->
-    <el-dialog v-model="renameDialogVisible" title="重命名" width="400px" :modal="false" append-to-body>
+    <el-dialog v-model="renameDialogVisible" title="重命名" width="380px" :modal="false" append-to-body class="desktop-dialog">
       <el-input v-model="renameInput" ref="renameInputRef" @keyup.enter="confirmRename" />
       <template #footer>
         <el-button @click="renameDialogVisible = false">取消</el-button>
@@ -112,7 +112,7 @@
     </el-dialog>
 
     <!-- 创建文件/文件夹对话框 -->
-    <el-dialog v-model="createDialogVisible" :title="createDialogTitle" width="400px" :modal="false" append-to-body>
+    <el-dialog v-model="createDialogVisible" :title="createDialogTitle" width="380px" :modal="false" append-to-body class="desktop-dialog">
       <el-input v-model="createInput" ref="createInputRef" @keyup.enter="confirmCreate" placeholder="请输入名称" />
       <template #footer>
         <el-button @click="createDialogVisible = false">取消</el-button>
@@ -716,6 +716,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style lang="scss">
+@use 'sass:color';
 @use '@/styles/theme.scss' as theme;
 
 .file-tree-container {
@@ -746,19 +747,24 @@ onBeforeUnmount(() => {
     width: 22px;
     height: 22px;
     border-radius: 4px;
-    color: #888;
     cursor: pointer;
     transition: all 0.15s;
 
+    @include theme.useTheme {
+      color: theme.getVar('textSecondary');
+    }
+
     &:hover {
-      color: #ccc;
       @include theme.useTheme {
-        background-color: theme.getVar('hoverColor');
+        color: theme.getVar('textColor');
+        background-color: theme.getVar('activityBarHover');
       }
     }
 
     &.active {
-      color: #007acc;
+      @include theme.useTheme {
+        color: theme.getVar('hoverColor');
+      }
     }
   }
 }
@@ -823,11 +829,19 @@ onBeforeUnmount(() => {
 
   &::-webkit-scrollbar { width: 6px; }
   &::-webkit-scrollbar-thumb {
-    background-color: rgba(155, 155, 155, 0.2);
     border-radius: 3px;
-    &:hover { background-color: rgba(155, 155, 155, 0.4); }
+    @include theme.useTheme {
+      background-color: theme.getVar('scrollbarThumb');
+    }
+    &:hover {
+      @include theme.useTheme {
+        background-color: color.adjust(theme.getVar('scrollbarThumb'), $lightness: 10%);
+      }
+    }
   }
-  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
 
 // ===== 分组 =====
@@ -848,7 +862,9 @@ onBeforeUnmount(() => {
   transition: background-color 0.1s;
 
   &:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
+    }
   }
 
   @include theme.useTheme {
@@ -861,8 +877,11 @@ onBeforeUnmount(() => {
   width: 12px;
   height: 12px;
   flex-shrink: 0;
-  color: #888;
   transition: transform 0.15s ease;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 
   &.expanded {
     transform: rotate(90deg);
@@ -878,7 +897,6 @@ onBeforeUnmount(() => {
 
 .section-count {
   font-weight: 400;
-  background-color: rgba(255, 255, 255, 0.06);
   padding: 0 5px;
   border-radius: 8px;
   flex-shrink: 0;
@@ -886,6 +904,7 @@ onBeforeUnmount(() => {
   @include theme.useTheme {
     font-size: theme.getVar('fontSizeSmall');
     color: theme.getVar('textSecondary');
+    background-color: theme.getVar('activityBarHover');
   }
 }
 
@@ -903,7 +922,9 @@ onBeforeUnmount(() => {
   transition: background-color 0.1s;
 
   &:hover {
-    background-color: rgba(255, 255, 255, 0.06);
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
+    }
     .favorite-remove { opacity: 1; }
   }
 
@@ -934,16 +955,16 @@ onBeforeUnmount(() => {
 
 .favorite-remove {
   opacity: 0;
-  color: #888;
   flex-shrink: 0;
   transition: all 0.1s;
   padding: 0 2px;
 
-  &:hover { color: #e06c75; }
-
   @include theme.useTheme {
+    color: theme.getVar('textSecondary');
     font-size: theme.getVar('fontSize');
   }
+
+  &:hover { color: #e06c75; }
 }
 
 // ===== 最近打开列表 =====
@@ -956,7 +977,9 @@ onBeforeUnmount(() => {
   transition: background-color 0.1s;
 
   &:hover {
-    background-color: rgba(255, 255, 255, 0.06);
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
+    }
   }
 
   @include theme.useTheme {
@@ -966,9 +989,12 @@ onBeforeUnmount(() => {
 
 .recent-icon {
   flex-shrink: 0;
-  color: #666;
   display: flex;
   align-items: center;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 
 .recent-name {
@@ -1077,14 +1103,16 @@ onBeforeUnmount(() => {
   cursor: pointer;
   padding: 2px;
   border-radius: 4px;
-  color: #888;
   transition: all 0.15s;
 
-  &:hover {
-    color: #ccc;
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 
+  &:hover {
     @include theme.useTheme {
-      background-color: theme.getVar('hoverColor');
+      color: theme.getVar('textColor');
+      background-color: theme.getVar('activityBarHover');
     }
   }
 }
@@ -1110,16 +1138,13 @@ onBeforeUnmount(() => {
 .tree-context-menu {
   position: fixed;
   z-index: 9999;
-  background-color: #2d2d2d;
-  border: 1px solid #454545;
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 4px 0;
   min-width: 180px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
 
   @include theme.useTheme {
     background-color: theme.getVar('bgColor');
-    border-color: theme.getVar('borderColor');
+    border: 1px solid theme.getVar('borderColor');
   }
 }
 
@@ -1128,17 +1153,19 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   padding: 6px 16px;
-  color: #ccc;
   cursor: pointer;
   transition: background-color 0.1s;
 
-  &:hover {
-    background-color: rgba(0, 122, 204, 0.3);
-    color: #fff;
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+    font-size: theme.getVar('fontSize');
   }
 
-  @include theme.useTheme {
-    font-size: theme.getVar('fontSize');
+  &:hover {
+    @include theme.useTheme {
+      background-color: theme.getVar('hoverColor');
+    }
+    color: #fff;
   }
 
   .el-icon {
@@ -1157,7 +1184,6 @@ onBeforeUnmount(() => {
 
 .ctx-divider {
   height: 1px;
-  background-color: #454545;
   margin: 4px 0;
 
   @include theme.useTheme {
@@ -1198,6 +1224,91 @@ onBeforeUnmount(() => {
   .el-tree-node__expand-icon {
     @include theme.useTheme {
       color: theme.getVar('textColor');
+    }
+  }
+}
+
+// ===== 桌面端对话框样式 =====
+.desktop-dialog {
+  @include theme.useTheme {
+    .el-dialog {
+      background-color: theme.getVar('bgColor');
+      border: 1px solid theme.getVar('borderColor');
+      border-radius: 4px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .el-dialog__header {
+      padding: 10px 16px 8px;
+      margin-right: 0;
+      border-bottom: 1px solid theme.getVar('borderColor');
+    }
+
+    .el-dialog__title {
+      color: theme.getVar('textColor');
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .el-dialog__headerbtn {
+      top: 10px;
+      right: 12px;
+      font-size: 14px;
+
+      .el-dialog__close {
+        color: theme.getVar('textSecondary');
+      }
+
+      &:hover .el-dialog__close {
+        color: theme.getVar('textColor');
+      }
+    }
+
+    .el-dialog__body {
+      padding: 12px 16px;
+    }
+
+    .el-dialog__footer {
+      padding: 8px 16px 12px;
+      border-top: 1px solid theme.getVar('borderColor');
+    }
+
+    .el-input__wrapper {
+      background-color: theme.getVar('appMainBgColor');
+      box-shadow: none;
+      border: 1px solid theme.getVar('borderColor');
+      border-radius: 4px;
+    }
+
+    .el-input__inner {
+      color: theme.getVar('textColor');
+    }
+
+    .el-button {
+      border-radius: 4px;
+      padding: 6px 16px;
+      font-size: 12px;
+    }
+
+    .el-button--default {
+      background-color: transparent;
+      border-color: theme.getVar('borderColor');
+      color: theme.getVar('textColor');
+
+      &:hover {
+        background-color: theme.getVar('activityBarHover');
+        border-color: theme.getVar('borderColor');
+        color: theme.getVar('textColor');
+      }
+    }
+
+    .el-button--primary {
+      background-color: theme.getVar('hoverColor');
+      border-color: theme.getVar('hoverColor');
+
+      &:hover {
+        opacity: 0.9;
+      }
     }
   }
 }

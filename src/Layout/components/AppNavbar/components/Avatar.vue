@@ -102,9 +102,12 @@ const handleCommand = (command: string | number | object) => {
   text-align: center;
   padding: 2px 0;
   margin: 5px;
-  background: #c4c5c9;
   font-size: 12px;
   border-radius: 3px;
-  color: #444;
+
+  @include theme.useTheme {
+    background: theme.getVar('sidebarBg');
+    color: theme.getVar('textSecondary');
+  }
 }
 </style>

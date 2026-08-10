@@ -444,7 +444,7 @@ onUnmounted(() => {
     &:hover,
     &.is-active {
       @include theme.useTheme {
-        background-color: rgba(128, 128, 128, 0.12);
+        background-color: theme.getVar('activityBarHover');
       }
     }
 
@@ -488,7 +488,7 @@ onUnmounted(() => {
 
         &:hover {
           @include theme.useTheme {
-            background-color: $theme-color;
+            background-color: theme.getVar('hoverColor');
             color: #fff;
           }
 

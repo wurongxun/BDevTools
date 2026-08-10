@@ -313,7 +313,6 @@ function handleHeaderCommand(cmd: string) {
     flex-direction: column;
     height: 100%;
     overflow: hidden;
-    background-color: #1e1e1e;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
     @include theme.useTheme {
@@ -333,7 +332,6 @@ function handleHeaderCommand(cmd: string) {
 
 .explorer-title {
     font-weight: 600;
-    color: #bbb;
     text-transform: uppercase;
     letter-spacing: 1px;
 
@@ -344,13 +342,18 @@ function handleHeaderCommand(cmd: string) {
 }
 
 .header-more-btn {
-    color: #888;
     padding: 2px 4px;
     border-radius: 4px;
 
+    @include theme.useTheme {
+        color: theme.getVar('textSecondary');
+    }
+
     &:hover {
-        color: #ccc;
-        background-color: rgba(255, 255, 255, 0.08);
+        @include theme.useTheme {
+            color: theme.getVar('textColor');
+            background-color: theme.getVar('activityBarHover');
+        }
     }
 }
 
