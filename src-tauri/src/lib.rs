@@ -246,6 +246,61 @@ pub fn run() {
             }
             app_settings(&app.handle());
             main_window.show().unwrap();
+
+            // 启动时自动创建 openOnStartup=true 的预设窗口（Rust 层直接创建，无需等待前端加载）
+            {
+                let handle = app.handle().clone();
+                if let Ok(store) = handle.store("settings.json") {
+                    if let Some(presets_val) = store.get("window_presets") {
+                        if let Some(presets) = presets_val.as_array() {
+                            for preset in presets {
+                                let open_on_startup = preset.get("openOnStartup")
+                                    .and_then(|v| v.as_bool())
+                                    .unwrap_or(false);
+                                if !open_on_startup {
+                                    continue;
+                                }
+                                let preset_id = preset.get("id")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                let name = preset.get("name")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                let width = preset.get("width")
+                                    .and_then(|v| v.as_f64())
+                                    .unwrap_or(960.0);
+                                let height = preset.get("height")
+                                    .and_then(|v| v.as_f64())
+                                    .unwrap_or(640.0);
+                                let focus_mode = preset.get("focusMode")
+                                    .and_then(|v| v.as_bool())
+                                    .unwrap_or(false);
+                                let enabled_plugins = preset.get("enabledPlugins")
+                                    .and_then(|v| v.as_array())
+                                    .map(|arr| {
+                                        arr.iter()
+                                            .filter_map(|item| item.as_str().map(String::from))
+                                            .collect::<Vec<String>>()
+                                    })
+                                    .unwrap_or_default();
+
+                                crate::window_manager::commands::create_preset_window_from_preset(
+                                    &handle,
+                                    &preset_id,
+                                    &name,
+                                    width,
+                                    height,
+                                    enabled_plugins,
+                                    focus_mode,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())

@@ -1,9 +1,9 @@
 <template>
   <div class="sidebar-container">
-    <!-- 活动栏（左侧图标列）：动态渲染所有已注册插件 -->
+    <!-- 活动栏（左侧图标列）：动态渲染当前窗口启用的插件 -->
     <div class="activity-bar">
       <div
-        v-for="plugin in pluginManager.plugins"
+        v-for="plugin in displayPlugins"
         :key="plugin.id"
         class="activity-item"
         :class="{ 'activity-item-active': pluginManager.activeToolId.value === plugin.id }"
@@ -16,7 +16,7 @@
 
     <!-- 面板区域：动态渲染当前激活插件的侧边栏面板 -->
     <div class="panel-area">
-      <template v-for="plugin in pluginManager.plugins" :key="plugin.id">
+      <template v-for="plugin in displayPlugins" :key="plugin.id">
         <div class="panel-content" v-show="pluginManager.activeToolId.value === plugin.id">
           <component :is="plugin.sidebarPanel" />
         </div>
@@ -26,7 +26,14 @@
 </template>
 
 <script setup lang="ts" name="AppSidebar">
+import { computed } from 'vue'
 import { pluginManager } from '@/core/pluginManager'
+import useStore from '@/store/index'
+
+const { useLayoutStore } = useStore()
+
+/** 当前窗口显示的插件列表（根据 layout store 的 enabledPlugins 过滤） */
+const displayPlugins = computed(() => useLayoutStore.filteredPlugins)
 </script>
 
 <style scoped lang="scss">

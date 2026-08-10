@@ -11,6 +11,7 @@ import { useConnectionStore } from './modules/connection'
 import { useFtpStore } from './modules/ftp'
 import { useWorkspaceStore } from './modules/workspace'
 import { useSessionStore } from './modules/session'
+import useLayoutStore from './modules/layout'
 const pinia = createPinia()
 
 export default function useStore() {
@@ -25,7 +26,8 @@ export default function useStore() {
     useConnectionStore: useConnectionStore(pinia),
     useFtpStore: useFtpStore(pinia),
     useWorkspaceStore: useWorkspaceStore(pinia),
-    useSessionStore: useSessionStore(pinia)
+    useSessionStore: useSessionStore(pinia),
+    useLayoutStore: useLayoutStore(pinia)
   }
 }
 //noteTem: useNoteStore(pinia),

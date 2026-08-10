@@ -20,7 +20,7 @@ import Common from '@/views/Common/Common.vue'
 import LoginView from '@/views/login/index.vue'
 import type { WindowRole } from '@/Types/workspace'
 
-const { useDocumentManagerStore, user, useWorkspaceStore, useSessionStore, routerNoteStore } = useStore()
+const { useDocumentManagerStore, user, useWorkspaceStore, useSessionStore, routerNoteStore, useLayoutStore } = useStore()
 
 const isLoggedIn = ref(false)
 const windowRole = ref<WindowRole>('main')
@@ -70,11 +70,34 @@ async function initWindow() {
 
 /**
  * 初始化编辑器窗口：新窗口完全隔离，不加载旧窗口数据
+ * 但会读取预设的布局配置（插件过滤、专注模式等）
  */
 async function initEditorWindow() {
   if (windowRole.value !== 'editor') return
 
-  // 新窗口从空白状态开始，不加载旧窗口的工作区和会话数据
+  // 读取布局配置（由创建窗口的调用方保存到 settings.json）
+  try {
+    const win = getCurrentWebviewWindow()
+    const label = await win.label
+    const settingsStore = await load('settings.json', { autoSave: false, defaults: {} })
+    const layoutConfig = await settingsStore.get<{
+      enabledPlugins: string[]
+      focusMode: boolean
+      presetId: string
+    }>(`window_layout_${label}`)
+
+    if (layoutConfig) {
+      // 应用布局配置到当前窗口的 layout store
+      useLayoutStore.applyPreset(layoutConfig)
+      // 清理临时配置，避免重复读取
+      await settingsStore.delete(`window_layout_${label}`)
+      await settingsStore.save()
+      console.log(`[App] 已应用布局配置: presetId=${layoutConfig.presetId}, focusMode=${layoutConfig.focusMode}`)
+    }
+  } catch (e) {
+    console.warn('加载窗口布局配置失败:', e)
+  }
+
   // 仅启动自动保存，用于保存当前窗口自身的状态
   useSessionStore.startAutoSave()
 }
@@ -179,6 +202,22 @@ async function initApp() {
 
   // 主窗口启动自动保存定时器（60s 定时备份）
   useSessionStore.startAutoSave()
+
+  // 主窗口：加载布局配置（插件过滤、专注模式等）
+  try {
+    const settingsStore = await load('settings.json', { autoSave: false, defaults: {} })
+    const layoutConfig = await settingsStore.get<{
+      enabledPlugins: string[]
+      focusMode: boolean
+      presetId: string
+    }>('window_layout_main')
+    if (layoutConfig) {
+      useLayoutStore.applyPreset(layoutConfig)
+      console.log(`[App] 主窗口已应用布局配置: presetId=${layoutConfig.presetId}, focusMode=${layoutConfig.focusMode}`)
+    }
+  } catch (e) {
+    console.warn('加载主窗口布局配置失败:', e)
+  }
 }
 
 onMounted(async () => {

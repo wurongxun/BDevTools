@@ -3,6 +3,7 @@
     <AppNavbar />
     <div class="main-area" :class="{ 'is-resizing': isDragging }">
       <aside
+        v-show="!isFocusMode"
         ref="sideBoxRef"
         class="side-box"
         :class="{ 'is-collapse': isCollapse }"
@@ -11,14 +12,14 @@
         <app-sidebar />
       </aside>
       <div
-        v-show="!isCollapse"
+        v-show="!isCollapse && !isFocusMode"
         class="resize-handle"
         :class="{ 'is-dragging': isDragging }"
         @mousedown="onResizeStart"
       >
         <div class="resize-handle-line"></div>
       </div>
-      <main ref="mainContentRef" class="app-content" :class="{ 'is-collapse': isCollapse, 'has-sidebar': !isCollapse && windowWidth >= 1024 }">
+      <main ref="mainContentRef" class="app-content" :class="{ 'is-collapse': isCollapse || isFocusMode, 'has-sidebar': !isCollapse && !isFocusMode && windowWidth >= 1024 }">
         <div class="editor-wrapper">
           <app-editor-main></app-editor-main>
         </div>
@@ -34,11 +35,14 @@ import AppHeader from './components/AppHeader/index.vue'
 import AppSidebar from './components/AppSidebar/index.vue'
 import useStore from '@/store/index'
 import { storeToRefs } from 'pinia'
-import { watch, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { watch, nextTick, onMounted, onUnmounted, ref, computed } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 
-const { system, useWorkspaceStore } = useStore()
+const { system, useWorkspaceStore, useLayoutStore } = useStore()
 const { isCollapse } = storeToRefs(system)
+
+/** 当前窗口是否处于专注模式 */
+const isFocusMode = computed(() => useLayoutStore.focusMode)
 
 // const isEditorRoute = computed(() => {
 //   return !route.path.startsWith('/App')

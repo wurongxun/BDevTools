@@ -257,6 +257,17 @@ const showWindowEditDialog = ref(false)
 const editingPreset = ref<WindowPresetConfig | null>(null)
 const isCreatingPreset = ref(false)
 
+/** 主窗口预设（不可删除，始终启动） */
+const mainWindowPreset = ref<WindowPresetConfig>({
+  id: 'main',
+  name: '主窗口',
+  enabledPlugins: [],
+  width: 960,
+  height: 640,
+  openOnStartup: true,
+  focusMode: false
+})
+
 /** 可选的窗口尺寸 */
 const sizeOptions = [
   { label: '小 (800×600)', width: 800, height: 600 },
@@ -273,14 +284,20 @@ const registeredPlugins = computed(() => pluginManager.plugins)
 /** 当前编辑的预设是否为新建 */
 const editingIsNew = computed(() => isCreatingPreset.value)
 
+/** 当前编辑的是否为主窗口预设 */
+const isEditingMain = computed(() => editingPreset.value?.id === 'main')
+
+/** 所有预设列表（主窗口 + 其他窗口） */
+const allPresets = computed(() => [mainWindowPreset.value, ...windowPresets.value])
+
 /** 当前尺寸是否为自定义 */
 const isCustomSize = computed(() => {
   if (!editingPreset.value) return false
   return !sizeOptions.some(s => s.width === editingPreset.value!.width && s.height === editingPreset.value!.height && s.width > 0)
 })
 
-/** 至少有一个窗口开启了启动时打开 */
-const hasStartupWindow = computed(() => windowPresets.value.some(p => p.openOnStartup))
+/** 已保存的预设中开启了"启动时打开"的数量 */
+const savedStartupCount = computed(() => windowPresets.value.filter(p => p.openOnStartup).length)
 
 /** 加载窗口预设 */
 async function loadWindowPresets() {
@@ -288,6 +305,11 @@ async function loadWindowPresets() {
   const val = await store.get<WindowPresetConfig[]>('window_presets')
   if (val && Array.isArray(val)) {
     windowPresets.value = val
+  }
+  // 加载主窗口预设
+  const mainVal = await store.get<WindowPresetConfig>('main_window_preset')
+  if (mainVal) {
+    mainWindowPreset.value = { ...mainVal, id: 'main', name: mainVal.name || '主窗口', openOnStartup: true }
   }
 }
 
@@ -325,6 +347,7 @@ function editWindowPreset(preset: WindowPresetConfig) {
 
 /** 删除窗口预设 */
 async function removeWindowPreset(id: string) {
+  if (id === 'main') return // 主窗口不可删除
   const preset = windowPresets.value.find(p => p.id === id)
   if (preset?.openOnStartup && windowPresets.value.filter(p => p.openOnStartup).length <= 1) {
     NotificationUtil.error('至少保留一个启动时打开的窗口')
@@ -350,6 +373,25 @@ async function saveEditingPreset() {
     return
   }
 
+  // 主窗口预设：单独存储
+  if (editingPreset.value.id === 'main') {
+    const config = { ...editingPreset.value, openOnStartup: true }
+    mainWindowPreset.value = config
+    if (store) {
+      await store.set('main_window_preset', config)
+      // 同时写入 window_layout_main 供主窗口启动时读取
+      await store.set('window_layout_main', {
+        enabledPlugins: config.enabledPlugins,
+        focusMode: config.focusMode,
+        presetId: 'main'
+      })
+      await store.save()
+    }
+    showWindowEditDialog.value = false
+    editingPreset.value = null
+    return
+  }
+
   if (isCreatingPreset.value) {
     windowPresets.value.push({ ...editingPreset.value })
   } else {
@@ -372,14 +414,22 @@ function onSizeChange(label: string) {
   }
 }
 
-/** 切换插件选中状态 */
+/** 切换插件选中状态（专注模式下为单选：点击即替换） */
 function togglePlugin(pluginId: string) {
   if (!editingPreset.value) return
   const idx = editingPreset.value.enabledPlugins.indexOf(pluginId)
   if (idx === -1) {
-    editingPreset.value.enabledPlugins.push(pluginId)
+    if (editingPreset.value.focusMode) {
+      // 专注模式：单选替换，只保留当前点击的插件
+      editingPreset.value.enabledPlugins = [pluginId]
+    } else {
+      editingPreset.value.enabledPlugins.push(pluginId)
+    }
   } else {
-    editingPreset.value.enabledPlugins.splice(idx, 1)
+    // 已选中的插件：专注模式下不允许取消（至少保留一个），普通模式可取消
+    if (!editingPreset.value.focusMode) {
+      editingPreset.value.enabledPlugins.splice(idx, 1)
+    }
   }
 }
 
@@ -560,28 +610,6 @@ const app_updates_check = async () => {
           </div>
         </div>
 
-<!--        <div class="settings-item">-->
-<!--          <div class="setting-info">-->
-<!--            <span class="setting-label">{{ $t('settings.theme') }}</span>-->
-<!--            <span class="setting-description">切换主题</span>-->
-<!--          </div>-->
-<!--          <div class="setting-control">-->
-<!--            <el-select-->
-<!--              v-model="theme"-->
-<!--              @change="theme_change"-->
-<!--              placeholder="选择主题"-->
-<!--              style="width: 180px"-->
-<!--            >-->
-<!--              <el-option-->
-<!--                v-for="item in theme_options"-->
-<!--                :key="item.value"-->
-<!--                :label="item.label"-->
-<!--                :value="item.value"-->
-<!--                :disabled="item.disabled"-->
-<!--              />-->
-<!--            </el-select>-->
-<!--          </div>-->
-<!--        </div>-->
 
         <div class="settings-item">
           <div class="setting-info">
@@ -730,30 +758,27 @@ const app_updates_check = async () => {
         <!-- 窗口预设列表 -->
         <div class="window-preset-list">
           <div
-            v-for="preset in windowPresets"
+            v-for="preset in allPresets"
             :key="preset.id"
             class="window-preset-card"
           >
             <div class="preset-info">
               <div class="preset-name-row">
                 <span class="preset-name">{{ preset.name }}</span>
-                <el-tag v-if="preset.openOnStartup" size="small" type="success">启动时打开</el-tag>
+                <el-tag v-if="preset.id === 'main'" size="small" type="primary">主窗口</el-tag>
+                <el-tag v-else-if="preset.openOnStartup" size="small" type="success">启动时打开</el-tag>
                 <el-tag v-if="preset.focusMode" size="small" type="warning">专注模式</el-tag>
               </div>
               <div class="preset-meta">
-                <span>插件: {{ preset.enabledPlugins.join(', ') }}</span>
+                <span>插件: {{ preset.enabledPlugins.length > 0 ? preset.enabledPlugins.join(', ') : '全部' }}</span>
                 <span class="preset-sep">|</span>
                 <span>{{ preset.width }} × {{ preset.height }}</span>
               </div>
             </div>
             <div class="preset-actions">
               <el-button size="small" @click="editWindowPreset(preset)" :icon="Edit" circle />
-              <el-button size="small" @click="removeWindowPreset(preset.id)" :icon="Delete" circle type="danger" />
+              <el-button v-if="preset.id !== 'main'" size="small" @click="removeWindowPreset(preset.id)" :icon="Delete" circle type="danger" />
             </div>
-          </div>
-
-          <div v-if="windowPresets.length === 0" class="window-preset-empty">
-            暂未配置窗口预设，点击下方按钮添加
           </div>
         </div>
 
@@ -788,7 +813,6 @@ const app_updates_check = async () => {
               v-for="plugin in registeredPlugins"
               :key="plugin.id"
               :model-value="editingPreset.enabledPlugins.includes(plugin.id)"
-              :disabled="editingPreset.focusMode && !editingPreset.enabledPlugins.includes(plugin.id)"
               @change="togglePlugin(plugin.id)"
             >
               {{ plugin.label }}
@@ -813,11 +837,11 @@ const app_updates_check = async () => {
         <div class="form-item form-item-row">
           <div class="form-label-group">
             <label class="form-label">启动时打开</label>
-            <span class="form-hint">应用启动时自动打开此窗口，至少保留一个</span>
+            <span class="form-hint">{{ isEditingMain ? '主窗口始终随应用启动' : '应用启动时自动打开此窗口，至少保留一个' }}</span>
           </div>
           <el-switch
             v-model="editingPreset.openOnStartup"
-            :disabled="!editingPreset.openOnStartup && !hasStartupWindow"
+            :disabled="isEditingMain || (editingPreset.openOnStartup && !editingIsNew && savedStartupCount <= 1)"
             inline-prompt
             :active-icon="Check"
             :inactive-icon="Close"
