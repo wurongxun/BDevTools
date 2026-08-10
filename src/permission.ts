@@ -25,7 +25,7 @@ router.beforeEach(
         } else {
           try {
             await user.getUserInfo()
-            const routerNote = await routerNoteStore.setRoutes()
+            const routerNote = await routerNoteStore.setFileTree()
             await permission.getPermissions()
             next({ ...to, replace: true })
             NProgress.done()

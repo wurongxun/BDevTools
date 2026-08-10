@@ -99,8 +99,8 @@ const menus: Menu[] = [
     label: '文件(F)',
     items: [
       { label: '打开文件', shortcut: 'Ctrl+O', command: 'openFile' },
-      { label: '新建窗口', shortcut: 'Ctrl+Shift+N', command: 'newWindow' },
       { label: '打开目录', shortcut: 'Ctrl+O', command: 'openWorkingDirectory' },
+      { label: '新建窗口', shortcut: 'Ctrl+Shift+N', command: 'newWindow' },
       { divider: true, label: '', command: '' },
       { label: '设置', command: 'settings' },
     ]

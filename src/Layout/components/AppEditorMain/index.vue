@@ -5,7 +5,7 @@
       <template v-for="plugin in displayPlugins" :key="plugin.id">
         <component
           :is="plugin.tabBar"
-          v-show="pluginManager.activeToolId.value === plugin.id && plugin.tabBar"
+          v-show="isTabVisible(plugin.id)"
         />
       </template>
     </el-header>
@@ -14,7 +14,7 @@
       <template v-for="plugin in displayPlugins" :key="plugin.id">
         <component
           :is="plugin.mainPanel"
-          v-show="pluginManager.activeToolId.value === plugin.id"
+          v-show="isPanelVisible(plugin.id)"
         />
       </template>
     </el-main>
@@ -24,13 +24,47 @@
 
 <script lang="ts" setup name="AppEditorMain">
 import { pluginManager } from '@/core/pluginManager'
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import useStore from '@/store/index'
 
 const { useLayoutStore } = useStore()
 
+/** 当前窗口是否处于专注模式 */
+const isFocusMode = computed(() => useLayoutStore.focusMode)
+
 /** 当前窗口显示的插件列表（根据 layout store 的 enabledPlugins 过滤） */
 const displayPlugins = computed(() => useLayoutStore.filteredPlugins)
+
+/**
+ * 专注模式下 activeToolId 可能不在 displayPlugins 中，
+ * 自动将其同步为第一个启用插件，确保主面板可见
+ */
+watch(displayPlugins, (plugins) => {
+  if (isFocusMode.value && plugins.length > 0) {
+    if (!plugins.some(p => p.id === pluginManager.activeToolId.value)) {
+      pluginManager.switchTool(plugins[0].id)
+    }
+  }
+}, { immediate: true })
+
+watch(isFocusMode, (focus) => {
+  if (focus) {
+    const plugins = displayPlugins.value
+    if (plugins.length > 0 && !plugins.some(p => p.id === pluginManager.activeToolId.value)) {
+      pluginManager.switchTool(plugins[0].id)
+    }
+  }
+})
+
+/** 判断 Tab 栏是否可见 */
+function isTabVisible(pluginId: string): boolean {
+  return pluginManager.activeToolId.value === pluginId
+}
+
+/** 判断主面板是否可见 */
+function isPanelVisible(pluginId: string): boolean {
+  return pluginManager.activeToolId.value === pluginId
+}
 
 // 动态计算主内容区域高度
 const appMainHeight = ref('calc(100vh - var(--header-height) - var(--tage-view-height))')

@@ -15,7 +15,6 @@
         <el-icon :size="64" class="welcome-icon">
           <Document />
         </el-icon>
-        <h2 class="welcome-title">Markdown 笔记工具</h2>
         <p class="welcome-desc">从左侧文件树中选择文件开始编辑</p>
       </div>
     </div>
@@ -62,7 +61,9 @@ function handleStateUpdate(state: any) {
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '@/styles/theme.scss' as theme;
+
 .file-editor-container {
   width: 100%;
   flex: 1;
@@ -76,29 +77,44 @@ function handleStateUpdate(state: any) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #1e1e1e;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+  }
 }
 
 .welcome-content {
   text-align: center;
-  color: #666;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 
 .welcome-icon {
-  color: #444;
   margin-bottom: 16px;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 
 .welcome-title {
   margin: 0 0 8px 0;
   font-size: 20px;
   font-weight: 500;
-  color: #888;
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
 }
 
 .welcome-desc {
   margin: 0;
   font-size: 14px;
-  color: #666;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 </style>

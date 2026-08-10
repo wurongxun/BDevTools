@@ -36,7 +36,7 @@ export async function changeWorkspace() {
   }
 
   // 刷新当前窗口的文件树
-  await routerNoteStore.setRoutes()
+  await get_file_Api();
 }
 
 export default class IndexUtils {

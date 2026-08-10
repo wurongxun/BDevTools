@@ -309,7 +309,7 @@ async function loadWindowPresets() {
   // 加载主窗口预设
   const mainVal = await store.get<WindowPresetConfig>('main_window_preset')
   if (mainVal) {
-    mainWindowPreset.value = { ...mainVal, id: 'main', name: mainVal.name || '主窗口', openOnStartup: true }
+    mainWindowPreset.value = { ...mainVal, id: 'main', name: mainVal.name || '主窗口' }
   }
 }
 
@@ -368,14 +368,24 @@ async function saveEditingPreset() {
     NotificationUtil.error('专注模式下只能选择一个插件')
     return
   }
-  if (editingPreset.value.enabledPlugins.length === 0) {
+  // 主窗口可以不选插件（主窗口侧边栏可为空），其他窗口至少选一个
+  if (editingPreset.value.id !== 'main' && editingPreset.value.enabledPlugins.length === 0) {
     NotificationUtil.error('至少选择一个插件')
+    return
+  }
+  // 检查窗口名称是否重复（跨主窗口和其他预设）
+  const currentName = editingPreset.value.name.trim()
+  const nameConflict = allPresets.value.some(
+    p => p.id !== editingPreset.value!.id && p.name.trim() === currentName
+  )
+  if (nameConflict) {
+    NotificationUtil.error('窗口名称不能重复')
     return
   }
 
   // 主窗口预设：单独存储
   if (editingPreset.value.id === 'main') {
-    const config = { ...editingPreset.value, openOnStartup: true }
+    const config = { ...editingPreset.value }
     mainWindowPreset.value = config
     if (store) {
       await store.set('main_window_preset', config)
@@ -766,7 +776,7 @@ const app_updates_check = async () => {
               <div class="preset-name-row">
                 <span class="preset-name">{{ preset.name }}</span>
                 <el-tag v-if="preset.id === 'main'" size="small" type="primary">主窗口</el-tag>
-                <el-tag v-else-if="preset.openOnStartup" size="small" type="success">启动时打开</el-tag>
+                <el-tag v-if="preset.openOnStartup && preset.id !== 'main'" size="small" type="success">启动时打开</el-tag>
                 <el-tag v-if="preset.focusMode" size="small" type="warning">专注模式</el-tag>
               </div>
               <div class="preset-meta">
@@ -837,11 +847,11 @@ const app_updates_check = async () => {
         <div class="form-item form-item-row">
           <div class="form-label-group">
             <label class="form-label">启动时打开</label>
-            <span class="form-hint">{{ isEditingMain ? '主窗口始终随应用启动' : '应用启动时自动打开此窗口，至少保留一个' }}</span>
+            <span class="form-hint">{{ isEditingMain ? '主窗口默认随应用启动，可手动关闭' : '应用启动时自动打开此窗口，至少保留一个' }}</span>
           </div>
           <el-switch
             v-model="editingPreset.openOnStartup"
-            :disabled="isEditingMain || (editingPreset.openOnStartup && !editingIsNew && savedStartupCount <= 1)"
+            :disabled="!isEditingMain && editingPreset.openOnStartup && !editingIsNew && savedStartupCount <= 1"
             inline-prompt
             :active-icon="Check"
             :inactive-icon="Close"

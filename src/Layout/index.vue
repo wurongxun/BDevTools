@@ -3,16 +3,15 @@
     <AppNavbar />
     <div class="main-area" :class="{ 'is-resizing': isDragging }">
       <aside
-        v-show="!isFocusMode"
         ref="sideBoxRef"
         class="side-box"
         :class="{ 'is-collapse': isCollapse }"
         :style="!isCollapse ? { width: sidebarWidth + 'px', minWidth: sidebarWidth + 'px', maxWidth: sidebarWidth + 'px' } : {}"
       >
-        <app-sidebar />
+        <app-sidebar :hideActivityBar="isFocusMode" />
       </aside>
       <div
-        v-show="!isCollapse && !isFocusMode"
+        v-show="!isCollapse"
         class="resize-handle"
         :class="{ 'is-dragging': isDragging }"
         @mousedown="onResizeStart"

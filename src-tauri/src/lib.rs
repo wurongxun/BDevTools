@@ -232,7 +232,7 @@ pub fn run() {
             //     Ok(it) => it,
             //     Err(err) => return Err(Box::new(err)),
             // };
-            main_window.restore_state(StateFlags::all()); // will restore the window's state from disk
+            main_window.restore_state(StateFlags::all() ^ StateFlags::VISIBLE); // 恢复窗口状态，但不恢复可见性（由 openOnStartup 配置控制）
             // 注册主窗口到全局注册表
             {
                 let meta = crate::window_manager::registry::create_window_meta(
@@ -245,7 +245,34 @@ pub fn run() {
                 crate::window_manager::registry::register_window(meta);
             }
             app_settings(&app.handle());
-            main_window.show().unwrap();
+
+            // 读取主窗口预设，判断是否显示主窗口（默认显示；有配置且 openOnStartup=false 时不显示）
+            // 直接从磁盘读取 settings.json，避免 store 插件内存缓存与前端保存不同步的问题
+            let show_main_window = {
+                let mut result = true; // 默认显示
+                if let Ok(config_dir) = app.path().app_data_dir() {
+                    let settings_path = config_dir.join("settings.json");
+                    if settings_path.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&settings_path) {
+                            if let Ok(settings) = serde_json::from_str::<serde_json::Value>(&content) {
+                                if let Some(main_preset) = settings.get("main_window_preset") {
+                                    if let Some(open_on_startup) = main_preset.get("openOnStartup").and_then(|v| v.as_bool()) {
+                                        result = open_on_startup;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                println!("[MdViewer] show_main_window = {}", result);
+                result
+            };
+            if show_main_window {
+                main_window.show().unwrap();
+            } else {
+                // 确保主窗口保持隐藏（restore_state 可能已恢复可见性）
+                let _ = main_window.hide();
+            }
 
             // 启动时自动创建 openOnStartup=true 的预设窗口（Rust 层直接创建，无需等待前端加载）
             {

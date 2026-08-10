@@ -1,7 +1,7 @@
 <template>
   <div class="sidebar-container">
-    <!-- 活动栏（左侧图标列）：动态渲染当前窗口启用的插件 -->
-    <div class="activity-bar">
+    <!-- 活动栏（左侧图标列）：hideActivityBar 时隐藏（专注模式） -->
+    <div v-show="!hideActivityBar" class="activity-bar">
       <div
         v-for="plugin in displayPlugins"
         :key="plugin.id"
@@ -17,7 +17,7 @@
     <!-- 面板区域：动态渲染当前激活插件的侧边栏面板 -->
     <div class="panel-area">
       <template v-for="plugin in displayPlugins" :key="plugin.id">
-        <div class="panel-content" v-show="pluginManager.activeToolId.value === plugin.id">
+        <div class="panel-content" v-show="isPanelVisible(plugin.id)">
           <component :is="plugin.sidebarPanel" />
         </div>
       </template>
@@ -32,8 +32,28 @@ import useStore from '@/store/index'
 
 const { useLayoutStore } = useStore()
 
+const props = withDefaults(defineProps<{
+  /** 是否隐藏活动栏（专注模式时只隐藏图标列，保留插件面板） */
+  hideActivityBar?: boolean
+}>(), {
+  hideActivityBar: false
+})
+
 /** 当前窗口显示的插件列表（根据 layout store 的 enabledPlugins 过滤） */
 const displayPlugins = computed(() => useLayoutStore.filteredPlugins)
+
+/**
+ * 判断插件面板是否可见
+ * - 活动栏隐藏时（专注模式）：显示第一个插件的面板
+ * - 正常模式：显示当前激活插件的面板
+ */
+function isPanelVisible(pluginId: string): boolean {
+  if (props.hideActivityBar) {
+    // 专注模式：自动显示第一个插件的面板
+    return displayPlugins.value.length > 0 && displayPlugins.value[0].id === pluginId
+  }
+  return pluginManager.activeToolId.value === pluginId
+}
 </script>
 
 <style scoped lang="scss">

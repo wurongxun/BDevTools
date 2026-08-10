@@ -2,9 +2,6 @@ import { defineStore } from 'pinia'
 import type { RouteRecordRaw } from 'vue-router'
 import { getMenu } from '@/api/user'
 import { get_file_Api } from '@/api/file'
-import useStore from '@/store/index'
-import { constantRoutes } from '@/router/index'
-import router from '@/router/index'
 import VerifyUtils from '@/utils/VerifyUtils'
 import ToolUtils from '@/utils/ToolUtils'
 import { TreeNode } from '@/Types/entitys'
@@ -104,21 +101,21 @@ export const routerNoteStore = defineStore('routerNoteStore', {
      * @description 数组扁平化， 同时修改路由name为[父元素name -> name]
      * @returns RouteRecordRaw[]
      */
-    async setRoutes() {
+    async setFileTree() {
       try {
         this.routes_loading = true
 
         this.tree_node = []
-        // 异步调用接口，主线程无需等待
-        get_file_Api()
-          .then((red_note: RouteRecordRaw[]) => {
-            // 处理获取到的路由数据
-            console.log('setRoutes ===============bred_note', red_note)
-
-          })
-          .catch((error) => {
-            console.error('获取路由信息失败:', error)
-          })
+        // // 异步调用接口，主线程无需等待
+        // get_file_Api()
+        //   .then((red_note: RouteRecordRaw[]) => {
+        //     // 处理获取到的路由数据
+        //     console.log('setRoutes ===============bred_note', red_note)
+        //
+        //   })
+        //   .catch((error) => {
+        //     console.error('获取路由信息失败:', error)
+        //   })
       } catch (error) {
         console.error('获取路由信息失败:', error)
       } finally {
