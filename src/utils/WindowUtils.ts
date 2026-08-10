@@ -21,13 +21,13 @@ export async function openAppWindow(path: string) {
   try {
     const existing = await WebviewWindow.getByLabel(windowLabel)
     if (existing) {
-      const win = existing as unknown as Window
-      await win.show()
-      await win.unminimize();
-      await win.setFocus()
+      // 窗口已存在，通过 Rust 后端强制显示在最顶层（Win32 SetForegroundWindow）
+      await invoke('focus_window', { label: windowLabel })
       return
     }
-  } catch (_) {}
+  } catch (e) {
+    console.warn(`查找窗口 ${windowLabel} 失败:`, e)
+  }
 
   const appWindow = new WebviewWindow(windowLabel, {
     title: config.title,

@@ -4,6 +4,11 @@ use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
 use uuid::Uuid;
 
+#[cfg(target_os = "windows")]
+use windows::Win32::UI::WindowsAndMessaging::{SetForegroundWindow, ShowWindow, SW_RESTORE};
+#[cfg(target_os = "windows")]
+use windows::Win32::Foundation::HWND;
+
 use crate::entity::window::{WindowMeta, WindowRole};
 use crate::response::response::Response;
 use crate::window_manager::registry;
@@ -113,14 +118,28 @@ pub async fn close_window(app: tauri::AppHandle, label: String) -> Response<bool
     }
 }
 
-/// 聚焦指定窗口
+/// 聚焦指定窗口（通用，使用 Win32 SetForegroundWindow 确保到最前）
 #[tauri::command]
 pub async fn focus_window(app: tauri::AppHandle, label: String) -> Response<bool> {
     let window = app.get_webview_window(&label);
     match window {
         Some(win) => {
             let _ = win.show();
-            let _ = win.set_focus();
+            #[cfg(target_os = "windows")]
+            {
+                // Windows 下使用 SetForegroundWindow 强制到最前
+                if let Ok(hwnd) = win.hwnd() {
+                    unsafe {
+                        let raw = hwnd.0 as usize as isize;
+                        let _ = ShowWindow(HWND(raw), SW_RESTORE);
+                        let _ = SetForegroundWindow(HWND(raw));
+                    }
+                }
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = win.set_focus();
+            }
             Response::new(200, true, "窗口已聚焦")
         }
         None => Response::new(404, false, &format!("窗口 {} 不存在", label)),

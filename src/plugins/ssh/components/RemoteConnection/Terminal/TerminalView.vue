@@ -12,28 +12,34 @@
         </span>
       </div>
       <div class="toolbar-right">
-        <el-button
-          size="small"
-          :type="status === 'connected' ? 'danger' : 'primary'"
+        <button
+          class="tool-btn"
+          :class="status === 'connected' ? 'tool-btn-danger' : 'tool-btn-primary'"
           @click="handleConnectToggle"
-          :loading="status === 'connecting'"
+          :disabled="status === 'connecting'"
+          :title="status === 'connected' ? '断开连接' : '连接'"
         >
-          {{ status === 'connected' ? '断开' : status === 'connecting' ? '连接中...' : '连接' }}
-        </el-button>
-        <el-button
-          size="small"
+          <svg v-if="status === 'connecting'" class="tool-icon spinning" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 0 1 7 7h-1.5A5.5 5.5 0 0 0 8 2.5V1z"/></svg>
+          <svg v-else-if="status === 'connected'" class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 1a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 4.5 1zm7 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 11.5 1zM8 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+          <svg v-else class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 1a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 4.5 1zm7 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 11.5 1zM8 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+          <span class="tool-label">{{ status === 'connected' ? '断开' : status === 'connecting' ? '连接中' : '连接' }}</span>
+        </button>
+        <button
+          class="tool-btn"
           @click="handleClear"
           :disabled="status !== 'connected'"
+          title="清屏"
         >
-          清屏
-        </el-button>
-        <el-button
-          size="small"
+          <svg class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 1a.5.5 0 0 0 0 1h1.11l.96 9.61A2 2 0 0 0 6.56 13h2.88a2 2 0 0 0 1.99-1.39L12.39 2H13.5a.5.5 0 0 0 0-1H2.5zM5.64 2h4.72l-.86 8.61a1 1 0 0 1-1 .89H6.56a1 1 0 0 1-1-.89L4.64 2zM6 5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0v-4A.5.5 0 0 1 6 5zm4 0a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0v-4A.5.5 0 0 1 10 5z"/></svg>
+        </button>
+        <button
+          class="tool-btn"
           @click="handleReconnect"
           :disabled="status !== 'connected'"
+          title="重连"
         >
-          重连
-        </el-button>
+          <svg class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/><path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/></svg>
+        </button>
       </div>
     </div>
 
@@ -401,7 +407,74 @@ onUnmounted(() => {
 
 .toolbar-right {
   display: flex;
-  gap: 6px;
+  gap: 2px;
+}
+
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.15s;
+  user-select: none;
+  white-space: nowrap;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+
+  &:hover:not(:disabled) {
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
+      color: theme.getVar('textColor');
+    }
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  &.tool-btn-primary {
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+    }
+  }
+
+  &.tool-btn-danger {
+    @include theme.useTheme {
+      color: #f44747;
+    }
+
+    &:hover:not(:disabled) {
+      background-color: rgba(244, 71, 71, 0.12);
+    }
+  }
+}
+
+.tool-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.tool-label {
+  line-height: 1;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .terminal-wrapper {

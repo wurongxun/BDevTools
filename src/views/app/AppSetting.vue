@@ -883,44 +883,63 @@ const app_updates_check = async () => {
 </template>
 
 <style lang="scss" scoped>
+@use '@/styles/theme.scss' as theme;
+
 .settings-layout {
   width: 100%;
   height: 100%;
   display: flex;
   overflow: hidden;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('appMainBgColor');
+  }
 }
 
+// ---- 左侧导航 ----
 .settings-nav {
   width: 160px;
   flex-shrink: 0;
-  padding: 16px 8px;
-  border-right: 1px solid var(--el-border-color-light);
+  padding: 12px 6px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('sidebarBg');
+    border-right: 1px solid theme.getVar('borderColor');
+  }
 }
 
 .settings-nav-item {
-  padding: 10px 16px;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  color: var(--el-text-color-regular);
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 13px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.15s;
   user-select: none;
 
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+
   &:hover {
-    background: var(--el-fill-color-light);
-    color: var(--el-text-color-primary);
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
+      color: theme.getVar('textColor');
+    }
   }
 
   &.active {
-    background: var(--el-color-primary-light-9);
-    color: var(--el-color-primary);
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
+      color: theme.getVar('textColor');
+    }
     font-weight: 500;
   }
 }
 
+// ---- 右侧内容区 ----
 .settings-main {
   flex: 1;
   min-width: 0;
@@ -933,7 +952,7 @@ const app_updates_check = async () => {
   width: 100%;
   height: 100%;
   overflow-y: auto;
-  padding: 20px;
+  padding: 16px 20px;
   box-sizing: border-box;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -945,29 +964,40 @@ const app_updates_check = async () => {
   }
 }
 
+// ---- 分组区块（扁平化，无阴影） ----
 .settings-section {
-  background: var(--el-bg-color);
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  padding: 16px;
+  margin-bottom: 12px;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+    border: 1px solid theme.getVar('borderColor');
+  }
 }
 
 .section-title {
-  font-size: 1.3rem;
-  color: var(--el-text-color-primary);
-  margin: 0 0 20px 0;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--el-border-color-light);
-  font-weight: 500;
+  font-size: 14px;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  font-weight: 600;
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+    border-bottom: 1px solid theme.getVar('borderColor');
+  }
 }
 
+// ---- 设置项 ----
 .settings-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 0;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  padding: 10px 0;
+
+  @include theme.useTheme {
+    border-bottom: 1px solid theme.getVar('borderColor');
+  }
 
   &:last-child {
     border-bottom: none;
@@ -978,33 +1008,41 @@ const app_updates_check = async () => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .setting-label {
   display: block;
-  font-size: 1rem;
-  color: var(--el-text-color-primary);
-  font-weight: 500;
+  font-size: 13px;
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
 }
 
 .setting-description {
   display: block;
-  font-size: 0.85rem;
-  color: var(--el-text-color-secondary);
+  font-size: 12px;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 
 .update-info {
   display: block;
-  font-size: 0.85rem;
-  color: var(--el-color-success);
+  font-size: 12px;
   margin-top: 4px;
   font-weight: 500;
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
 }
 
 .setting-control {
   flex-shrink: 0;
-  margin-left: 20px;
+  margin-left: 16px;
 }
 
 .read-lines-control {
@@ -1013,69 +1051,50 @@ const app_updates_check = async () => {
   gap: 8px;
 }
 
+// ---- 按钮：桌面风格，无浮动效果 ----
 .el-button {
-  transition: all 0.3s;
+  transition: background-color 0.15s;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: none;
+    box-shadow: none;
   }
 }
 
-@media (max-width: 768px) {
-  .settings-nav {
-    width: 120px;
-    padding: 12px 6px;
-  }
-
-  .settings-content {
-    padding: 15px;
-  }
-
-  .settings-item {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .setting-control {
-    margin-left: 0;
-    margin-top: 15px;
-    width: 100%;
-    display: flex;
-    justify-content: flex-end;
-  }
-
-  .section-title {
-    font-size: 1.2rem;
-  }
-}
-
-// ==================== 窗口预设样式 ====================
-
+// ---- 窗口预设 ----
 .section-desc {
-  font-size: 0.9rem;
-  color: var(--el-text-color-secondary);
-  margin: -12px 0 16px 0;
+  font-size: 12px;
+  margin: -8px 0 12px 0;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 
 .window-preset-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 6px;
+  margin-bottom: 12px;
 }
 
 .window-preset-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  border-radius: 6px;
-  border: 1px solid var(--el-border-color-light);
-  transition: border-color 0.2s;
+  padding: 10px 14px;
+  border-radius: 4px;
+  transition: background-color 0.15s;
+
+  @include theme.useTheme {
+    border: 1px solid theme.getVar('borderColor');
+    background-color: theme.getVar('appMainBgColor');
+  }
 
   &:hover {
-    border-color: var(--el-color-primary);
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
+    }
   }
 }
 
@@ -1087,19 +1106,25 @@ const app_updates_check = async () => {
 .preset-name-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: 6px;
+  margin-bottom: 3px;
 }
 
 .preset-name {
-  font-size: 1rem;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--el-text-color-primary);
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
 }
 
 .preset-meta {
-  font-size: 0.85rem;
-  color: var(--el-text-color-secondary);
+  font-size: 12px;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 
 .preset-sep {
@@ -1109,7 +1134,7 @@ const app_updates_check = async () => {
 
 .preset-actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
   margin-left: 12px;
 }
@@ -1117,21 +1142,24 @@ const app_updates_check = async () => {
 .window-preset-empty {
   text-align: center;
   padding: 24px;
-  color: var(--el-text-color-placeholder);
-  font-size: 0.9rem;
+  font-size: 13px;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 
-// 编辑弹窗表单
+// ---- 编辑弹窗表单 ----
 .window-edit-form {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
 }
 
 .form-item {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 
   &.form-item-row {
     flex-direction: row;
@@ -1141,9 +1169,12 @@ const app_updates_check = async () => {
 }
 
 .form-label {
-  font-size: 0.95rem;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--el-text-color-primary);
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
 }
 
 .form-label-group {
@@ -1153,21 +1184,24 @@ const app_updates_check = async () => {
 }
 
 .form-hint {
-  font-size: 0.8rem;
-  color: var(--el-text-color-secondary);
+  font-size: 12px;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 
 .plugin-checkbox-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .custom-size-inputs {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 6px;
 
   .el-input-number {
     flex: 1;
@@ -1175,7 +1209,10 @@ const app_updates_check = async () => {
 }
 
 .size-sep {
-  color: var(--el-text-color-secondary);
-  font-size: 0.9rem;
+  font-size: 13px;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 </style>

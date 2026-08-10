@@ -24,7 +24,7 @@ pub async fn my_read_file(path: std::path::PathBuf) -> String {
     std::fs::read_to_string(path).unwrap()
 }
 
-// 打开目录
+// 打开目录（项目）
 #[tauri::command]
 pub async fn file_manager_open_path(app_handle: tauri::AppHandle, path: String) -> ResData<String> {
     let re = app_handle.opener().open_path(path, None::<String>);
@@ -32,7 +32,7 @@ pub async fn file_manager_open_path(app_handle: tauri::AppHandle, path: String) 
         Ok(_) => {
             return ResData {
                 code: 200,
-                msg: "打开目录成功".to_string(),
+                msg: "打开项目成功".to_string(),
                 data: "".to_string(),
             };
         }

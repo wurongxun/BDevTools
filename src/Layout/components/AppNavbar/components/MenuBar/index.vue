@@ -20,6 +20,49 @@
               v-if="item.divider"
               class="menu-divider"
             ></div>
+            <!-- 子菜单项（如"最近的项目"） -->
+            <div
+              v-else-if="item.submenu"
+              class="menu-option has-submenu"
+              :class="{ 'is-disabled': item.disabled }"
+              @mouseenter="activeSubmenu = item.command"
+              @mouseleave="activeSubmenu = null"
+            >
+              <span class="option-label">{{ item.label }}</span>
+              <span class="submenu-arrow">▶</span>
+              <!-- 子菜单弹出层 -->
+              <div
+                v-if="activeSubmenu === item.command"
+                class="submenu-popup"
+                @mouseenter="activeSubmenu = item.command"
+                @mouseleave="activeSubmenu = null"
+              >
+                <div
+                  v-if="item.submenu.length === 0"
+                  class="menu-option is-disabled"
+                >
+                  <span class="option-label">暂无记录</span>
+                </div>
+                <div
+                  v-for="(subItem, subIdx) in item.submenu"
+                  :key="subIdx"
+                  class="menu-option submenu-item"
+                  :class="{ 'is-disabled': subItem.disabled }"
+                  @click.stop="handleMenuCommand(subItem)"
+                >
+                  <span class="option-label" :title="subItem.label">{{ subItem.label }}</span>
+                </div>
+                <div v-if="item.submenu.length > 0" class="menu-divider"></div>
+                <div
+                  v-if="item.submenu.length > 0"
+                  class="menu-option"
+                  @click.stop="handleMenuCommand({ label: '清除最近项目', command: 'clearRecentProjects' })"
+                >
+                  <span class="option-label">清除最近项目</span>
+                </div>
+              </div>
+            </div>
+            <!-- 普通菜单项 -->
             <div
               v-else
               class="menu-option"
@@ -37,7 +80,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { load, Store } from '@tauri-apps/plugin-store'
 import { tauri_request } from '@/utils/tauri_request'
@@ -49,9 +92,10 @@ import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openAppWindow, createEditorWindow } from '@/utils/WindowUtils'
-const {useDocumentManagerStore,routerNoteStore } = useStore()
+const {useDocumentManagerStore,routerNoteStore,useLayoutStore } = useStore()
 const router = useRouter()
 const activeMenu = ref<string | null>(null)
+const activeSubmenu = ref<string | null>(null)
 let store: Store | undefined
 
 interface MenuItem {
@@ -60,6 +104,7 @@ interface MenuItem {
   divider?: boolean
   disabled?: boolean
   command: string
+  submenu?: MenuItem[]
 }
 
 interface Menu {
@@ -67,53 +112,107 @@ interface Menu {
   items: MenuItem[]
   action?: string
 }
-// items: [
-//   { label: '新建文件', shortcut: 'Ctrl+N', command: 'newFile' },
-//   { label: '打开文件', shortcut: 'Ctrl+O', command: 'openFile' },
-//   { label: '新建文件夹', command: 'newFolder' },
-//   { divider: true, label: '', command: '' },
-//   { label: '保存', shortcut: 'Ctrl+S', command: 'save' },
-//   { label: '另存为', shortcut: 'Ctrl+Shift+S', command: 'saveAs' },
-//   { divider: true, label: '', command: '' },
-//   { label: '设置', command: 'settings' },
-// ]
 
-// ,
-// {
-//   label: '编码(N)',
-//     items: [
-//   { label: 'UTF-8', command: 'encodingUtf8' },
-//   { label: 'GBK', command: 'encodingGbk' },
-//   { label: 'UTF-16', command: 'encodingUtf16' },
-//   { label: 'ASCII', command: 'encodingAscii' },
-// ]
-// }
+const MAX_RECENT_PROJECTS = 20
 
-  // {
-  //   label: '终端(T)',
-  //   items: [],
-  //   action: 'newTerminal'
-  // },
-const menus: Menu[] = [
-  {
-    label: '文件(F)',
-    items: [
-      { label: '打开文件', shortcut: 'Ctrl+O', command: 'openFile' },
-      { label: '打开目录', shortcut: 'Ctrl+O', command: 'openWorkingDirectory' },
-      { label: '新建窗口', shortcut: 'Ctrl+Shift+N', command: 'newWindow' },
-      { divider: true, label: '', command: '' },
-      { label: '设置', command: 'settings' },
-    ]
-  },
+// ===== 最近项目状态 =====
+const recentProjects = ref<string[]>([])
 
-  {
-    label: '帮助(H)',
-    items: [
-      { label: '帮助', command: 'help' },
-      { label: '关于', command: 'about' }
-    ]
+/** 判断当前窗口是否启用了 files 插件 */
+const hasFilesPlugin = computed(() => {
+  const enabled = useLayoutStore.enabledPlugins
+  // 空数组表示显示全部插件
+  return enabled.length === 0 || enabled.includes('files')
+})
+
+// ===== 最近项目持久化 =====
+async function loadRecentProjects() {
+  if (!store) {
+    store = await load('settings.json', { autoSave: false, defaults: {} })
   }
-]
+  const val = await store.get<string[]>('recent_projects')
+  recentProjects.value = val || []
+}
+
+async function saveRecentProjects() {
+  if (!store) {
+    store = await load('settings.json', { autoSave: false, defaults: {} })
+  }
+  await store.set('recent_projects', recentProjects.value)
+  await store.save()
+}
+
+function addRecentProject(dirPath: string) {
+  // 移除重复项，添加到最前
+  recentProjects.value = recentProjects.value.filter(p => p !== dirPath)
+  recentProjects.value.unshift(dirPath)
+  // 限制数量
+  if (recentProjects.value.length > MAX_RECENT_PROJECTS) {
+    recentProjects.value = recentProjects.value.slice(0, MAX_RECENT_PROJECTS)
+  }
+  saveRecentProjects()
+}
+
+function removeRecentProject(dirPath: string) {
+  recentProjects.value = recentProjects.value.filter(p => p !== dirPath)
+  saveRecentProjects()
+}
+
+function clearRecentProjects() {
+  recentProjects.value = []
+  saveRecentProjects()
+}
+
+/** 获取目录名用于显示 */
+function getDirName(dirPath: string): string {
+  const parts = dirPath.replace(/\\/g, '/').split('/')
+  return parts[parts.length - 1] || dirPath
+}
+
+// ===== 动态菜单 =====
+const menus = computed<Menu[]>(() => {
+  const fileItems: MenuItem[] = []
+
+  if (hasFilesPlugin.value) {
+    fileItems.push({ label: '打开文件', shortcut: 'Ctrl+O', command: 'openFile' })
+    fileItems.push({ label: '打开项目', shortcut: 'Ctrl+Shift+O', command: 'openWorkingDirectory' })
+
+    // 最近项目子菜单
+    const submenuItems: MenuItem[] = recentProjects.value.map(p => ({
+      label: p,
+      command: 'openRecentProject',
+      _dirPath: p
+    } as MenuItem & { _dirPath: string }))
+
+    fileItems.push({
+      label: '最近的项目',
+      command: 'recentProjects',
+      submenu: submenuItems
+    })
+
+    fileItems.push({ label: '新建窗口', shortcut: 'Ctrl+Shift+N', command: 'newWindow' })
+    fileItems.push({ divider: true, label: '', command: '' })
+  } else {
+    fileItems.push({ label: '新建窗口', shortcut: 'Ctrl+Shift+N', command: 'newWindow' })
+    fileItems.push({ divider: true, label: '', command: '' })
+  }
+
+  fileItems.push({ label: '设置', command: 'settings' })
+
+  return [
+    {
+      label: '文件(F)',
+      items: fileItems
+    },
+    {
+      label: '帮助(H)',
+      items: [
+        { label: '帮助', command: 'help' },
+        { label: '关于', command: 'about' }
+      ]
+    }
+  ]
+})
 
 const getWorkingDirectory = async (): Promise<string> => {
   if (!store) {
@@ -169,6 +268,34 @@ const handleMenuCommand = async (item: MenuItem) => {
     }
     case 'openWorkingDirectory': {
       await changeWorkspace();
+      // 记录到最近项目
+      if (routerNoteStore.workingDirectory) {
+        addRecentProject(routerNoteStore.workingDirectory)
+      }
+      break
+    }
+    case 'openRecentProject': {
+      const dirPath = (item as MenuItem & { _dirPath: string })._dirPath
+      if (dirPath) {
+        routerNoteStore.setWorkingDirectory(dirPath)
+        // 持久化到 settings.json
+        let s: Store | undefined
+        if (!s) {
+          s = await load('settings.json', { autoSave: false, defaults: {} })
+        }
+        if (s) {
+          await s.set('md_working_directory', { value: dirPath })
+          await s.save()
+        }
+        await get_file_Api()
+        // 移到最近列表最前
+        addRecentProject(dirPath)
+      }
+      break
+    }
+    case 'clearRecentProjects': {
+      clearRecentProjects()
+      NotificationUtil.success('已清除最近项目')
       break
     }
 
@@ -250,6 +377,7 @@ const handleMouseEnter = (label: string) => {
 
 const closeMenu = () => {
   activeMenu.value = null
+  activeSubmenu.value = null
 }
 
 const handleGlobalClick = (e: MouseEvent) => {
@@ -276,9 +404,10 @@ const handleKeydown = (e: KeyboardEvent) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('click', handleGlobalClick)
   document.addEventListener('keydown', handleKeydown)
+  await loadRecentProjects()
 })
 
 onUnmounted(() => {
@@ -351,6 +480,7 @@ onUnmounted(() => {
         font-size: 13px;
         cursor: pointer;
         transition: background-color 0.15s;
+        position: relative;
 
         @include theme.useTheme {
           color: theme.getVar('textColor');
@@ -379,12 +509,46 @@ onUnmounted(() => {
 
         .option-label {
           flex: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .option-shortcut {
           font-size: 12px;
           opacity: 0.5;
           margin-left: 24px;
+        }
+
+        .submenu-arrow {
+          font-size: 10px;
+          opacity: 0.5;
+          margin-left: 12px;
+        }
+
+        // 子菜单弹出层
+        &.has-submenu {
+          .submenu-popup {
+            position: absolute;
+            left: 100%;
+            top: 0;
+            min-width: 280px;
+            max-height: 360px;
+            overflow-y: auto;
+            padding: 4px 0;
+            z-index: 100000;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+
+            @include theme.useTheme {
+              background-color: theme.getVar('bgColor');
+              border: 1px solid theme.getVar('borderColor');
+            }
+
+            .submenu-item .option-label {
+              font-size: 12px;
+            }
+          }
         }
       }
     }

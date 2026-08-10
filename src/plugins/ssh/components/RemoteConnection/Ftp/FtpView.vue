@@ -2,32 +2,48 @@
   <div class="ftp-view">
     <!-- FTP 工具栏 -->
     <div class="ftp-toolbar">
-      <el-button size="small" @click="handleConnect" :loading="isConnecting">
-        {{ isConnected ? '已连接' : '连接' }}
-      </el-button>
-      <el-button size="small" @click="handleUpload" :disabled="!isConnected || selectedLocalFiles.length === 0">
-        <el-icon><Upload /></el-icon> 上传
-      </el-button>
-      <el-button size="small" @click="handleDownload" :disabled="!isConnected || selectedRemoteFiles.length === 0">
-        <el-icon><Download /></el-icon> 下载
-      </el-button>
-      <el-button size="small" @click="handleNewFolder" :disabled="!isConnected">
-        <el-icon><FolderAdd /></el-icon> 新建目录
-      </el-button>
-      <el-button size="small" @click="handleDeleteSelected" :disabled="!isConnected || selectedRemoteFiles.length === 0">
-        <el-icon><Delete /></el-icon> 删除
-      </el-button>
-      <el-button size="small" @click="handleRename" :disabled="!isConnected || selectedRemoteFiles.length !== 1">
-        <el-icon><EditPen /></el-icon> 重命名
-      </el-button>
-      <el-button size="small" @click="handleRefresh" :disabled="!isConnected">
-        <el-icon><Refresh /></el-icon> 刷新
-      </el-button>
+      <button
+        class="tool-btn"
+        :class="isConnected ? 'tool-btn-active' : ''"
+        @click="handleConnect"
+        :disabled="isConnecting"
+        :title="isConnected ? '已连接' : '连接'"
+      >
+        <svg v-if="isConnecting" class="tool-icon spinning" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 0 1 7 7h-1.5A5.5 5.5 0 0 0 8 2.5V1z"/></svg>
+        <svg v-else-if="isConnected" class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 1a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 4.5 1zm7 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 11.5 1zM8 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+        <svg v-else class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 1a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 4.5 1zm7 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 11.5 1zM8 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+        <span class="tool-label">{{ isConnected ? '已连接' : '连接' }}</span>
+      </button>
+      <button class="tool-btn" @click="handleUpload" :disabled="!isConnected || selectedLocalFiles.length === 0" title="上传">
+        <svg class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>
+        <span class="tool-label">上传</span>
+      </button>
+      <button class="tool-btn" @click="handleDownload" :disabled="!isConnected || selectedRemoteFiles.length === 0" title="下载">
+        <svg class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+        <span class="tool-label">下载</span>
+      </button>
+      <button class="tool-btn" @click="handleNewFolder" :disabled="!isConnected" title="新建目录">
+        <svg class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M.54 3.87.5 3a2 2 0 0 1 2-2h3.672a2 2 0 0 1 1.414.586l.828.828A2 2 0 0 0 9.828 3h3.982a2 2 0 0 1 1.992 2.181l-.637 7A2 2 0 0 1 13.174 14H2.826a2 2 0 0 1-1.991-1.819l-.637-7a1.99 1.99 0 0 1 .342-1.31zM2.19 4a1 1 0 0 0-.996 1.09l.637 7a1 1 0 0 0 .995.91h10.348a1 1 0 0 0 .995-.91l.637-7A1 1 0 0 0 13.81 4H2.19zm4.69-1.707A1 1 0 0 0 6.172 2H2.5a1 1 0 0 0-1 .981l.006.139C1.72 3.042 1.95 3 2.19 3h5.396l-.707-.707z"/><path d="M13.5 10a.5.5 0 0 1 .5.5V12h1.5a.5.5 0 0 1 0 1H14v1.5a.5.5 0 0 1-1 0V13h-1.5a.5.5 0 0 1 0-1H13v-1.5a.5.5 0 0 1 .5-.5z"/></svg>
+        <span class="tool-label">新建目录</span>
+      </button>
+      <button class="tool-btn" @click="handleDeleteSelected" :disabled="!isConnected || selectedRemoteFiles.length === 0" title="删除">
+        <svg class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H5.5l1-1h3l1 1H13a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+        <span class="tool-label">删除</span>
+      </button>
+      <button class="tool-btn" @click="handleRename" :disabled="!isConnected || selectedRemoteFiles.length !== 1" title="重命名">
+        <svg class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/></svg>
+        <span class="tool-label">重命名</span>
+      </button>
+      <button class="tool-btn" @click="handleRefresh" :disabled="!isConnected" title="刷新">
+        <svg class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/><path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/></svg>
+      </button>
       <!-- 书签下拉 -->
       <el-dropdown trigger="click" :disabled="!isConnected">
-        <el-button size="small">
-          <el-icon><Star /></el-icon> 书签<el-icon class="el-icon--right"><ArrowDown /></el-icon>
-        </el-button>
+        <button class="tool-btn" :disabled="!isConnected" title="书签">
+          <svg class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2v13.5a.5.5 0 0 0 .74.439L8 13.069l5.26 2.87A.5.5 0 0 0 14 15.5V2a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/></svg>
+          <span class="tool-label">书签</span>
+          <svg class="tool-icon tool-icon-arrow" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+        </button>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item
@@ -63,10 +79,12 @@
               @keyup.enter="navigateLocalDir"
               placeholder="本地路径"
             />
-            <el-button size="small" @click="browseLocalPath">浏览</el-button>
-            <el-button size="small" @click="goUpLocalDir" title="上一级">
-              <el-icon><ArrowUp /></el-icon>
-            </el-button>
+            <button class="tool-btn tool-btn-sm" @click="browseLocalPath" title="浏览">
+              <svg class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M.54 3.87.5 3a2 2 0 0 1 2-2h3.672a2 2 0 0 1 1.414.586l.828.828A2 2 0 0 0 9.828 3h3.982a2 2 0 0 1 1.992 2.181l-.637 7A2 2 0 0 1 13.174 14H2.826a2 2 0 0 1-1.991-1.819l-.637-7a1.99 1.99 0 0 1 .342-1.31z"/></svg>
+            </button>
+            <button class="tool-btn tool-btn-sm" @click="goUpLocalDir" title="上一级">
+              <svg class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+            </button>
           </div>
         </div>
         <div class="file-list">
@@ -121,9 +139,9 @@
               placeholder="远程路径"
               :disabled="!isConnected"
             />
-            <el-button size="small" @click="goUpDir" :disabled="!isConnected || remotePath === '/'" title="上一级">
-              <el-icon><ArrowUp /></el-icon>
-            </el-button>
+            <button class="tool-btn tool-btn-sm" @click="goUpDir" :disabled="!isConnected || remotePath === '/'" title="上一级">
+              <svg class="tool-icon" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+            </button>
           </div>
         </div>
         <div class="file-list">
@@ -192,6 +210,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { desktopDir, dirname } from '@tauri-apps/api/path'
 import { open } from '@tauri-apps/plugin-dialog'
 import { Upload, Download, FolderAdd, Delete, Refresh, EditPen, ArrowUp, ArrowDown, Star, Close } from '@element-plus/icons-vue'
+// 保留 Element Plus 图标导入（其他位置可能使用）
 import { ElMessageBox, ElInput } from 'element-plus'
 import useStore from '@/store'
 import { ConnectionStatus } from '@/entity/entitys'
@@ -654,16 +673,80 @@ function formatSize(bytes: number): string {
 .ftp-toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background-color: #252526;
-  border-bottom: 1px solid #2d2d2d;
+  gap: 2px;
+  padding: 4px 8px;
   flex-shrink: 0;
 
   @include theme.useTheme {
     background-color: theme.getVar('bgColor');
-    border-bottom-color: theme.getVar('borderColor');
+    border-bottom: 1px solid theme.getVar('borderColor');
   }
+}
+
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.15s;
+  user-select: none;
+  white-space: nowrap;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+
+  &:hover:not(:disabled) {
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
+      color: theme.getVar('textColor');
+    }
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  &.tool-btn-active {
+    @include theme.useTheme {
+      color: #4ec9b0;
+    }
+  }
+
+  &.tool-btn-sm {
+    padding: 3px 6px;
+  }
+}
+
+.tool-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.tool-icon-arrow {
+  width: 10px;
+  height: 10px;
+}
+
+.tool-label {
+  line-height: 1;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .ftp-panels {
