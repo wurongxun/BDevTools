@@ -1,4 +1,16 @@
-import { NotebookInfo, ResponseData, TreeNode } from '@/Types/entitys'
+import { ResponseData, TreeNode } from '@/Types/entitys'
+
+/** 笔记目录信息（仅本模块使用） */
+class NotebookInfo {
+  public id: string = ''
+  public parent_id: string = ''
+  public path: string = ''
+  public folder: string = ''
+  public name: string = ''
+  public isfile: boolean = false
+  public data_type: string = ''
+  public children: Array<NotebookInfo> = []
+}
 import NotificationUtil from '@/utils/NotificationUtil'
 import request from '@/utils/request/index'
 import { tauri_request } from '@/utils/tauri_request'

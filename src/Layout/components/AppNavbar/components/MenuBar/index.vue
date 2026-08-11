@@ -91,11 +91,13 @@ import { changeWorkspace } from '@/utils/index'
 
 import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
+import { useDocumentManagerStore } from '@/plugins/files/store/documents'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openAppWindow, createEditorWindow, createPresetWindow } from '@/utils/WindowUtils'
 import type { WindowPresetConfig } from '@/utils/WindowUtils'
 import type { WindowMeta } from '@/Types/workspace'
-const {useDocumentManagerStore,routerNoteStore,useLayoutStore } = useStore()
+const {routerNoteStore,useLayoutStore } = useStore()
+const docStore = useDocumentManagerStore()
 const router = useRouter()
 const activeMenu = ref<string | null>(null)
 const activeSubmenu = ref<string | null>(null)
@@ -290,7 +292,7 @@ const handleMenuCommand = async (item: MenuItem) => {
       })
       if (selected) {
         console.log('[MenuBar] Open file:', selected)
-        useDocumentManagerStore.openDocument(selected);
+        docStore.openDocument(selected);
       }
       break
     }

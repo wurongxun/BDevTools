@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::{
     error::Error,
     fs::{metadata, read_dir},
@@ -5,11 +6,80 @@ use std::{
 };
 
 use super::regexUtil;
-use crate::{
-    entity::structs::DirAndFileInfo,
-    response::{resp_data::ResData, response::Response},
-};
+use crate::response::{resp_data::ResData, response::Response};
 use tauri::{AppHandle, Manager};
+
+/// 目录与文件信息（仅文件模块使用）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirAndFileInfo {
+    pub id: String,
+    pub parent_id: String,
+    pub path: String,
+    pub folder: String,
+    pub name: String,
+    pub isfile: bool,
+    pub data_type: String,
+    pub children: Vec<DirAndFileInfo>,
+}
+
+impl DirAndFileInfo {
+    pub fn create(
+        id: String,
+        parent_id: String,
+        path: String,
+        folder: String,
+        name: String,
+        isfile: bool,
+        data_type: String,
+    ) -> DirAndFileInfo {
+        DirAndFileInfo {
+            id,
+            parent_id,
+            path,
+            folder,
+            name,
+            isfile,
+            data_type,
+            children: Vec::new(),
+        }
+    }
+    pub fn set_children(&mut self, children: DirAndFileInfo) {
+        self.children.push(children);
+    }
+    pub fn get_path(&mut self) -> String {
+        self.path.clone()
+    }
+    pub fn get_folder(&mut self) -> String {
+        self.folder.clone()
+    }
+    pub fn get_id(&mut self) -> String {
+        self.id.clone()
+    }
+    pub fn set_parent_id(&mut self, parent_id: String) {
+        self.parent_id = parent_id;
+    }
+    pub fn set_folder(&mut self, folder: String) {
+        self.folder = folder;
+    }
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
+    }
+    pub fn set_isfile(&mut self, isfile: bool) {
+        self.isfile = isfile;
+    }
+    pub fn set_dataType(&mut self, dataType: String) {
+        self.data_type = dataType;
+    }
+    pub fn get_name(&mut self) -> String {
+        self.name.clone()
+    }
+    pub fn get_isfile(&mut self) -> bool {
+        self.isfile
+    }
+    pub fn get_dataType(&mut self) -> String {
+        self.data_type.clone()
+    }
+}
 
 pub fn read_dir_info<P: AsRef<Path>>(local_data_dir: P) -> Result<ResData<Vec<String>>, String> {
     let mut notebooks: Vec<String> = vec![];

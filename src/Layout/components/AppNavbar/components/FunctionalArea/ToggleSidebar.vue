@@ -27,7 +27,7 @@ function toggleSidebar() {
 </template>
 
 <style scoped lang="scss">
-@use '@/styles/variables.scss' as variables;
+@use '@/styles/theme.scss' as theme;
 
 .layout-toggle-btn {
   display: flex;
@@ -38,15 +38,22 @@ function toggleSidebar() {
   margin-right: 12px;
   margin-bottom: 2px;
   cursor: pointer;
-  color: inherit;
-  transition: color 0.2s;
+  transition: color 0.15s;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 
   &:hover {
-    color: variables.$theme-color;
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+    }
   }
 
   &.is-active {
-    color: variables.$theme-color;
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+    }
   }
 }
 </style>

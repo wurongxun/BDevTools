@@ -7,8 +7,8 @@ import type {
   ConnectionTab,
   ConnectionStatus,
   TabContentType
-} from '@/entity/entitys'
-import { ConnectionType } from '@/entity/entitys'
+} from '../types'
+import { ConnectionType } from '../types'
 import NotificationUtil from '@/utils/NotificationUtil'
 
 let tabIdCounter = 0
@@ -96,7 +96,7 @@ export const useConnectionStore = defineStore('connection', () => {
     const idx = connectionGroups.value.indexOf(name)
     if (idx < 0) return false
     connectionGroups.value.splice(idx, 1)
-    // 将该分组下的连接移到“默认分组”
+    // 将该分组下的连接移到"默认分组"
     for (const conn of connections.value) {
       if (conn.favorites_name === name) {
         conn.favorites_name = '默认分组'

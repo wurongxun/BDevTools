@@ -25,15 +25,17 @@
 import { computed } from 'vue'
 import { Document } from '@element-plus/icons-vue'
 import useStore from '@/store'
+import { useDocumentManagerStore } from '../store/documents'
 import CodeEditor from './EditorType/CodeEditor.vue'
 import ImageEditor from './EditorType/ImageEditor.vue'
 import PdfEditor from './EditorType/PdfEditor.vue'
 import MdEditor from './EditorType/MdEditor.vue'
 import TextView from './EditorType/TextView.vue'
 
-const { routerNoteStore,  useDocumentManagerStore } = useStore()
+const { routerNoteStore } = useStore()
+const docStore = useDocumentManagerStore()
 
-const activeDocument = computed(() => useDocumentManagerStore.activeDocument)
+const activeDocument = computed(() => docStore.activeDocument)
 const activePathId = computed(() => activeDocument.value?.id || '')
 const activeKey = computed(() => {
   const doc = activeDocument.value
@@ -55,8 +57,8 @@ const currentEditorComponent = computed(() => {
 })
 
 function handleStateUpdate(state: any) {
-  if (activeDocument.value&&useDocumentManagerStore.activeDocumentPath) {
-      useDocumentManagerStore.updateViewState(useDocumentManagerStore.activeDocumentPath, state)
+  if (activeDocument.value&&docStore.activeDocumentPath) {
+      docStore.updateViewState(docStore.activeDocumentPath, state)
   }
 }
 </script>

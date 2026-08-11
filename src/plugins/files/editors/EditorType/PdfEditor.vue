@@ -16,7 +16,8 @@ import { ElMessage } from 'element-plus'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import useStore from '@/store'
 import BookmarkTree from './Pdf/BookmarkTree.vue'
-import { DocumentState } from '@/store/modules/documents'
+import { DocumentState } from '../../store/documents'
+import { useDocumentManagerStore } from '../../store/documents'
 import { ArrowRight, ArrowDown, FolderOpened, Document } from '@element-plus/icons-vue'
 
 defineOptions({
@@ -29,9 +30,10 @@ const MIN_SCALE = 0.2
 const MAX_SCALE = 5
 const CONTAINER_PADDING = 40
 const MAX_FIT_SCALE = 1.5
-const { appConfig, system, useDocumentManagerStore } = useStore()
+const { appConfig, system } = useStore()
+const docStore = useDocumentManagerStore()
 // 当前激活的文档路径
-const activeDocumentPath = computed(() => useDocumentManagerStore.activeDocumentPath)
+const activeDocumentPath = computed(() => docStore.activeDocumentPath)
 const scale = ref<number>(1)
 const page_num = ref<number>(1)
 const page_count = ref<number>(0)
@@ -237,7 +239,7 @@ const loadPdfFile = async () => {
       throw new Error('No active document selected')
     }
 
-    const doc = useDocumentManagerStore.documents.get(activeDocumentPath.value)
+    const doc = docStore.documents.get(activeDocumentPath.value)
     if (!doc || !doc.id) {
       throw new Error('No PDF file path provided')
     }

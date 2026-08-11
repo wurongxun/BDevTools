@@ -1,8 +1,7 @@
 use crate::{
-    entity::structs::DirAndFileInfo,
     response::resp_data::ResData,
     utils::{
-        fileUtil::{default_document_data, md_notebooks, read_dir_info},
+        fileUtil::{default_document_data, md_notebooks, read_dir_info, DirAndFileInfo},
         regexUtil,
     },
 };

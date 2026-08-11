@@ -8,11 +8,11 @@
 
 <script lang="ts" setup>
 import { computed } from 'vue'
-import useStore from '@/store'
-const { useDocumentManagerStore } = useStore()
+import { useDocumentManagerStore } from '@/plugins/files/store/documents'
+const docStore = useDocumentManagerStore()
 const name = computed(() => {
-  console.log("4444444444444444444"+useDocumentManagerStore.activeDocument)
-  return useDocumentManagerStore.activeDocument?.name || ''
+  console.log("4444444444444444444"+docStore.activeDocument)
+  return docStore.activeDocument?.name || ''
 })
 </script>
 

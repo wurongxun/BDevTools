@@ -9,6 +9,7 @@ import { Window } from '@tauri-apps/api/window'
 import type { SessionSnapshot, WindowState, OpenFileInfo, LayoutState } from '@/Types/workspace'
 import { sessionService } from '@/services/sessionService'
 import useStore from '@/store'
+import { useDocumentManagerStore } from '@/plugins/files/store/documents'
 
 export const useSessionStore = defineStore('session', () => {
   /** 上次保存/加载的快照 */
@@ -22,8 +23,8 @@ export const useSessionStore = defineStore('session', () => {
    * 采集当前窗口状态生成快照
    */
   async function captureSnapshot(): Promise<SessionSnapshot> {
-    const { useDocumentManagerStore, system } = useStore()
-    const docStore = useDocumentManagerStore
+    const { system } = useStore()
+    const docStore = useDocumentManagerStore()
 
     // 获取窗口状态
     let windowState: WindowState = {
@@ -112,8 +113,8 @@ export const useSessionStore = defineStore('session', () => {
    * 从快照恢复窗口状态
    */
   async function restoreFromSnapshot(snapshot: SessionSnapshot) {
-    const { useDocumentManagerStore, system } = useStore()
-    const docStore = useDocumentManagerStore
+    const { system } = useStore()
+    const docStore = useDocumentManagerStore()
 
     lastSnapshot.value = snapshot
 
@@ -168,8 +169,7 @@ export const useSessionStore = defineStore('session', () => {
     if (!autoSaveEnabled.value) return
 
     autoSaveTimer = setInterval(async () => {
-      const { useDocumentManagerStore } = useStore()
-      const docStore = useDocumentManagerStore
+      const docStore = useDocumentManagerStore()
       // 仅在有脏文档时保存
       if (docStore.hasUnsavedChanges) {
         await saveSnapshot()

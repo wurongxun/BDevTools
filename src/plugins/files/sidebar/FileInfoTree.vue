@@ -220,16 +220,18 @@ import { ElMessage } from 'element-plus'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/entity/entitys'
+import { useDocumentManagerStore } from '../store/documents'
 import useStore from '@/store/index'
 import { TreeNode } from '@/Types/entitys'
 import { changeWorkspace } from '@/utils/index'
 
-const { appConfig, useDocumentManagerStore } = useStore()
+const { appConfig } = useStore()
+const docStore = useDocumentManagerStore()
 let md_working_directory = ref<string>('')
 
 // ===== 收藏/最近打开 =====
-const favoriteFiles = computed(() => useDocumentManagerStore.favoriteFiles)
-const recentFiles = computed(() => useDocumentManagerStore.recentFiles)
+const favoriteFiles = computed(() => docStore.favoriteFiles)
+const recentFiles = computed(() => docStore.recentFiles)
 const expandedSections = ref<Set<string>>(new Set(['favorites', 'recent']))
 
 function toggleSection(key: string) {
@@ -240,13 +242,13 @@ function favoriteName(path: string): string {
   return path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || path
 }
 function handleFavoriteClick(path: string) {
-  useDocumentManagerStore.openDocument(path)
+  docStore.openDocument(path)
 }
 function handleRemoveFavorite(path: string) {
-  useDocumentManagerStore.toggleFavorite(path)
+  docStore.toggleFavorite(path)
 }
 function handleRecentClick(path: string) {
-  useDocumentManagerStore.openDocument(path)
+  docStore.openDocument(path)
 }
 
 // Props & Emits
@@ -390,7 +392,7 @@ const defaultProps = { children: 'children', label: 'label' }
 
 // ===== 收藏判断 =====
 function isFavoriteNode(node: TreeNode): boolean {
-  return useDocumentManagerStore.isFavorite(node.filePath || node.folder || '')
+  return docStore.isFavorite(node.filePath || node.folder || '')
 }
 
 // ===== 文件图标 =====
@@ -455,7 +457,7 @@ function handleToggleFavorite() {
   const node = contextNode.value
   if (!node) return
   const path = node.filePath || node.folder || ''
-  useDocumentManagerStore.toggleFavorite(path)
+  docStore.toggleFavorite(path)
   closeContextMenu()
 }
 

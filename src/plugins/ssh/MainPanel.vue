@@ -6,19 +6,19 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import useStore from '@/store'
+import { useConnectionStore } from './store'
 import ConnectionPanel from './components/RemoteConnection/ConnectionPanel.vue'
 import { useRemoteAutoSave } from './composables/useRemoteAutoSave'
 
-const { useConnectionStore } = useStore()
+const connectionStore = useConnectionStore()
 
 // 启动远程文件自动保存
 useRemoteAutoSave()
 
 onMounted(() => {
-  useConnectionStore.loadConnections()
-  useConnectionStore.setupSshOutputListener()
-  useConnectionStore.setupTransferProgressListener()
+  connectionStore.loadConnections()
+  connectionStore.setupSshOutputListener()
+  connectionStore.setupTransferProgressListener()
 })
 </script>
 

@@ -1,5 +1,5 @@
 import { watch, onUnmounted } from 'vue'
-import { useDocumentManagerStore } from '@/store/modules/documents'
+import { useDocumentManagerStore } from '@/plugins/files/store/documents'
 import NotificationUtil from '@/utils/NotificationUtil'
 
 /**

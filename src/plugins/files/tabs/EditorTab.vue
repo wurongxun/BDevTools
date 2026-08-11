@@ -128,12 +128,12 @@
 
 <script setup lang="ts">
 import useStore from '@/store'
-const {useDocumentManagerStore } = useStore()
+import { useDocumentManagerStore } from '../store/documents'
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { TabBarContainer, TabBarItem, TabCloseButton } from '@/components/TabBar'
 import FileIcon from './FileIcon.vue'
 
-const docStore = useDocumentManagerStore;
+const docStore = useDocumentManagerStore();
 
 // TabBar 容器引用
 const tabBarContainer = ref<InstanceType<typeof TabBarContainer> | null>(null)

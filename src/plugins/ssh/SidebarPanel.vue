@@ -182,10 +182,10 @@ import { ref, computed, onMounted } from 'vue'
 import { Plus, ArrowRight, MoreFilled, FolderAdd, EditPen, Delete, Monitor, FolderOpened } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import ConnectionDialog from './components/RemoteConnection/ConnectionDialog.vue'
-import useStore from '@/store'
-import type { RemoteConnection } from '@/entity/entitys'
+import { useConnectionStore } from './store'
+import type { RemoteConnection } from './types'
 
-const { useConnectionStore } = useStore()
+const connectionStore = useConnectionStore()
 
 const showConnectionDialog = ref(false)
 const editingConnection = ref<RemoteConnection | null>(null)
@@ -193,8 +193,8 @@ const defaultGroupForNew = ref<string>('')
 const expandedGroups = ref<string[]>([])
 const activeConnId = ref<number | null>(null)
 
-const connections = computed(() => useConnectionStore.connections)
-const allGroupNames = computed(() => useConnectionStore.connectionGroups)
+const connections = computed(() => connectionStore.connections)
+const allGroupNames = computed(() => connectionStore.connectionGroups)
 
 // 按分组顺序组织连接
 const orderedGroups = computed(() => {
@@ -244,13 +244,13 @@ function handleConnectionClick(conn: RemoteConnection) {
 
 function openTerminal(conn: RemoteConnection) {
   activeConnId.value = conn.id
-  useConnectionStore.openTab(conn, 'terminal')
+  connectionStore.openTab(conn, 'terminal')
   closeAllContextMenus()
 }
 
 function openFtp(conn: RemoteConnection) {
   activeConnId.value = conn.id
-  useConnectionStore.openTab(conn, 'ftp')
+  connectionStore.openTab(conn, 'ftp')
   closeAllContextMenus()
 }
 
@@ -273,7 +273,7 @@ function promptAddGroup() {
     inputPattern: /.+/,
     inputErrorMessage: '分组名称不能为空'
   }).then(({ value }) => {
-    if (useConnectionStore.addGroup(value.trim())) {
+    if (connectionStore.addGroup(value.trim())) {
       expandedGroups.value.push(value.trim())
     } else {
       ElMessageBox.alert('分组名称已存在', '提示')
@@ -301,7 +301,7 @@ function handleGroupRename() {
     inputPattern: /.+/,
     inputErrorMessage: '分组名称不能为空'
   }).then(({ value }) => {
-    useConnectionStore.renameGroup(oldName, value.trim())
+    connectionStore.renameGroup(oldName, value.trim())
   }).catch(() => {})
 }
 
@@ -311,7 +311,7 @@ function handleGroupDelete() {
   ElMessageBox.confirm(`确定删除分组 "${name}" 吗？\n该分组下的连接将移到"默认分组"。`, '确认删除', {
     type: 'warning'
   }).then(() => {
-    useConnectionStore.deleteGroup(name)
+    connectionStore.deleteGroup(name)
   }).catch(() => {})
 }
 
@@ -346,7 +346,7 @@ function handleConnDelete() {
   ElMessageBox.confirm(`确定删除连接 "${conn.name}" 吗？`, '确认删除', {
     type: 'warning'
   }).then(() => {
-    useConnectionStore.deleteConnection(conn.id)
+    connectionStore.deleteConnection(conn.id)
   }).catch(() => {})
 }
 
@@ -354,7 +354,7 @@ function handleMoveToGroup(groupName: string) {
   const conn = connContextMenu.value.conn
   closeAllContextMenus()
   if (!conn) return
-  useConnectionStore.moveConnectionToGroup(conn.id, groupName)
+  connectionStore.moveConnectionToGroup(conn.id, groupName)
 }
 
 function closeAllContextMenus() {
@@ -363,8 +363,8 @@ function closeAllContextMenus() {
 }
 
 onMounted(() => {
-  useConnectionStore.loadConnections()
-  useConnectionStore.loadGroups()
+  connectionStore.loadConnections()
+  connectionStore.loadGroups()
   expandedGroups.value = allGroupNames.value.length > 0
     ? [...allGroupNames.value]
     : ['默认分组']

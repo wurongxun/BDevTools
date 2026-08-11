@@ -212,10 +212,10 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { Upload, Download, FolderAdd, Delete, Refresh, EditPen, ArrowUp, ArrowDown, Star, Close } from '@element-plus/icons-vue'
 // 保留 Element Plus 图标导入（其他位置可能使用）
 import { ElMessageBox, ElInput } from 'element-plus'
-import useStore from '@/store'
-import { ConnectionStatus } from '@/entity/entitys'
-import type { ConnectionTab, RemoteConnection, FtpFileItem } from '@/entity/entitys'
-import { useDocumentManagerStore } from '@/store/modules/documents'
+import { ConnectionStatus } from '../../../types'
+import type { ConnectionTab, RemoteConnection, FtpFileItem } from '../../../types'
+import { useDocumentManagerStore } from '@/plugins/files/store/documents'
+import { useConnectionStore, useFtpStore } from '../../../store'
 import NotificationUtil from '@/utils/NotificationUtil'
 import TransferPanel from '../TransferPanel.vue'
 
@@ -224,11 +224,13 @@ const props = defineProps<{
   connection: RemoteConnection
 }>()
 
-const { useConnectionStore, useFtpStore } = useStore()
+const connectionStore = useConnectionStore()
+const ftpStore = useFtpStore()
+const docStore = useDocumentManagerStore()
 
 const isConnecting = ref(false)
 
-const panel = computed(() => useFtpStore.getPanel(props.tab.id))
+const panel = computed(() => ftpStore.getPanel(props.tab.id))
 const isConnected = computed(() => props.tab.status === ConnectionStatus.CONNECTED)
 
 // remotePath / localPath 直接读写 store panel，消除双源不同步
@@ -281,14 +283,14 @@ function saveBookmarks() {
 }
 
 onMounted(async () => {
-  useFtpStore.initPanel(props.tab.id)
+  ftpStore.initPanel(props.tab.id)
   loadBookmarks()
   window.addEventListener('click', handleGlobalClick)
   // 本地目录默认读取桌面目录
   try {
     const desktop = await desktopDir()
     localPath.value = desktop
-    await useFtpStore.listLocalFiles(props.tab.id, desktop)
+    await ftpStore.listLocalFiles(props.tab.id, desktop)
   } catch {
     // fallback: 不加载
   }
@@ -300,14 +302,14 @@ onUnmounted(() => {
   if (sftpSessionId) {
     invoke('sftp_disconnect', { sessionId: sftpSessionId }).catch(() => {})
   }
-  useFtpStore.destroyPanel(props.tab.id)
+  ftpStore.destroyPanel(props.tab.id)
 })
 
 async function handleConnect() {
   if (isConnected.value) return
 
   isConnecting.value = true
-  useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.CONNECTING)
+  connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.CONNECTING)
 
   try {
     const res = await invoke<any>('sftp_connect', {
@@ -322,18 +324,18 @@ async function handleConnect() {
 
     if (res.code === 200) {
       sftpSessionId = res.data
-      useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.CONNECTED)
+      connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.CONNECTED)
       // 列出根目录
       if (sftpSessionId) {
-        await useFtpStore.listRemoteFiles(props.tab.id, sftpSessionId, '/')
+        await ftpStore.listRemoteFiles(props.tab.id, sftpSessionId, '/')
       }
       // 启动连接状态定时检测
       startConnectionCheck()
     } else {
-      useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.ERROR)
+      connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.ERROR)
     }
   } catch (error) {
-    useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.ERROR)
+    connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.ERROR)
     console.error('SFTP connect error:', error)
   } finally {
     isConnecting.value = false
@@ -342,7 +344,7 @@ async function handleConnect() {
 
 async function handleUpload() {
   if (!sftpSessionId || selectedLocalFiles.value.length === 0) return
-  await useFtpStore.uploadFiles(
+  await ftpStore.uploadFiles(
     props.tab.id,
     sftpSessionId,
     selectedLocalFiles.value,
@@ -354,7 +356,7 @@ async function handleDownload() {
   if (!sftpSessionId || selectedRemoteFiles.value.length === 0) return
   const dir = await open({ directory: true, multiple: false })
   if (dir) {
-    await useFtpStore.downloadFiles(
+    await ftpStore.downloadFiles(
       props.tab.id,
       sftpSessionId,
       selectedRemoteFiles.value,
@@ -371,7 +373,7 @@ async function handleNewFolder() {
       cancelButtonText: '取消'
     })
     if (value) {
-      await useFtpStore.createRemoteDir(props.tab.id, sftpSessionId, remotePath.value, value)
+      await ftpStore.createRemoteDir(props.tab.id, sftpSessionId, remotePath.value, value)
     }
   } catch {
     // cancelled
@@ -387,7 +389,7 @@ async function handleDeleteSelected() {
       { type: 'warning' }
     )
     for (const path of selectedRemoteFiles.value) {
-      await useFtpStore.deleteRemoteFile(props.tab.id, sftpSessionId, path)
+      await ftpStore.deleteRemoteFile(props.tab.id, sftpSessionId, path)
     }
   } catch {
     // cancelled
@@ -396,9 +398,9 @@ async function handleDeleteSelected() {
 
 async function handleRefresh() {
   if (!sftpSessionId) return
-  await useFtpStore.listRemoteFiles(props.tab.id, sftpSessionId, remotePath.value)
+  await ftpStore.listRemoteFiles(props.tab.id, sftpSessionId, remotePath.value)
   if (localPath.value) {
-    await useFtpStore.listLocalFiles(props.tab.id, localPath.value)
+    await ftpStore.listLocalFiles(props.tab.id, localPath.value)
   }
 }
 
@@ -418,7 +420,7 @@ function handleLocalFileClick(file: FtpFileItem, event: MouseEvent) {
 function handleLocalFileDblClick(file: FtpFileItem) {
   if (file.isDirectory) {
     localPath.value = file.path
-    useFtpStore.listLocalFiles(props.tab.id, file.path)
+    ftpStore.listLocalFiles(props.tab.id, file.path)
   }
 }
 
@@ -437,7 +439,7 @@ function handleRemoteFileClick(file: FtpFileItem, event: MouseEvent) {
 function handleRemoteFileDblClick(file: FtpFileItem) {
   if (file.isDirectory && sftpSessionId) {
     remotePath.value = file.path
-    useFtpStore.listRemoteFiles(props.tab.id, sftpSessionId, file.path)
+    ftpStore.listRemoteFiles(props.tab.id, sftpSessionId, file.path)
   } else if (!file.isDirectory && sftpSessionId) {
     // 双击打开远程文件
     handleOpenRemoteFile(file)
@@ -499,7 +501,7 @@ async function handleRename() {
     if (value && value !== oldName) {
       const parentPath = oldPath.substring(0, oldPath.lastIndexOf('/'))
       const newPath = `${parentPath}/${value}`
-      await useFtpStore.renameRemoteFile(props.tab.id, sftpSessionId, oldPath, newPath)
+      await ftpStore.renameRemoteFile(props.tab.id, sftpSessionId, oldPath, newPath)
       selectedRemoteFiles.value = []
     }
   } catch {
@@ -518,7 +520,7 @@ function goUpDir() {
   const parentPath = parts.length > 0 ? '/' + parts.join('/') : '/'
   remotePath.value = parentPath
   console.log("goUpDir",props.tab.id, sftpSessionId, parentPath)
-  useFtpStore.listRemoteFiles(props.tab.id, sftpSessionId, parentPath)
+  ftpStore.listRemoteFiles(props.tab.id, sftpSessionId, parentPath)
 }
 
 async function goUpLocalDir() {
@@ -528,7 +530,7 @@ async function goUpLocalDir() {
     const parent = await dirname(currentPath)
     if (parent && parent !== currentPath) {
       localPath.value = parent
-      await useFtpStore.listLocalFiles(props.tab.id, parent)
+      await ftpStore.listLocalFiles(props.tab.id, parent)
     }
   } catch {
     // fallback: 手动截取
@@ -536,7 +538,7 @@ async function goUpLocalDir() {
     if (idx > 0) {
       const parent = currentPath.substring(0, idx)
       localPath.value = parent
-      await useFtpStore.listLocalFiles(props.tab.id, parent)
+      await ftpStore.listLocalFiles(props.tab.id, parent)
     }
   }
 }
@@ -550,13 +552,13 @@ function navigateToBreadcrumb(idx: number) {
   } else {
     remotePath.value = '/' + parts.slice(0, idx + 1).join('/')
   }
-  useFtpStore.listRemoteFiles(props.tab.id, sftpSessionId, remotePath.value)
+  ftpStore.listRemoteFiles(props.tab.id, sftpSessionId, remotePath.value)
 }
 
 function navigateToBookmark(path: string) {
   if (!sftpSessionId) return
   remotePath.value = path
-  useFtpStore.listRemoteFiles(props.tab.id, sftpSessionId, path)
+  ftpStore.listRemoteFiles(props.tab.id, sftpSessionId, path)
 }
 
 // 右键菜单
@@ -600,9 +602,9 @@ function startConnectionCheck() {
   stopConnectionCheck()
   connectionCheckTimer = setInterval(async () => {
     if (!sftpSessionId || !isConnected.value) return
-    const alive = await useFtpStore.checkSftpConnection(sftpSessionId)
+    const alive = await ftpStore.checkSftpConnection(sftpSessionId)
     if (!alive) {
-      useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.DISCONNECTED)
+      connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.DISCONNECTED)
       NotificationUtil.error('SFTP 连接已断开')
       stopConnectionCheck()
     }
@@ -618,13 +620,13 @@ function stopConnectionCheck() {
 
 function navigateLocalDir() {
   if (localPath.value) {
-    useFtpStore.listLocalFiles(props.tab.id, localPath.value)
+    ftpStore.listLocalFiles(props.tab.id, localPath.value)
   }
 }
 
 function navigateRemoteDir() {
   if (sftpSessionId && remotePath.value) {
-    useFtpStore.listRemoteFiles(props.tab.id, sftpSessionId, remotePath.value)
+    ftpStore.listRemoteFiles(props.tab.id, sftpSessionId, remotePath.value)
   }
 }
 
@@ -632,7 +634,7 @@ async function browseLocalPath() {
   const dir = await open({ directory: true, multiple: false })
   if (dir) {
     localPath.value = dir
-    await useFtpStore.listLocalFiles(props.tab.id, dir)
+    await ftpStore.listLocalFiles(props.tab.id, dir)
   }
 }
 

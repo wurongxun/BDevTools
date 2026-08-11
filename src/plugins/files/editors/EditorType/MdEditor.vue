@@ -60,11 +60,11 @@ import { Document } from '@element-plus/icons-vue';
 import { useDark } from '@vueuse/core'
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import useStore from '@/store'
+import { useDocumentManagerStore } from '../../store/documents'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
 // --- 状态与 Store 初始化 ---
 let store: Store | undefined = undefined;
-const { useDocumentManagerStore } = useStore()
-const docStore = useDocumentManagerStore
+const docStore = useDocumentManagerStore()
 
 // 接收父组件传入的文档路径（每个实例绑定自己的文档）
 const props = defineProps<{

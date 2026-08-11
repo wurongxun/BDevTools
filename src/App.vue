@@ -19,8 +19,10 @@ import Layout from '@/Layout/index.vue'
 import Common from '@/views/Common/Common.vue'
 import LoginView from '@/views/login/index.vue'
 import type { WindowRole } from '@/Types/workspace'
+import { useDocumentManagerStore } from '@/plugins/files/store/documents'
 
-const { useDocumentManagerStore, user, useWorkspaceStore, useSessionStore, routerNoteStore, useLayoutStore } = useStore()
+const { user, useWorkspaceStore, useSessionStore, routerNoteStore, useLayoutStore } = useStore()
+const docStore = useDocumentManagerStore()
 
 const isLoggedIn = ref(false)
 const windowRole = ref<WindowRole>('main')
@@ -120,7 +122,6 @@ function setupCloseHandler() {
 
       try {
         const sessionStore = useSessionStore
-        const docStore = useDocumentManagerStore
 
         // 保存会话快照
         await sessionStore.saveSnapshot()
@@ -155,8 +156,6 @@ function handleLoginSuccess() {
  * 初始化应用数据
  */
 async function initApp() {
-  const docStore = useDocumentManagerStore
-
   // 编辑器窗口：通过会话恢复加载文件
   if (windowRole.value === 'editor') {
     await initEditorWindow()

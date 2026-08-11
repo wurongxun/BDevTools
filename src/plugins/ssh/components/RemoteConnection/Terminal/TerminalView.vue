@@ -55,9 +55,9 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
-import useStore from '@/store'
-import { ConnectionStatus } from '@/entity/entitys'
-import type { ConnectionTab, RemoteConnection } from '@/entity/entitys'
+import { ConnectionStatus } from '../../../types'
+import type { ConnectionTab, RemoteConnection } from '../../../types'
+import { useConnectionStore } from '../../../store'
 import { isDark } from '@/composables/useDark'
 
 const props = defineProps<{
@@ -65,7 +65,7 @@ const props = defineProps<{
   connection: RemoteConnection
 }>()
 
-const { useConnectionStore } = useStore()
+const connectionStore = useConnectionStore()
 
 const terminalContainer = ref<HTMLElement>()
 const xtermContainer = ref<HTMLElement>()
@@ -199,7 +199,7 @@ async function handleConnectToggle() {
 async function connect() {
   if (!terminal) return
 
-  useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.CONNECTING)
+  connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.CONNECTING)
   terminal.writeln(`\x1b[33m正在连接 ${props.connection.address}...\x1b[0m`)
 
   try {
@@ -215,7 +215,7 @@ async function connect() {
 
     if (res.code === 200) {
       sshSessionId = res.data
-      useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.CONNECTED)
+      connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.CONNECTED)
 
       // 初始适配终端大小后再连接 shell，确保 PTY 尺寸正确
       nextTick(() => {
@@ -234,11 +234,11 @@ async function connect() {
       // 启动连接状态定时检测
       startConnectionCheck()
     } else {
-      useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.ERROR)
+      connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.ERROR)
       terminal.writeln(`\x1b[31m连接失败: ${res.msg}\x1b[0m`)
     }
   } catch (error) {
-    useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.ERROR)
+    connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.ERROR)
     terminal.writeln(`\x1b[31m连接错误: ${error}\x1b[0m`)
   }
 }
@@ -254,7 +254,7 @@ async function disconnect() {
     sshSessionId = null
   }
 
-  useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.DISCONNECTED)
+  connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.DISCONNECTED)
   if (terminal) {
     terminal.writeln('\r\n\x1b[33m已断开连接\x1b[0m')
   }
@@ -292,12 +292,12 @@ function startConnectionCheck() {
     try {
       const res = await invoke<any>('ssh_check', { sessionId: sshSessionId })
       if (res.code !== 200 || !res.data) {
-        useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.DISCONNECTED)
+        connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.DISCONNECTED)
         terminal?.writeln('\r\n\x1b[31m SSH 连接已断开\x1b[0m')
         stopConnectionCheck()
       }
     } catch {
-      useConnectionStore.updateTabStatus(props.tab.id, ConnectionStatus.DISCONNECTED)
+      connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.DISCONNECTED)
       terminal?.writeln('\r\n\x1b[31m⚠ SSH 连接已断开\x1b[0m')
       stopConnectionCheck()
     }

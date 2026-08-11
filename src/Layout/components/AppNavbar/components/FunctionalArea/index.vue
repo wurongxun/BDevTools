@@ -255,7 +255,7 @@ const handleSettingCommand = (command: string) => {
 
   &.is-active {
     @include theme.useTheme {
-      color: theme.getVar('hoverColor');
+      color: theme.getVar('activityBarActive');
     }
   }
 

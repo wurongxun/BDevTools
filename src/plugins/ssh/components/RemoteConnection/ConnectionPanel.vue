@@ -35,16 +35,16 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import useStore from '@/store'
+import { useConnectionStore } from '../../store'
 import TerminalView from './Terminal/TerminalView.vue'
 import FtpView from './Ftp/FtpView.vue'
-import type { RemoteConnection } from '@/entity/entitys'
+import type { RemoteConnection } from '../../types'
 
-const { useConnectionStore } = useStore()
+const connectionStore = useConnectionStore()
 
-const tabs = computed(() => useConnectionStore.tabs)
-const activeTabId = computed(() => useConnectionStore.activeTabId)
-const connections = computed(() => useConnectionStore.connections)
+const tabs = computed(() => connectionStore.tabs)
+const activeTabId = computed(() => connectionStore.activeTabId)
+const connections = computed(() => connectionStore.connections)
 
 function getConnection(connectionId: number): RemoteConnection | null {
   return connections.value.find(c => c.id === connectionId) || null

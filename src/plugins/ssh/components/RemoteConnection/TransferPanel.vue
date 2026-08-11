@@ -55,18 +55,18 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ArrowDown, ArrowUp } from '@element-plus/icons-vue'
-import useStore from '@/store'
-import type { TransferTask, TransferStatus } from '@/entity/entitys'
+import { useFtpStore } from '../../store'
+import type { TransferTask, TransferStatus } from '../../types'
 
 const props = defineProps<{
   tabId: string
 }>()
 
-const { useFtpStore } = useStore()
+const ftpStore = useFtpStore()
 
 const isExpanded = ref(false)
 
-const panel = computed(() => useFtpStore.getPanel(props.tabId))
+const panel = computed(() => ftpStore.getPanel(props.tabId))
 const tasks = computed(() => panel.value?.transferTasks || [])
 
 const activeCount = computed(() =>
@@ -98,7 +98,7 @@ function statusText(status: TransferStatus): string {
 }
 
 function handleClearCompleted() {
-  useFtpStore.clearCompletedTasks(props.tabId)
+  ftpStore.clearCompletedTasks(props.tabId)
 }
 </script>
 

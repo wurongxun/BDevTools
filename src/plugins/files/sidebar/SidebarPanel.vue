@@ -10,6 +10,7 @@ import { ElMessageBox } from 'element-plus'
 import StringUtil from '@/utils/StringUtil'
 import { load, Store } from '@tauri-apps/plugin-store'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
+import { useDocumentManagerStore } from '../store/documents'
 
 // 常量定义
 const INVALID_CHARS_REGEX = /.*[/\\:*?|].*/
@@ -19,7 +20,8 @@ const MAX_FILENAME_LENGTH = 255
 let store: Store | undefined = undefined
 const router = useRouter()
 const route = useRoute()
-const { routerNoteStore, useDocumentManagerStore } = useStore()
+const { routerNoteStore } = useStore()
+const docStore = useDocumentManagerStore()
 
 // 树数据排序
 const file_node = computed(() => sortTreeData(routerNoteStore.tree_node))
@@ -42,7 +44,7 @@ const sortTreeData = (data: TreeNode[]): TreeNode[] => {
 // ===== Autoscroll 联动 =====
 const fileTreeRef = ref<InstanceType<typeof FileInfoTree> | null>(null)
 
-watch(() => useDocumentManagerStore.activeDocumentPath, (newPath) => {
+watch(() => docStore.activeDocumentPath, (newPath) => {
     if (newPath && fileTreeRef.value) {
         nextTick(() => {
             fileTreeRef.value?.scrollToNode(newPath)
@@ -59,8 +61,8 @@ onMounted(async () => {
         })
     }
     // 加载收藏和最近打开（由 FileInfoTree 内部处理显示）
-    useDocumentManagerStore.loadFavorites()
-    useDocumentManagerStore.loadRecentFiles()
+    docStore.loadFavorites()
+    docStore.loadRecentFiles()
     // 确保文件树数据已加载
     if (routerNoteStore.tree_node.length === 0) {
         routerNoteStore.setFileTree()
@@ -91,7 +93,7 @@ const checkNameExists = async (parentPath: string, name: string): Promise<boolea
 
 const handleNodeClick = (node: TreeNode) => {
     if (!node.isFolder && node.filePath) {
-        useDocumentManagerStore.openDocument(node.filePath)
+        docStore.openDocument(node.filePath)
     }
 }
 
@@ -252,13 +254,13 @@ const processNodeCache = async (item: TreeNode): Promise<boolean> => {
 }
 
 // ===== 头部操作 =====
-function handleCloseAllEditors() { useDocumentManagerStore.closeAllDocuments() }
+function handleCloseAllEditors() { docStore.closeAllDocuments() }
 
 function handleHeaderCommand(cmd: string) {
     switch (cmd) {
         case 'closeAll': handleCloseAllEditors(); break
         case 'refresh': handleRefresh(); break
-        case 'clearRecent': useDocumentManagerStore.clearRecentFiles(); break
+        case 'clearRecent': docStore.clearRecentFiles(); break
     }
 }
 

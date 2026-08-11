@@ -39,19 +39,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { TabBarContainer, TabBarItem, TabCloseButton } from '@/components/TabBar'
-import useStore from '@/store'
+import { useConnectionStore } from '../../store'
 
-const { useConnectionStore } = useStore()
+const connectionStore = useConnectionStore()
 
-const tabs = computed(() => useConnectionStore.tabs)
-const activeTabId = computed(() => useConnectionStore.activeTabId)
+const tabs = computed(() => connectionStore.tabs)
+const activeTabId = computed(() => connectionStore.activeTabId)
 
 function handleTabClick(tabId: string) {
-  useConnectionStore.switchTab(tabId)
+  connectionStore.switchTab(tabId)
 }
 
 function handleTabClose(tabId: string) {
-  useConnectionStore.closeTab(tabId)
+  connectionStore.closeTab(tabId)
 }
 </script>
 

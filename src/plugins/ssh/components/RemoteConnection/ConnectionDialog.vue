@@ -107,13 +107,13 @@
 import { ref, reactive, computed, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { open } from '@tauri-apps/plugin-dialog'
-import useStore from '@/store'
-import { ConnectionType } from '@/entity/entitys'
-import type { RemoteConnection } from '@/entity/entitys'
+import { useConnectionStore } from '../../store'
+import { ConnectionType } from '../../types'
+import type { RemoteConnection } from '../../types'
 
-const { useConnectionStore } = useStore()
+const connectionStore = useConnectionStore()
 
-const groupOptions = computed(() => useConnectionStore.connectionGroups)
+const groupOptions = computed(() => connectionStore.connectionGroups)
 
 const props = defineProps<{
   modelValue: boolean
@@ -183,12 +183,12 @@ async function handleSubmit() {
   submitting.value = true
   try {
     if (isEdit.value && props.editData) {
-      await useConnectionStore.updateConnection({
+      await connectionStore.updateConnection({
         ...form,
         id: props.editData.id
       } as RemoteConnection)
     } else {
-      await useConnectionStore.addConnection(form as RemoteConnection)
+      await connectionStore.addConnection(form as RemoteConnection)
     }
     handleClose()
   } finally {

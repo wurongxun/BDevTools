@@ -6,9 +6,6 @@ import errorInfoStore from './modules/errorInfo'
 import { appConfigInfo } from './modules/appConfigInfo'
 // import { useNoteStore } from './modules/noteTem'
 import { routerNoteStore } from './modules/routerNote'
-import { useDocumentManagerStore } from './modules/documents'
-import { useConnectionStore } from './modules/connection'
-import { useFtpStore } from './modules/ftp'
 import { useWorkspaceStore } from './modules/workspace'
 import { useSessionStore } from './modules/session'
 import useLayoutStore from './modules/layout'
@@ -22,9 +19,6 @@ export default function useStore() {
     errorStore: errorInfoStore(pinia),
     appConfig: appConfigInfo(pinia),
     routerNoteStore: routerNoteStore(pinia),
-    useDocumentManagerStore: useDocumentManagerStore(pinia),
-    useConnectionStore: useConnectionStore(pinia),
-    useFtpStore: useFtpStore(pinia),
     useWorkspaceStore: useWorkspaceStore(pinia),
     useSessionStore: useSessionStore(pinia),
     useLayoutStore: useLayoutStore(pinia)
