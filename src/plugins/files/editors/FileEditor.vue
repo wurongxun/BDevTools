@@ -103,7 +103,7 @@ function handleStateUpdate(state: any) {
 
 .welcome-title {
   margin: 0 0 8px 0;
-  font-size: 20px;
+  font-size: theme.getVar('fontSizeXl');
   font-weight: 500;
 
   @include theme.useTheme {
@@ -113,7 +113,7 @@ function handleStateUpdate(state: any) {
 
 .welcome-desc {
   margin: 0;
-  font-size: 14px;
+  font-size: theme.getVar('fontSize');
 
   @include theme.useTheme {
     color: theme.getVar('textSecondary');

@@ -89,7 +89,8 @@ const hasChildren = (bookmark: BookmarkItem): boolean => {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use '@/styles/theme.scss' as theme;
 .bookmark-tree-wrapper {
   width: 100%;
 }
@@ -141,12 +142,12 @@ const hasChildren = (bookmark: BookmarkItem): boolean => {
 .bookmark-icon {
   color: var(--el-color-warning);
   flex-shrink: 0;
-  font-size: 14px;
+  font-size: theme.getVar('fontSize');
 }
 
 .bookmark-text {
   flex: 1;
-  font-size: 13px;
+  font-size: theme.getVar('fontSize');
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -154,7 +155,7 @@ const hasChildren = (bookmark: BookmarkItem): boolean => {
 }
 
 .bookmark-page {
-  font-size: 12px;
+  font-size: theme.getVar('fontSizeSmall');
   color: var(--el-text-color-secondary);
   flex-shrink: 0;
   min-width: 30px;

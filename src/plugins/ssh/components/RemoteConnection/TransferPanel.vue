@@ -143,7 +143,7 @@ function handleClearCompleted() {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: theme.getVar('fontSizeSmall');
   color: #ccc;
 
   @include theme.useTheme {
@@ -178,12 +178,12 @@ function handleClearCompleted() {
 }
 
 .transfer-icon {
-  font-size: 12px;
+  font-size: theme.getVar('fontSizeSmall');
 }
 
 .transfer-name {
   flex: 1;
-  font-size: 12px;
+  font-size: theme.getVar('fontSizeSmall');
   color: #ccc;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -195,7 +195,7 @@ function handleClearCompleted() {
 }
 
 .transfer-direction {
-  font-size: 11px;
+  font-size: theme.getVar('fontSizeSm');
   color: #888;
 }
 
@@ -206,7 +206,7 @@ function handleClearCompleted() {
 .transfer-meta {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: theme.getVar('fontSizeSm');
   color: #888;
   margin-top: 2px;
 }
@@ -221,7 +221,7 @@ function handleClearCompleted() {
 }
 
 .transfer-error {
-  font-size: 11px;
+  font-size: theme.getVar('fontSizeSm');
   color: #f44747;
   margin-top: 2px;
 }

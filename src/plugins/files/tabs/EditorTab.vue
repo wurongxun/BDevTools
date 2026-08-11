@@ -505,7 +505,7 @@ function handleDragEnd() {
 .tab-dirty-indicator {
   flex-shrink: 0;
   color: #e2b714;
-  font-size: 16px;
+  font-size: theme.getVar('fontSizeLg');
   line-height: 1;
 }
 
@@ -584,7 +584,7 @@ function handleDragEnd() {
   padding: 8px 12px;
   background-color: #2d2d2d;
   border-bottom: 1px solid #1e1e1e;
-  font-size: 12px;
+  font-size: theme.getVar('fontSizeSmall');
   color: #cccccc;
   font-weight: 500;
 
@@ -602,7 +602,7 @@ function handleDragEnd() {
   border: 1px solid #3e3e3e;
   border-radius: 3px;
   color: #cccccc;
-  font-size: 11px;
+  font-size: theme.getVar('fontSizeSm');
   cursor: pointer;
   transition: all 0.15s;
 
@@ -687,14 +687,14 @@ function handleDragEnd() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: theme.getVar('fontSize');
 }
 
 /* 下拉项修改指示器 */
 .dropdown-dirty {
   flex-shrink: 0;
   color: #e2b714;
-  font-size: 14px;
+  font-size: theme.getVar('fontSize');
 }
 
 /* 下拉项关闭按钮 */
@@ -740,7 +740,7 @@ function handleDragEnd() {
   padding: 6px 10px;
   border: 1px solid #3e3e3e;
   border-radius: 3px;
-  font-size: 12px;
+  font-size: theme.getVar('fontSizeSmall');
   font-family: 'Consolas', 'Courier New', monospace;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   z-index: 9999;

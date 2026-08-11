@@ -1030,7 +1030,7 @@ onBeforeUnmount(() => {
     }
 
     .svg-icon {
-      font-size: 24px;
+      font-size: theme.getVar('fontSizeXl');
       color: var(--el-color-primary);
       transition: color 0.2s;
 
@@ -1070,7 +1070,7 @@ onBeforeUnmount(() => {
 
 .node-icon {
   margin-right: 6px;
-  font-size: 16px;
+  font-size: theme.getVar('fontSizeLg');
   width: 1em;
   height: 1em;
   flex-shrink: 0;
@@ -1101,7 +1101,7 @@ onBeforeUnmount(() => {
 
 .action-icon {
   margin-left: 4px;
-  font-size: 16px;
+  font-size: theme.getVar('fontSizeLg');
   cursor: pointer;
   padding: 2px;
   border-radius: 4px;
@@ -1248,14 +1248,14 @@ onBeforeUnmount(() => {
 
     .el-dialog__title {
       color: theme.getVar('textColor');
-      font-size: 13px;
+      font-size: theme.getVar('fontSize');
       font-weight: 600;
     }
 
     .el-dialog__headerbtn {
       top: 10px;
       right: 12px;
-      font-size: 14px;
+      font-size: theme.getVar('fontSize');
 
       .el-dialog__close {
         color: theme.getVar('textSecondary');
@@ -1289,7 +1289,7 @@ onBeforeUnmount(() => {
     .el-button {
       border-radius: 4px;
       padding: 6px 16px;
-      font-size: 12px;
+      font-size: theme.getVar('fontSizeSmall');
     }
 
     .el-button--default {

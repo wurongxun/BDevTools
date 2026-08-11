@@ -403,7 +403,7 @@ onMounted(() => {
 }
 
 .panel-title {
-  font-size: 11px;
+  font-size: theme.getVar('fontSizeSmall');
   font-weight: 600;
   color: #bbb;
   text-transform: uppercase;
@@ -459,7 +459,7 @@ onMounted(() => {
   padding: 4px 8px;
   cursor: pointer;
   user-select: none;
-  font-size: 11px;
+  font-size: theme.getVar('fontSizeSm');
   font-weight: 600;
   color: #bbb;
   text-transform: uppercase;
@@ -476,7 +476,7 @@ onMounted(() => {
 }
 
 .group-chevron {
-  font-size: 10px;
+  font-size: theme.getVar('fontSizeXs');
   color: #888;
   transition: transform 0.15s ease;
   flex-shrink: 0;
@@ -494,7 +494,7 @@ onMounted(() => {
 }
 
 .group-count {
-  font-size: 10px;
+  font-size: theme.getVar('fontSizeXs');
   font-weight: 400;
   color: #666;
   background-color: rgba(255, 255, 255, 0.06);
@@ -509,7 +509,7 @@ onMounted(() => {
 
 .group-empty {
   padding: 4px 12px 4px 36px;
-  font-size: 12px;
+  font-size: theme.getVar('fontSizeSmall');
   color: #555;
   font-style: italic;
 }
@@ -523,7 +523,7 @@ onMounted(() => {
   cursor: pointer;
   transition: background-color 0.1s;
   position: relative;
-  font-size: 13px;
+  font-size: theme.getVar('fontSize');
 
   &:hover {
     background-color: rgba(255, 255, 255, 0.06);
@@ -551,7 +551,7 @@ onMounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #ccc;
-  font-size: 13px;
+  font-size: theme.getVar('fontSize');
 
   @include theme.useTheme {
     color: theme.getVar('textColor');
@@ -559,7 +559,7 @@ onMounted(() => {
 }
 
 .conn-addr {
-  font-size: 11px;
+  font-size: theme.getVar('fontSizeSm');
   color: #555;
   flex-shrink: 0;
   max-width: 100px;
@@ -603,7 +603,7 @@ onMounted(() => {
   color: #555;
   gap: 12px;
 
-  p { font-size: 13px; margin: 0; }
+  p { font-size: theme.getVar('fontSize'); margin: 0; }
 }
 
 // ===== 右键菜单 =====
@@ -634,7 +634,7 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 6px 16px;
-  font-size: 13px;
+  font-size: theme.getVar('fontSize');
   color: #ccc;
   cursor: pointer;
   transition: background-color 0.1s;
@@ -645,7 +645,7 @@ onMounted(() => {
   }
 
   .el-icon {
-    font-size: 14px;
+    font-size: theme.getVar('fontSize');
   }
 }
 
@@ -679,7 +679,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 6px 16px;
-  font-size: 13px;
+  font-size: theme.getVar('fontSize');
   color: #ccc;
   cursor: pointer;
   transition: background-color 0.1s;
@@ -690,7 +690,7 @@ onMounted(() => {
   }
 
   .submenu-arrow {
-    font-size: 10px;
+    font-size: theme.getVar('fontSizeXs');
     color: #666;
   }
 }

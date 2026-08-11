@@ -393,7 +393,8 @@ const handleCreateNote = () => {
 
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '@/styles/theme.scss' as theme;
 .box {
   width: 100%;
   flex: 1;
@@ -418,7 +419,7 @@ const handleCreateNote = () => {
   top: 45%;
   margin-top: -10px;
   border-radius: 5px;
-  font-size: 26px;
+  font-size: theme.getVar('fontSizeXl');
   display: flex;
   align-items: center;
   justify-content: center;
@@ -452,7 +453,7 @@ const handleCreateNote = () => {
 
 .sidebar-title {
   margin: 0;
-  font-size: 16px;
+  font-size: theme.getVar('fontSizeLg');
   font-weight: 600;
 }
 
@@ -511,7 +512,7 @@ const handleCreateNote = () => {
 
 .placeholder-text {
   margin-top: 16px;
-  font-size: 16px;
+  font-size: theme.getVar('fontSizeLg');
 }
 
 .create-note-button {
@@ -564,7 +565,7 @@ const handleCreateNote = () => {
 }
 
 .custom-dialog :deep(.el-dialog__title) {
-  font-size: 18px;
+  font-size: theme.getVar('fontSizeLg');
   font-weight: 600;
 }
 

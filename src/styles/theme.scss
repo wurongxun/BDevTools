@@ -15,8 +15,12 @@ $themes: (
     activityBarActive: #212121,
     scrollbarThumb: #c1c1c1,
     scrollbarTrack: #f1f1f1,
+    fontSizeXs: 10px,
+    fontSizeSm: 11px,
+    fontSizeSmall: 12px,
     fontSize: 14px,
-    fontSizeSmall: 12px
+    fontSizeLg: 16px,
+    fontSizeXl: 20px
   ),
   dark: (
     // IDEA Darcula 风格配色
@@ -33,8 +37,12 @@ $themes: (
     activityBarActive: #bbbbbb, // 活动栏激活色
     scrollbarThumb: #505355, // 滚动条滑块 中灰
     scrollbarTrack: #323537, // 滚动条轨道 深灰
+    fontSizeXs: 10px,
+    fontSizeSm: 11px,
+    fontSizeSmall: 12px,
     fontSize: 14px,
-    fontSizeSmall: 12px
+    fontSizeLg: 16px,
+    fontSizeXl: 20px
   )
 );
 

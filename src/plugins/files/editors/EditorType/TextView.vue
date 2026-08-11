@@ -1003,7 +1003,7 @@ async function switchEncoding(enc: string) {
 }
 
 .match-count {
-  font-size: 12px;
+  font-size: getVar(fontSizeSmall);
   min-width: 90px;
   text-align: center;
   @include useTheme {
@@ -1046,7 +1046,7 @@ async function switchEncoding(enc: string) {
 }
 
 .block-total {
-  font-size: 12px;
+  font-size: getVar(fontSizeSmall);
   @include useTheme {
     color: getVar(textColor);
     opacity: 0.6;
@@ -1054,7 +1054,7 @@ async function switchEncoding(enc: string) {
 }
 
 .line-range {
-  font-size: 12px;
+  font-size: getVar(fontSizeSmall);
   margin-left: 8px;
   @include useTheme {
     color: getVar(textColor);
@@ -1068,7 +1068,7 @@ async function switchEncoding(enc: string) {
 }
 
 .encoding-label {
-  font-size: 12px;
+  font-size: getVar(fontSizeSmall);
   @include useTheme {
     color: getVar(textColor);
     opacity: 0.7;
@@ -1082,7 +1082,7 @@ async function switchEncoding(enc: string) {
 }
 
 .line-info {
-  font-size: 12px;
+  font-size: getVar(fontSizeSmall);
   white-space: nowrap;
   margin-left: 8px;
   @include useTheme {
@@ -1092,7 +1092,7 @@ async function switchEncoding(enc: string) {
 }
 
 .loading-tip {
-  font-size: 12px;
+  font-size: getVar(fontSizeSmall);
   color: #f5c542;
   white-space: nowrap;
   margin-left: 4px;
@@ -1103,7 +1103,7 @@ async function switchEncoding(enc: string) {
   overflow-x: scroll;
   overflow-y: auto;
   font-family: 'Consolas', monospace;
-  font-size: 13px;
+  font-size: getVar(fontSize);
   @include useTheme {
     background: getVar(bgColor);
   }
@@ -1202,7 +1202,7 @@ async function switchEncoding(enc: string) {
 }
 
 .loading-text {
-  font-size: 13px;
+  font-size: getVar(fontSize);
   @include useTheme {
     color: getVar(textColor);
   }

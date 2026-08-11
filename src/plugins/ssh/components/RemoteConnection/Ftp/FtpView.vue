@@ -695,7 +695,7 @@ function formatSize(bytes: number): string {
   border-radius: 4px;
   background: transparent;
   cursor: pointer;
-  font-size: 12px;
+  font-size: theme.getVar('fontSizeSmall');
   transition: background-color 0.15s;
   user-select: none;
   white-space: nowrap;
@@ -781,7 +781,7 @@ function formatSize(bytes: number): string {
 }
 
 .panel-title {
-  font-size: 12px;
+  font-size: theme.getVar('fontSizeSmall');
   font-weight: 500;
   color: #ccc;
   white-space: nowrap;
@@ -795,7 +795,7 @@ function formatSize(bytes: number): string {
   display: flex;
   align-items: center;
   gap: 2px;
-  font-size: 12px;
+  font-size: theme.getVar('fontSizeSmall');
   color: #888;
   flex: 1;
   min-width: 0;
@@ -860,7 +860,7 @@ function formatSize(bytes: number): string {
   align-items: center;
   gap: 8px;
   padding: 4px 12px;
-  font-size: 13px;
+  font-size: theme.getVar('fontSize');
   color: #ccc;
   cursor: pointer;
   transition: background-color 0.1s;
@@ -883,7 +883,7 @@ function formatSize(bytes: number): string {
   flex-shrink: 0;
   width: 18px;
   text-align: center;
-  font-size: 14px;
+  font-size: theme.getVar('fontSize');
 }
 
 .file-name {
@@ -897,7 +897,7 @@ function formatSize(bytes: number): string {
   flex-shrink: 0;
   width: 70px;
   text-align: right;
-  font-size: 11px;
+  font-size: theme.getVar('fontSizeSm');
   color: #888;
 }
 
@@ -905,7 +905,7 @@ function formatSize(bytes: number): string {
   flex-shrink: 0;
   width: 130px;
   text-align: right;
-  font-size: 11px;
+  font-size: theme.getVar('fontSizeSm');
   color: #888;
 }
 
@@ -915,7 +915,7 @@ function formatSize(bytes: number): string {
   justify-content: center;
   height: 100px;
   color: #666;
-  font-size: 13px;
+  font-size: theme.getVar('fontSize');
 }
 
 .ftp-context-menu {
@@ -939,7 +939,7 @@ function formatSize(bytes: number): string {
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: theme.getVar('fontSize');
   color: #ccc;
   cursor: pointer;
   transition: background-color 0.15s;

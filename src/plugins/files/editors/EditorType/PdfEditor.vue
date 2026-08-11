@@ -668,7 +668,8 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use '@/styles/theme.scss' as theme;
 .pdf-wrapper {
   display: flex;
   width: 100%;
@@ -709,7 +710,7 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: theme.getVar('fontSize');
   color: var(--el-text-color-primary);
 }
 
@@ -779,14 +780,14 @@ onMounted(() => {
 
 .bookmark-text {
   flex: 1;
-  font-size: 13px;
+  font-size: theme.getVar('fontSize');
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .bookmark-page {
-  font-size: 12px;
+  font-size: theme.getVar('fontSizeSmall');
   color: var(--el-text-color-secondary);
   flex-shrink: 0;
   min-width: 30px;
@@ -832,12 +833,12 @@ onMounted(() => {
 }
 
 .loading-spinner {
-  font-size: 18px;
+  font-size: theme.getVar('fontSizeLg');
   color: #409eff;
 }
 
 .error-message {
-  font-size: 18px;
+  font-size: theme.getVar('fontSizeLg');
   color: #f56c6c;
   text-align: center;
   padding: 20px;
@@ -869,7 +870,7 @@ onMounted(() => {
   transition: all 0.2s ease;
   min-width: 60px;
   box-shadow: 0 2px 3px rgba(0, 0, 0, 0.2);
-  font-size: 14px;
+  font-size: theme.getVar('fontSize');
 }
 
 .pdf-controls button:hover:not(:disabled) {
@@ -891,7 +892,7 @@ onMounted(() => {
 .pdf-controls span {
   font-weight: 500;
   color: #ffffff;
-  font-size: 14px;
+  font-size: theme.getVar('fontSize');
   min-width: 80px;
   text-align: center;
 }
@@ -916,11 +917,11 @@ onMounted(() => {
   .pdf-controls button {
     padding: 6px 12px;
     min-width: 50px;
-    font-size: 14px;
+    font-size: theme.getVar('fontSize');
   }
 
   .pdf-controls span {
-    font-size: 12px;
+    font-size: theme.getVar('fontSizeSmall');
     min-width: 60px;
   }
 }

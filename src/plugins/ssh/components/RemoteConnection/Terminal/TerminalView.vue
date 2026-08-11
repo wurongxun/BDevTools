@@ -373,7 +373,7 @@ onUnmounted(() => {
 }
 
 .terminal-title {
-  font-size: 13px;
+  font-size: theme.getVar('fontSize');
   font-weight: 500;
   color: #ccc;
 
@@ -383,7 +383,7 @@ onUnmounted(() => {
 }
 
 .terminal-status {
-  font-size: 11px;
+  font-size: theme.getVar('fontSizeSm');
   padding: 1px 6px;
   border-radius: 3px;
 
@@ -420,7 +420,7 @@ onUnmounted(() => {
   border-radius: 4px;
   background: transparent;
   cursor: pointer;
-  font-size: 12px;
+  font-size: theme.getVar('fontSizeSmall');
   transition: background-color 0.15s;
   user-select: none;
   white-space: nowrap;

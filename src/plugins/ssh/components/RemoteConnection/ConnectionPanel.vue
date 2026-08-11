@@ -91,11 +91,11 @@ function getConnection(connectionId: number): RemoteConnection | null {
 
     p {
       margin: 4px 0;
-      font-size: 14px;
+      font-size: theme.getVar('fontSize');
     }
 
     .sub-text {
-      font-size: 12px;
+      font-size: theme.getVar('fontSizeSmall');
       color: #555;
     }
   }
