@@ -32,7 +32,7 @@ import PdfEditor from './EditorType/PdfEditor.vue'
 import MdEditor from './EditorType/MdEditor.vue'
 import TextView from './EditorType/TextView.vue'
 
-const { routerNoteStore } = useStore()
+const { fileTreeStore } = useStore()
 const docStore = useDocumentManagerStore()
 
 const activeDocument = computed(() => docStore.activeDocument)

@@ -7,7 +7,7 @@ import type { RouteLocationNormalized, NavigationGuardNext } from 'vue-router'
 
 NProgress.configure({ showSpinner: false }) // NProgress Configuration
 
-const { user, permission,  routerNoteStore } = useStore()
+const { user, permission,  fileTreeStore } = useStore()
 
 const whiteList = ['/login', '/component/AMap'] // no redirect whitelist
 
@@ -25,7 +25,7 @@ router.beforeEach(
         } else {
           try {
             await user.getUserInfo()
-            const routerNote = await routerNoteStore.setFileTree()
+            await fileTreeStore.setFileTree()
             await permission.getPermissions()
             next({ ...to, replace: true })
             NProgress.done()

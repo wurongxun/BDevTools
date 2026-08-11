@@ -96,7 +96,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { openAppWindow, createEditorWindow, createPresetWindow } from '@/utils/WindowUtils'
 import type { WindowPresetConfig } from '@/utils/WindowUtils'
 import type { WindowMeta } from '@/Types/workspace'
-const {routerNoteStore,useLayoutStore } = useStore()
+const {fileTreeStore,useLayoutStore } = useStore()
 const docStore = useDocumentManagerStore()
 const router = useRouter()
 const activeMenu = ref<string | null>(null)
@@ -299,15 +299,15 @@ const handleMenuCommand = async (item: MenuItem) => {
     case 'openWorkingDirectory': {
       await changeWorkspace();
       // 记录到最近项目
-      if (routerNoteStore.workingDirectory) {
-        addRecentProject(routerNoteStore.workingDirectory)
+      if (fileTreeStore.workingDirectory) {
+        addRecentProject(fileTreeStore.workingDirectory)
       }
       break
     }
     case 'openRecentProject': {
       const dirPath = (item as MenuItem & { _dirPath: string })._dirPath
       if (dirPath) {
-        routerNoteStore.setWorkingDirectory(dirPath)
+        fileTreeStore.setWorkingDirectory(dirPath)
         // 持久化到 settings.json
         let s: Store | undefined
         if (!s) {

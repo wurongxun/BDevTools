@@ -5,7 +5,7 @@ import permissionStore from './modules/permission'
 import errorInfoStore from './modules/errorInfo'
 import { appConfigInfo } from './modules/appConfigInfo'
 // import { useNoteStore } from './modules/noteTem'
-import { routerNoteStore } from './modules/routerNote'
+import { fileTreeStore } from './modules/fileTree'
 import { useWorkspaceStore } from './modules/workspace'
 import { useSessionStore } from './modules/session'
 import useLayoutStore from './modules/layout'
@@ -18,7 +18,7 @@ export default function useStore() {
     permission: permissionStore(pinia),
     errorStore: errorInfoStore(pinia),
     appConfig: appConfigInfo(pinia),
-    routerNoteStore: routerNoteStore(pinia),
+    fileTreeStore: fileTreeStore(pinia),
     useWorkspaceStore: useWorkspaceStore(pinia),
     useSessionStore: useSessionStore(pinia),
     useLayoutStore: useLayoutStore(pinia)

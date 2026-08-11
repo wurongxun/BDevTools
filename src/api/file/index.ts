@@ -25,9 +25,9 @@ import useStore from '@/store/index'
 import router from '@/router/index'
 
 export const get_file_Api = async () => {
-  const { routerNoteStore } = useStore()
+  const { fileTreeStore } = useStore()
   // 从当前窗口的 Pinia 状态读取工作目录（per-window 隔离）
-  const workingDir = routerNoteStore.workingDirectory || ''
+  const workingDir = fileTreeStore.workingDirectory || ''
 
   let notebooks_data = ref<NotebookInfo | null>(null)
   // 将 per-window 工作目录传给 Rust 命令，不再从全局 settings.json 读取
@@ -111,9 +111,9 @@ const FileTreeNodeHandler = (notebooks_data: NotebookInfo, workingDirectory: str
   }
   root.push(root_data)
 
-  const { routerNoteStore } = useStore()
-  routerNoteStore.addTreeNode(root)
-  routerNoteStore.addSearchData(searchData_val)
+  const { fileTreeStore } = useStore()
+  fileTreeStore.addTreeNode(root)
+  fileTreeStore.addSearchData(searchData_val)
   return root
 }
 

@@ -9,7 +9,7 @@ import { load, Store } from '@tauri-apps/plugin-store'
  */
 export async function changeWorkspace() {
   const { open } = await import('@tauri-apps/plugin-dialog')
-  const { routerNoteStore } = useStore()
+  const { fileTreeStore } = useStore()
 
   const file_directory = await open({
     multiple: false,
@@ -20,7 +20,7 @@ export async function changeWorkspace() {
   }
 
   // 更新当前窗口的 Pinia 状态（per-window 隔离）
-  routerNoteStore.setWorkingDirectory(file_directory)
+  fileTreeStore.setWorkingDirectory(file_directory)
 
   // 持久化到 settings.json（仅作为主窗口下次启动的初始值）
   let store: Store | undefined

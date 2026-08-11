@@ -21,7 +21,7 @@ import LoginView from '@/views/login/index.vue'
 import type { WindowRole } from '@/Types/workspace'
 import { useDocumentManagerStore } from '@/plugins/files/store/documents'
 
-const { user, useWorkspaceStore, useSessionStore, routerNoteStore, useLayoutStore } = useStore()
+const { user, useWorkspaceStore, useSessionStore, fileTreeStore, useLayoutStore } = useStore()
 const docStore = useDocumentManagerStore()
 
 const isLoggedIn = ref(false)
@@ -170,7 +170,7 @@ async function initApp() {
     })
     const mdDir = await settingsStore.get<{ value: string }>('md_working_directory')
     if (mdDir?.value) {
-      routerNoteStore.setWorkingDirectory(mdDir.value)
+      fileTreeStore.setWorkingDirectory(mdDir.value)
     }
   } catch (e) {
     console.warn('加载工作目录设置失败:', e)

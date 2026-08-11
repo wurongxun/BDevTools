@@ -25,12 +25,12 @@ interface IRoutes extends Omit<RouteRecordRaw, 'redirect'> {
 }
 
 const router = useRouter()
-const {routerNoteStore } = useStore()
+const {fileTreeStore } = useStore()
 
 let autoInputRef: Ref<any> = ref(null)
 let keyword: Ref<string> = ref('')
 let isSearch: Ref<boolean> = ref(false)
-const search_data: ComputedRef<TreeNode[]> = computed(() => routerNoteStore.search_data)
+const search_data: ComputedRef<TreeNode[]> = computed(() => fileTreeStore.search_data)
 
 
 let timeout: ReturnType<typeof setTimeout>

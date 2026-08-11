@@ -16,15 +16,13 @@ import { useDocumentManagerStore } from '../store/documents'
 const INVALID_CHARS_REGEX = /.*[/\\:*?|].*/
 const PURE_NUMBER_REGEX = /^\d+$/
 const MAX_FILENAME_LENGTH = 255
-
 let store: Store | undefined = undefined
-const router = useRouter()
 const route = useRoute()
-const { routerNoteStore } = useStore()
+const { fileTreeStore } = useStore()
 const docStore = useDocumentManagerStore()
 
 // 树数据排序
-const file_node = computed(() => sortTreeData(routerNoteStore.tree_node))
+const file_node = computed(() => sortTreeData(fileTreeStore.tree_node))
 
 const isLoading = ref(false)
 
@@ -64,8 +62,8 @@ onMounted(async () => {
     docStore.loadFavorites()
     docStore.loadRecentFiles()
     // 确保文件树数据已加载
-    if (routerNoteStore.tree_node.length === 0) {
-        routerNoteStore.setFileTree()
+    if (fileTreeStore.tree_node.length === 0) {
+        fileTreeStore.setFileTree()
     }
 })
 
@@ -97,7 +95,7 @@ const handleNodeClick = (node: TreeNode) => {
     }
 }
 
-const handleRefresh = () => { routerNoteStore.setFileTree() }
+const handleRefresh = () => { fileTreeStore.setFileTree() }
 
 const handleAddFile = async (parent: TreeNode, name: string) => {
     if (isLoading.value) return
@@ -108,7 +106,7 @@ const handleAddFile = async (parent: TreeNode, name: string) => {
     try {
         isLoading.value = true
         const result = await tauri_request<ResponseData<string>>('create_note_file', { fatherPath: parent.folder, newNoteMdFileName: name })
-        if (result?.code === 200) { NotificationUtil.success('笔记创建成功'); routerNoteStore.setFileTree() }
+        if (result?.code === 200) { NotificationUtil.success('笔记创建成功'); fileTreeStore.setFileTree() }
         else throw new Error(result?.msg || '未知错误')
     } catch (error: any) {
         console.error('创建文件失败:', error)
@@ -125,7 +123,7 @@ const handleAddFolder = async (parent: TreeNode, name: string) => {
     try {
         isLoading.value = true
         const result = await tauri_request<ResponseData<string>>('create_folder', { fatherPath: parent.folder, newFolderName: name })
-        if (result?.code === 200) { NotificationUtil.success('文件夹创建成功'); routerNoteStore.setFileTree() }
+        if (result?.code === 200) { NotificationUtil.success('文件夹创建成功'); fileTreeStore.setFileTree() }
         else throw new Error(result?.msg || '未知错误')
     } catch (error: any) {
         console.error('创建文件夹失败:', error)
@@ -138,7 +136,7 @@ const handleDeleteNode = async (node: TreeNode) => {
     try {
         if (node.isfile) await deleteFile(node)
         else await deleteFolder(node)
-        routerNoteStore.setFileTree()
+        fileTreeStore.setFileTree()
         if (route.path === node.routerPath && node.isfile) await processNodeCache(node)
     } catch (error: any) {
         if (error !== 'cancel') {
@@ -199,7 +197,7 @@ const handleRenameNode = async (node: TreeNode, newName: string) => {
         isLoading.value = true
         if (node.isfile) await renameFile(node, newName)
         else await renameFolder(node, newName)
-        routerNoteStore.setFileTree()
+        fileTreeStore.setFileTree()
     } catch (error: any) {
         console.error('重命名失败:', error)
         NotificationUtil.error(`操作失败：${error.message}`)

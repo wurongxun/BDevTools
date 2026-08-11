@@ -121,7 +121,7 @@ const router = useRouter()
 const { t } = useI18n()
 
 const { isCollapse } = storeToRefs(store.system)
-const { search_data } = storeToRefs(store.routerNoteStore)
+const { search_data } = storeToRefs(store.fileTreeStore)
 
 // ========== 侧边栏切换 ==========
 function toggleSidebar(){
