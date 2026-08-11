@@ -603,23 +603,7 @@ const app_updates_check = async () => {
           </div>
         </div>
 
-        <div class="settings-item">
-          <div class="setting-info">
-            <span class="setting-label">{{ $t('update.name') }}</span>
-            <span class="setting-description">{{ $t('update.hint') }}</span>
-          </div>
-          <div class="setting-control">
-            <el-switch
-              v-model="update_reminder"
-              @change="software_change()"
-              inline-prompt
-              :active-icon="Check"
-              :inactive-icon="Close"
-              disabled
-            />
-          </div>
-        </div>
-
+      
 
         <div class="settings-item">
           <div class="setting-info">

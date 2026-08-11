@@ -55,32 +55,40 @@ async function handleClose() {
 </script>
 
 <style scoped lang="scss">
-@use '@/styles/variables.scss' as *;
+@use '@/styles/theme.scss';
 
 .window-controls {
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  margin-left: 2px;
 }
 
 .ctrl-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  margin-right: 12px;
+  width: 24px;
+  height: 24px;
   cursor: pointer;
-  color: inherit;
-  transition: color 0.2s;
+  border-radius: 4px;
+  transition: background-color 0.15s;
   flex-shrink: 0;
 
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+
   &:hover {
-    color: $theme-color;
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+      background-color: theme.getVar('activityBarHover');
+    }
   }
 }
 
 .ctrl-close:hover {
-  color: #e81123;
+  color: #e81123 !important;
+  background-color: rgba(232, 17, 35, 0.1) !important;
 }
 </style>

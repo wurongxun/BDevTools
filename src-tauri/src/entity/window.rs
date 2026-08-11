@@ -24,6 +24,7 @@ pub struct WindowMeta {
     pub role: WindowRole,
     pub workspace_id: Option<String>,
     pub title: String,
+    pub preset_id: Option<String>,
     pub x: f64,
     pub y: f64,
     pub width: f64,

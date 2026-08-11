@@ -2,23 +2,15 @@
   <div class="main-box">
     <AppNavbar />
     <div class="main-area" :class="{ 'is-resizing': isDragging }">
-      <aside
-        ref="sideBoxRef"
-        class="side-box"
-        :class="{ 'is-collapse': isCollapse }"
-        :style="!isCollapse ? { width: sidebarWidth + 'px', minWidth: sidebarWidth + 'px', maxWidth: sidebarWidth + 'px' } : {}"
-      >
+      <aside ref="sideBoxRef" class="side-box" :class="{ 'is-collapse': isCollapse }"
+        :style="!isCollapse ? { width: sidebarWidth + 'px', minWidth: sidebarWidth + 'px', maxWidth: sidebarWidth + 'px' } : {}">
         <app-sidebar :hideActivityBar="isFocusMode" />
       </aside>
-      <div
-        v-show="!isCollapse"
-        class="resize-handle"
-        :class="{ 'is-dragging': isDragging }"
-        @mousedown="onResizeStart"
-      >
+      <div v-show="!isCollapse" class="resize-handle" :class="{ 'is-dragging': isDragging }" @mousedown="onResizeStart">
         <div class="resize-handle-line"></div>
       </div>
-      <main ref="mainContentRef" class="app-content" :class="{ 'is-collapse': isCollapse || isFocusMode, 'has-sidebar': !isCollapse && !isFocusMode && windowWidth >= 1024 }">
+      <main ref="mainContentRef" class="app-content"
+        :class="{ 'is-collapse': isCollapse || isFocusMode, 'has-sidebar': !isCollapse && !isFocusMode && windowWidth >= 1024 }">
         <div class="editor-wrapper">
           <app-editor-main></app-editor-main>
         </div>
@@ -55,7 +47,7 @@ const sideBoxRef = ref<HTMLElement | null>(null)
 const mainContentRef = ref<HTMLElement | null>(null)
 const windowWidth = ref(window.innerWidth)
 
-const SIDEBAR_MIN_WIDTH =60
+const SIDEBAR_MIN_WIDTH = 60
 const SIDEBAR_MAX_WIDTH = 700
 const SIDEBAR_DEFAULT_WIDTH = 220
 
@@ -112,10 +104,10 @@ let windowWidth_2 = ref<number>(window.innerWidth)
 let lastWindowWidth = ref<number>(window.innerWidth)
 let windowWidthshrink = ref<Boolean>(false)
 
-const handleResize=() => {
+const handleResize = () => {
   updateWindowWidth();
 }
-const updateWindowWidth=() => {
+const updateWindowWidth = () => {
   windowWidth_2.value = window.innerWidth;
   if (windowWidth_2.value < lastWindowWidth.value) {
     console.log('窗口宽度在变小');
@@ -148,10 +140,10 @@ const handleWindowResize = () => {
   windowWidth.value = window.innerWidth
 
   // 窗口宽度小于 720px 时自动隐藏侧边栏
-  if (windowWidth.value < 720 && !isCollapse.value&&windowWidthshrink.value) {
+  if (windowWidth.value < 720 && !isCollapse.value && windowWidthshrink.value) {
     system.packCollapse()
     console.log('[Layout] Auto-hiding sidebar (width < 720px):', windowWidth.value)
-  }else if (windowWidth.value >= 720 && isCollapse.value&&!windowWidthshrink.value) {
+  } else if (windowWidth.value >= 720 && isCollapse.value && !windowWidthshrink.value) {
     system.expandCollapse()
     console.log('[Layout] Auto-show sidebar (width >= 720px):', windowWidth.value)
   }
@@ -200,7 +192,7 @@ onMounted(async () => {
   if (windowWidth.value < 720 && !isCollapse.value) {
     system.packCollapse()
     console.log('[Layout] Initial auto-hide sidebar (width < 720px):', windowWidth.value)
-  }else if (windowWidth.value >= 720 && isCollapse.value) {
+  } else if (windowWidth.value >= 720 && isCollapse.value) {
     system.expandCollapse()
     console.log('[Layout] Auto-show sidebar (width >= 720px):', windowWidth.value)
   }
@@ -224,7 +216,8 @@ onUnmounted(() => {
 </script>
 
 
-<style scoped lang="scss">@use '@/styles/variables.scss' as *;
+<style scoped lang="scss">
+@use '@/styles/variables.scss' as *;
 @use '@/styles/theme.scss';
 
 .main-box {
@@ -242,6 +235,7 @@ onUnmounted(() => {
     overflow: hidden;
 
     &.is-resizing {
+
       .side-box,
       .app-content {
         transition: none !important;
@@ -255,9 +249,9 @@ onUnmounted(() => {
       max-width: $menu-width;
       height: 100%;
       transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-      min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-      max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-      opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       z-index: 1000;
       box-sizing: border-box;
       overflow: hidden;

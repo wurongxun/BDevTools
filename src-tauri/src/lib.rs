@@ -240,6 +240,7 @@ pub fn run() {
                     crate::entity::window::WindowRole::Main,
                     None,
                     "MdViewer".to_string(),
+                    Some("main".to_string()),
                     0.0, 0.0, 960.0, 640.0,
                 );
                 crate::window_manager::registry::register_window(meta);

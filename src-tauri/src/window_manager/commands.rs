@@ -21,8 +21,9 @@ pub async fn create_editor_window(
     width: Option<f64>,
     height: Option<f64>,
     title: Option<String>,
+    preset_id: Option<String>,
 ) -> Response<WindowMeta> {
-    println!("[create_editor_window] 命令被调用, workspace_id={:?}, width={:?}, height={:?}", workspace_id, width, height);
+    println!("[create_editor_window] 命令被调用, workspace_id={:?}, width={:?}, height={:?}, preset_id={:?}", workspace_id, width, height, preset_id);
     let uuid = Uuid::new_v4().to_string();
     // 截取 uuid 前 8 位作为简短标识
     let short_id = &uuid[..8];
@@ -53,6 +54,7 @@ pub async fn create_editor_window(
                 WindowRole::Editor,
                 workspace_id,
                 win_title,
+                preset_id,
                 100.0,
                 100.0,
                 w,
@@ -90,6 +92,7 @@ pub async fn create_editor_window(
                 role: WindowRole::Editor,
                 workspace_id: None,
                 title: String::new(),
+                preset_id: None,
                 x: 0.0, y: 0.0, width: 0.0, height: 0.0,
                 is_maximized: false,
                 created_at: 0,
@@ -206,6 +209,7 @@ pub fn create_preset_window_from_preset(
                 WindowRole::Editor,
                 None,
                 title,
+                Some(preset_id.to_string()),
                 100.0,
                 100.0,
                 width,

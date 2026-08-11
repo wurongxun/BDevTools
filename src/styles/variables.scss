@@ -29,8 +29,8 @@ $theme-color: #555555;
 $font-size: 16px;
 
 $dialog-width: 640px;
-$header-height: 2em;
-$tage-view-height: 2em;
+$header-height: 32px;
+$tage-view-height: 30px;
 // The :export directive is the magic sauce for webpack
 // https://mattferderer.com/use-sass-variables-in-typescript-and-javascript
 :export {

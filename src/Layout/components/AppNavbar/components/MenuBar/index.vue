@@ -83,6 +83,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { load, Store } from '@tauri-apps/plugin-store'
+import { invoke } from '@tauri-apps/api/core'
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/Types/entitys'
 import NotificationUtil from '@/utils/NotificationUtil'
@@ -91,7 +92,9 @@ import { changeWorkspace } from '@/utils/index'
 import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
 import { open } from '@tauri-apps/plugin-dialog'
-import { openAppWindow, createEditorWindow } from '@/utils/WindowUtils'
+import { openAppWindow, createEditorWindow, createPresetWindow } from '@/utils/WindowUtils'
+import type { WindowPresetConfig } from '@/utils/WindowUtils'
+import type { WindowMeta } from '@/Types/workspace'
 const {useDocumentManagerStore,routerNoteStore,useLayoutStore } = useStore()
 const router = useRouter()
 const activeMenu = ref<string | null>(null)
@@ -117,6 +120,19 @@ const MAX_RECENT_PROJECTS = 20
 
 // ===== 最近项目状态 =====
 const recentProjects = ref<string[]>([])
+
+// ===== 窗口预设状态 =====
+const windowPresets = ref<WindowPresetConfig[]>([])
+const mainWindowPreset = ref<WindowPresetConfig>({
+  id: 'main',
+  name: '主窗口',
+  enabledPlugins: [],
+  width: 960,
+  height: 640,
+  openOnStartup: true,
+  focusMode: false
+})
+const allWindowPresets = computed(() => [mainWindowPreset.value, ...windowPresets.value])
 
 /** 判断当前窗口是否启用了 files 插件 */
 const hasFilesPlugin = computed(() => {
@@ -190,19 +206,31 @@ const menus = computed<Menu[]>(() => {
       submenu: submenuItems
     })
 
-    fileItems.push({ label: '新建窗口', shortcut: 'Ctrl+Shift+N', command: 'newWindow' })
+    //fileItems.push({ label: '新建窗口', shortcut: 'Ctrl+Shift+N', command: 'newWindow' })
     fileItems.push({ divider: true, label: '', command: '' })
   } else {
-    fileItems.push({ label: '新建窗口', shortcut: 'Ctrl+Shift+N', command: 'newWindow' })
+    //fileItems.push({ label: '新建窗口', shortcut: 'Ctrl+Shift+N', command: 'newWindow' })
     fileItems.push({ divider: true, label: '', command: '' })
   }
 
   fileItems.push({ label: '设置', command: 'settings' })
 
+  // 窗口菜单项：列出所有配置的窗口预设
+  const windowItems: MenuItem[] = allWindowPresets.value.map(preset => ({
+    label: preset.name,
+    command: `window_preset_${preset.id}`
+  }))
+  windowItems.push({ divider: true, label: '', command: '' })
+  windowItems.push({ label: '新建窗口', shortcut: 'Ctrl+Shift+N', command: 'newWindow' })
+
   return [
     {
       label: '文件(F)',
       items: fileItems
+    },
+    {
+      label: '窗口(W)',
+      items: windowItems
     },
     {
       label: '帮助(H)',
@@ -362,6 +390,59 @@ const handleMenuCommand = async (item: MenuItem) => {
       openAppWindow('/App/terminal')
       break
     }
+    default: {
+      // 处理窗口预设命令：window_preset_{id}
+      if (item.command.startsWith('window_preset_')) {
+        const presetId = item.command.replace('window_preset_', '')
+        await handleWindowPresetClick(presetId)
+      }
+      break
+    }
+  }
+}
+
+/** 加载窗口预设配置 */
+async function loadWindowPresets() {
+  if (!store) {
+    store = await load('settings.json', { autoSave: false, defaults: {} })
+  }
+  const val = await store.get<WindowPresetConfig[]>('window_presets')
+  if (val && Array.isArray(val)) {
+    windowPresets.value = val
+  }
+  const mainVal = await store.get<WindowPresetConfig>('main_window_preset')
+  if (mainVal) {
+    mainWindowPreset.value = { ...mainVal, id: 'main', name: mainVal.name || '主窗口' }
+  }
+}
+
+/** 窗口预设菜单项点击：已打开则聚焦，未打开则创建 */
+async function handleWindowPresetClick(presetId: string) {
+  const preset = allWindowPresets.value.find(p => p.id === presetId)
+  if (!preset) return
+
+  try {
+    // 查询当前已打开的窗口列表
+    const res = await invoke<ResponseData<WindowMeta[]>>('get_window_list')
+    console.log('[MenuBar] 窗口列表:', JSON.stringify(res.data))
+    if (res.code === 200 && res.data) {
+      // 优先按 preset_id 匹配，后备按窗口标题（即预设名称）匹配
+      const matched = res.data.find(w => w.preset_id === presetId)
+        || res.data.find(w => w.title === preset.name)
+      if (matched) {
+        console.log('[MenuBar] 找到已打开窗口:', matched.label, 'preset_id:', matched.preset_id, 'title:', matched.title)
+        await invoke('focus_window', { label: matched.label })
+        return
+      }
+    }
+  } catch (e) {
+    console.warn('查询窗口列表失败:', e)
+  }
+
+  // 窗口未打开，根据预设创建新窗口
+  const meta = await createPresetWindow(preset)
+  if (!meta) {
+    NotificationUtil.error('创建窗口失败，请查看控制台日志')
   }
 }
 
@@ -408,6 +489,7 @@ onMounted(async () => {
   document.addEventListener('click', handleGlobalClick)
   document.addEventListener('keydown', handleKeydown)
   await loadRecentProjects()
+  await loadWindowPresets()
 })
 
 onUnmounted(() => {
@@ -428,12 +510,12 @@ onUnmounted(() => {
 
   .menu-item {
     position: relative;
-    padding: 0 10px;
+    padding: 0 8px;
     height: 100%;
     display: flex;
     align-items: center;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 12px;
     white-space: nowrap;
     transition: background-color 0.15s;
 
@@ -455,12 +537,12 @@ onUnmounted(() => {
       min-width: 200px;
       padding: 4px 0;
       z-index: 99999;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-      border-radius: 6px;
+      border-radius: 4px;
 
       @include theme.useTheme {
         background-color: theme.getVar('bgColor');
         border: 1px solid theme.getVar('borderColor');
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       }
 
       .menu-divider {
@@ -476,8 +558,8 @@ onUnmounted(() => {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 6px 16px;
-        font-size: 13px;
+        padding: 5px 14px;
+        font-size: 12px;
         cursor: pointer;
         transition: background-color 0.15s;
         position: relative;
@@ -489,8 +571,8 @@ onUnmounted(() => {
         &:hover {
           @include theme.useTheme {
             background-color: theme.getVar('hoverColor');
-            color: #fff;
           }
+          color: #fff;
 
           .option-shortcut {
             opacity: 1;
@@ -515,13 +597,13 @@ onUnmounted(() => {
         }
 
         .option-shortcut {
-          font-size: 12px;
+          font-size: 11px;
           opacity: 0.5;
           margin-left: 24px;
         }
 
         .submenu-arrow {
-          font-size: 10px;
+          font-size: 9px;
           opacity: 0.5;
           margin-left: 12px;
         }
@@ -537,12 +619,12 @@ onUnmounted(() => {
             overflow-y: auto;
             padding: 4px 0;
             z-index: 100000;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-            border-radius: 6px;
+            border-radius: 4px;
 
             @include theme.useTheme {
               background-color: theme.getVar('bgColor');
               border: 1px solid theme.getVar('borderColor');
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
             }
 
             .submenu-item .option-label {

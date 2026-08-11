@@ -95,7 +95,7 @@
       @click="toggleSidebar"
       :title="isCollapse ? '显示侧边栏' : '隐藏侧边栏'"
     >
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
         <rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
         <rect x="3" y="3" width="6" height="18" rx="1" :fill="!isCollapse ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.2" opacity="0.9"/>
       </svg>
@@ -222,178 +222,46 @@ const handleSettingCommand = (command: string) => {
 </script>
 
 <style scoped lang="scss">
-@use '@/styles/variables.scss' as *;
 @use '@/styles/theme.scss';
 
 .functional-area {
   display: flex;
   align-items: center;
   height: 100%;
-  font-size: 20px;
+  gap: 2px;
 }
 
 .fa-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  margin-right: 12px;
+  width: 24px;
+  height: 24px;
   cursor: pointer;
-  color: inherit;
-  transition: color 0.2s;
+  border-radius: 4px;
+  transition: background-color 0.15s;
   flex-shrink: 0;
 
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+
   &:hover {
-    color: $theme-color;
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+      background-color: theme.getVar('activityBarHover');
+    }
   }
 
   &.is-active {
-    color: $theme-color;
-  }
-}
-
-// 搜索展开区域
-.search-item {
-  display: flex;
-  align-items: center;
-  margin-right: 4px;
-
-  .search-input-wrap {
-    overflow: hidden;
-    width: 0;
-    transition: width 0.4s ease;
-
-    :deep(.el-input__wrapper) {
-      box-shadow: none !important;
+    @include theme.useTheme {
+      color: theme.getVar('hoverColor');
     }
   }
 
-  &.is-expanded .search-input-wrap {
-    width: 200px;
-    margin-left: 8px;
-  }
-}
-
-// 消息 popover
-.message-container {
-  .message-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--el-border-color-lighter);
-
-    h3 {
-      margin: 0;
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--el-text-color-primary);
-    }
-  }
-
-  .message-tabs {
-    :deep(.el-tabs__header) {
-      margin: 0;
-      padding: 0 16px;
-    }
-  }
-
-  .empty-state {
-    padding: 40px 20px;
-    text-align: center;
-  }
-
-  .message-item {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--el-border-color-lighter);
-    cursor: pointer;
-    transition: background-color 0.2s;
-
-    &:hover {
-      background-color: var(--el-fill-color-light);
-    }
-
-    &.read {
-      opacity: 0.7;
-    }
-
-    .message-title {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--el-text-color-primary);
-      margin-bottom: 6px;
-    }
-
-    .message-text {
-      font-size: 13px;
-      color: var(--el-text-color-regular);
-      line-height: 1.5;
-      margin-bottom: 6px;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-
-    .message-time {
-      font-size: 12px;
-      color: var(--el-text-color-secondary);
-    }
-  }
-}
-</style>
-
-<style lang="scss">
-.message-popover {
-  z-index: 99999 !important;
-
-  .el-popover__inner {
-    padding: 0;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
-    border-radius: 8px;
-    overflow: hidden;
-  }
-}
-
-.setting-dropdown-popper {
-  z-index: 99999 !important;
-
-  .el-dropdown-menu {
-    padding: 6px 0;
-    min-width: 160px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
-    border-radius: 8px;
-
-    .el-dropdown-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
-      font-size: 14px;
-
-      .el-icon {
-        font-size: 16px;
-        opacity: 0.8;
-      }
-
-      &:hover .el-icon {
-        opacity: 1;
-        color: var(--el-color-primary);
-      }
-    }
-  }
-}
-
-html.dark {
-  .message-popover .el-popper__arrow::before {
-    background: var(--el-bg-color);
-    box-shadow: -2px -2px 4px rgba(0, 0, 0, 0.3);
-  }
-
-  .setting-dropdown-popper .el-dropdown-menu {
-    background-color: var(--el-bg-color-overlay);
-    border: 1px solid var(--el-border-color);
+  svg {
+    width: 14px;
+    height: 14px;
   }
 }
 </style>

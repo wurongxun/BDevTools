@@ -12,6 +12,7 @@ export interface WindowMeta {
   role: WindowRole
   workspace_id: string | null
   title: string
+  preset_id: string | null
   x: number
   y: number
   width: number

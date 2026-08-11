@@ -61,12 +61,14 @@ export async function openAppWindow(path: string) {
  * @param width 窗口宽度（可选，默认 960）
  * @param height 窗口高度（可选，默认 640）
  * @param title 窗口标题（可选）
+ * @param presetId 窗口预设 ID（可选，用于窗口菜单识别已打开的预设窗口）
  */
 export async function createEditorWindow(
   workspaceId?: string,
   width?: number,
   height?: number,
-  title?: string
+  title?: string,
+  presetId?: string
 ): Promise<WindowMeta | null> {
   console.log('[createEditorWindow] 开始调用, workspaceId=', workspaceId, 'size=', width, 'x', height)
   try {
@@ -74,7 +76,8 @@ export async function createEditorWindow(
       workspaceId: workspaceId ?? null,
       width: width ?? null,
       height: height ?? null,
-      title: title ?? null
+      title: title ?? null,
+      presetId: presetId ?? null
     })
     console.log('[createEditorWindow] 响应:', res)
     if (res.code === 200) {
@@ -108,7 +111,8 @@ export async function createPresetWindow(preset: WindowPresetConfig): Promise<Wi
     undefined,
     preset.width,
     preset.height,
-    preset.name
+    preset.name,
+    preset.id
   )
   if (!meta) return null
 
