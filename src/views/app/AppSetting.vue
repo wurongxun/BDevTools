@@ -9,19 +9,15 @@ import { load, Store } from '@tauri-apps/plugin-store'
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
 import { open } from '@tauri-apps/plugin-dialog'
 import { isDark, toggleDark } from '@/composables/useDark'
-import { ITagItem } from '@/Types/TagView'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { tauri_request } from '@/utils/tauri_request'
 import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting'
 import { TreeNode } from '@/Types/entitys'
-import { useRouter, useRoute, LocationQueryRaw, RouteParamsRaw } from 'vue-router'
 import { check as check_, Update, DownloadEvent } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { pluginManager } from '@/core/pluginManager'
 
 const { appConfig } = useStore()
-const router = useRouter()
-const route = useRoute()
 const { t, locale } = useI18n()
 
 /** 当前激活的设置页签 */

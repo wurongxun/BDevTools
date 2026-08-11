@@ -81,7 +81,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { load, Store } from '@tauri-apps/plugin-store'
 import { invoke } from '@tauri-apps/api/core'
 import { tauri_request } from '@/utils/tauri_request'
@@ -98,7 +97,6 @@ import type { WindowPresetConfig } from '@/utils/WindowUtils'
 import type { WindowMeta } from '@/Types/workspace'
 const {fileTreeStore,useLayoutStore } = useStore()
 const docStore = useDocumentManagerStore()
-const router = useRouter()
 const activeMenu = ref<string | null>(null)
 const activeSubmenu = ref<string | null>(null)
 let store: Store | undefined

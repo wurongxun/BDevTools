@@ -1,11 +1,9 @@
 <template>
   <div id="app">
-    <!-- 未登录 → 登录页 -->
-    <LoginView v-if="!isLoggedIn" @login-success="handleLoginSuccess" />
     <!-- 辅助窗口（设置/关于/帮助/终端）→ 直接渲染对应组件，不走 Router -->
-    <Common v-else-if="windowRole === 'auxiliary'" :page-component="appPageComponent" :page-title="appPageTitle" />
+    <Common v-if="windowRole === 'auxiliary'" :page-component="appPageComponent" :page-title="appPageTitle" />
     <!-- 主窗口 / 编辑器窗口 → 使用 Layout -->
-    <Layout v-else-if="isLoggedIn" />
+    <Layout v-else />
   </div>
 </template>
 
@@ -17,14 +15,12 @@ import { Window } from '@tauri-apps/api/window'
 import useStore from '@/store'
 import Layout from '@/Layout/index.vue'
 import Common from '@/views/Common/Common.vue'
-import LoginView from '@/views/login/index.vue'
 import type { WindowRole } from '@/Types/workspace'
 import { useDocumentManagerStore } from '@/plugins/files/store/documents'
 
-const { user, useWorkspaceStore, useSessionStore, fileTreeStore, useLayoutStore } = useStore()
+const { useWorkspaceStore, useSessionStore, fileTreeStore, useLayoutStore } = useStore()
 const docStore = useDocumentManagerStore()
 
-const isLoggedIn = ref(false)
 const windowRole = ref<WindowRole>('main')
 /** 关闭拦截递归保护标志 */
 const isClosing = ref(false)
@@ -138,21 +134,6 @@ function setupCloseHandler() {
 }
 
 /**
- * 检查登录状态（从 Cookie 读取 token）
- */
-function checkLoginState() {
-  isLoggedIn.value = !!user.hasToken()
-}
-
-/**
- * 登录成功回调
- */
-function handleLoginSuccess() {
-  isLoggedIn.value = true
-  initApp()
-}
-
-/**
  * 初始化应用数据
  */
 async function initApp() {
@@ -221,10 +202,7 @@ async function initApp() {
 
 onMounted(async () => {
   await initWindow()
-  checkLoginState()
-  if (isLoggedIn.value) {
-    await initApp()
-  }
+  await initApp()
   // 设置窗口关闭拦截
   setupCloseHandler()
 })

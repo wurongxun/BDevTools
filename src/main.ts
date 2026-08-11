@@ -1,7 +1,6 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import piniaStore from '@/store/index'
-import router from '@/router'
 import ElementPlus from 'element-plus'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
@@ -15,7 +14,6 @@ import registerDirectives from '@/directives/index'
 import errorHandler from './errorHandler'
 import i18n from '../src/locales'
 import { registerBuiltinPlugins } from '@/plugins'
-import '@/permission'
 
 async function initializeApp() {
   // 注册内置工具插件
@@ -24,7 +22,6 @@ async function initializeApp() {
   const app = createApp(App)
   app.use(i18n)
   app.use(piniaStore)
-  app.use(router)
   app.use(ElementPlus, {
     locale: zhCn
   })

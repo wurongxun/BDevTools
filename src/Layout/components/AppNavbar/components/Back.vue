@@ -1,5 +1,5 @@
 <template>
-  <div class="scale-icon" @click="back">
+  <div class="scale-icon">
     <el-icon size="20px">
       <Back />
     </el-icon>
@@ -10,18 +10,9 @@
 import useStore from '@/store'
 import { storeToRefs } from 'pinia'
 import { Back, Minus, Close } from "@element-plus/icons-vue";
-//import router from '@/router';
-import { ITagItem } from '@/Types/TagView';
-import { useRouter, useRoute } from 'vue-router'
 
 const { system } = useStore()
 const { isCollapse } = storeToRefs(system)
-const router = useRouter()
-const route = useRoute()
-const back = async function () {
-  router.back();
-
-};
 </script>
 
 <style scoped lang="scss">

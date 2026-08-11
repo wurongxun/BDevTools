@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia'
-import { getPermission } from '@/api/user'
 
 const permissionStore = defineStore('permissionStore', {
   state: () => {
@@ -9,11 +8,11 @@ const permissionStore = defineStore('permissionStore', {
   },
   actions: {
     /**
-     * @description 获取控件权限
+     * @description 初始化权限（桌面工具无需服务端权限）
      */
     async getPermissions() {
-      const res = await getPermission()
-      this.permissions = res.data
+      // 桌面工具本地运行，无需服务端权限验证
+      this.permissions = ['*']
     }
   }
 })

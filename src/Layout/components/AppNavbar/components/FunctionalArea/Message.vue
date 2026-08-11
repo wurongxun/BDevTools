@@ -76,13 +76,13 @@ interface MessageItem {
 
 const messageList = ref<MessageItem[]>([
   {
-    title: 'MdViewer 0.2.0 版发布',
-    content: 'MdViewer 0.2.0 版发布啦，新增了多项功能和优化，请升级到最新版体验！',
+    title: 'BackendDevelopmentTools 0.2.0 版发布',
+    content: 'BackendDevelopmentTools 0.2.0 版发布啦，新增了多项功能和优化，请升级到最新版体验！',
     time: '2024-01-15 10:30'
   },
   {
     title: '系统通知',
-    content: '欢迎使用 MdViewer，这是一个基于 Tauri 的跨平台 Markdown 编辑器。',
+    content: '欢迎使用 BackendDevelopmentTools，这是一个基于 Tauri 的跨平台桌面工具。',
     time: '2024-01-14 09:00'
   }
 ])

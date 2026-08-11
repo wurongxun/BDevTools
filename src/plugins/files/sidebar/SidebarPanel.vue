@@ -2,7 +2,6 @@
 import { computed, h, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import FileInfoTree from './FileInfoTree.vue'
 import useStore from '@/store'
-import { useRouter, useRoute } from 'vue-router'
 import { tauri_request } from '@/utils/tauri_request'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { ResponseData, TreeNode } from '@/Types/entitys'
@@ -17,7 +16,6 @@ const INVALID_CHARS_REGEX = /.*[/\\:*?|].*/
 const PURE_NUMBER_REGEX = /^\d+$/
 const MAX_FILENAME_LENGTH = 255
 let store: Store | undefined = undefined
-const route = useRoute()
 const { fileTreeStore } = useStore()
 const docStore = useDocumentManagerStore()
 
@@ -137,7 +135,8 @@ const handleDeleteNode = async (node: TreeNode) => {
         if (node.isfile) await deleteFile(node)
         else await deleteFolder(node)
         fileTreeStore.setFileTree()
-        if (route.path === node.routerPath && node.isfile) await processNodeCache(node)
+        const activeDoc = docStore.activeDocument
+        if (activeDoc?.id === node.routerPath && node.isfile) await processNodeCache(node)
     } catch (error: any) {
         if (error !== 'cancel') {
             console.error('删除操作失败:', error)

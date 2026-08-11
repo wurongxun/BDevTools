@@ -56,14 +56,11 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { Document } from '@element-plus/icons-vue'
 import { title, login_desc } from '@/setting'
-import useStore from '@/store'
-import Cookies from 'js-cookie'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 
 const emit = defineEmits<{
   'login-success': []
 }>()
-
-const { user } = useStore()
 const loadingText = ref('正在启动...')
 const progress = ref(0)
 const appVersion = ref('1.0.0')
@@ -80,7 +77,7 @@ const loadingSteps = [
 ]
 
 // 最小显示时间（毫秒）- 确保动画至少播放这么长时间
-const MIN_DISPLAY_TIME = 3000 // 3秒
+const MIN_DISPLAY_TIME = 2000 // 2秒
 
 onMounted(async () => {
   const startTime = Date.now()
@@ -138,44 +135,25 @@ const handleInitialization = async () => {
     progressInterval = null
   }
 
-  // 设置 token（如果没有的话）
-  if (!user.hasToken()) {
-    const savedToken = Cookies.get('token')
-    if (savedToken) {
-      user.token = savedToken
-    } else {
-      // 生成本地 token
-      const localToken = 'local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9)
-      user.token = localToken
-      Cookies.set('token', localToken, { expires: 365 })
-    }
-  }
-
-  // 初始化应用数据
+  // Tauri 2.0 风格：通知后端隐藏启动画面并显示主窗口
   try {
-    if (!user.hasUserInfo()) {
-      // 设置默认用户信息
-      user.userInfo = {
-        account: 'local_user',
-        nickName: '本地用户',
-        phone: '',
-        avatar: '',
-        email: '',
-        postTitle: ''
-      }
+    const webview = getCurrentWebviewWindow()
+    const label = await webview.label
+    
+    // 如果是主窗口，发送事件通知后端
+    if (label === 'main') {
+      // 使用 emitTo 发送全局事件
+      const { emit } = await import('@tauri-apps/api/event')
+      await emit('splash-screen-ready')
     }
-
-    // 短暂延迟后通知父组件登录成功
-    setTimeout(() => {
-      emit('login-success')
-    }, 500)
-  } catch (error) {
-    console.error('App initialization failed:', error)
-    // 初始化失败，仍然通知登录成功
-    setTimeout(() => {
-      emit('login-success')
-    }, 500)
+  } catch (e) {
+    console.warn('Failed to notify splash ready:', e)
   }
+
+  // 桌面工具无需认证，直接通知登录成功
+  setTimeout(() => {
+    emit('login-success')
+  }, 500)
 }
 
 onUnmounted(() => {

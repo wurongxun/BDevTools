@@ -106,7 +106,6 @@
 </template>
 
 <script lang="ts" setup name="FunctionalArea">import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { Search, Sunny, Moon, Message } from '@element-plus/icons-vue'
@@ -116,8 +115,9 @@ import useStore from '@/store'
 import { TreeNode } from '@/Types/entitys'
 import WindowControls from '@/components/WindowControls.vue'
 import { openAppWindow } from '@/utils/WindowUtils'
+import { useDocumentManagerStore } from '@/plugins/files/store/documents'
 const store = useStore()
-const router = useRouter()
+const docStore = useDocumentManagerStore()
 const { t } = useI18n()
 
 const { isCollapse } = storeToRefs(store.system)
@@ -175,7 +175,7 @@ const createFilter = (queryString: string) => {
   }
 }
 const handleSelect = (route: TreeNode) => {
-  if (route.routerPath) router.push({ path: route.routerPath })
+  if (route.routerPath) docStore.openDocument(route.routerPath)
 }
 const onSearchRoutes = () => {
   isSearch.value = true
@@ -194,8 +194,8 @@ interface MessageItem {
 }
 
 const messageList = ref<MessageItem[]>([
-  { title: 'MdViewer 0.2.0 版发布', content: 'MdViewer 0.2.0 版发布啦，新增了多项功能和优化，请升级到最新版体验！', time: '2024-01-15 10:30' },
-  { title: '系统通知', content: '欢迎使用 MdViewer，这是一个基于 Tauri 的跨平台 Markdown 编辑器。', time: '2024-01-14 09:00' }
+  { title: 'BackendDevelopmentTools 0.2.0 版发布', content: 'BackendDevelopmentTools 0.2.0 版发布啦，新增了多项功能和优化，请升级到最新版体验！', time: '2024-01-15 10:30' },
+  { title: '系统通知', content: '欢迎使用 BackendDevelopmentTools，这是一个基于 Tauri 的跨平台桌面工具。', time: '2024-01-14 09:00' }
 ])
 const readMessageList = ref<MessageItem[]>([])
 const unreadCount = computed(() => messageList.value.length)

@@ -15,7 +15,6 @@ instance.interceptors.request.use(
   (config) => {
     // 在发送请求之前做些什么
     LoadingUtils.show()
-    config.headers['x-token'] = 'token'
     return config
   },
   (error) => {

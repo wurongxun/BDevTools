@@ -1,5 +1,5 @@
 export default {
-  appName: 'md-viewer',
+  appName: 'BackendDevelopmentTools',
   settings: {
     name: '設置',
     projectSetting: '项目配置',

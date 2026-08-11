@@ -15,14 +15,12 @@ import NotificationUtil from '@/utils/NotificationUtil'
 import request from '@/utils/request/index'
 import { tauri_request } from '@/utils/tauri_request'
 import { defineAsyncComponent, ref } from 'vue'
-import { RouteRecordRaw, RouteComponent } from 'vue-router'
 import {
   note_comm_router,
   note_comm_router_notebookMd,
   note_comm_router_notebookPdf
 } from '@/setting'
 import useStore from '@/store/index'
-import router from '@/router/index'
 
 export const get_file_Api = async () => {
   const { fileTreeStore } = useStore()
@@ -38,8 +36,7 @@ export const get_file_Api = async () => {
     let data_: NotebookInfo = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
     notebooks_data.value = data_
     FileTreeNodeHandler(data_, workingDir)
-    let data: RouteRecordRaw[] = [] as RouteRecordRaw[]
-    return data
+    return []
   } else {
     NotificationUtil.error(res.msg)
     return []

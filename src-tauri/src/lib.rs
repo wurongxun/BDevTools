@@ -3,7 +3,7 @@
 use serde_json::json;
 use tauri::AppHandle;
 use tauri::Manager;
-use tauri::{App, Emitter};
+use tauri::{App, Emitter, Listener};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
 use tauri_plugin_window_state::{StateFlags, WindowExt};
@@ -201,12 +201,12 @@ pub fn run() {
                 "main".to_string(),
                 tauri::WebviewUrl::App("index.html".into()),
             )
-            .title("MdViewer")
+            .title("BackendDevelopmentTools")
             .decorations(false)
             .inner_size(960.0, 640.0)
             .min_inner_size(640.0, 480.0)
             .center()
-            .visible(false)
+            .visible(false) // Tauri 2.0 Splash Screen: 初始隐藏，等待前端通知
             // .menu(system_menu(&context))//窗口菜单
             .build()
             {
@@ -239,7 +239,7 @@ pub fn run() {
                     "main".to_string(),
                     crate::entity::window::WindowRole::Main,
                     None,
-                    "MdViewer".to_string(),
+                    "BackendDevelopmentTools".to_string(),
                     Some("main".to_string()),
                     0.0, 0.0, 960.0, 640.0,
                 );
@@ -265,9 +265,18 @@ pub fn run() {
                         }
                     }
                 }
-                println!("[MdViewer] show_main_window = {}", result);
+                println!("[BackendDevelopmentTools] show_main_window = {}", result);
                 result
             };
+            // Tauri 2.0 Splash Screen: 监听前端启动完成事件
+            let app_handle = app.handle().clone();
+            let main_window_clone = main_window.clone();
+            app_handle.listen("splash-screen-ready", move |_event| {
+                println!("[SplashScreen] Frontend ready, showing main window");
+                let _ = main_window_clone.show();
+            });
+
+            // 如果配置为立即显示，则直接显示（不等待 splash 事件）
             if show_main_window {
                 main_window.show().unwrap();
             } else {

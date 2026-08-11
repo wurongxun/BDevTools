@@ -1,5 +1,5 @@
 {
-  "name": "md-viewer",
+  "name": "backend-development-tools",
   "version": "1.2.0",
   "private": true,
   "scripts": {
@@ -36,7 +36,6 @@
     "dayjs": "^1.11.21",
     "echarts": "^6.1.0",
     "element-plus": "^2.14.2",
-    "js-cookie": "^3.0.8",
     "lottie-web": "^5.13.0",
     "md-editor-v3": "^6.5.3",
     "normalize.css": "^8.0.1",
@@ -47,15 +46,13 @@
     "typeit": "^8.8.7",
     "uuid": "^14.0.1",
     "vue": "^3.5.39",
-    "vue-i18n": "^11.4.6",
-    "vue-router": "^5.1.0"
+    "vue-i18n": "^11.4.6"
   },
   "devDependencies": {
     "@intlify/devtools-types": "^11.4.6",
     "@rushstack/eslint-patch": "^1.16.1",
     "@tauri-apps/cli": "^2.11.4",
     "@types/axios": "^0.14.4",
-    "@types/js-cookie": "^3.0.6",
     "@types/mockjs": "^1.0.10",
     "@types/node": "^26.1.0",
     "@types/nprogress": "^0.2.3",

@@ -13,18 +13,13 @@
 
 <script lang="ts" setup>
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import useStore from '@/store'
 import type { ComputedRef, Ref } from 'vue'
-import type { RouteRecordRaw } from 'vue-router'
 import { TreeNode } from '@/Types/entitys'
+import { useDocumentManagerStore } from '@/plugins/files/store/documents'
 
-interface IRoutes extends Omit<RouteRecordRaw, 'redirect'> {
-  redirect?: string
-}
-
-const router = useRouter()
+const docStore = useDocumentManagerStore()
 const {fileTreeStore } = useStore()
 
 let autoInputRef: Ref<any> = ref(null)
@@ -89,13 +84,10 @@ const createFilter = (queryString: string) => {
 }
 const handleSelect = (route: TreeNode) => {
   console.log('handleSelect route', route)
-  let routerPath = route.routerPath;
-  if (routerPath) {
-    router.push({
-      path: routerPath
-    })
+  let filePath = route.routerPath;
+  if (filePath) {
+    docStore.openDocument(filePath)
   }
-
 }
 
 const onSearchRoutes = () => {

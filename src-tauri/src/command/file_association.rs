@@ -4,7 +4,7 @@ use tauri::AppHandle;
 use winreg::enums::*;
 use winreg::RegKey;
 
-const APP_PROG_ID: &str = "MdViewer.File";
+const APP_PROG_ID: &str = "BackendDevelopmentTools.File";
 
 #[tauri::command]
 pub async fn register_file_association(app_handle: AppHandle) -> ResData<String> {
@@ -54,7 +54,7 @@ fn do_register(exe_path: &str, extensions: &[&str]) -> Result<(), Box<dyn std::e
 
     // 注册 ProgID
     let (prog_key, _) = hkcu.create_subkey(format!("Software\\Classes\\{}", APP_PROG_ID))?;
-    prog_key.set_value("", &"MdViewer 文件")?;
+    prog_key.set_value("", &"BackendDevelopmentTools 文件")?;
 
     // 设置图标
     let (icon_key, _) =
@@ -99,7 +99,7 @@ fn do_register(exe_path: &str, extensions: &[&str]) -> Result<(), Box<dyn std::e
         .to_string();
     let (app_key, _) =
         hkcu.create_subkey(format!("Software\\Classes\\Applications\\{}", exe_name))?;
-    app_key.set_value("", &"MdViewer")?;
+    app_key.set_value("", &"BackendDevelopmentTools")?;
 
     let (app_cmd_key, _) = hkcu.create_subkey(format!(
         "Software\\Classes\\Applications\\{}\\shell\\open\\command",
