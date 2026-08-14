@@ -3,7 +3,7 @@
     <AppNavbar />
     <div class="main-area" :class="{ 'is-resizing': isDragging }">
       <aside ref="sideBoxRef" class="side-box" :class="{ 'is-collapse': isCollapse }"
-        :style="!isCollapse ? { width: sidebarWidth + 'px', minWidth: sidebarWidth + 'px', maxWidth: sidebarWidth + 'px' } : {}">
+        :style="!isCollapse ? { width: sidebarWidth + 'px', minWidth: sidebarWidth + 'px', maxWidth: sidebarWidth + 'px', transition: isDragging ? 'none' : '' } : {}">
         <app-sidebar :hideActivityBar="isFocusMode" />
       </aside>
       <div v-show="!isCollapse" class="resize-handle" :class="{ 'is-dragging': isDragging }" @mousedown="onResizeStart">
@@ -25,8 +25,9 @@ import AppEditorMain from './components/AppEditorMain/index.vue'
 import AppHeader from './components/AppHeader/index.vue'
 import AppSidebar from './components/AppSidebar/index.vue'
 import useStore from '@/store/index'
+import { pluginManager } from '@/core/pluginManager'
 import { storeToRefs } from 'pinia'
-import { watch, nextTick, onMounted, onUnmounted, ref, computed } from 'vue'
+import { watch, nextTick, onMounted, onUnmounted, ref, reactive, computed } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 
 const { system, useWorkspaceStore, useLayoutStore } = useStore()
@@ -51,7 +52,16 @@ const SIDEBAR_MIN_WIDTH = 60
 const SIDEBAR_MAX_WIDTH = 700
 const SIDEBAR_DEFAULT_WIDTH = 220
 
+/** 每个插件独立的侧边栏宽度（持久化存储） */
+const pluginSidebarWidths: Record<string, number> = {}
+
+/** 当前侧边栏宽度（直接驱动 DOM） */
 const sidebarWidth = ref(SIDEBAR_DEFAULT_WIDTH)
+
+/** 插件切换时恢复该插件记住的宽度 */
+watch(() => pluginManager.activeToolId.value, (newId) => {
+  sidebarWidth.value = pluginSidebarWidths[newId] ?? SIDEBAR_DEFAULT_WIDTH
+})
 const isDragging = ref(false)
 
 const onResizeStart = (e: MouseEvent) => {
@@ -62,35 +72,25 @@ const onResizeStart = (e: MouseEvent) => {
   const asideEl = sideBoxRef.value
   if (!asideEl) return
 
-  asideEl.style.transition = 'none'
-
-  let rafId: number | null = null
-  let pendingWidth = startWidth
+  let currentWidth = startWidth
 
   const onMouseMove = (moveEvent: MouseEvent) => {
-    const delta = moveEvent.clientX - startX
-    pendingWidth = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startWidth + delta))
-    if (rafId === null) {
-      rafId = requestAnimationFrame(() => {
-        asideEl.style.width = pendingWidth + 'px'
-        asideEl.style.minWidth = pendingWidth + 'px'
-        asideEl.style.maxWidth = pendingWidth + 'px'
-        rafId = null
-      })
-    }
+    currentWidth = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startWidth + (moveEvent.clientX - startX)))
+    // 拖拽期间只操作 DOM，不触发 Vue 响应式更新
+    asideEl.style.width = currentWidth + 'px'
+    asideEl.style.minWidth = currentWidth + 'px'
+    asideEl.style.maxWidth = currentWidth + 'px'
   }
 
   const onMouseUp = () => {
-    if (rafId !== null) {
-      cancelAnimationFrame(rafId)
-    }
-    sidebarWidth.value = pendingWidth
-    asideEl.style.transition = ''
-    isDragging.value = false
     document.removeEventListener('mousemove', onMouseMove)
     document.removeEventListener('mouseup', onMouseUp)
     document.body.style.cursor = ''
     document.body.style.userSelect = ''
+    // 同步更新 ref，Vue 重渲染后 :style 绑定会接管宽度
+    sidebarWidth.value = currentWidth
+    pluginSidebarWidths[pluginManager.activeToolId.value] = currentWidth
+    isDragging.value = false
     triggerLayoutUpdate('drag-resize')
   }
 
@@ -244,9 +244,6 @@ onUnmounted(() => {
 
     .side-box {
       flex-shrink: 0;
-      width: $menu-width;
-      min-width: $menu-width;
-      max-width: $menu-width;
       height: 100%;
       transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
         min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
