@@ -19,6 +19,7 @@ mod sqlite;
 mod window_manager;
 mod workspace;
 mod session;
+mod database;
 
 use crate::app::app_store::{app_autostart, app_settings,app_openFile, APP};
 use crate::app::tray::create_tray;
@@ -57,6 +58,19 @@ use crate::workspace::commands::{
 use crate::session::commands::{
     session_save, session_load, session_load_all, session_list,
     session_delete, session_clear,
+};
+use crate::database::connection::{
+    db_connection_create, db_connection_delete, db_connection_update,
+    db_connection_list, db_connection_test, db_connect, db_disconnect,
+};
+use crate::database::operations::{
+    db_execute_sql, db_query_table_data, db_insert_row, db_update_row, db_delete_row,
+};
+use crate::database::metadata::{
+    db_list_databases, db_list_tables, db_table_columns, db_table_indexes, db_table_schema,
+};
+use crate::database::import_export::{
+    db_export_csv, db_export_excel, db_import_csv, db_import_excel,
 };
 
 
@@ -150,6 +164,31 @@ pub fn run() {
             session_list,
             session_delete,
             session_clear,
+            // 数据库连接管理
+            db_connection_create,
+            db_connection_delete,
+            db_connection_update,
+            db_connection_list,
+            db_connection_test,
+            db_connect,
+            db_disconnect,
+            // 数据库操作
+            db_execute_sql,
+            db_query_table_data,
+            db_insert_row,
+            db_update_row,
+            db_delete_row,
+            // 元数据查询
+            db_list_databases,
+            db_list_tables,
+            db_table_columns,
+            db_table_indexes,
+            db_table_schema,
+            // 导入导出
+            db_export_csv,
+            db_export_excel,
+            db_import_csv,
+            db_import_excel,
         ])
         .setup(move |app: &mut App| {
             // 初始化 app_dir

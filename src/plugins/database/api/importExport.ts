@@ -1,0 +1,25 @@
+/**
+ * 导入导出 API
+ */
+import { invoke } from '@tauri-apps/api/core'
+import type { ExportResult, ImportResult, ApiResponse } from '../types'
+
+/** 导出为 CSV */
+export function dbExportCsv(configId: string, database: string, table: string, filePath: string): Promise<ApiResponse<ExportResult>> {
+  return invoke('db_export_csv', { configId, database, table, filePath })
+}
+
+/** 导出为 Excel */
+export function dbExportExcel(configId: string, database: string, table: string, filePath: string): Promise<ApiResponse<ExportResult>> {
+  return invoke('db_export_excel', { configId, database, table, filePath })
+}
+
+/** 从 CSV 导入 */
+export function dbImportCsv(configId: string, database: string, table: string, filePath: string, hasHeader: boolean): Promise<ApiResponse<ImportResult>> {
+  return invoke('db_import_csv', { configId, database, table, filePath, hasHeader })
+}
+
+/** 从 Excel 导入 */
+export function dbImportExcel(configId: string, database: string, table: string, filePath: string): Promise<ApiResponse<ImportResult>> {
+  return invoke('db_import_excel', { configId, database, table, filePath })
+}

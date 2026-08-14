@@ -45,6 +45,27 @@ fn init_tables(conn: &Connection) -> Result<()> {
     // 迁移：为已有表添加新列（忽略已存在错误）
     let _ = conn.execute_batch("ALTER TABLE connections ADD COLUMN auth_type TEXT NOT NULL DEFAULT 'password';");
     let _ = conn.execute_batch("ALTER TABLE connections ADD COLUMN private_key_path TEXT NOT NULL DEFAULT '';");
+    // 初始化数据库连接配置表
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS db_connections (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            db_type TEXT NOT NULL,
+            host TEXT NOT NULL,
+            port INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            password TEXT NOT NULL,
+            database_name TEXT,
+            ssh_enabled INTEGER NOT NULL DEFAULT 0,
+            ssh_host TEXT,
+            ssh_port INTEGER,
+            ssh_username TEXT,
+            ssh_password TEXT,
+            ssh_key_path TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        );"
+    )?;
     Ok(())
 }
 /// 封装一个方法，获取连接
