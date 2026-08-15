@@ -22,6 +22,8 @@ pub fn register_window(meta: WindowMeta) {
 
 /// 从全局注册表移除窗口
 pub fn unregister_window(label: &str) {
+    // 释放该窗口持有的所有工作区锁
+    crate::workspace::lock::unlock_all(label);
     let mut registry = WINDOW_REGISTRY.lock();
     registry.remove(label);
 }

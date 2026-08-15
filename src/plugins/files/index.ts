@@ -12,5 +12,6 @@ export default {
   sidebarPanel: markRaw(SidebarPanel),
   mainPanel: markRaw(FileEditor),
   tabBar: markRaw(EditorTab),
+  workspaceDirs: ['temp'],
   order: 1
 } satisfies ToolPlugin

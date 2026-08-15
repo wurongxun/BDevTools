@@ -5,8 +5,8 @@ import { invoke } from '@tauri-apps/api/core'
 import type { SqlResult, TableDataResult, ApiResponse } from '../types'
 
 /** 执行 SQL */
-export function dbExecuteSql(configId: string, sql: string): Promise<ApiResponse<SqlResult>> {
-  return invoke('db_execute_sql', { configId, sql })
+export function dbExecuteSql(configId: string, sql: string, database?: string): Promise<ApiResponse<SqlResult>> {
+  return invoke('db_execute_sql', { configId, sql, database })
 }
 
 /** 分页查询表数据 */

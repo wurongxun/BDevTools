@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import type {
@@ -10,6 +10,7 @@ import type {
 } from '../types'
 import { ConnectionType } from '../types'
 import NotificationUtil from '@/utils/NotificationUtil'
+import { useWorkspaceConnections, WORKSPACE_CONNECTION_KEYS } from '@/composables/useWorkspaceConnections'
 
 let tabIdCounter = 0
 function generateTabId(): string {
@@ -18,8 +19,12 @@ function generateTabId(): string {
 }
 
 export const useConnectionStore = defineStore('connection', () => {
-  // 所有保存的连接配置
-  const connections = ref<RemoteConnection[]>([])
+  // 工作区连接隔离
+  const wsConnections = useWorkspaceConnections(WORKSPACE_CONNECTION_KEYS.ssh)
+  // 所有保存的连接配置（后端返回的全部）
+  const allConnections = ref<RemoteConnection[]>([])
+  // 当前工作区可见的连接（过滤后）
+  const connections = computed(() => wsConnections.filterVisible(allConnections.value))
   // 当前打开的 tab 列表
   const tabs = ref<ConnectionTab[]>([])
   // 当前激活的 tab id
@@ -129,7 +134,7 @@ export const useConnectionStore = defineStore('connection', () => {
     try {
       const res = await invoke<any>('connection_list')
       if (res.code === 200) {
-        connections.value = res.data.map((item: any) => ({
+        allConnections.value = res.data.map((item: any) => ({
           ...item,
           status: 'disconnected' as ConnectionStatus
         }))
@@ -148,6 +153,8 @@ export const useConnectionStore = defineStore('connection', () => {
    */
   async function addConnection(conn: Omit<RemoteConnection, 'id'>) {
     try {
+      // 记录当前已有的 ID，用于识别新建的连接
+      const oldIds = new Set(allConnections.value.map(c => c.id))
       const res = await invoke<any>('connection_create', {
         map: {
           ...conn,
@@ -157,6 +164,11 @@ export const useConnectionStore = defineStore('connection', () => {
       if (res.code === 200) {
         NotificationUtil.success('连接添加成功')
         await loadConnections()
+        // 找到新建的连接并绑定到当前工作区
+        const newConn = allConnections.value.find(c => !oldIds.has(c.id))
+        if (newConn) {
+          wsConnections.bindToCurrentWorkspace(String(newConn.id))
+        }
       } else {
         NotificationUtil.error(res.msg || '添加失败')
       }
@@ -192,6 +204,7 @@ export const useConnectionStore = defineStore('connection', () => {
       const res = await invoke<any>('connection_delete', { id: String(id) })
       if (res.code === 200) {
         NotificationUtil.success('连接删除成功')
+        wsConnections.removeConnection(String(id))
         // 关闭该连接相关的所有 tab
         const tabsToRemove = tabs.value.filter(t => t.connectionId === id)
         tabsToRemove.forEach(t => closeTab(t.id))
@@ -306,6 +319,19 @@ export const useConnectionStore = defineStore('connection', () => {
       window.dispatchEvent(new CustomEvent('transfer-progress', { detail: event.payload }))
     })
   }
+
+  // 监听工作区切换事件，重新加载连接列表
+  function onWorkspaceChanged() {
+    loadConnections()
+  }
+
+  onMounted(() => {
+    window.addEventListener('workspace-changed', onWorkspaceChanged)
+  })
+
+  onUnmounted(() => {
+    window.removeEventListener('workspace-changed', onWorkspaceChanged)
+  })
 
   return {
     // 状态

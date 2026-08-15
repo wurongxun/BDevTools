@@ -101,6 +101,7 @@ export interface EditorTab {
   table?: string
   content?: string
   dirty?: boolean
+  filePath?: string
 }
 
 /** 树节点 */

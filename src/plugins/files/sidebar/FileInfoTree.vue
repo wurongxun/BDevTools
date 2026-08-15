@@ -97,7 +97,7 @@
       </el-tree>
       <!-- 空状态 -->
       <div v-show="treeChildrenData.length === 0" class="empty-tree-actions">
-        <div class="empty-hint" @click="changeWorkspace()">请选择工作区</div>
+        <div class="empty-hint" @click="changeWorkspace()">请选择文件夹</div>
       
       </div>
     </div>

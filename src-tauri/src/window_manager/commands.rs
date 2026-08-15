@@ -24,11 +24,35 @@ pub async fn create_editor_window(
     preset_id: Option<String>,
 ) -> Response<WindowMeta> {
     println!("[create_editor_window] 命令被调用, workspace_id={:?}, width={:?}, height={:?}, preset_id={:?}", workspace_id, width, height, preset_id);
+
+    // 工作区锁检查：如果指定了 workspace_id 且已被其他窗口占用，拒绝创建
+    if let Some(ref ws_id) = workspace_id {
+        if let Some(holder) = crate::workspace::lock::get_lock_holder(ws_id) {
+            println!("[create_editor_window] 工作区 {} 已被窗口 {} 锁定，拒绝创建", ws_id, holder);
+            return Response::new(
+                300,
+                WindowMeta {
+                    label: String::new(),
+                    role: WindowRole::Editor,
+                    workspace_id: None,
+                    title: String::new(),
+                    preset_id: None,
+                    x: 0.0, y: 0.0, width: 0.0, height: 0.0,
+                    is_maximized: false,
+                    created_at: 0,
+                },
+                &format!("该工作区已被窗口 [{}] 占用，无法在同一工作区打开多个窗口", holder),
+            );
+        }
+    }
+
     let uuid = Uuid::new_v4().to_string();
-    // 截取 uuid 前 8 位作为简短标识
+    // 截取 uuid 前 8 位作为简短标识（仅用于窗口 label，用户不可见）
     let short_id = &uuid[..8];
     let label = format!("editor-{}", short_id);
-    let win_title = title.unwrap_or_else(|| format!("编辑器 - {}", short_id));
+    // 窗口标题用序号，后续前端会更新为工作区名称
+    let editor_count = registry::get_window_count(true) + 1;
+    let win_title = title.unwrap_or_else(|| format!("编辑器 {}", editor_count));
     let w = width.unwrap_or(960.0);
     let h = height.unwrap_or(640.0);
     println!("[create_editor_window] 准备创建窗口: label={}, title={}, size={}x{}", label, win_title, w, h);
@@ -61,19 +85,8 @@ pub async fn create_editor_window(
                 h,
             );
 
-            // 注册到全局注册表
+            // 注册到全局注册表（窗口销毁时由 lib.rs 的全局监听自动移除并释放工作区锁）
             registry::register_window(meta.clone());
-
-            // 监听窗口关闭事件，自动从注册表移除
-            let label_clone = label.clone();
-            let app_clone = app.clone();
-            win.on_window_event(move |event| {
-                if let tauri::WindowEvent::Destroyed = event {
-                    registry::unregister_window(&label_clone);
-                    // 通知其他窗口
-                    let _ = app_clone.emit("window-destroyed", &label_clone);
-                }
-            });
 
             // 居中显示
             let _ = win.center();
@@ -216,15 +229,6 @@ pub fn create_preset_window_from_preset(
                 height,
             );
             registry::register_window(meta.clone());
-
-            let label_clone = label.clone();
-            let app_clone = app.clone();
-            win.on_window_event(move |event| {
-                if let tauri::WindowEvent::Destroyed = event {
-                    registry::unregister_window(&label_clone);
-                    let _ = app_clone.emit("window-destroyed", &label_clone);
-                }
-            });
 
             let _ = win.center();
             let _ = win.show();

@@ -19,6 +19,8 @@ export interface ToolPlugin {
   tabBar?: Component
   /** 排序权重，越小越靠前 */
   order?: number
+  /** 插件需要的工作目录子路径（相对于插件工作目录根） */
+  workspaceDirs?: string[]
   /** 插件激活回调 */
   onActivate?: () => void | Promise<void>
   /** 插件停用回调 */

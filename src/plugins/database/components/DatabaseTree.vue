@@ -9,10 +9,9 @@
       highlight-current
       :key="treeKey"
       @node-click="handleNodeClick"
-      @node-contextmenu="handleContextMenu"
     >
       <template #default="{ node, data }">
-        <span class="tree-node">
+        <span class="tree-node" @contextmenu.prevent="onTreeNodeContextmenu($event, data)">
           <el-icon v-if="data.type === 'connection'" :class="{ 'is-connected': isConnected(data.data?.id) }">
             <Connection />
           </el-icon>
@@ -26,26 +25,25 @@
     </el-tree>
 
     <!-- 右键菜单 -->
-    <el-dropdown
-      v-if="contextMenuVisible"
-      ref="dropdownRef"
-      trigger="contextmenu"
-      :style="{ position: 'fixed', left: contextMenuX + 'px', top: contextMenuY + 'px' }"
-      @visible-change="onDropdownChange"
-    >
-      <el-dropdown-menu>
-        <el-dropdown-item v-if="contextNodeType === 'connection'" @click="handleRefresh">刷新</el-dropdown-item>
-        <el-dropdown-item v-if="contextNodeType === 'connection'" @click="handleNewQuery">新建查询</el-dropdown-item>
-        <el-dropdown-item v-if="contextNodeType === 'table'" @click="handleViewTable">查看表数据</el-dropdown-item>
-        <el-dropdown-item v-if="contextNodeType === 'table'" @click="handleViewStructure">查看表结构</el-dropdown-item>
-        <el-dropdown-item v-if="contextNodeType === 'table'" @click="handleExportTable">导出数据</el-dropdown-item>
-      </el-dropdown-menu>
-    </el-dropdown>
+    <teleport to="body">
+      <div
+        v-if="contextMenuVisible"
+        class="context-menu"
+        :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }"
+        @click.stop
+      >
+        <div v-if="contextNodeType === 'connection'" class="context-menu-item" @click="handleRefresh">刷新</div>
+        <div v-if="contextNodeType === 'connection'" class="context-menu-item" @click="handleNewQuery">新建查询</div>
+        <div v-if="contextNodeType === 'table'" class="context-menu-item" @click="handleViewTable">查看表数据</div>
+        <div v-if="contextNodeType === 'table'" class="context-menu-item" @click="handleViewStructure">查看表结构</div>
+        <div v-if="contextNodeType === 'table'" class="context-menu-item" @click="handleExportTable">导出数据</div>
+      </div>
+    </teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { Connection, Coin, Grid, Document } from '@element-plus/icons-vue'
 import { useConnectionStore, useEditorStore } from '../store'
 import { dbListDatabases, dbListTables, dbTableColumns } from '../api/metadata'
@@ -206,24 +204,42 @@ function handleDblClick(data: TreeNode) {
   }
 }
 
-function handleContextMenu(event: MouseEvent, data: TreeNode) {
+function onTreeNodeContextmenu(event: MouseEvent, data: TreeNode) {
   event.preventDefault()
-  contextMenuVisible.value = true
   contextMenuX.value = event.clientX
   contextMenuY.value = event.clientY
   contextNodeType.value = data.type
   contextNodeData.value = data.data
+  contextMenuVisible.value = true
 }
 
-function onDropdownChange(visible: boolean) {
-  if (!visible) contextMenuVisible.value = false
+function closeContextMenu() {
+  contextMenuVisible.value = false
 }
+
+// 点击菜单外部时关闭
+function onDocMouseDown(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  if (!target?.closest?.('.context-menu')) {
+    closeContextMenu()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', onDocMouseDown, true)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousedown', onDocMouseDown, true)
+})
 
 function handleRefresh() {
+  closeContextMenu()
   refreshTree()
 }
 
 function handleNewQuery() {
+  closeContextMenu()
   if (contextNodeData.value?.id) {
     editorStore.openTab({
       title: '新查询',
@@ -235,6 +251,7 @@ function handleNewQuery() {
 }
 
 function handleViewTable() {
+  closeContextMenu()
   const d = contextNodeData.value
   if (d) {
     editorStore.openTab({
@@ -248,6 +265,7 @@ function handleViewTable() {
 }
 
 function handleViewStructure() {
+  closeContextMenu()
   const d = contextNodeData.value
   if (d) {
     editorStore.openTab({
@@ -261,7 +279,7 @@ function handleViewStructure() {
 }
 
 function handleExportTable() {
-  // 通过事件通知 MainPanel 打开导出对话框
+  closeContextMenu()
   const d = contextNodeData.value
   if (d) {
     editorStore.openTab({
@@ -300,5 +318,30 @@ defineExpose({ refreshTree })
 }
 .is-connected {
   color: #67c23a;
+}
+</style>
+
+<style>
+/* 右键菜单（非 scoped，因为 teleport 到 body） */
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  padding: 4px 0;
+  min-width: 120px;
+}
+.context-menu-item {
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: #333;
+}
+.context-menu-item:hover {
+  background-color: #ecf5ff;
+  color: #409eff;
 }
 </style>

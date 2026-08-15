@@ -12,5 +12,6 @@ export default {
   sidebarPanel: markRaw(SidebarPanel),
   mainPanel: markRaw(MainPanel),
   tabBar: markRaw(ConnectionTabBar),
+  workspaceDirs: ['keys', 'sessions'],
   order: 2
 } satisfies ToolPlugin

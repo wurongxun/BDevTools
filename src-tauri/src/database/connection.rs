@@ -6,8 +6,8 @@ use crate::response::response::Response;
 use anyhow::{anyhow, Result};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use sqlx::mysql::MySqlPool;
-use sqlx::postgres::PgPool;
+use sqlx::mysql::{MySqlPool, MySqlPoolOptions};
+use sqlx::postgres::{PgPool, PgPoolOptions};
 use tauri::command;
 use uuid::Uuid;
 use super::pool::{DbPool, set_pool, remove_pool};
@@ -303,7 +303,11 @@ pub async fn create_pool(config: &DbConnectionConfig) -> Result<DbPool> {
                 config.port,
                 config.database_name.as_deref().unwrap_or(""),
             );
-            let pool = MySqlPool::connect(&url).await?;
+            let pool = MySqlPoolOptions::new()
+                .max_connections(20)
+                .acquire_timeout(std::time::Duration::from_secs(10))
+                .connect(&url)
+                .await?;
             Ok(DbPool::MySQL(pool))
         }
         "postgresql" => {
@@ -315,7 +319,11 @@ pub async fn create_pool(config: &DbConnectionConfig) -> Result<DbPool> {
                 config.port,
                 config.database_name.as_deref().unwrap_or("postgres"),
             );
-            let pool = PgPool::connect(&url).await?;
+            let pool = PgPoolOptions::new()
+                .max_connections(20)
+                .acquire_timeout(std::time::Duration::from_secs(10))
+                .connect(&url)
+                .await?;
             Ok(DbPool::PostgreSQL(pool))
         }
         _ => Err(anyhow!("不支持的数据库类型: {}", config.db_type)),

@@ -159,6 +159,13 @@
       </div>
     </teleport>
 
+    <!-- 插件设置（可折叠） -->
+    <el-collapse class="sidebar-settings-collapse">
+      <el-collapse-item title="插件设置" name="settings">
+        <PluginDirSettings plugin-id="ssh" />
+      </el-collapse-item>
+    </el-collapse>
+
     <!-- 连接管理对话框 -->
     <ConnectionDialog
       v-model="showConnectionDialog"
@@ -182,6 +189,7 @@ import { ref, computed, onMounted } from 'vue'
 import { Plus, ArrowRight, MoreFilled, FolderAdd, EditPen, Delete, Monitor, FolderOpened } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import ConnectionDialog from './components/RemoteConnection/ConnectionDialog.vue'
+import PluginDirSettings from '@/components/PluginDirSettings.vue'
 import { useConnectionStore } from './store'
 import type { RemoteConnection } from './types'
 
@@ -711,6 +719,29 @@ onMounted(() => {
   @include theme.useTheme {
     background-color: theme.getVar('bgColor');
     border-color: theme.getVar('borderColor');
+  }
+}
+
+// ===== 设置区 =====
+.sidebar-settings-collapse {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+
+  :deep(.el-collapse-item__header) {
+    font-size: 12px;
+    height: 32px;
+    line-height: 32px;
+    padding: 0 12px;
+    background: transparent;
+    color: #bbb;
+    border-bottom: none;
+  }
+  :deep(.el-collapse-item__wrap) {
+    padding: 0 12px;
+    border-bottom: none;
+  }
+  :deep(.el-collapse-item__content) {
+    padding-bottom: 8px;
   }
 }
 

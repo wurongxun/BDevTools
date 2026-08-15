@@ -6,7 +6,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use sqlx::mysql::MySqlPool;
 use sqlx::postgres::PgPool;
-use sqlx::{Row, Column};
+use sqlx::{Row, Column, Executor};
 use tauri::command;
 use super::pool::{get_pool, DbPool};
 
@@ -43,14 +43,25 @@ pub struct ColumnInfo {
 
 /// 执行 SQL 语句
 #[command]
-pub async fn db_execute_sql(config_id: String, sql: String) -> Response<SqlResult> {
+pub async fn db_execute_sql(config_id: String, sql: String, database: Option<String>) -> Response<SqlResult> {
     let pool = match get_pool(&config_id) {
         Some(p) => p,
         None => return Response::new(300, SqlResult { columns: vec![], rows: vec![], affected_rows: 0, execution_time_ms: 0, is_query: false }, "未连接到数据库"),
     };
 
     let start = std::time::Instant::now();
-    let result = execute_sql(&pool, &sql).await;
+
+    // 如果指定了数据库，获取专用连接先切换数据库再执行 SQL
+    let result = if let Some(db) = &database {
+        if !db.is_empty() {
+            execute_with_database(&pool, db, &sql).await
+        } else {
+            execute_sql(&pool, &sql).await
+        }
+    } else {
+        execute_sql(&pool, &sql).await
+    };
+
     let elapsed = start.elapsed().as_millis() as u64;
 
     match result {
@@ -61,6 +72,84 @@ pub async fn db_execute_sql(config_id: String, sql: String) -> Response<SqlResul
         }
         Err(e) => Response::new(300, SqlResult { columns: vec![], rows: vec![], affected_rows: 0, execution_time_ms: elapsed, is_query: false }, &format!("执行失败: {}", e)),
     }
+}
+
+/// 在专用连接上先切换数据库再执行 SQL（确保同一连接）
+async fn execute_with_database(pool: &DbPool, database: &str, sql: &str) -> Result<SqlResult> {
+    let is_query = is_select_query(sql);
+    match pool {
+        DbPool::MySQL(p) => {
+            let mut conn = p.acquire().await?;
+            // 在同一连接上先 USE 再执行 SQL（PoolConnection Deref 到底层连接）
+            let use_sql = format!("USE `{}`", database);
+            Executor::execute(&mut *conn, use_sql.as_str()).await?;
+            if is_query {
+                let rows = sqlx::query(sql).fetch_all(&mut *conn).await?;
+                Ok(build_query_result(rows))
+            } else {
+                let result = sqlx::query(sql).execute(&mut *conn).await?;
+                Ok(SqlResult { columns: vec![], rows: vec![], affected_rows: result.rows_affected(), execution_time_ms: 0, is_query: false })
+            }
+        }
+        DbPool::PostgreSQL(p) => {
+            let mut conn = p.acquire().await?;
+            let use_sql = format!("SET search_path TO \"{}\"", database);
+            Executor::execute(&mut *conn, use_sql.as_str()).await?;
+            if is_query {
+                let rows = sqlx::query(sql).fetch_all(&mut *conn).await?;
+                Ok(build_pg_query_result(rows))
+            } else {
+                let result = sqlx::query(sql).execute(&mut *conn).await?;
+                Ok(SqlResult { columns: vec![], rows: vec![], affected_rows: result.rows_affected(), execution_time_ms: 0, is_query: false })
+            }
+        }
+    }
+}
+
+/// 将 MySQL 查询结果行转换为 SqlResult
+fn build_query_result(rows: Vec<sqlx::mysql::MySqlRow>) -> SqlResult {
+    let mut columns = Vec::new();
+    let mut data_rows = Vec::new();
+    if let Some(first_row) = rows.first() {
+        for col in first_row.columns() {
+            columns.push(col.name().to_string());
+        }
+    }
+    for row in &rows {
+        let mut values = Vec::new();
+        for (i, _) in columns.iter().enumerate() {
+            let val: Option<String> = row.try_get(i).ok();
+            values.push(match val {
+                Some(v) => serde_json::Value::String(v),
+                None => serde_json::Value::Null,
+            });
+        }
+        data_rows.push(values);
+    }
+    SqlResult { columns, rows: data_rows, affected_rows: 0, execution_time_ms: 0, is_query: true }
+}
+
+/// 将 PostgreSQL 查询结果行转换为 SqlResult
+fn build_pg_query_result(rows: Vec<sqlx::postgres::PgRow>) -> SqlResult {
+    let mut columns = Vec::new();
+    let mut data_rows = Vec::new();
+    if let Some(first_row) = rows.first() {
+        for col in first_row.columns() {
+            columns.push(col.name().to_string());
+        }
+    }
+    for row in &rows {
+        let mut values = Vec::new();
+        for (i, _) in columns.iter().enumerate() {
+            let val: Option<String> = row.try_get(i).ok();
+            values.push(match val {
+                Some(v) => serde_json::Value::String(v),
+                None => serde_json::Value::Null,
+            });
+        }
+        data_rows.push(values);
+    }
+    SqlResult { columns, rows: data_rows, affected_rows: 0, execution_time_ms: 0, is_query: true }
 }
 
 /// 分页查询表数据
@@ -224,9 +313,14 @@ pub async fn db_delete_row(
 
 // ==================== 内部辅助函数 ====================
 
-/// 执行 SQL 并返回结果
+/// 执行 SQL 并返回结果（自动判断是否为查询语句）
 pub async fn execute_sql(pool: &DbPool, sql: &str) -> Result<SqlResult> {
     let is_query = is_select_query(sql);
+    execute_sql_with_mode(pool, sql, is_query).await
+}
+
+/// 执行 SQL 并返回结果（显式指定是否为查询语句）
+async fn execute_sql_with_mode(pool: &DbPool, sql: &str, is_query: bool) -> Result<SqlResult> {
     match pool {
         DbPool::MySQL(p) => execute_mysql(p, sql, is_query).await,
         DbPool::PostgreSQL(p) => execute_postgres(p, sql, is_query).await,
@@ -332,10 +426,35 @@ async fn query_count(pool: &DbPool, sql: &str) -> Result<u64> {
     }
 }
 
-/// 判断是否为查询语句
+/// 判断是否为查询语句（跳过前导注释）
 fn is_select_query(sql: &str) -> bool {
-    let trimmed = sql.trim().to_uppercase();
-    trimmed.starts_with("SELECT") || trimmed.starts_with("SHOW") || trimmed.starts_with("DESCRIBE") || trimmed.starts_with("EXPLAIN")
+    let stripped = strip_leading_comments(sql).trim().to_uppercase();
+    stripped.starts_with("SELECT") || stripped.starts_with("SHOW") || stripped.starts_with("DESCRIBE") || stripped.starts_with("EXPLAIN")
+}
+
+/// 去除 SQL 前导注释（支持 -- 单行注释和 /* */ 块注释）
+fn strip_leading_comments(sql: &str) -> &str {
+    let mut s = sql.trim_start();
+    loop {
+        if s.starts_with("--") {
+            // 单行注释：跳到行尾
+            if let Some(pos) = s.find('\n') {
+                s = s[pos + 1..].trim_start();
+            } else {
+                return "";
+            }
+        } else if s.starts_with("/*") {
+            // 块注释：跳到 */
+            if let Some(pos) = s.find("*/") {
+                s = s[pos + 2..].trim_start();
+            } else {
+                return s;
+            }
+        } else {
+            break;
+        }
+    }
+    s
 }
 
 /// 格式化 JSON 值为 SQL 值字符串

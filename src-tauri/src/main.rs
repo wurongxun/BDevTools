@@ -7,5 +7,5 @@ extern crate lazy_static;
 #[macro_use]
 extern crate anyhow;
 fn main() {
-    md_note_v2_lib::run()
+    backend_dev_tools_lib::run()
 }

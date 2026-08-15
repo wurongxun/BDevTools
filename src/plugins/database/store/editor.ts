@@ -3,7 +3,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { EditorTab } from '../types'
+import type { EditorTab, SqlResult } from '../types'
 
 let tabCounter = 0
 
@@ -12,10 +12,17 @@ export const useEditorStore = defineStore('dbEditor', () => {
   const tabs = ref<EditorTab[]>([])
   /** 当前激活的 Tab ID */
   const activeTabId = ref<string>('')
+  /** 每个 Tab 的 SQL 执行结果（按 tabId 存储） */
+  const tabResults = ref<Record<string, SqlResult | null>>({})
 
   /** 当前激活的 Tab */
   const activeTab = computed(() =>
     tabs.value.find(t => t.id === activeTabId.value)
+  )
+
+  /** 当前激活 Tab 的执行结果 */
+  const activeTabResult = computed(() =>
+    tabResults.value[activeTabId.value] ?? null
   )
 
   /** 打开新 Tab */
@@ -48,6 +55,7 @@ export const useEditorStore = defineStore('dbEditor', () => {
     const idx = tabs.value.findIndex(t => t.id === tabId)
     if (idx === -1) return
     tabs.value.splice(idx, 1)
+    delete tabResults.value[tabId]
     if (activeTabId.value === tabId) {
       activeTabId.value = tabs.value[Math.min(idx, tabs.value.length - 1)]?.id || ''
     }
@@ -62,12 +70,30 @@ export const useEditorStore = defineStore('dbEditor', () => {
     }
   }
 
+  /** 设置 Tab 的执行结果 */
+  function setTabResult(tabId: string, result: SqlResult | null) {
+    tabResults.value[tabId] = result
+  }
+
+  /** 设置 Tab 的文件路径 */
+  function setTabFilePath(tabId: string, filePath: string) {
+    const tab = tabs.value.find(t => t.id === tabId)
+    if (tab) {
+      tab.filePath = filePath
+      tab.dirty = false
+    }
+  }
+
   return {
     tabs,
     activeTabId,
     activeTab,
+    activeTabResult,
+    tabResults,
     openTab,
     closeTab,
     updateTabContent,
+    setTabResult,
+    setTabFilePath,
   }
 })

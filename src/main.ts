@@ -14,10 +14,14 @@ import registerDirectives from '@/directives/index'
 import errorHandler from './errorHandler'
 import i18n from '../src/locales'
 import { registerBuiltinPlugins } from '@/plugins'
+import { initPluginWorkspace } from '@/composables/usePluginDir'
 
 async function initializeApp() {
   // 注册内置工具插件
   registerBuiltinPlugins()
+
+  // 初始化插件工作区（获取默认工作区 ID）
+  await initPluginWorkspace()
 
   const app = createApp(App)
   app.use(i18n)

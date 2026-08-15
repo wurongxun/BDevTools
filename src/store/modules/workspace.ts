@@ -3,9 +3,15 @@
  * 管理当前窗口绑定的工作区配置
  */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { WorkspaceConfig, WorkspaceSummary } from '@/Types/workspace'
 import { workspaceService } from '@/services/workspaceService'
+import { setPluginWorkspaceId } from '@/composables/usePluginDir'
+import { fileTreeStore as getFileTreeStore } from '@/store/modules/fileTree'
+import { get_file_Api } from '@/api/file'
+import { load } from '@tauri-apps/plugin-store'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
+import NotificationUtil from '@/utils/NotificationUtil'
 
 export const useWorkspaceStore = defineStore('workspace', () => {
   /** 当前窗口绑定的工作区 */
@@ -14,6 +20,38 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const allWorkspaces = ref<WorkspaceSummary[]>([])
   /** 是否正在加载 */
   const loading = ref(false)
+  /** 当前窗口的 label（用于工作区锁） */
+  const windowLabel = ref('main')
+
+  // 初始化窗口 label
+  try {
+    windowLabel.value = getCurrentWebviewWindow().label
+  } catch { /* 默认 main */ }
+
+  // 工作区变化时自动更新窗口标题
+  watch(currentWorkspace, (ws) => {
+    if (ws?.name) {
+      try {
+        getCurrentWebviewWindow().setTitle(ws.name)
+      } catch { /* ignore */ }
+    }
+  })
+
+  // 监听工作目录变化（打开文件夹 / 最近文件夹等），自动同步到当前工作区的文件夹列表
+  watch(
+    () => getFileTreeStore().workingDirectory,
+    async (dir) => {
+      if (!dir || !currentWorkspace.value) return
+      const folders = currentWorkspace.value.folders ?? []
+      // 已是首位文件夹，无需重复写入
+      if (folders[0] === dir) return
+      // 新文件夹置顶，去重，最多保留 10 个
+      const newFolders = [dir, ...folders.filter(f => f !== dir)].slice(0, 10)
+      await updateCurrentWorkspace({ folders: newFolders })
+      // 刷新工作区列表（管理对话框中展示文件夹路径）
+      await loadAllWorkspaces()
+    }
+  )
 
   /** 当前工作区名称 */
   const currentWorkspaceName = computed(() => {
@@ -37,22 +75,119 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
-  /** 加载当前窗口的工作区配置 */
+  /** 将工作区的首个文件夹应用到文件树（并持久化到 settings.json） */
+  async function applyWorkspaceFolder(config: WorkspaceConfig) {
+    if (config.folders.length === 0) return
+    const dir = config.folders[0]
+    const ftStore = getFileTreeStore()
+    if (ftStore.workingDirectory === dir) return
+    ftStore.setWorkingDirectory(dir)
+    await get_file_Api()
+    try {
+      const store = await load('settings.json', { autoSave: false, defaults: {} })
+      await store.set('md_working_directory', { value: dir })
+      await store.save()
+    } catch { /* ignore */ }
+  }
+
+  /** 加载当前窗口的工作区配置（并自动加锁）
+   * 如果目标工作区已被其他窗口占用，自动尝试找一个未锁定的工作区
+   */
   async function loadCurrentWorkspace(workspaceId: string | null) {
+    let config: WorkspaceConfig | null = null
+
     if (!workspaceId) {
-      // 没有指定 ID，获取默认工作区
-      currentWorkspace.value = await workspaceService.getDefault()
+      config = await workspaceService.getDefault()
     } else {
-      currentWorkspace.value = await workspaceService.get(workspaceId)
+      config = await workspaceService.get(workspaceId)
+    }
+
+    // 尝试锁定目标工作区
+    if (config) {
+      const lockResult = await workspaceService.lock(config.id, windowLabel.value).catch(() => ({ locked: false }))
+      if (lockResult.locked) {
+        currentWorkspace.value = config
+        await applyWorkspaceFolder(config)
+        return
+      }
+      // 锁定失败（被其他窗口占用），尝试找未锁定的工作区
+      console.warn(`[workspace] 工作区 [${config.name}] 已被占用，尝试寻找可用工作区`)
+      const unlocked = await findUnlockedWorkspace()
+      if (unlocked) {
+        currentWorkspace.value = unlocked
+        await applyWorkspaceFolder(unlocked)
+        return
+      }
+    }
+
+    // 所有工作区都被占用或没有工作区，创建一个新的
+    const appDir = config?.folders?.[0] || ''
+    const newConfig = await workspaceService.create(
+      `工作区 ${allWorkspaces.value.length + 1}`,
+      appDir ? [appDir] : []
+    )
+    if (newConfig) {
+      await workspaceService.lock(newConfig.id, windowLabel.value).catch(() => {})
+      currentWorkspace.value = newConfig
+      await loadAllWorkspaces()
     }
   }
 
-  /** 切换工作区 */
-  async function switchWorkspace(id: string) {
+  /** 从工作区列表中找到一个未被锁定的工作区 */
+  async function findUnlockedWorkspace(): Promise<WorkspaceConfig | null> {
+    const list = allWorkspaces.value.length > 0
+      ? allWorkspaces.value
+      : await workspaceService.list()
+
+    for (const summary of list) {
+      const holder = await workspaceService.lockStatus(summary.id).catch(() => null)
+      if (!holder) {
+        // 未被锁定，尝试锁定
+        const lockResult = await workspaceService.lock(summary.id, windowLabel.value).catch(() => ({ locked: false }))
+        if (lockResult.locked) {
+          return await workspaceService.get(summary.id)
+        }
+      }
+    }
+    return null
+  }
+
+  /** 切换工作区（带锁保护）
+   * @returns { success: boolean, error?: string }  */
+  async function switchWorkspace(id: string): Promise<{ success: boolean; error?: string }> {
+    // 如果已经是当前工作区，无需切换
+    if (currentWorkspace.value?.id === id) {
+      return { success: true }
+    }
+
+    // 尝试锁定目标工作区
+    const lockResult = await workspaceService.lock(id, windowLabel.value)
+    if (!lockResult.locked) {
+      const holder = lockResult.holder || '未知窗口'
+      const errorMsg = `该工作区已被窗口 [${holder}] 占用`
+      NotificationUtil.warn(errorMsg)
+      return { success: false, error: errorMsg }
+    }
+
+    // 锁定成功，释放旧工作区的锁
+    const oldId = currentWorkspace.value?.id
+    if (oldId) {
+      await workspaceService.unlock(oldId, windowLabel.value).catch(() => {})
+    }
+
     const config = await workspaceService.get(id)
     if (config) {
       currentWorkspace.value = config
+      setPluginWorkspaceId(id)
+
+      // 联动文件树：切换到工作区的第一个文件夹
+      await applyWorkspaceFolder(config)
+
+      // 广播工作区切换事件，供各插件监听
+      window.dispatchEvent(new CustomEvent('workspace-changed', { detail: { workspaceId: id, config } }))
     }
+
+    return { success: true }
   }
 
   /** 创建新工作区 */
@@ -87,6 +222,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       await loadAllWorkspaces()
     }
   }
+
+  // 窗口关闭时 Rust 端的 unregister_window 会自动释放工作区锁
+  // 无需前端额外处理
 
   return {
     // 状态

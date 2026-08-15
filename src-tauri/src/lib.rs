@@ -55,6 +55,14 @@ use crate::workspace::commands::{
     workspace_list, workspace_get, workspace_create, workspace_update,
     workspace_delete, workspace_get_default,
 };
+use crate::workspace::lock::{
+    workspace_lock, workspace_unlock, workspace_lock_status,
+};
+use crate::workspace::plugin_dir::{
+    workspace_get_plugin_dir, workspace_get_plugin_subdir,
+    workspace_get_global_plugin_dir, workspace_set_plugin_custom_dir,
+    workspace_get_plugin_custom_dir,
+};
 use crate::session::commands::{
     session_save, session_load, session_load_all, session_list,
     session_delete, session_clear,
@@ -92,6 +100,14 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        // 全局窗口销毁监听：释放工作区锁并从注册表移除（覆盖所有窗口，含主窗口）
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                let label = window.label().to_string();
+                crate::window_manager::registry::unregister_window(&label);
+                let _ = window.app_handle().emit("window-destroyed", &label);
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             get_document_notebooks,
             file_manager_open_path,
@@ -157,6 +173,16 @@ pub fn run() {
             workspace_update,
             workspace_delete,
             workspace_get_default,
+            // 工作区锁
+            workspace_lock,
+            workspace_unlock,
+            workspace_lock_status,
+            // 插件工作目录
+            workspace_get_plugin_dir,
+            workspace_get_plugin_subdir,
+            workspace_get_global_plugin_dir,
+            workspace_set_plugin_custom_dir,
+            workspace_get_plugin_custom_dir,
             // 会话管理
             session_save,
             session_load,
@@ -196,6 +222,7 @@ pub fn run() {
             // 初始化工作区和会话目录
             crate::workspace::config::ensure_workspaces_dir();
             crate::session::snapshot::ensure_sessions_dir();
+            crate::workspace::plugin_dir::ensure_plugin_data_dir();
             #[cfg(all(desktop))]
             {
                 let handle = app.handle();

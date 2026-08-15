@@ -10,5 +10,6 @@ export default {
   icon: markRaw(Coin),
   sidebarPanel: markRaw(SidebarPanel),
   mainPanel: markRaw(MainPanel),
+  workspaceDirs: ['scripts', 'exports'],
   order: 3
 } satisfies ToolPlugin

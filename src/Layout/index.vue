@@ -16,6 +16,7 @@
         </div>
       </main>
     </div>
+    <AppStatusBar />
   </div>
 </template>
 
@@ -24,6 +25,7 @@ import AppNavbar from './components/AppNavbar/index.vue'
 import AppEditorMain from './components/AppEditorMain/index.vue'
 import AppHeader from './components/AppHeader/index.vue'
 import AppSidebar from './components/AppSidebar/index.vue'
+import AppStatusBar from './components/AppStatusBar/index.vue'
 import useStore from '@/store/index'
 import { pluginManager } from '@/core/pluginManager'
 import { storeToRefs } from 'pinia'
