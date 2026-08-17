@@ -173,6 +173,26 @@
       :default-group="defaultGroupForNew"
     />
 
+    <!-- 新建分组弹窗 -->
+    <GlobalPromptDialog
+      v-model="showAddGroupDialog"
+      title="新建分组"
+      message="请输入分组名称"
+      placeholder="分组名称"
+      :validator="validateGroupName"
+      @confirm="handleAddGroup"
+    />
+
+    <!-- 重命名分组弹窗 -->
+    <GlobalPromptDialog
+      v-model="showRenameGroupDialog"
+      title="重命名分组"
+      message="请输入新名称"
+      :initial-value="renamingGroup"
+      :validator="validateGroupName"
+      @confirm="handleRenameGroup"
+    />
+
     <!-- 全局点击关闭菜单 -->
     <teleport to="body">
       <div
@@ -189,6 +209,7 @@ import { ref, computed, onMounted } from 'vue'
 import { Plus, ArrowRight, MoreFilled, FolderAdd, EditPen, Delete, Monitor, FolderOpened } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import ConnectionDialog from './components/RemoteConnection/ConnectionDialog.vue'
+import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
 import PluginDirSettings from '@/components/PluginDirSettings.vue'
 import { useConnectionStore } from './store'
 import type { RemoteConnection } from './types'
@@ -200,6 +221,11 @@ const editingConnection = ref<RemoteConnection | null>(null)
 const defaultGroupForNew = ref<string>('')
 const expandedGroups = ref<string[]>([])
 const activeConnId = ref<number | null>(null)
+
+// 新建/重命名分组弹窗状态
+const showAddGroupDialog = ref(false)
+const showRenameGroupDialog = ref(false)
+const renamingGroup = ref('')
 
 const connections = computed(() => connectionStore.connections)
 const allGroupNames = computed(() => connectionStore.connectionGroups)
@@ -275,18 +301,23 @@ function handleHeaderCommand(cmd: string) {
 
 // 添加分组
 function promptAddGroup() {
-  ElMessageBox.prompt('请输入分组名称', '新建分组', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    inputPattern: /.+/,
-    inputErrorMessage: '分组名称不能为空'
-  }).then(({ value }) => {
-    if (connectionStore.addGroup(value.trim())) {
-      expandedGroups.value.push(value.trim())
-    } else {
-      ElMessageBox.alert('分组名称已存在', '提示')
-    }
-  }).catch(() => {})
+  renamingGroup.value = ''
+  showAddGroupDialog.value = true
+}
+
+// 分组名校验：非空且不重复（重命名时允许保持原名）
+function validateGroupName(value: string): string | true {
+  if (!value) return '分组名称不能为空'
+  if (value !== renamingGroup.value && allGroupNames.value.includes(value)) {
+    return '分组名称已存在'
+  }
+  return true
+}
+
+function handleAddGroup(value: string) {
+  if (connectionStore.addGroup(value)) {
+    expandedGroups.value.push(value)
+  }
 }
 
 // 分组右键菜单
@@ -300,17 +331,13 @@ function handleGroupContext(groupName: string, event: MouseEvent) {
 }
 
 function handleGroupRename() {
-  const oldName = groupContextMenu.value.groupName
+  renamingGroup.value = groupContextMenu.value.groupName
   closeAllContextMenus()
-  ElMessageBox.prompt('请输入新名称', '重命名分组', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    inputValue: oldName,
-    inputPattern: /.+/,
-    inputErrorMessage: '分组名称不能为空'
-  }).then(({ value }) => {
-    connectionStore.renameGroup(oldName, value.trim())
-  }).catch(() => {})
+  showRenameGroupDialog.value = true
+}
+
+function handleRenameGroup(value: string) {
+  connectionStore.renameGroup(renamingGroup.value, value)
 }
 
 function handleGroupDelete() {

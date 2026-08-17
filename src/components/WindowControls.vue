@@ -60,18 +60,21 @@ async function handleClose() {
 .window-controls {
   display: flex;
   align-items: center;
+  gap: 4px;
   flex-shrink: 0;
-  margin-left: 2px;
+  margin-right: 6px;
 }
 
+// 紧凑方形按钮，与 FunctionalArea 的 .fa-icon 规格一致，在 32px 标题栏内垂直居中
 .ctrl-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
+  width: 26px;
   height: 24px;
   cursor: pointer;
   border-radius: 4px;
+  font-size: 12px;
   transition: background-color 0.15s;
   flex-shrink: 0;
 
@@ -88,7 +91,7 @@ async function handleClose() {
 }
 
 .ctrl-close:hover {
-  color: #e81123 !important;
-  background-color: rgba(232, 17, 35, 0.1) !important;
+  color: #fff !important;
+  background-color: #e81123 !important;
 }
 </style>

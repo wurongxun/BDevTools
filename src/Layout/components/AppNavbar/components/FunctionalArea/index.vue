@@ -100,6 +100,8 @@
         <rect x="3" y="3" width="6" height="18" rx="1" :fill="!isCollapse ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.2" opacity="0.9"/>
       </svg>
     </div>
+    <!-- 功能图标与窗口控制按钮的视觉分隔 -->
+    <div class="fa-divider"></div>
     <!-- 窗口控制 -->
     <WindowControls />
   </div>
@@ -229,6 +231,17 @@ const handleSettingCommand = (command: string) => {
   align-items: center;
   height: 100%;
   gap: 2px;
+}
+
+.fa-divider {
+  width: 1px;
+  height: 14px;
+  margin: 0 5px;
+  flex-shrink: 0;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('borderColor');
+  }
 }
 
 .fa-icon {

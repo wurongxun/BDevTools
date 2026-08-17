@@ -1,9 +1,8 @@
 <template>
-  <el-dialog
+  <GlobalDialog
     v-model="visible"
     :title="isEdit ? '编辑连接' : '新建连接'"
     width="560px"
-    :close-on-click-modal="false"
     @close="handleClose"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
@@ -55,17 +54,18 @@
       </template>
     </el-form>
     <template #footer>
-      <el-button @click="handleTest" :loading="testing">测试连接</el-button>
-      <el-button @click="handleClose">取消</el-button>
-      <el-button type="primary" @click="handleSubmit" :loading="submitting">确定</el-button>
+      <el-button size="small" sm @click="handleTest" :loading="testing">测试连接</el-button>
+      <el-button size="small" @click="handleClose">取消</el-button>
+      <el-button size="small" type="primary" @click="handleSubmit" :loading="submitting">确定</el-button>
     </template>
-  </el-dialog>
+  </GlobalDialog>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import GlobalDialog from '@/components/GlobalDialog.vue'
 import type { DbConnectionConfig } from '../types'
 import { dbConnectionTest } from '../api/connection'
 
@@ -161,7 +161,7 @@ function handleSubmit() {
 }
 
 function handleClose() {
-  visible.value = false
+  if (visible.value) visible.value = false
   emit('update:modelValue', false)
 }
 </script>

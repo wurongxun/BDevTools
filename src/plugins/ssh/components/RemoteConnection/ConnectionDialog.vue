@@ -1,9 +1,8 @@
 <template>
-  <el-dialog
+  <GlobalDialog
     v-model="visible"
     :title="isEdit ? '编辑连接' : '新建连接'"
     width="520px"
-    :close-on-click-modal="false"
     @close="handleClose"
   >
     <el-form
@@ -95,18 +94,19 @@
     </el-form>
 
     <template #footer>
-      <el-button @click="handleClose">取消</el-button>
-      <el-button type="primary" @click="handleSubmit" :loading="submitting">
+      <el-button size="small" @click="handleClose">取消</el-button>
+      <el-button size="small" type="primary" @click="handleSubmit" :loading="submitting">
         {{ isEdit ? '保存' : '创建' }}
       </el-button>
     </template>
-  </el-dialog>
+  </GlobalDialog>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { open } from '@tauri-apps/plugin-dialog'
+import GlobalDialog from '@/components/GlobalDialog.vue'
 import { useConnectionStore } from '../../store'
 import { ConnectionType } from '../../types'
 import type { RemoteConnection } from '../../types'
@@ -209,9 +209,6 @@ async function handleSelectKeyFile() {
 </script>
 
 <style scoped lang="scss">
-:deep(.el-dialog) {
-  border-radius: 8px;
-}
 :deep(.el-radio-group) {
   width: 100%;
   display: flex;
