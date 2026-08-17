@@ -6,7 +6,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use sqlx::mysql::MySqlPool;
 use sqlx::postgres::PgPool;
-use sqlx::{Row, Column, Executor};
+use sqlx::{Row, Column, Executor, ValueRef};
 use tauri::command;
 use super::pool::{get_pool, DbPool};
 
@@ -118,11 +118,7 @@ fn build_query_result(rows: Vec<sqlx::mysql::MySqlRow>) -> SqlResult {
     for row in &rows {
         let mut values = Vec::new();
         for (i, _) in columns.iter().enumerate() {
-            let val: Option<String> = row.try_get(i).ok();
-            values.push(match val {
-                Some(v) => serde_json::Value::String(v),
-                None => serde_json::Value::Null,
-            });
+            values.push(mysql_cell_to_value(row, i));
         }
         data_rows.push(values);
     }
@@ -141,11 +137,7 @@ fn build_pg_query_result(rows: Vec<sqlx::postgres::PgRow>) -> SqlResult {
     for row in &rows {
         let mut values = Vec::new();
         for (i, _) in columns.iter().enumerate() {
-            let val: Option<String> = row.try_get(i).ok();
-            values.push(match val {
-                Some(v) => serde_json::Value::String(v),
-                None => serde_json::Value::Null,
-            });
+            values.push(pg_cell_to_value(row, i));
         }
         data_rows.push(values);
     }
@@ -313,6 +305,58 @@ pub async fn db_delete_row(
 
 // ==================== 内部辅助函数 ====================
 
+/// 将结果行单元格转为 JSON 值。
+/// try_get::<String> 无法解码整型列（MySQL 二进制协议下会静默失败变 null），
+/// 因此按原生类型依次尝试：i64 → u64（unsigned）→ f64 → bool → String（日期/文本），
+/// 全部失败且非 NULL 时返回占位文案，避免把解码失败伪装成空值。
+fn mysql_cell_to_value(row: &sqlx::mysql::MySqlRow, i: usize) -> serde_json::Value {
+    if let Ok(Some(v)) = row.try_get::<Option<i64>, _>(i) {
+        return serde_json::Value::Number(v.into());
+    }
+    if let Ok(Some(v)) = row.try_get::<Option<u64>, _>(i) {
+        return serde_json::Value::Number(v.into());
+    }
+    if let Ok(Some(v)) = row.try_get::<Option<f64>, _>(i) {
+        if let Some(n) = serde_json::Number::from_f64(v) {
+            return serde_json::Value::Number(n);
+        }
+    }
+    if let Ok(Some(v)) = row.try_get::<Option<bool>, _>(i) {
+        return serde_json::Value::Bool(v);
+    }
+    if let Ok(Some(v)) = row.try_get::<Option<String>, _>(i) {
+        return serde_json::Value::String(v);
+    }
+    // 区分真正的 NULL 与解码失败，避免把解码失败伪装成空值
+    match row.try_get_raw(i) {
+        Ok(raw) if raw.is_null() => serde_json::Value::Null,
+        _ => serde_json::Value::String("[类型转换失败]".to_string()),
+    }
+}
+
+/// PostgreSQL 版本：Pg 的整数均带符号，u64 分支仅作兼容保留
+fn pg_cell_to_value(row: &sqlx::postgres::PgRow, i: usize) -> serde_json::Value {
+    if let Ok(Some(v)) = row.try_get::<Option<i64>, _>(i) {
+        return serde_json::Value::Number(v.into());
+    }
+    if let Ok(Some(v)) = row.try_get::<Option<f64>, _>(i) {
+        if let Some(n) = serde_json::Number::from_f64(v) {
+            return serde_json::Value::Number(n);
+        }
+    }
+    if let Ok(Some(v)) = row.try_get::<Option<bool>, _>(i) {
+        return serde_json::Value::Bool(v);
+    }
+    if let Ok(Some(v)) = row.try_get::<Option<String>, _>(i) {
+        return serde_json::Value::String(v);
+    }
+    // 区分真正的 NULL 与解码失败，避免把解码失败伪装成空值
+    match row.try_get_raw(i) {
+        Ok(raw) if raw.is_null() => serde_json::Value::Null,
+        _ => serde_json::Value::String("[类型转换失败]".to_string()),
+    }
+}
+
 /// 执行 SQL 并返回结果（自动判断是否为查询语句）
 pub async fn execute_sql(pool: &DbPool, sql: &str) -> Result<SqlResult> {
     let is_query = is_select_query(sql);
@@ -342,11 +386,7 @@ async fn execute_mysql(pool: &MySqlPool, sql: &str, is_query: bool) -> Result<Sq
         for row in &rows {
             let mut values = Vec::new();
             for (i, _) in columns.iter().enumerate() {
-                let val: Option<String> = row.try_get(i).ok();
-                values.push(match val {
-                    Some(v) => serde_json::Value::String(v),
-                    None => serde_json::Value::Null,
-                });
+                values.push(mysql_cell_to_value(row, i));
             }
             data_rows.push(values);
         }
@@ -385,11 +425,7 @@ async fn execute_postgres(pool: &PgPool, sql: &str, is_query: bool) -> Result<Sq
         for row in &rows {
             let mut values = Vec::new();
             for (i, _) in columns.iter().enumerate() {
-                let val: Option<String> = row.try_get(i).ok();
-                values.push(match val {
-                    Some(v) => serde_json::Value::String(v),
-                    None => serde_json::Value::Null,
-                });
+                values.push(pg_cell_to_value(row, i));
             }
             data_rows.push(values);
         }

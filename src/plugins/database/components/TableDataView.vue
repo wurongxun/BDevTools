@@ -132,6 +132,7 @@ async function loadColumns() {
 async function loadData() {
   loading.value = true
   try {
+    console.log('[TableDataView] loadData:', props.database, props.table, page.value, pageSize.value, whereClause.value, orderBy.value)
     const res = await dbQueryTableData(
       props.configId,
       props.database,
@@ -155,6 +156,7 @@ async function loadData() {
         return obj
       })
       console.log('[TableDataView] data loaded:', tableData.value.length, 'rows, total:', total.value)
+      console.log('[TableDataView] data res:', res)
     } else {
       console.error('[TableDataView] loadData failed:', res.msg)
       ElMessage.error('查询失败: ' + res.msg)
