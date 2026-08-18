@@ -200,8 +200,9 @@ onMounted(async () => {
   flex-shrink: 0;
 
   @include theme.useTheme {
-    background-color: #007acc;
-    color: #fff;
+    background-color: theme.getVar('activityBarBg');
+    color: theme.getVar('textSecondary');
+    border-top: 1px solid theme.getVar('borderColor');
   }
 }
 
@@ -223,7 +224,10 @@ onMounted(async () => {
   transition: background-color 0.15s;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.12);
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+      background: theme.getVar('activityBarHover');
+    }
   }
 }
 
@@ -281,7 +285,10 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+
+  @include theme.useTheme {
+    border-bottom: 1px solid theme.getVar('borderColor');
+  }
 }
 
 .sws-title {
@@ -320,11 +327,18 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
 
-  &:hover { background: rgba(128, 128, 128, 0.1); }
+  &:hover {
+    @include theme.useTheme {
+      background: theme.getVar('hoverColor');
+    }
+  }
 
   &.sws-active {
-    background: rgba(0, 122, 204, 0.15);
-    border-left: 3px solid #007acc;
+    @include theme.useTheme {
+      background: theme.getVar('hoverColor');
+      // 浅色主题的 hoverColor 过浅，用文字色做高对比激活指示条
+      border-left: 3px solid theme.getVar('textColor');
+    }
   }
 }
 
@@ -353,9 +367,13 @@ onMounted(async () => {
   font-size: 10px;
   padding: 1px 6px;
   border-radius: 3px;
-  background: #007acc;
-  color: #fff;
   font-weight: 400;
+
+  // 反色方案：两种主题下均保证高对比（浅色 hoverColor 太浅不适合做底色）
+  @include theme.useTheme {
+    background: theme.getVar('textColor');
+    color: theme.getVar('bgColor');
+  }
 }
 
 .sws-item-folders {
@@ -378,11 +396,14 @@ onMounted(async () => {
   flex: 1;
   padding: 4px 8px;
   font-size: 13px;
-  border: 1px solid #007acc;
   border-radius: 4px;
   outline: none;
-  background: transparent;
-  color: inherit;
+
+  @include theme.useTheme {
+    border: 1px solid theme.getVar('textSecondary');
+    background: theme.getVar('bgColor');
+    color: theme.getVar('textColor');
+  }
 }
 
 // 操作按钮
@@ -400,7 +421,11 @@ onMounted(async () => {
 
   &:hover {
     opacity: 1;
-    background: rgba(128, 128, 128, 0.15);
+
+    @include theme.useTheme {
+      // 与导航栏图标按钮同一规格
+      background: theme.getVar('activityBarHover');
+    }
   }
 }
 
@@ -414,13 +439,23 @@ onMounted(async () => {
 
 .sws-footer {
   padding: 10px 16px;
-  border-top: 1px solid rgba(128, 128, 128, 0.2);
+
+  @include theme.useTheme {
+    border-top: 1px solid theme.getVar('borderColor');
+  }
 }
 
 .sws-create {
   font-size: 12px;
   cursor: pointer;
   opacity: 0.7;
-  &:hover { opacity: 1; color: #007acc; }
+
+  &:hover {
+    opacity: 1;
+
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+    }
+  }
 }
 </style>
