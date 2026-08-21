@@ -4,6 +4,32 @@
     <Common v-if="windowRole === 'auxiliary'" :page-component="appPageComponent" :page-title="appPageTitle" />
     <!-- 主窗口 / 编辑器窗口 → 使用 Layout -->
     <Layout v-else />
+
+    <!-- 新建编辑器窗口：选择工作区或新建临时工作区 -->
+    <WorkspaceSelectDialog
+      v-model="showWorkspaceSelect"
+      @select="handleWorkspaceSelected"
+      @create-temp="handleCreateTempWorkspace"
+      @close="handleWorkspaceSelectClosed"
+    />
+
+    <!-- 关闭确认：临时工作区是否保留 -->
+    <GlobalDialog
+      v-model="showTempWorkspaceConfirm"
+      title="临时工作区"
+      width="400px"
+      @close="handleTempConfirmClosed"
+    >
+      <div class="temp-ws-message">
+        当前窗口使用的是临时工作区「{{ tempWorkspaceName }}」，关闭窗口前是否保存该工作区？
+        <div class="temp-ws-sub">不保存将在关闭后清除。</div>
+      </div>
+      <template #footer>
+        <el-button size="small" @click="tempConfirmAction = 'cancel'; showTempWorkspaceConfirm = false">取消</el-button>
+        <el-button size="small" type="danger" plain @click="tempConfirmAction = 'discard'; showTempWorkspaceConfirm = false">不保存</el-button>
+        <el-button size="small" type="primary" @click="tempConfirmAction = 'save'; showTempWorkspaceConfirm = false">保存</el-button>
+      </template>
+    </GlobalDialog>
   </div>
 </template>
 
@@ -15,8 +41,11 @@ import { Window } from '@tauri-apps/api/window'
 import useStore from '@/store'
 import Layout from '@/Layout/index.vue'
 import Common from '@/views/Common/Common.vue'
+import GlobalDialog from '@/components/GlobalDialog.vue'
+import WorkspaceSelectDialog from '@/components/WorkspaceSelectDialog.vue'
 import type { WindowRole } from '@/Types/workspace'
 import { useDocumentManagerStore } from '@/plugins/files/store/documents'
+import { windowService } from '@/services/windowService'
 
 const { useWorkspaceStore, useSessionStore, fileTreeStore, useLayoutStore } = useStore()
 const docStore = useDocumentManagerStore()
@@ -24,6 +53,25 @@ const docStore = useDocumentManagerStore()
 const windowRole = ref<WindowRole>('main')
 /** 关闭拦截递归保护标志 */
 const isClosing = ref(false)
+
+// ===== 新建窗口：工作区选择弹窗 =====
+const showWorkspaceSelect = ref(false)
+
+// 编辑器窗口：启动后需弹窗选择工作区。
+// 必须在 setup 阶段同步置位：父组件 onMounted 晚于子组件，
+// 否则 MenuBar/AppStatusBar 的 onMounted 会先自动分配兜底工作区
+try {
+  if (getCurrentWebviewWindow().label.startsWith('editor-')) {
+    useWorkspaceStore.pendingWorkspaceSelection = true
+  }
+} catch { /* 非 Tauri 环境忽略 */ }
+// ===== 关闭确认：临时工作区保留/清除 =====
+const showTempWorkspaceConfirm = ref(false)
+/** 用户在临时工作区确认弹窗中的选择（save/discard/cancel） */
+const tempConfirmAction = ref<'save' | 'discard' | 'cancel'>('cancel')
+const tempWorkspaceName = ref('')
+/** 确认弹窗关闭后待执行的收尾动作 */
+let tempConfirmResolve: ((action: 'save' | 'discard' | 'cancel') => void) | null = null
 
 // 辅助窗口直接渲染的页面组件
 const appPageComponent = shallowRef<any>(null)
@@ -98,6 +146,70 @@ async function initEditorWindow() {
 
   // 仅启动自动保存，用于保存当前窗口自身的状态
   useSessionStore.startAutoSave()
+
+  // 创建时已绑定工作区（注册表 meta）：直接加载，不弹选择窗
+  try {
+    const win = getCurrentWebviewWindow()
+    const list = await windowService.getWindowList()
+    const meta = list.find((m) => m.label === win.label)
+    if (meta?.workspace_id) {
+      useWorkspaceStore.pendingWorkspaceSelection = false
+      await useWorkspaceStore.loadCurrentWorkspace(meta.workspace_id)
+      if (useWorkspaceStore.currentWorkspace) return
+    }
+  } catch (e) {
+    console.warn('读取窗口绑定工作区失败:', e)
+  }
+
+  // 未绑定工作区：弹窗让用户选择或新建临时工作区（pending 标志已在 setup 阶段置位）
+  if (!useWorkspaceStore.currentWorkspace) {
+    showWorkspaceSelect.value = true
+  } else {
+    useWorkspaceStore.pendingWorkspaceSelection = false
+  }
+}
+
+/** 选中已有工作区：绑定到当前窗口（内含锁保护） */
+async function handleWorkspaceSelected(workspaceId: string) {
+  useWorkspaceStore.pendingWorkspaceSelection = false
+  const result = await useWorkspaceStore.switchWorkspace(workspaceId)
+  if (!result.success && !useWorkspaceStore.currentWorkspace) {
+    // 锁定失败且当前无工作区，兜底创建临时工作区
+    await useWorkspaceStore.createTempWorkspace()
+  }
+}
+
+/** 新建临时工作区并绑定到当前窗口 */
+async function handleCreateTempWorkspace() {
+  useWorkspaceStore.pendingWorkspaceSelection = false
+  await useWorkspaceStore.createTempWorkspace()
+}
+
+/** 选择弹窗被直接关闭（未选择）：兜底创建临时工作区，保证窗口有工作区可用 */
+async function handleWorkspaceSelectClosed() {
+  if (useWorkspaceStore.pendingWorkspaceSelection) {
+    useWorkspaceStore.pendingWorkspaceSelection = false
+    if (!useWorkspaceStore.currentWorkspace) {
+      await useWorkspaceStore.createTempWorkspace()
+    }
+  }
+}
+
+/** 以 Promise 形式等待用户在临时工作区确认弹窗中作出选择 */
+function askTempWorkspaceConfirm(name: string): Promise<'save' | 'discard' | 'cancel'> {
+  return new Promise((resolve) => {
+    tempWorkspaceName.value = name
+    tempConfirmAction.value = 'cancel'
+    tempConfirmResolve = resolve
+    showTempWorkspaceConfirm.value = true
+  })
+}
+
+/** 确认弹窗关闭（按钮或右上角 ✕）：兑现 Promise */
+function handleTempConfirmClosed() {
+  const resolve = tempConfirmResolve
+  tempConfirmResolve = null
+  resolve?.(tempConfirmAction.value)
 }
 
 /**
@@ -115,6 +227,29 @@ function setupCloseHandler() {
       // 阻止默认关闭，等待保存完成
       event.preventDefault()
       isClosing.value = true
+
+      // 新窗口尚在工作区选择阶段且未绑定工作区：无状态可保存，直接关闭
+      if (useWorkspaceStore.pendingWorkspaceSelection && !useWorkspaceStore.currentWorkspace) {
+        await win.destroy()
+        return
+      }
+
+      // 临时工作区：关闭前询问是否保存，不保存则清除
+      if (useWorkspaceStore.isTemporary(useWorkspaceStore.currentWorkspace)) {
+        const tempWs = useWorkspaceStore.currentWorkspace!
+        const action = await askTempWorkspaceConfirm(tempWs.name)
+        if (action === 'cancel') {
+          // 取消关闭：复位拦截标志，放行后续关闭请求
+          isClosing.value = false
+          return
+        }
+        if (action === 'save') {
+          await useWorkspaceStore.saveTempWorkspace(tempWs.id)
+        } else {
+          // 不保存：清除临时工作区（先置空再删，避免快照/监听引用已删工作区）
+          await useWorkspaceStore.deleteWorkspace(tempWs.id)
+        }
+      }
 
       try {
         const sessionStore = useSessionStore
@@ -211,3 +346,19 @@ onBeforeUnmount(() => {
   useSessionStore.stopAutoSave()
 })
 </script>
+
+<style scoped lang="scss">
+@use '@/styles/theme.scss';
+
+.temp-ws-message {
+  line-height: 1.6;
+}
+
+.temp-ws-sub {
+  margin-top: 6px;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+}
+</style>

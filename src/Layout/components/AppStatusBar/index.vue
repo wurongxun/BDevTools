@@ -180,7 +180,8 @@ async function handleDeleteWorkspace(ws: WorkspaceSummary) {
 
 onMounted(async () => {
   await loadWorkspaceList()
-  if (!workspaceStore.currentWorkspace) {
+  // 新窗口等待用户选择工作区期间，不自动分配兜底工作区
+  if (!workspaceStore.currentWorkspace && !workspaceStore.pendingWorkspaceSelection) {
     await workspaceStore.loadCurrentWorkspace(null)
   }
 })

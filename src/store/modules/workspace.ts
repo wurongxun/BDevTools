@@ -22,6 +22,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const loading = ref(false)
   /** 当前窗口的 label（用于工作区锁） */
   const windowLabel = ref('main')
+  /** 是否正在等待用户选择工作区（新建窗口弹窗期间，抑制自动分配兜底逻辑） */
+  const pendingWorkspaceSelection = ref(false)
 
   // 初始化窗口 label
   try {
@@ -223,6 +225,47 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
+  /** 判断工作区配置是否为临时工作区 */
+  function isTemporary(config: WorkspaceConfig | null): boolean {
+    return config?.settings?.isTemporary === true
+  }
+
+  /** 创建临时工作区并绑定到当前窗口
+   * 临时标记写入 settings.isTemporary，关闭窗口时会询问是否保留
+   */
+  async function createTempWorkspace(): Promise<WorkspaceConfig | null> {
+    const name = `临时工作区 ${new Date().toLocaleString('zh-CN', {
+      month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+    })}`
+    const config = await workspaceService.create(name, [])
+    if (!config) return null
+    // 打上临时标记（update 为整体替换 settings，需合并已有键）
+    const marked = await workspaceService.update(config.id, {
+      settings: { ...config.settings, isTemporary: true }
+    })
+    const finalConfig = marked ?? config
+    await workspaceService.lock(finalConfig.id, windowLabel.value).catch(() => {})
+    currentWorkspace.value = finalConfig
+    setPluginWorkspaceId(finalConfig.id)
+    await loadAllWorkspaces()
+    return finalConfig
+  }
+
+  /** 保存临时工作区：移除临时标记，转为正式工作区 */
+  async function saveTempWorkspace(id: string): Promise<boolean> {
+    const config = currentWorkspace.value
+    if (!config || config.id !== id) return false
+    const settings = { ...config.settings }
+    delete settings.isTemporary
+    const updated = await workspaceService.update(id, { settings })
+    if (updated) {
+      currentWorkspace.value = updated
+      await loadAllWorkspaces()
+      return true
+    }
+    return false
+  }
+
   // 窗口关闭时 Rust 端的 unregister_window 会自动释放工作区锁
   // 无需前端额外处理
 
@@ -231,6 +274,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     currentWorkspace,
     allWorkspaces,
     loading,
+    pendingWorkspaceSelection,
     // 计算属性
     currentWorkspaceName,
     currentFolders,
@@ -240,6 +284,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     switchWorkspace,
     createWorkspace,
     updateCurrentWorkspace,
-    deleteWorkspace
+    deleteWorkspace,
+    isTemporary,
+    createTempWorkspace,
+    saveTempWorkspace
   }
 })

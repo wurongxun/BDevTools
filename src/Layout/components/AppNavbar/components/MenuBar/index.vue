@@ -645,8 +645,10 @@ onMounted(async () => {
   await loadRecentProjects()
   await loadWindowPresets()
   await loadWorkspaceList()
-  // 加载当前工作区
-  await workspaceStore.loadCurrentWorkspace(null)
+  // 加载当前工作区（新窗口等待用户选择期间不自动分配）
+  if (!workspaceStore.pendingWorkspaceSelection) {
+    await workspaceStore.loadCurrentWorkspace(null)
+  }
 })
 
 onUnmounted(() => {
