@@ -269,6 +269,8 @@ pub fn run() {
             )
             .title("BackendDevelopmentTools")
             .decorations(false)
+            // 无边框窗口必须启用阴影，否则 Windows 下 DWM 会在左/右/底边露出 1px 黑线
+            .shadow(true)
             .inner_size(960.0, 640.0)
             .min_inner_size(640.0, 480.0)
             .center()
@@ -279,7 +281,7 @@ pub fn run() {
                 Ok(it) => it,
                 Err(err) => return Err(Box::new(err)),
             };
-            //窗口阴影功能
+            // 主窗口注册（阴影已在 builder 中启用）
             // #[cfg(any(target_os = "windows", target_os = "macos"))]
             // set_shadow(&main_window, true).expect("Unsupported platform!");
 

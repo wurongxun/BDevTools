@@ -39,6 +39,8 @@ export async function openAppWindow(path: string) {
     x: 100,
     y: 100,
     decorations: false,
+    // 无边框窗口必须启用阴影，否则 Windows 下边缘露出 1px 黑线
+    shadow: true,
     visible: false,
     url: `index.html#${path}`
   })

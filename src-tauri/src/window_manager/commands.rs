@@ -65,6 +65,8 @@ pub async fn create_editor_window(
     )
     .title(&win_title)
     .decorations(false)
+    // 无边框窗口必须启用阴影，否则 Windows 下边缘露出 1px 黑线
+    .shadow(true)
     .inner_size(w, h)
     .min_inner_size(400.0, 300.0)
     .visible(false)
@@ -222,6 +224,7 @@ pub fn create_preset_window_from_preset(
     )
     .title(&title)
     .decorations(false)
+    .shadow(true)
     .inner_size(width, height)
     .min_inner_size(400.0, 300.0)
     .visible(false)
