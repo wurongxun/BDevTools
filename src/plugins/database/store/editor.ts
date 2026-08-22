@@ -37,11 +37,20 @@ export const useEditorStore = defineStore('dbEditor', () => {
       table: tab.table,
       content: tab.content || '',
       dirty: false,
+      filePath: tab.filePath,
     }
-    // 检查是否已存在相同的 Tab
-    const existing = tabs.value.find(
-      t => t.type === newTab.type && t.configId === newTab.configId && t.database === newTab.database && t.table === newTab.table
-    )
+    // 检查是否已存在相同的 Tab：sql 文件按路径去重，其余按类型+连接+库+表去重
+    const existing = tabs.value.find(t => {
+      if (t.type === 'sql' && t.filePath) {
+        return newTab.type === 'sql' && t.filePath === newTab.filePath
+      }
+      return (
+        t.type === newTab.type &&
+        t.configId === newTab.configId &&
+        t.database === newTab.database &&
+        t.table === newTab.table
+      )
+    })
     if (existing) {
       activeTabId.value = existing.id
       return
@@ -75,12 +84,14 @@ export const useEditorStore = defineStore('dbEditor', () => {
     tabResults.value[tabId] = result
   }
 
-  /** 设置 Tab 的文件路径 */
+  /** 设置 Tab 的文件路径（同步更新标题为文件名） */
   function setTabFilePath(tabId: string, filePath: string) {
     const tab = tabs.value.find(t => t.id === tabId)
     if (tab) {
       tab.filePath = filePath
       tab.dirty = false
+      const fileName = filePath.split(/[\\/]/).pop()
+      if (fileName && tab.type === 'sql') tab.title = fileName
     }
   }
 

@@ -49,18 +49,26 @@ fn ensure_dir(path: &PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-/// 从 settings.json 读取插件自定义目录
-fn get_custom_dir(app: &tauri::AppHandle, plugin_id: &str) -> Option<String> {
+/// 从 settings.json 读取插件自定义目录（按工作区隔离）
+/// 优先读取 `plugin_dir.{workspace_id}.{plugin_id}`，
+/// 兼容旧版全局 key `plugin_dir.{plugin_id}` 作为迁移回退。
+fn get_custom_dir(app: &tauri::AppHandle, workspace_id: &str, plugin_id: &str) -> Option<String> {
     let store = app.store("settings.json").ok()?;
-    let key = format!("plugin_dir.{}", plugin_id);
-    store.get(&key)
+    // 新：按工作区隔离的 key
+    let scoped_key = format!("plugin_dir.{}.{}", workspace_id, plugin_id);
+    if let Some(v) = store.get(&scoped_key) {
+        return v.as_str().map(|s: &str| s.to_string());
+    }
+    // 旧：全局 key（历史数据迁移回退，读取但不回写）
+    let legacy_key = format!("plugin_dir.{}", plugin_id);
+    store.get(&legacy_key)
         .and_then(|v: serde_json::Value| v.as_str().map(|s: &str| s.to_string()))
 }
 
-/// 向 settings.json 写入插件自定义目录
-fn set_custom_dir(app: &tauri::AppHandle, plugin_id: &str, path: &str) {
+/// 向 settings.json 写入插件自定义目录（按工作区隔离）
+fn set_custom_dir(app: &tauri::AppHandle, workspace_id: &str, plugin_id: &str, path: &str) {
     if let Ok(store) = app.store("settings.json") {
-        let key = format!("plugin_dir.{}", plugin_id);
+        let key = format!("plugin_dir.{}.{}", workspace_id, plugin_id);
         if path.is_empty() {
             let _ = store.delete(&key);
         } else {
@@ -79,8 +87,8 @@ pub fn workspace_get_plugin_dir(
     workspace_id: String,
     plugin_id: String,
 ) -> Response<String> {
-    // 优先使用自定义路径
-    if let Some(custom) = get_custom_dir(&app, &plugin_id) {
+    // 优先使用自定义路径（按工作区隔离）
+    if let Some(custom) = get_custom_dir(&app, &workspace_id, &plugin_id) {
         if !custom.is_empty() {
             let path = PathBuf::from(&custom);
             if let Err(e) = ensure_dir(&path) {
@@ -106,8 +114,8 @@ pub fn workspace_get_plugin_subdir(
     plugin_id: String,
     subdir: String,
 ) -> Response<String> {
-    // 优先使用自定义路径
-    let base = if let Some(custom) = get_custom_dir(&app, &plugin_id) {
+    // 优先使用自定义路径（按工作区隔离）
+    let base = if let Some(custom) = get_custom_dir(&app, &workspace_id, &plugin_id) {
         if !custom.is_empty() {
             PathBuf::from(&custom)
         } else {
@@ -136,10 +144,11 @@ pub fn workspace_get_global_plugin_dir(
     Response::new(200, dir.to_string_lossy().to_string(), "ok")
 }
 
-/// 设置插件自定义工作目录（传空字符串则恢复默认）
+/// 设置插件自定义工作目录（传空字符串则恢复默认，按工作区隔离）
 #[command]
 pub fn workspace_set_plugin_custom_dir(
     app: tauri::AppHandle,
+    workspace_id: String,
     plugin_id: String,
     custom_path: String,
 ) -> Response<bool> {
@@ -150,16 +159,29 @@ pub fn workspace_set_plugin_custom_dir(
             return Response::new(500, false, &e);
         }
     }
-    set_custom_dir(&app, &plugin_id, &custom_path);
+    set_custom_dir(&app, &workspace_id, &plugin_id, &custom_path);
     Response::new(200, true, "设置成功")
 }
 
-/// 获取插件自定义工作目录（None 表示使用默认）
+/// 获取插件自定义工作目录（None 表示使用默认，按工作区隔离）
 #[command]
 pub fn workspace_get_plugin_custom_dir(
     app: tauri::AppHandle,
+    workspace_id: String,
     plugin_id: String,
 ) -> Response<Option<String>> {
-    let custom = get_custom_dir(&app, &plugin_id);
+    let custom = get_custom_dir(&app, &workspace_id, &plugin_id);
     Response::new(200, custom, "ok")
+}
+
+/// 删除指定工作区的全部插件数据目录（删除工作区时调用，避免孤儿数据）
+pub fn delete_plugin_data_dir(workspace_id: &str) {
+    let dir = get_plugin_dir_path(workspace_id, "");
+    if dir.exists() {
+        if let Err(e) = fs::remove_dir_all(&dir) {
+            println!("[PluginDir] 清理工作区 {} 插件数据失败: {}", workspace_id, e);
+        } else {
+            println!("[PluginDir] 已清理工作区 {} 插件数据: {}", workspace_id, dir.display());
+        }
+    }
 }

@@ -4,18 +4,9 @@
  */
 import { ref, computed } from 'vue'
 import { workspaceDirService } from '@/services/workspaceDirService'
-import { workspaceService } from '@/services/workspaceService'
 
-/** 当前工作区 ID（全局共享） */
+/** 当前窗口的工作区 ID（模块级单例，每窗口独立；由窗口加载工作区时通过 setPluginWorkspaceId 设置） */
 const currentWorkspaceId = ref<string>('')
-
-/** 初始化工作区 ID（应用启动时调用一次） */
-export async function initPluginWorkspace() {
-  const ws = await workspaceService.getDefault()
-  if (ws) {
-    currentWorkspaceId.value = ws.id
-  }
-}
 
 /** 获取当前工作区 ID */
 export function getCurrentWorkspaceId(): string {
@@ -51,14 +42,16 @@ export function usePluginDir(pluginId: string) {
     return workspaceDirService.getGlobalPluginDir(pluginId)
   }
 
-  /** 获取自定义目录 */
+  /** 获取自定义目录（按当前工作区） */
   async function getCustomDir(): Promise<string | null> {
-    return workspaceDirService.getCustomDir(pluginId)
+    if (!workspaceId.value) return null
+    return workspaceDirService.getCustomDir(workspaceId.value, pluginId)
   }
 
-  /** 设置自定义目录 */
+  /** 设置自定义目录（按当前工作区） */
   async function setCustomDir(path: string): Promise<boolean> {
-    return workspaceDirService.setCustomDir(pluginId, path)
+    if (!workspaceId.value) return false
+    return workspaceDirService.setCustomDir(workspaceId.value, pluginId, path)
   }
 
   return {

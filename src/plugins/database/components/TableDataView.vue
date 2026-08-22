@@ -42,18 +42,27 @@
       />
     </div>
 
-    <!-- 新增行对话框 -->
-    <el-dialog v-model="showAddDialog" title="新增行" width="500px">
+    <!-- 新增行对话框（统一使用 GlobalDialog） -->
+    <GlobalDialog v-model="showAddDialog" title="新增行" width="500px">
       <el-form label-width="100px">
         <el-form-item v-for="col in columns" :key="col.name" :label="col.name">
           <el-input v-model="addFormData[col.name]" :placeholder="col.data_type" size="small" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showAddDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleAddRow">确定</el-button>
+        <el-button size="small" @click="showAddDialog = false">取消</el-button>
+        <el-button size="small" type="primary" @click="handleAddRow">确定</el-button>
       </template>
-    </el-dialog>
+    </GlobalDialog>
+
+    <!-- 删除行确认 -->
+    <GlobalDialog v-model="showDeleteConfirm" title="确认删除" width="400px">
+      <div>确定要删除此行数据吗？</div>
+      <template #footer>
+        <el-button size="small" @click="showDeleteConfirm = false">取消</el-button>
+        <el-button size="small" type="danger" plain @click="confirmDeleteRow">删除</el-button>
+      </template>
+    </GlobalDialog>
 
     <!-- 导入导出对话框 -->
     <ImportExportDialog
@@ -68,7 +77,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import GlobalDialog from '@/components/GlobalDialog.vue'
 import { dbQueryTableData, dbInsertRow, dbUpdateRow, dbDeleteRow } from '../api/operations'
 import { dbTableColumns } from '../api/metadata'
 import type { ColumnInfo } from '../types'
@@ -225,11 +235,21 @@ async function handleDeleteRow(row: Record<string, any>) {
   if (!pkCol) { ElMessage.warning('未找到主键列，无法删除'); return }
 
   const pkIdx = columns.value.indexOf(pkCol)
-  const pkValue = row[String(pkIdx)]
+  deletingRowPk.value = { col: pkCol.name, value: row[String(pkIdx)] }
+  showDeleteConfirm.value = true
+}
 
+// 删除确认状态（统一使用 GlobalDialog）
+const showDeleteConfirm = ref(false)
+const deletingRowPk = ref<{ col: string; value: any } | null>(null)
+
+async function confirmDeleteRow() {
+  showDeleteConfirm.value = false
+  const pk = deletingRowPk.value
+  deletingRowPk.value = null
+  if (!pk) return
   try {
-    await ElMessageBox.confirm('确定要删除此行数据吗？', '确认删除', { type: 'warning' })
-    const res = await dbDeleteRow(props.configId, props.database, props.table, pkCol.name, pkValue)
+    const res = await dbDeleteRow(props.configId, props.database, props.table, pk.col, pk.value)
     if (res.code === 200) {
       ElMessage.success('删除成功')
       await loadData()
@@ -237,7 +257,7 @@ async function handleDeleteRow(row: Record<string, any>) {
       ElMessage.error(res.msg)
     }
   } catch (e) {
-    // 用户取消
+    ElMessage.error('删除失败')
   }
 }
 

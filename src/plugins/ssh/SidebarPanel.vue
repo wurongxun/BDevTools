@@ -193,6 +193,15 @@
       @confirm="handleRenameGroup"
     />
 
+    <!-- 删除确认弹窗（分组/连接共用，统一使用 GlobalDialog） -->
+    <GlobalDialog v-model="showDeleteConfirm" title="确认删除" width="400px">
+      <div class="delete-confirm-message">{{ deleteConfirmMessage }}</div>
+      <template #footer>
+        <el-button size="small" @click="showDeleteConfirm = false">取消</el-button>
+        <el-button size="small" type="danger" plain @click="confirmDelete">删除</el-button>
+      </template>
+    </GlobalDialog>
+
     <!-- 全局点击关闭菜单 -->
     <teleport to="body">
       <div
@@ -207,9 +216,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { Plus, ArrowRight, MoreFilled, FolderAdd, EditPen, Delete, Monitor, FolderOpened } from '@element-plus/icons-vue'
-import { ElMessageBox } from 'element-plus'
 import ConnectionDialog from './components/RemoteConnection/ConnectionDialog.vue'
 import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
+import GlobalDialog from '@/components/GlobalDialog.vue'
 import PluginDirSettings from '@/components/PluginDirSettings.vue'
 import { useConnectionStore } from './store'
 import type { RemoteConnection } from './types'
@@ -226,6 +235,23 @@ const activeConnId = ref<number | null>(null)
 const showAddGroupDialog = ref(false)
 const showRenameGroupDialog = ref(false)
 const renamingGroup = ref('')
+
+// 删除确认弹窗状态（分组/连接共用）
+const showDeleteConfirm = ref(false)
+const deleteConfirmMessage = ref('')
+let pendingDeleteAction: (() => void) | null = null
+
+function askDeleteConfirm(message: string, action: () => void) {
+  deleteConfirmMessage.value = message
+  pendingDeleteAction = action
+  showDeleteConfirm.value = true
+}
+
+function confirmDelete() {
+  pendingDeleteAction?.()
+  pendingDeleteAction = null
+  showDeleteConfirm.value = false
+}
 
 const connections = computed(() => connectionStore.connections)
 const allGroupNames = computed(() => connectionStore.connectionGroups)
@@ -343,11 +369,9 @@ function handleRenameGroup(value: string) {
 function handleGroupDelete() {
   const name = groupContextMenu.value.groupName
   closeAllContextMenus()
-  ElMessageBox.confirm(`确定删除分组 "${name}" 吗？\n该分组下的连接将移到"默认分组"。`, '确认删除', {
-    type: 'warning'
-  }).then(() => {
+  askDeleteConfirm(`确定删除分组 "${name}" 吗？\n该分组下的连接将移到"默认分组"。`, () => {
     connectionStore.deleteGroup(name)
-  }).catch(() => {})
+  })
 }
 
 function handleAddConnToGroup() {
@@ -378,11 +402,9 @@ function handleConnDelete() {
   const conn = connContextMenu.value.conn
   closeAllContextMenus()
   if (!conn) return
-  ElMessageBox.confirm(`确定删除连接 "${conn.name}" 吗？`, '确认删除', {
-    type: 'warning'
-  }).then(() => {
+  askDeleteConfirm(`确定删除连接 "${conn.name}" 吗？`, () => {
     connectionStore.deleteConnection(conn.id)
-  }).catch(() => {})
+  })
 }
 
 function handleMoveToGroup(groupName: string) {
@@ -774,5 +796,11 @@ onMounted(() => {
 
 .context-menu-submenu:hover .context-menu-submenu-list {
   display: block;
+}
+
+// 删除确认文案：保留 \n 换行
+.delete-confirm-message {
+  white-space: pre-line;
+  line-height: 1.6;
 }
 </style>

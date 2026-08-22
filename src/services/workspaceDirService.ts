@@ -24,15 +24,15 @@ export const workspaceDirService = {
     return res.code === 200 ? res.data : ''
   },
 
-  /** 设置插件自定义工作目录（传空字符串恢复默认） */
-  async setCustomDir(pluginId: string, customPath: string): Promise<boolean> {
-    const res = await invoke<ApiResponse<boolean>>('workspace_set_plugin_custom_dir', { pluginId, customPath })
+  /** 设置插件自定义工作目录（传空字符串恢复默认，按工作区隔离） */
+  async setCustomDir(workspaceId: string, pluginId: string, customPath: string): Promise<boolean> {
+    const res = await invoke<ApiResponse<boolean>>('workspace_set_plugin_custom_dir', { workspaceId, pluginId, customPath })
     return res.code === 200
   },
 
-  /** 获取插件自定义工作目录（null 表示使用默认） */
-  async getCustomDir(pluginId: string): Promise<string | null> {
-    const res = await invoke<ApiResponse<string | null>>('workspace_get_plugin_custom_dir', { pluginId })
+  /** 获取插件自定义工作目录（null 表示使用默认，按工作区隔离） */
+  async getCustomDir(workspaceId: string, pluginId: string): Promise<string | null> {
+    const res = await invoke<ApiResponse<string | null>>('workspace_get_plugin_custom_dir', { workspaceId, pluginId })
     return res.code === 200 ? res.data : null
   },
 }

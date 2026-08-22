@@ -397,3 +397,122 @@ fn rename_file_path(original_path: &str, new_filename: &str, suffix: &str) -> St
     let new_file_path = parent.join(format!("{}{}", new_filename, suffix));
     new_file_path.to_string_lossy().to_string()
 }
+
+/// 写入脚本文件（不存在则创建，存在则覆盖；供数据库插件查询文件管理器使用）
+#[tauri::command]
+pub async fn write_script_file(path: String, content: String) -> Result<ResData<String>, String> {
+    match tokio::fs::write(&path, content.as_bytes()).await {
+        Ok(_) => Ok(ResData {
+            code: 200,
+            msg: "操作成功".to_string(),
+            data: String::new(),
+        }),
+        Err(e) => Ok(ResData {
+            code: 500,
+            msg: format!("写入文件失败: {}", e),
+            data: String::new(),
+        }),
+    }
+}
+
+/// 重命名脚本文件（保留原扩展名，供数据库插件查询文件管理器使用）
+#[tauri::command]
+pub async fn rename_script_file(
+    path: String,
+    new_name: String,
+) -> Result<ResData<String>, String> {
+    let src = PathBuf::from(&path);
+    if !src.exists() {
+        return Ok(ResData {
+            code: 500,
+            msg: "选择文件不存在！".to_string(),
+            data: String::new(),
+        });
+    }
+    let extension = src
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy()))
+        .unwrap_or_default();
+    let file_name = if new_name.ends_with(&extension) {
+        new_name.clone()
+    } else {
+        format!("{}{}", new_name, extension)
+    };
+    let dest = src
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .join(file_name);
+    match tokio::fs::rename(&src, &dest).await {
+        Ok(_) => Ok(ResData {
+            code: 200,
+            msg: "操作成功".to_string(),
+            data: dest.to_string_lossy().to_string(),
+        }),
+        Err(e) => Ok(ResData {
+            code: 500,
+            msg: e.to_string(),
+            data: String::new(),
+        }),
+    }
+}
+
+/// 脚本文件树节点（供数据库插件查询文件管理器使用）
+#[derive(serde::Serialize)]
+pub struct ScriptFileEntry {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub children: Vec<ScriptFileEntry>,
+}
+
+/// 递归收集目录下的文件/文件夹（目录优先、按名称排序）
+async fn collect_script_entries(dir: &Path) -> Result<Vec<ScriptFileEntry>, String> {
+    let mut entries: Vec<ScriptFileEntry> = Vec::new();
+    let mut read_dir = tokio::fs::read_dir(dir).await.map_err(|e| e.to_string())?;
+    while let Some(entry) = read_dir.next_entry().await.map_err(|e| e.to_string())? {
+        let p = entry.path();
+        let is_dir = p.is_dir();
+        let children = if is_dir {
+            Box::pin(collect_script_entries(&p)).await?
+        } else {
+            Vec::new()
+        };
+        entries.push(ScriptFileEntry {
+            name: entry.file_name().to_string_lossy().to_string(),
+            path: p.to_string_lossy().to_string(),
+            is_dir,
+            children,
+        });
+    }
+    entries.sort_by(|a, b| {
+        b.is_dir
+            .cmp(&a.is_dir)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+    Ok(entries)
+}
+
+/// 递归列出目录下所有文件与文件夹（数据库插件查询文件管理器）
+#[tauri::command]
+pub async fn list_script_files(path: String) -> Result<ResData<Vec<ScriptFileEntry>>, String> {
+    let dir = PathBuf::from(&path);
+    if !dir.exists() || !dir.is_dir() {
+        return Ok(ResData {
+            code: 500,
+            msg: "路径不存在或不是目录".to_string(),
+            data: Vec::new(),
+        });
+    }
+    match collect_script_entries(&dir).await {
+        Ok(entries) => Ok(ResData {
+            code: 200,
+            msg: "success".to_string(),
+            data: entries,
+        }),
+        Err(e) => Ok(ResData {
+            code: 500,
+            msg: format!("读取目录失败: {}", e),
+            data: Vec::new(),
+        }),
+    }
+}

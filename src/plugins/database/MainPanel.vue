@@ -22,6 +22,7 @@
           <div class="sql-editor-wrap">
             <SqlEditor
               :config-id="editorStore.activeTab.configId"
+              :database="editorStore.activeTab.database"
               :initial-content="editorStore.activeTab.content"
               :saved-file-path="editorStore.activeTab.filePath"
               @executed="onSqlExecuted"
@@ -75,13 +76,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Close, Coin } from '@element-plus/icons-vue'
-import { useEditorStore } from './store'
+import { useEditorStore, useScriptsStore } from './store'
 import SqlEditor from './components/SqlEditor.vue'
 import SqlResultPanel from './components/SqlResultPanel.vue'
 import TableDataView from './components/TableDataView.vue'
 import TableMetadata from './components/TableMetadata.vue'
 
 const editorStore = useEditorStore()
+const scriptsStore = useScriptsStore()
 
 // ==================== 垂直 resize（编辑器 / 结果面板） ====================
 const RESULT_HEIGHT_DEFAULT = 250
@@ -126,9 +128,12 @@ function onSqlExecuted(result: any) {
   }
 }
 
-function onSqlSaved(filePath: string) {
+async function onSqlSaved(filePath: string, configId: string, database: string) {
   if (editorStore.activeTabId) {
     editorStore.setTabFilePath(editorStore.activeTabId, filePath)
+    // 保存时自动落绑定：该文件默认对应的连接与数据库
+    await scriptsStore.bindFile(filePath, configId, database)
+    await scriptsStore.refresh()
   }
 }
 </script>

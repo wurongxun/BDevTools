@@ -102,23 +102,25 @@
       </div>
     </div>
 
-    <!-- 重命名对话框 -->
-    <el-dialog v-model="renameDialogVisible" title="重命名" width="380px" :modal="false" append-to-body class="desktop-dialog">
-      <el-input v-model="renameInput" ref="renameInputRef" @keyup.enter="confirmRename" />
-      <template #footer>
-        <el-button @click="renameDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmRename">确定</el-button>
-      </template>
-    </el-dialog>
+    <!-- 重命名对话框（统一使用 GlobalPromptDialog） -->
+    <GlobalPromptDialog
+      v-if="renameDialogVisible"
+      v-model="renameDialogVisible"
+      title="重命名"
+      :initial-value="renameInitial"
+      :validator="validateName"
+      @confirm="confirmRename"
+    />
 
     <!-- 创建文件/文件夹对话框 -->
-    <el-dialog v-model="createDialogVisible" :title="createDialogTitle" width="380px" :modal="false" append-to-body class="desktop-dialog">
-      <el-input v-model="createInput" ref="createInputRef" @keyup.enter="confirmCreate" placeholder="请输入名称" />
-      <template #footer>
-        <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmCreate">确定</el-button>
-      </template>
-    </el-dialog>
+    <GlobalPromptDialog
+      v-if="createDialogVisible"
+      v-model="createDialogVisible"
+      :title="createDialogTitle"
+      placeholder="请输入名称"
+      :validator="validateName"
+      @confirm="confirmCreate"
+    />
 
     <!-- 右键菜单 -->
     <teleport to="body">
@@ -217,6 +219,7 @@ import {
   Refresh
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/entity/entitys'
@@ -374,13 +377,15 @@ const hoveredNodeId = ref<string | null>(null)
 
 // ===== 对话框状态 =====
 const renameDialogVisible = ref(false)
-const renameInput = ref('')
-const renameInputRef: Ref<any> = ref(null)
+const renameInitial = ref('')
 const createDialogVisible = ref(false)
-const createInput = ref('')
-const createInputRef: Ref<any> = ref(null)
 const createDialogTitle = ref('')
 const createMode = ref<'file' | 'folder'>('file')
+
+// 名称校验：非空即可，错误文案由弹窗展示
+function validateName(value: string): string | true {
+  return value.trim() ? true : '名称不能为空'
+}
 
 // ===== 右键菜单 =====
 const contextMenuVisible = ref(false)
@@ -481,19 +486,14 @@ function showRenameDialog() {
     const lastDotIndex = label.lastIndexOf('.')
     if (lastDotIndex > 0) label = label.substring(0, lastDotIndex)
   }
-  renameInput.value = label
+  renameInitial.value = label
   renameDialogVisible.value = true
   closeContextMenu()
-  nextTick(() => renameInputRef.value?.focus())
 }
 
-function confirmRename() {
-  if (!contextNode.value || !renameInput.value.trim()) {
-    ElMessage.warning('名称不能为空')
-    return
-  }
-  emit('rename-node', contextNode.value, renameInput.value.trim())
-  renameDialogVisible.value = false
+function confirmRename(value: string) {
+  if (!contextNode.value) return
+  emit('rename-node', contextNode.value, value.trim())
 }
 
 function handleDelete() {
@@ -512,24 +512,18 @@ function handleDeleteNode(data: TreeNode) {
 function showCreateDialog(mode: 'file' | 'folder') {
   if (!contextNode.value) return
   createMode.value = mode
-  createInput.value = ''
   createDialogTitle.value = mode === 'folder' ? '新建文件夹' : '新建文件'
   createDialogVisible.value = true
   closeContextMenu()
-  nextTick(() => createInputRef.value?.focus())
 }
 
-function confirmCreate() {
-  if (!contextNode.value || !createInput.value.trim()) {
-    ElMessage.warning('名称不能为空')
-    return
-  }
+function confirmCreate(value: string) {
+  if (!contextNode.value) return
   if (createMode.value === 'folder') {
-    emit('add-folder', contextNode.value, createInput.value.trim())
+    emit('add-folder', contextNode.value, value.trim())
   } else {
-    emit('add-file', contextNode.value, createInput.value.trim())
+    emit('add-file', contextNode.value, value.trim())
   }
-  createDialogVisible.value = false
 }
 
 function handleAddFile(data: TreeNode) {
@@ -562,10 +556,8 @@ function handleAddRootFile() {
   }
   contextNode.value = rootNode
   createMode.value = 'file'
-  createInput.value = ''
   createDialogTitle.value = '新建文件'
   createDialogVisible.value = true
-  nextTick(() => createInputRef.value?.focus())
 }
 
 function handleAddRootFolder() {
@@ -583,10 +575,8 @@ function handleAddRootFolder() {
   }
   contextNode.value = rootNode
   createMode.value = 'folder'
-  createInput.value = ''
   createDialogTitle.value = '新建文件夹'
   createDialogVisible.value = true
-  nextTick(() => createInputRef.value?.focus())
 }
 
 // ===== 拖拽 =====
@@ -1226,91 +1216,6 @@ onBeforeUnmount(() => {
   .el-tree-node__expand-icon {
     @include theme.useTheme {
       color: theme.getVar('textColor');
-    }
-  }
-}
-
-// ===== 桌面端对话框样式 =====
-.desktop-dialog {
-  @include theme.useTheme {
-    .el-dialog {
-      background-color: theme.getVar('bgColor');
-      border: 1px solid theme.getVar('borderColor');
-      border-radius: 4px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-    }
-
-    .el-dialog__header {
-      padding: 10px 16px 8px;
-      margin-right: 0;
-      border-bottom: 1px solid theme.getVar('borderColor');
-    }
-
-    .el-dialog__title {
-      color: theme.getVar('textColor');
-      font-size: theme.getVar('fontSize');
-      font-weight: 600;
-    }
-
-    .el-dialog__headerbtn {
-      top: 10px;
-      right: 12px;
-      font-size: theme.getVar('fontSize');
-
-      .el-dialog__close {
-        color: theme.getVar('textSecondary');
-      }
-
-      &:hover .el-dialog__close {
-        color: theme.getVar('textColor');
-      }
-    }
-
-    .el-dialog__body {
-      padding: 12px 16px;
-    }
-
-    .el-dialog__footer {
-      padding: 8px 16px 12px;
-      border-top: 1px solid theme.getVar('borderColor');
-    }
-
-    .el-input__wrapper {
-      background-color: theme.getVar('appMainBgColor');
-      box-shadow: none;
-      border: 1px solid theme.getVar('borderColor');
-      border-radius: 4px;
-    }
-
-    .el-input__inner {
-      color: theme.getVar('textColor');
-    }
-
-    .el-button {
-      border-radius: 4px;
-      padding: 6px 16px;
-      font-size: theme.getVar('fontSizeSmall');
-    }
-
-    .el-button--default {
-      background-color: transparent;
-      border-color: theme.getVar('borderColor');
-      color: theme.getVar('textColor');
-
-      &:hover {
-        background-color: theme.getVar('activityBarHover');
-        border-color: theme.getVar('borderColor');
-        color: theme.getVar('textColor');
-      }
-    }
-
-    .el-button--primary {
-      background-color: theme.getVar('hoverColor');
-      border-color: theme.getVar('hoverColor');
-
-      &:hover {
-        opacity: 0.9;
-      }
     }
   }
 }

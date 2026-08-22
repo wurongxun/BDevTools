@@ -32,10 +32,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { FolderOpened } from '@element-plus/icons-vue'
 import { usePluginDir } from '@/composables/usePluginDir'
 import { invoke } from '@tauri-apps/api/core'
+import { emit, listen } from '@tauri-apps/api/event'
+
+/** 插件自定义目录变更事件（跨窗口同步面板展示） */
+const PLUGIN_DIR_CHANGED_EVENT = 'plugin-dir-changed'
 
 const props = defineProps<{
   pluginId: string
@@ -45,9 +49,24 @@ const pluginDir = usePluginDir(props.pluginId)
 const currentDir = ref('')
 const customPath = ref('')
 const editing = ref(false)
+let unlistenDirChanged: (() => void) | null = null
 
 onMounted(async () => {
   await refreshDir()
+  // 其他窗口修改了自定义目录时同步刷新展示（Rust store 内存已共享，此处仅刷新 UI）
+  unlistenDirChanged = await listen(PLUGIN_DIR_CHANGED_EVENT, () => {
+    refreshDir()
+  })
+})
+
+onUnmounted(() => {
+  unlistenDirChanged?.()
+  unlistenDirChanged = null
+})
+
+// 窗口切换工作区时重新解析插件目录（按工作区隔离）
+watch(pluginDir.workspaceId, () => {
+  refreshDir()
 })
 
 async function refreshDir() {
@@ -73,6 +92,8 @@ async function saveEdit() {
   const success = await pluginDir.setCustomDir(customPath.value)
   if (success) {
     await refreshDir()
+    // 通知其他窗口的面板同步刷新（同窗口自身也会收到，幂等）
+    emit(PLUGIN_DIR_CHANGED_EVENT).catch(() => {})
   }
 }
 

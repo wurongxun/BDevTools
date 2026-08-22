@@ -30,8 +30,11 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     windowLabel.value = getCurrentWebviewWindow().label
   } catch { /* 默认 main */ }
 
-  // 工作区变化时自动更新窗口标题
+  // 工作区变化时自动更新窗口标题，并同步插件目录上下文
   watch(currentWorkspace, (ws) => {
+    if (ws) {
+      setPluginWorkspaceId(ws.id)
+    }
     if (ws?.name) {
       try {
         getCurrentWebviewWindow().setTitle(ws.name)

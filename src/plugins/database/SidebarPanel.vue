@@ -1,11 +1,19 @@
 <template>
   <div class="db-sidebar">
-    <div class="sidebar-header">
-      <span class="title">数据库连接</span>
-      <el-button :icon="Plus" size="small" circle @click="showConnectionDialog = true" />
-      <el-button :icon="Refresh" size="small" circle @click="refreshConnections" />
+    <!-- 数据库连接区 -->
+    <div class="connections-section">
+      <div class="sidebar-header">
+        <span class="title">数据库连接</span>
+        <el-button :icon="Plus" size="small" circle @click="showConnectionDialog = true" />
+        <el-button :icon="Refresh" size="small" circle @click="refreshConnections" />
+      </div>
+      <DatabaseTree ref="treeRef" />
     </div>
-    <DatabaseTree ref="treeRef" />
+
+    <!-- 查询文件管理器 -->
+    <div class="scripts-section">
+      <ScriptExplorer />
+    </div>
 
     <!-- 插件设置（可折叠） -->
     <el-collapse class="sidebar-settings">
@@ -29,6 +37,7 @@ import { ElMessage } from 'element-plus'
 import { useConnectionStore } from './store'
 import DatabaseTree from './components/DatabaseTree.vue'
 import ConnectionDialog from './components/ConnectionDialog.vue'
+import ScriptExplorer from './components/ScriptExplorer.vue'
 import PluginDirSettings from '@/components/PluginDirSettings.vue'
 import type { DbConnectionConfig } from './types'
 
@@ -77,6 +86,25 @@ async function handleConnectionSubmit(config: DbConnectionConfig) {
   flex-direction: column;
   height: 100%;
   background: var(--el-bg-color);
+}
+.connections-section {
+  flex: 1;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.connections-section .database-tree {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.scripts-section {
+  flex-shrink: 0;
+  height: 42%;
+  min-height: 160px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  overflow: hidden;
 }
 .sidebar-header {
   display: flex;

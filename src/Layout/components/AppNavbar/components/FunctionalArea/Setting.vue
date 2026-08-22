@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">import useStore from '@/store/index'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { storeToRefs } from 'pinia'
 import { useI18n } from "vue-i18n";
 import { Setting, InfoFilled, QuestionFilled } from '@element-plus/icons-vue'

@@ -30,11 +30,33 @@
         <el-button size="small" type="primary" @click="tempConfirmAction = 'save'; showTempWorkspaceConfirm = false">保存</el-button>
       </template>
     </GlobalDialog>
+
+    <!-- 草稿冲突：文件在关闭后被外部修改，逐个让用户决策 -->
+    <GlobalDialog
+      v-model="showDraftConflict"
+      title="草稿冲突"
+      width="460px"
+    >
+      <div v-if="currentConflict" class="temp-ws-message">
+        文件在上次关闭后已被外部修改，与未保存草稿冲突：
+        <div class="temp-ws-sub conflict-path">{{ currentConflict.path }}</div>
+        <div class="temp-ws-sub">
+          草稿时间：{{ formatTs(currentConflict.draftSavedAt) }}，
+          文件修改：{{ formatTs(currentConflict.fileMtime * 1000) }}
+          （剩余 {{ sessionConflicts.length }} 个）
+        </div>
+      </div>
+      <template #footer>
+        <el-button size="small" type="danger" plain @click="handleConflictAction('discard')">放弃草稿</el-button>
+        <el-button size="small" @click="handleConflictAction('saveAs')">草稿另存为副本</el-button>
+        <el-button size="small" type="primary" @click="handleConflictAction('restore')">恢复草稿</el-button>
+      </template>
+    </GlobalDialog>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, shallowRef, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { ref, shallowRef, computed, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { load, Store } from '@tauri-apps/plugin-store'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { Window } from '@tauri-apps/api/window'
@@ -48,6 +70,7 @@ import { useDocumentManagerStore } from '@/plugins/files/store/documents'
 import { windowService } from '@/services/windowService'
 import { workspaceService } from '@/services/workspaceService'
 import NotificationUtil from '@/utils/NotificationUtil'
+import type { DraftConflict } from '@/store/modules/session'
 
 const { useWorkspaceStore, useSessionStore, fileTreeStore, useLayoutStore } = useStore()
 const docStore = useDocumentManagerStore()
@@ -74,6 +97,45 @@ const tempConfirmAction = ref<'save' | 'discard' | 'cancel'>('cancel')
 const tempWorkspaceName = ref('')
 /** 确认弹窗关闭后待执行的收尾动作 */
 let tempConfirmResolve: ((action: 'save' | 'discard' | 'cancel') => void) | null = null
+
+// ===== 草稿冲突（文件在关闭后被外部修改）=====
+const sessionConflicts = ref<DraftConflict[]>([])
+const showDraftConflict = computed(() => sessionConflicts.value.length > 0)
+const currentConflict = computed(() => sessionConflicts.value[0] ?? null)
+
+/** 时间戳格式化（弹窗展示用） */
+function formatTs(ts: number): string {
+  if (!ts) return '未知'
+  return new Date(ts).toLocaleString('zh-CN', {
+    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+  })
+}
+
+/** 处理当前冲突项后推进队列 */
+async function handleConflictAction(action: 'restore' | 'saveAs' | 'discard') {
+  const conflict = currentConflict.value
+  const wsId = useWorkspaceStore.currentWorkspace?.id
+  if (!conflict || !wsId) {
+    sessionConflicts.value = []
+    return
+  }
+  await useSessionStore.resolveDraftConflict(wsId, conflict, action)
+  sessionConflicts.value = sessionConflicts.value.slice(1)
+}
+
+/** 窗口工作区就绪后尝试恢复会话，冲突交给弹窗处理 */
+async function restoreSessionIfAny() {
+  const wsId = useWorkspaceStore.currentWorkspace?.id
+  if (!wsId) return
+  const conflicts = await useSessionStore.tryRestoreSession(wsId).catch((e) => {
+    console.warn('会话恢复失败:', e)
+    return [] as DraftConflict[]
+  })
+  if (conflicts.length > 0) {
+    sessionConflicts.value = conflicts
+    NotificationUtil.warn(`已恢复上次会话，${conflicts.length} 个文件的草稿与外部修改冲突，请处理`)
+  }
+}
 
 // 辅助窗口直接渲染的页面组件
 const appPageComponent = shallowRef<any>(null)
@@ -171,7 +233,11 @@ async function initEditorWindow() {
     if (!holder) {
       useWorkspaceStore.pendingWorkspaceSelection = false
       await useWorkspaceStore.loadCurrentWorkspace(boundWorkspaceId)
-      if (useWorkspaceStore.currentWorkspace) return
+      if (useWorkspaceStore.currentWorkspace) {
+        // 工作区就绪：恢复上次会话（含草稿指纹校验）
+        await restoreSessionIfAny()
+        return
+      }
     } else {
       NotificationUtil.warn(`绑定的工作区已在窗口 [${holder}] 中打开，请重新选择`)
     }
@@ -189,7 +255,10 @@ async function initEditorWindow() {
 async function handleWorkspaceSelected(workspaceId: string) {
   useWorkspaceStore.pendingWorkspaceSelection = false
   const result = await useWorkspaceStore.switchWorkspace(workspaceId)
-  if (!result.success && !useWorkspaceStore.currentWorkspace) {
+  if (result.success) {
+    // 切换到的工作区可能存在上次会话（含草稿）
+    await restoreSessionIfAny()
+  } else if (!useWorkspaceStore.currentWorkspace) {
     // 锁定失败且当前无工作区，兜底创建临时工作区
     await useWorkspaceStore.createTempWorkspace()
   }
@@ -270,10 +339,15 @@ function setupCloseHandler() {
       try {
         const sessionStore = useSessionStore
 
-        // 保存会话快照
+        // 保存会话快照（脏文档内容同步写入草稿）
         await sessionStore.saveSnapshot()
-        // 保存未保存的文档
+        // 保存未保存的文档（内容落盘后不再需要草稿）
         await docStore.saveAllDocuments()
+        // 清理已落盘文档的草稿，避免堆积；未保存文档的草稿保留接续保护
+        const wsId = useWorkspaceStore.currentWorkspace?.id
+        if (wsId) {
+          await sessionStore.cleanupSavedDrafts(wsId)
+        }
       } catch (e) {
         console.warn('关闭前保存失败:', e)
       }
@@ -331,6 +405,9 @@ async function initApp() {
   // 主窗口加载默认工作区（Layout 挂载前就绪）
   await useWorkspaceStore.loadCurrentWorkspace(null)
 
+  // 主窗口：恢复上次会话（含草稿指纹校验）
+  await restoreSessionIfAny()
+
   // 主窗口启动自动保存定时器（60s 定时备份）
   useSessionStore.startAutoSave()
 
@@ -376,5 +453,10 @@ onBeforeUnmount(() => {
   @include theme.useTheme {
     color: theme.getVar('textSecondary');
   }
+}
+
+.conflict-path {
+  word-break: break-all;
+  font-size: 12px;
 }
 </style>

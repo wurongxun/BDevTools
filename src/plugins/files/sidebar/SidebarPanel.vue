@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, h, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import FileInfoTree from './FileInfoTree.vue'
 import useStore from '@/store'
 import { tauri_request } from '@/utils/tauri_request'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { ResponseData, TreeNode } from '@/Types/entitys'
-import { ElMessageBox } from 'element-plus'
+import GlobalDialog from '@/components/GlobalDialog.vue'
 import StringUtil from '@/utils/StringUtil'
 import { load, Store } from '@tauri-apps/plugin-store'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
@@ -146,39 +146,55 @@ const handleDeleteNode = async (node: TreeNode) => {
     }
 }
 
-const deleteFile = async (node: TreeNode) => {
-    await ElMessageBox({
-        title: '删除文件',
-        message: h('div', {}, [h('br'), h('br'), h('p', { style: 'color:red;' }, `确定删除文件 "${node.label}" 吗？`), h('br'), h('br')]),
-        showCancelButton: true, confirmButtonText: '删除', cancelButtonText: '取消',
-    })
+// ===== 删除确认弹窗（统一使用 GlobalDialog）=====
+const showDeleteConfirm = ref(false)
+const deleteConfirmMessage = ref('')
+let pendingDeleteAction: (() => Promise<void> | void) | null = null
+
+function askDeleteConfirm(message: string, action: () => Promise<void> | void) {
+    deleteConfirmMessage.value = message
+    pendingDeleteAction = action
+    showDeleteConfirm.value = true
+}
+
+async function confirmDelete() {
+    showDeleteConfirm.value = false
+    const action = pendingDeleteAction
+    pendingDeleteAction = null
+    if (!action) return
     try {
-        isLoading.value = true
-        const result = await tauri_request<ResponseData<string>>('remove_file', { path: node.filePath })
-        if (result?.code === 200) NotificationUtil.success('删除文件成功！')
-        else throw new Error(result?.msg || '未知错误')
-    } catch (error: any) { if (error !== 'cancel') throw error }
-    finally { isLoading.value = false }
+        await action()
+    } catch (error: any) {
+        console.error('删除操作失败:', error)
+        NotificationUtil.error(`操作失败：${error.message}`)
+    }
+}
+
+const deleteFile = async (node: TreeNode) => {
+    askDeleteConfirm(`确定删除文件 "${node.label}" 吗？`, async () => {
+        try {
+            isLoading.value = true
+            const result = await tauri_request<ResponseData<string>>('remove_file', { path: node.filePath })
+            if (result?.code === 200) NotificationUtil.success('删除文件成功！')
+            else throw new Error(result?.msg || '未知错误')
+        } finally { isLoading.value = false }
+    })
 }
 
 const deleteFolder = async (node: TreeNode) => {
     if (StringUtil.isNullOrEmpty(node.folder) && node.isFolder) { NotificationUtil.error('请选择文件夹！'); return }
-    await ElMessageBox({
-        title: '删除文件夹',
-        message: h('div', {}, [h('br'), h('br'), h('p', { style: 'color:red;' }, `删除文件夹 "${node.folder}" 吗，文件夹下笔记文件也将一并删除！`), h('br'), h('br')]),
-        showCancelButton: true, confirmButtonText: '删除', cancelButtonText: '取消',
+    askDeleteConfirm(`删除文件夹 "${node.folder}" 吗，文件夹下笔记文件也将一并删除！`, async () => {
+        try {
+            isLoading.value = true
+            const children: TreeNode[] = []
+            getAllChildrenFile(node, children)
+            const cacheResults = await Promise.all(children.map(item => processNodeCache(item)))
+            if (cacheResults.some(result => !result)) { NotificationUtil.error('文件缓存处理失败！'); return }
+            const result = await tauri_request<ResponseData<string>>('remove_folder', { path: node.folder })
+            if (result?.code === 200) NotificationUtil.success('操作成功')
+            else throw new Error(result?.msg || '未知错误')
+        } finally { isLoading.value = false }
     })
-    try {
-        isLoading.value = true
-        const children: TreeNode[] = []
-        getAllChildrenFile(node, children)
-        const cacheResults = await Promise.all(children.map(item => processNodeCache(item)))
-        if (cacheResults.some(result => !result)) { NotificationUtil.error('文件缓存处理失败！'); return }
-        const result = await tauri_request<ResponseData<string>>('remove_folder', { path: node.folder })
-        if (result?.code === 200) NotificationUtil.success('操作成功')
-        else throw new Error(result?.msg || '未知错误')
-    } catch (error: any) { if (error !== 'cancel') throw error }
-    finally { isLoading.value = false }
 }
 
 const handleRenameNode = async (node: TreeNode, newName: string) => {
@@ -309,6 +325,15 @@ function handleHeaderCommand(cmd: string) {
                 <PluginDirSettings plugin-id="files" />
             </el-collapse-item>
         </el-collapse>
+
+        <!-- 删除确认弹窗（统一使用 GlobalDialog） -->
+        <GlobalDialog v-model="showDeleteConfirm" :title="'确认删除'" width="400px">
+            <div class="delete-confirm-message">{{ deleteConfirmMessage }}</div>
+            <template #footer>
+                <el-button size="small" @click="showDeleteConfirm = false">取消</el-button>
+                <el-button size="small" type="danger" plain @click="confirmDelete">删除</el-button>
+            </template>
+        </GlobalDialog>
     </div>
 </template>
 
@@ -393,5 +418,11 @@ function handleHeaderCommand(cmd: string) {
     :deep(.el-collapse-item__content) {
         padding-bottom: 8px;
     }
+}
+
+// 删除确认文案
+.delete-confirm-message {
+    line-height: 1.6;
+    word-break: break-all;
 }
 </style>

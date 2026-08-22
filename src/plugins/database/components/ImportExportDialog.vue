@@ -1,5 +1,10 @@
 <template>
-  <el-dialog v-model="visible" :title="mode === 'export' ? '导出数据' : '导入数据'" width="480px" @close="handleClose">
+  <GlobalDialog
+    v-model="visible"
+    :title="mode === 'export' ? '导出数据' : '导入数据'"
+    width="480px"
+    @close="handleClose"
+  >
     <el-form label-width="100px">
       <el-form-item label="目标表">
         <span>{{ table }}</span>
@@ -43,17 +48,18 @@
     </div>
 
     <template #footer>
-      <el-button @click="handleClose">关闭</el-button>
-      <el-button type="primary" @click="handleExecute" :loading="executing" :disabled="mode === 'import' && !importPath">
+      <el-button size="small" @click="handleClose">关闭</el-button>
+      <el-button size="small" type="primary" @click="handleExecute" :loading="executing" :disabled="mode === 'import' && !importPath">
         {{ mode === 'export' ? '导出' : '导入' }}
       </el-button>
     </template>
-  </el-dialog>
+  </GlobalDialog>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import GlobalDialog from '@/components/GlobalDialog.vue'
 import { save } from '@tauri-apps/plugin-dialog'
 import { open } from '@tauri-apps/plugin-dialog'
 import { dbExportCsv, dbExportExcel, dbImportCsv, dbImportExcel } from '../api/importExport'

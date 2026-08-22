@@ -42,11 +42,16 @@ pub async fn workspace_update(
     }
 }
 
-/// 删除工作区
+/// 删除工作区（同时清理该工作区的插件数据目录）
 #[tauri::command]
 pub async fn workspace_delete(id: String) -> Response<bool> {
     let ok = config::delete_workspace(&id);
     if ok {
+        // 同步清理插件数据，避免孤儿目录残留（含临时工作区不保存场景）
+        crate::workspace::plugin_dir::delete_plugin_data_dir(&id);
+        // 同步清理会话快照与未保存草稿（与工作区同生命周期）
+        crate::session::snapshot::delete_snapshot_by_workspace(&id);
+        crate::session::draft::clear_workspace_drafts(&id);
         Response::new(200, true, "工作区已删除")
     } else {
         Response::new(404, false, "工作区不存在")

@@ -77,58 +77,8 @@
       </transition>
     </div>
 
-    <!-- 工作区管理对话框 -->
-    <teleport to="body">
-      <div v-if="showWorkspaceDialog" class="workspace-dialog-overlay" @click="showWorkspaceDialog = false">
-        <div class="workspace-dialog" @click.stop>
-          <div class="ws-dialog-header">
-            <span class="ws-dialog-title">管理工作区</span>
-            <span class="ws-dialog-close" @click="showWorkspaceDialog = false">&times;</span>
-          </div>
-          <div class="ws-dialog-body">
-            <div v-if="workspaceList.length === 0" class="ws-empty">暂无工作区</div>
-            <div
-              v-for="ws in workspaceList"
-              :key="ws.id"
-              class="ws-item"
-              :class="{ 'ws-item-active': currentWsId === ws.id }"
-            >
-              <!-- 编辑模式 -->
-              <template v-if="wsEditingId === ws.id">
-                <div class="ws-edit-row">
-                  <input
-                    class="ws-edit-input"
-                    v-model="wsEditingName"
-                    @keyup.enter="wsConfirmRename(ws)"
-                    @keyup.escape="wsCancelRename"
-                    ref="wsEditInputRef"
-                  />
-                  <span class="ws-btn ws-btn-confirm" @click="wsConfirmRename(ws)">✓</span>
-                  <span class="ws-btn" @click="wsCancelRename">✗</span>
-                </div>
-              </template>
-              <!-- 普通模式 -->
-              <template v-else>
-                <div class="ws-item-main" @click="handleSelectWorkspace(ws)">
-                  <div class="ws-item-name">
-                    {{ ws.name }}
-                    <span v-if="currentWsId === ws.id" class="ws-badge">当前</span>
-                  </div>
-                  <div class="ws-item-folders">{{ ws.folders.join(', ') || '无关联文件夹' }}</div>
-                </div>
-                <div class="ws-item-actions">
-                  <span class="ws-btn" title="重命名" @click.stop="wsStartRename(ws)">✏</span>
-                  <span class="ws-btn ws-btn-danger" title="删除" @click.stop="wsDelete(ws)">🗑</span>
-                </div>
-              </template>
-            </div>
-          </div>
-          <div class="ws-dialog-footer">
-            <span class="ws-create-link" @click="handleCreateWorkspace">+ 新建工作区</span>
-          </div>
-        </div>
-      </div>
-    </teleport>
+    <!-- 工作区管理对话框（基于 GlobalDialog 的共享组件） -->
+    <WorkspaceManageDialog v-model="showWorkspaceDialog" />
   </div>
 </template>
 
@@ -141,8 +91,7 @@ import { ResponseData } from '@/Types/entitys'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { changeWorkspace } from '@/utils/index'
 import { useWorkspaceStore } from '@/store/modules/workspace'
-import { workspaceService } from '@/services/workspaceService'
-import { setPluginWorkspaceId } from '@/composables/usePluginDir'
+import WorkspaceManageDialog from '@/components/WorkspaceManageDialog.vue'
 
 import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
@@ -152,7 +101,7 @@ import { listen } from '@tauri-apps/api/event'
 import { openAppWindow, createEditorWindow, createPresetWindow } from '@/utils/WindowUtils'
 import type { WindowPresetConfig } from '@/utils/WindowUtils'
 import type { WindowMeta } from '@/Types/workspace'
-import type { WorkspaceConfig, WorkspaceSummary } from '@/Types/workspace'
+import type { WorkspaceConfig } from '@/Types/workspace'
 const {fileTreeStore,useLayoutStore } = useStore()
 const workspaceStore = useWorkspaceStore()
 const docStore = useDocumentManagerStore()
@@ -203,88 +152,6 @@ const hasFilesPlugin = computed(() => {
   return enabled.length === 0 || enabled.includes('files')
 })
 
-// ===== 工作区切换对话框状态 =====
-const workspaceList = ref<WorkspaceSummary[]>([])
-const currentWsId = computed(() => workspaceStore.currentWorkspace?.id ?? '')
-
-async function loadWorkspaceList() {
-  workspaceList.value = await workspaceService.list()
-}
-
-async function handleSelectWorkspace(ws: WorkspaceSummary) {
-  const result = await workspaceStore.switchWorkspace(ws.id)
-  showWorkspaceDialog.value = false
-  if (result.success) {
-    NotificationUtil.success(`已切换到工作区: ${ws.name}`)
-  }
-}
-
-async function handleCreateWorkspace() {
-  showWorkspaceDialog.value = false
-  // 打开工作目录选择
-  const folder = await open({ directory: true, multiple: false })
-  if (!folder || typeof folder !== 'string') return
-  const name = getDirName(folder)
-  const config = await workspaceStore.createWorkspace(name, [folder])
-  if (config) {
-    const result = await workspaceStore.switchWorkspace(config.id)
-    await loadWorkspaceList()
-    if (result.success) {
-      NotificationUtil.success(`工作区已创建并切换: ${config.name}`)
-    }
-  }
-}
-
-// ===== 工作区重命名/删除 =====
-const wsEditingId = ref<string | null>(null)
-const wsEditingName = ref('')
-const wsEditInputRef = ref<HTMLInputElement | null>(null)
-
-function wsStartRename(ws: WorkspaceSummary) {
-  wsEditingId.value = ws.id
-  wsEditingName.value = ws.name
-  nextTick(() => {
-    wsEditInputRef.value?.focus()
-    wsEditInputRef.value?.select()
-  })
-}
-
-function wsCancelRename() {
-  wsEditingId.value = null
-  wsEditingName.value = ''
-}
-
-async function wsConfirmRename(ws: WorkspaceSummary) {
-  const newName = wsEditingName.value.trim()
-  if (!newName || newName === ws.name) {
-    wsCancelRename()
-    return
-  }
-  const updated = await workspaceService.update(ws.id, { name: newName })
-  if (updated) {
-    NotificationUtil.success(`工作区已重命名: ${newName}`)
-    await loadWorkspaceList()
-    if (ws.id === workspaceStore.currentWorkspace?.id) {
-      await workspaceStore.loadCurrentWorkspace(ws.id)
-    }
-  } else {
-    NotificationUtil.error('重命名失败')
-  }
-  wsCancelRename()
-}
-
-async function wsDelete(ws: WorkspaceSummary) {
-  if (ws.id === workspaceStore.currentWorkspace?.id) {
-    NotificationUtil.warn('无法删除当前正在使用的工作区')
-    return
-  }
-  const confirmed = window.confirm(`确定删除工作区「${ws.name}」吗？\n该操作不可恢复。`)
-  if (!confirmed) return
-
-  await workspaceStore.deleteWorkspace(ws.id)
-  NotificationUtil.success(`工作区已删除: ${ws.name}`)
-  await loadWorkspaceList()
-}
 
 // ===== 最近项目持久化 =====
 async function loadRecentProjects() {
@@ -454,7 +321,6 @@ const handleMenuCommand = async (item: MenuItem) => {
       break
     }
     case 'openWorkspace': {
-      await loadWorkspaceList()
       showWorkspaceDialog.value = true
       break
     }
@@ -647,7 +513,6 @@ onMounted(async () => {
   document.addEventListener('keydown', handleKeydown)
   await loadRecentProjects()
   await loadWindowPresets()
-  await loadWorkspaceList()
   // 加载当前工作区（新窗口等待用户选择期间不自动分配）
   if (!workspaceStore.pendingWorkspaceSelection) {
     await workspaceStore.loadCurrentWorkspace(null)
@@ -821,181 +686,5 @@ onUnmounted(() => {
 .menu-dropdown-leave-to {
   opacity: 0;
   transform: translateY(-4px);
-}
-
-// ===== 工作区切换对话框 =====
-.workspace-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 99999;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.workspace-dialog {
-  width: 420px;
-  max-height: 480px;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-
-  @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
-    border: 1px solid theme.getVar('borderColor');
-    color: theme.getVar('textColor');
-  }
-}
-
-.ws-dialog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
-}
-
-.ws-dialog-title {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.ws-dialog-close {
-  font-size: 20px;
-  cursor: pointer;
-  opacity: 0.6;
-  line-height: 1;
-  &:hover { opacity: 1; }
-}
-
-.ws-dialog-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.ws-empty {
-  text-align: center;
-  padding: 32px 0;
-  opacity: 0.5;
-  font-size: 13px;
-}
-
-.ws-item {
-  padding: 10px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.15s;
-  margin-bottom: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  &:hover {
-    background: rgba(128, 128, 128, 0.1);
-  }
-
-  &.ws-item-active {
-    background: rgba(0, 122, 204, 0.15);
-    border-left: 3px solid #007acc;
-  }
-}
-
-.ws-item-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.ws-item-actions {
-  display: flex;
-  gap: 4px;
-  margin-left: 8px;
-  flex-shrink: 0;
-}
-
-.ws-item-name {
-  font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 4px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.ws-badge {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: #007acc;
-  color: #fff;
-  font-weight: 400;
-}
-
-.ws-item-folders {
-  font-size: 11px;
-  opacity: 0.6;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-// 编辑模式
-.ws-edit-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-}
-
-.ws-edit-input {
-  flex: 1;
-  padding: 4px 8px;
-  font-size: 13px;
-  border: 1px solid #007acc;
-  border-radius: 4px;
-  outline: none;
-  background: transparent;
-  color: inherit;
-}
-
-// 操作按钮
-.ws-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  opacity: 0.6;
-  transition: opacity 0.15s, background 0.15s;
-
-  &:hover {
-    opacity: 1;
-    background: rgba(128, 128, 128, 0.15);
-  }
-}
-
-.ws-btn-confirm {
-  color: #52c41a;
-}
-
-.ws-btn-danger {
-  &:hover { color: #ff4d4f; }
-}
-
-.ws-dialog-footer {
-  padding: 10px 16px;
-  border-top: 1px solid rgba(128, 128, 128, 0.2);
-}
-
-.ws-create-link {
-  font-size: 12px;
-  cursor: pointer;
-  opacity: 0.7;
-  &:hover { opacity: 1; color: #007acc; }
 }
 </style>

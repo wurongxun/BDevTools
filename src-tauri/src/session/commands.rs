@@ -12,11 +12,25 @@ pub async fn session_save(snapshot_data: SessionSnapshot) -> Response<bool> {
     }
 }
 
-/// 加载指定窗口的会话快照
+/// 加载指定窗口的会话快照（兼容旧键：窗口 label）
 #[tauri::command]
 pub async fn session_load(window_label: String) -> Response<Option<SessionSnapshot>> {
     let snapshot = snapshot::load_snapshot(&window_label);
     Response::new(200, snapshot, "获取会话快照成功")
+}
+
+/// 按工作区 ID 加载会话快照（多窗口体系下的主入口）
+#[tauri::command]
+pub async fn session_load_workspace(workspace_id: String) -> Response<Option<SessionSnapshot>> {
+    let snapshot = snapshot::load_snapshot_by_workspace(&workspace_id);
+    Response::new(200, snapshot, "获取会话快照成功")
+}
+
+/// 按工作区 ID 删除会话快照（删除工作区/丢弃临时工作区时调用）
+#[tauri::command]
+pub async fn session_delete_workspace(workspace_id: String) -> Response<bool> {
+    let ok = snapshot::delete_snapshot_by_workspace(&workspace_id);
+    Response::new(200, ok, "会话快照已删除")
 }
 
 /// 加载所有会话快照

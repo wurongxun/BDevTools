@@ -83,6 +83,15 @@ pub struct OpenFileInfo {
     pub cursor_line: u32,
     pub cursor_col: u32,
     pub scroll_top: f64,
+    /// 是否存在未保存内容的草稿（脏文档内容已写入 drafts 目录）
+    #[serde(default)]
+    pub has_draft: bool,
+    /// 快照时目标文件的 mtime 指纹（秒，0 表示不存在/未记录）
+    #[serde(default)]
+    pub file_mtime: i64,
+    /// 快照时目标文件的大小指纹（0 表示不存在/未记录）
+    #[serde(default)]
+    pub file_size: u64,
 }
 
 /// 布局状态

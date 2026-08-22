@@ -36,13 +36,14 @@ import * as monaco from 'monaco-editor'
 
 const props = defineProps<{
   configId?: string
+  database?: string
   initialContent?: string
   savedFilePath?: string
 }>()
 
 const emit = defineEmits<{
   'executed': [result: SqlResult]
-  'saved': [filePath: string]
+  'saved': [filePath: string, configId: string, database: string]
 }>()
 
 const connectionStore = useConnectionStore()
@@ -114,7 +115,11 @@ async function loadDatabases(configId: string) {
     const res = await dbListDatabases(configId)
     if (res.code === 200) {
       databases.value = res.data
-      if (res.data.length > 0) {
+      // 优先使用文件绑定的数据库，其次回退到第一个库
+      const bound = props.database ? res.data.find(d => d.name === props.database) : undefined
+      if (bound) {
+        selectedDb.value = bound.name
+      } else if (res.data.length > 0) {
         selectedDb.value = res.data[0].name
       } else {
         selectedDb.value = ''
@@ -185,7 +190,7 @@ async function handleSave() {
     }
     await writeTextFile(filePath, content)
     console.log('[SqlEditor] SQL 已保存至:', filePath)
-    emit('saved', filePath)
+    emit('saved', filePath, selectedConfigId.value, selectedDb.value)
   } catch (e: any) {
     console.error('[SqlEditor] 保存失败:', e)
   }

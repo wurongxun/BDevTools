@@ -114,6 +114,21 @@ export interface TreeNode {
   data?: any
 }
 
+/** 查询文件的默认连接/数据库绑定（存于 scripts/index.json） */
+export interface ScriptFileBinding {
+  configId?: string
+  database?: string
+  updatedAt?: number
+}
+
+/** 查询文件树节点（scripts 目录） */
+export interface ScriptFileNode {
+  name: string
+  path: string
+  isDir: boolean
+  children: ScriptFileNode[]
+}
+
 /** 统一响应 */
 export interface ApiResponse<T> {
   code: number

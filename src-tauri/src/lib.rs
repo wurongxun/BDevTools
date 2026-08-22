@@ -30,7 +30,8 @@ use crate::command::app_window::{
 };
 use crate::command::file_command::{
     create_folder, create_note_file, ensure_dir, get_note_list, get_path_childrenFoldersAndFiles,
-    read_note_file, remove_file, remove_folder, save_note, up_file_name,
+    list_script_files, read_note_file, remove_file, remove_folder, rename_script_file, save_note,
+    up_file_name, write_script_file,
 };
 use crate::command::file_utils::{file_manager_open_path, get_document_notebooks, up_folder_name,detect_file_encoding};
 use crate::command::file_association::{register_file_association, open_default_apps_settings};
@@ -65,7 +66,10 @@ use crate::workspace::plugin_dir::{
 };
 use crate::session::commands::{
     session_save, session_load, session_load_all, session_list,
-    session_delete, session_clear,
+    session_delete, session_clear, session_load_workspace, session_delete_workspace,
+};
+use crate::session::draft::{
+    draft_save, draft_check, draft_load, draft_delete,
 };
 use crate::database::connection::{
     db_connection_create, db_connection_delete, db_connection_update,
@@ -117,6 +121,9 @@ pub fn run() {
             ensure_dir,
             create_note_file,
             get_path_childrenFoldersAndFiles,
+            list_script_files,
+            rename_script_file,
+            write_script_file,
             save_note,
             up_file_name,
             up_folder_name,
@@ -183,13 +190,20 @@ pub fn run() {
             workspace_get_global_plugin_dir,
             workspace_set_plugin_custom_dir,
             workspace_get_plugin_custom_dir,
-            // 会话管理
+            // 会话管理（主键：工作区 ID）
             session_save,
             session_load,
+            session_load_workspace,
+            session_delete_workspace,
             session_load_all,
             session_list,
             session_delete,
             session_clear,
+            // 草稿管理（未保存内容保护，按工作区隔离）
+            draft_save,
+            draft_check,
+            draft_load,
+            draft_delete,
             // 数据库连接管理
             db_connection_create,
             db_connection_delete,

@@ -188,6 +188,36 @@
     <!-- 传输面板 -->
     <TransferPanel :tab-id="tab.id" />
 
+    <!-- 新建远程目录（统一使用 GlobalPromptDialog） -->
+    <GlobalPromptDialog
+      v-model="showNewFolderDialog"
+      title="新建远程目录"
+      message="请输入目录名称"
+      confirm-button-text="创建"
+      :validator="validateDirName"
+      @confirm="confirmNewFolder"
+    />
+
+    <!-- 重命名（v-if 保证每次打开重建以取最新预填值） -->
+    <GlobalPromptDialog
+      v-if="showRenameDialog"
+      v-model="showRenameDialog"
+      title="重命名"
+      message="请输入新名称"
+      :initial-value="renameInitial"
+      :validator="validateDirName"
+      @confirm="confirmRenameFile"
+    />
+
+    <!-- 删除确认（统一使用 GlobalDialog） -->
+    <GlobalDialog v-model="showDeleteConfirm" title="确认删除" width="400px">
+      <div class="ftp-delete-message">确定要删除选中的 {{ selectedRemoteFiles.length }} 个文件/目录吗？</div>
+      <template #footer>
+        <el-button size="small" @click="showDeleteConfirm = false">取消</el-button>
+        <el-button size="small" type="danger" plain @click="confirmDeleteSelected">删除</el-button>
+      </template>
+    </GlobalDialog>
+
     <!-- 右键上下文菜单 -->
     <teleport to="body">
       <div
@@ -211,7 +241,9 @@ import { desktopDir, dirname } from '@tauri-apps/api/path'
 import { open } from '@tauri-apps/plugin-dialog'
 import { Upload, Download, FolderAdd, Delete, Refresh, EditPen, ArrowUp, ArrowDown, Star, Close } from '@element-plus/icons-vue'
 // 保留 Element Plus 图标导入（其他位置可能使用）
-import { ElMessageBox, ElInput } from 'element-plus'
+import { ElInput } from 'element-plus'
+import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
+import GlobalDialog from '@/components/GlobalDialog.vue'
 import { ConnectionStatus } from '../../../types'
 import type { ConnectionTab, RemoteConnection, FtpFileItem } from '../../../types'
 import { useDocumentManagerStore } from '@/plugins/files/store/documents'
@@ -365,34 +397,38 @@ async function handleDownload() {
   }
 }
 
+// 弹窗状态（新建目录/重命名/删除确认，统一使用 Global 弹窗组件）
+const showNewFolderDialog = ref(false)
+const showRenameDialog = ref(false)
+const renameInitial = ref('')
+const renameOldPath = ref('')
+const showDeleteConfirm = ref(false)
+
+// 名称校验：非空即可，错误文案由弹窗展示
+function validateDirName(value: string): string | true {
+  return value.trim() ? true : '名称不能为空'
+}
+
 async function handleNewFolder() {
   if (!sftpSessionId) return
-  try {
-    const { value } = await ElMessageBox.prompt('请输入目录名称', '新建远程目录', {
-      confirmButtonText: '创建',
-      cancelButtonText: '取消'
-    })
-    if (value) {
-      await ftpStore.createRemoteDir(props.tab.id, sftpSessionId, remotePath.value, value)
-    }
-  } catch {
-    // cancelled
-  }
+  showNewFolderDialog.value = true
+}
+
+async function confirmNewFolder(value: string) {
+  if (!sftpSessionId) return
+  await ftpStore.createRemoteDir(props.tab.id, sftpSessionId, remotePath.value, value.trim())
 }
 
 async function handleDeleteSelected() {
   if (!sftpSessionId || selectedRemoteFiles.value.length === 0) return
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除选中的 ${selectedRemoteFiles.value.length} 个文件/目录吗？`,
-      '确认删除',
-      { type: 'warning' }
-    )
-    for (const path of selectedRemoteFiles.value) {
-      await ftpStore.deleteRemoteFile(props.tab.id, sftpSessionId, path)
-    }
-  } catch {
-    // cancelled
+  showDeleteConfirm.value = true
+}
+
+async function confirmDeleteSelected() {
+  showDeleteConfirm.value = false
+  if (!sftpSessionId) return
+  for (const path of selectedRemoteFiles.value) {
+    await ftpStore.deleteRemoteFile(props.tab.id, sftpSessionId, path)
   }
 }
 
@@ -492,20 +528,20 @@ async function handleRename() {
   if (!sftpSessionId || selectedRemoteFiles.value.length !== 1) return
   const oldPath = selectedRemoteFiles.value[0]
   const oldName = oldPath.split('/').pop() || ''
-  try {
-    const { value } = await ElMessageBox.prompt('请输入新名称', '重命名', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      inputValue: oldName
-    })
-    if (value && value !== oldName) {
-      const parentPath = oldPath.substring(0, oldPath.lastIndexOf('/'))
-      const newPath = `${parentPath}/${value}`
-      await ftpStore.renameRemoteFile(props.tab.id, sftpSessionId, oldPath, newPath)
-      selectedRemoteFiles.value = []
-    }
-  } catch {
-    // cancelled
+  renameOldPath.value = oldPath
+  renameInitial.value = oldName
+  showRenameDialog.value = true
+}
+
+async function confirmRenameFile(value: string) {
+  if (!sftpSessionId) return
+  const oldPath = renameOldPath.value
+  const oldName = oldPath.split('/').pop() || ''
+  if (value && value !== oldName) {
+    const parentPath = oldPath.substring(0, oldPath.lastIndexOf('/'))
+    const newPath = `${parentPath}/${value}`
+    await ftpStore.renameRemoteFile(props.tab.id, sftpSessionId, oldPath, newPath)
+    selectedRemoteFiles.value = []
   }
 }
 //上一个文件夹（远程）

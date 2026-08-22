@@ -55,6 +55,29 @@ export interface OpenFileInfo {
   cursor_line: number
   cursor_col: number
   scroll_top: number
+  /** 是否存在未保存内容草稿 */
+  has_draft?: boolean
+  /** 快照时目标文件 mtime 指纹（秒） */
+  file_mtime?: number
+  /** 快照时目标文件大小指纹 */
+  file_size?: number
+}
+
+/** 草稿检查结果（恢复前指纹校验） */
+export interface DraftCheckResult {
+  has_draft: boolean
+  file_changed: boolean
+  draft_saved_at: number
+  file_mtime: number
+}
+
+/** 草稿元数据（保存草稿时返回的指纹） */
+export interface DraftMeta {
+  path: string
+  saved_at: number
+  file_mtime: number
+  file_size: number
+  file_exists: boolean
 }
 
 /** 布局状态 */
