@@ -193,7 +193,19 @@ pub fn create_preset_window_from_preset(
     height: f64,
     enabled_plugins: Vec<String>,
     focus_mode: bool,
+    workspace_id: Option<String>,
 ) -> Option<String> {
+    // 绑定工作区的锁检查：同一工作区同时只能在一个窗口中打开（多个预设可绑同一工作区）
+    if let Some(ref ws_id) = workspace_id {
+        if let Some(holder) = crate::workspace::lock::get_lock_holder(ws_id) {
+            println!(
+                "[Rust] 预设 [{}] 绑定的工作区 {} 已被窗口 {} 打开，跳过创建",
+                name, ws_id, holder
+            );
+            return None;
+        }
+    }
+
     let uuid = Uuid::new_v4().to_string();
     let short_id = &uuid[..8];
     let label = format!("editor-{}", short_id);
@@ -220,7 +232,7 @@ pub fn create_preset_window_from_preset(
             let meta = registry::create_window_meta(
                 label.clone(),
                 WindowRole::Editor,
-                None,
+                workspace_id.clone(),
                 title,
                 Some(preset_id.to_string()),
                 100.0,
@@ -235,7 +247,7 @@ pub fn create_preset_window_from_preset(
             let _ = win.set_focus();
             let _ = app.emit("window-created", &meta);
 
-            // 将布局配置写入 settings.json，供新窗口前端读取
+            // 将布局配置写入 settings.json，供新窗口前端读取（含工作区绑定）
             if let Ok(store) = app.store("settings.json") {
                 let config_key = format!("window_layout_{}", label);
                 let _ = store.set(
@@ -243,7 +255,8 @@ pub fn create_preset_window_from_preset(
                     json!({
                         "enabledPlugins": enabled_plugins,
                         "focusMode": focus_mode,
-                        "presetId": preset_id
+                        "presetId": preset_id,
+                        "workspaceId": workspace_id.unwrap_or_default()
                     }),
                 );
                 let _ = store.save();

@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { load } from '@tauri-apps/plugin-store'
 import type { WindowMeta } from '@/Types/workspace'
 import type { ResponseData } from '@/entity/entitys'
+import NotificationUtil from '@/utils/NotificationUtil'
 const PAGE_CONFIGS: Record<string, { title: string; width: number; height: number }> = {
   '/App/setting': { title: '设置', width: 800, height: 650 },
   '/App/about': { title: '关于', width: 800, height: 650 },
@@ -100,6 +101,8 @@ export interface WindowPresetConfig {
   height: number
   openOnStartup: boolean
   focusMode: boolean
+  /** 绑定的工作区 ID（可选；多个预设可绑同一工作区，但同时只能打开一个） */
+  workspaceId?: string
 }
 
 /**
@@ -108,21 +111,28 @@ export interface WindowPresetConfig {
  */
 export async function createPresetWindow(preset: WindowPresetConfig): Promise<WindowMeta | null> {
   const meta = await createEditorWindow(
-    undefined,
+    preset.workspaceId || undefined,
     preset.width,
     preset.height,
     preset.name,
     preset.id
   )
-  if (!meta) return null
+  if (!meta) {
+    // 绑定工作区被占用时后端返回 300，提示用户（新窗口未绑定则弹窗选择）
+    if (preset.workspaceId) {
+      NotificationUtil.warn('该预设绑定的工作区已在其他窗口中打开')
+    }
+    return null
+  }
 
-  // 将布局配置保存到 settings.json，供新窗口初始化时读取
+  // 将布局配置保存到 settings.json，供新窗口初始化时读取（含工作区绑定）
   try {
     const store = await load('settings.json', { autoSave: false, defaults: {} })
     await store.set(`window_layout_${meta.label}`, {
       enabledPlugins: preset.enabledPlugins,
       focusMode: preset.focusMode,
-      presetId: preset.id
+      presetId: preset.id,
+      workspaceId: preset.workspaceId || ''
     })
     await store.save()
   } catch (e) {

@@ -388,6 +388,11 @@ pub fn run() {
                                             .collect::<Vec<String>>()
                                     })
                                     .unwrap_or_default();
+                                // 预设绑定的工作区（可选；空字符串视为未绑定）
+                                let workspace_id = preset.get("workspaceId")
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string())
+                                    .filter(|s| !s.is_empty());
 
                                 crate::window_manager::commands::create_preset_window_from_preset(
                                     &handle,
@@ -397,6 +402,7 @@ pub fn run() {
                                     height,
                                     enabled_plugins,
                                     focus_mode,
+                                    workspace_id,
                                 );
                             }
                         }

@@ -148,6 +148,7 @@ import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
 import { useDocumentManagerStore } from '@/plugins/files/store/documents'
 import { open } from '@tauri-apps/plugin-dialog'
+import { listen } from '@tauri-apps/api/event'
 import { openAppWindow, createEditorWindow, createPresetWindow } from '@/utils/WindowUtils'
 import type { WindowPresetConfig } from '@/utils/WindowUtils'
 import type { WindowMeta } from '@/Types/workspace'
@@ -192,6 +193,8 @@ const mainWindowPreset = ref<WindowPresetConfig>({
   focusMode: false
 })
 const allWindowPresets = computed(() => [mainWindowPreset.value, ...windowPresets.value])
+/** 预设变更事件监听取消函数 */
+let unlistenPresetsChanged: (() => void) | null = null
 
 /** 判断当前窗口是否启用了 files 插件 */
 const hasFilesPlugin = computed(() => {
@@ -531,7 +534,7 @@ const handleMenuCommand = async (item: MenuItem) => {
       break
     }
     case 'newWindow': {
-      // 不传工作区 ID，新窗口启动时自动分配一个未锁定的工作区
+      // 不传工作区 ID，新窗口启动时弹窗让用户选择工作区或新建临时工作区
       const meta = await createEditorWindow()
       if (meta) {
         NotificationUtil.success(`编辑器窗口已创建: ${meta.label}`)
@@ -649,11 +652,17 @@ onMounted(async () => {
   if (!workspaceStore.pendingWorkspaceSelection) {
     await workspaceStore.loadCurrentWorkspace(null)
   }
+  // 监听窗口预设变更（设置窗口新增/修改/删除预设后广播），实时刷新窗口菜单
+  unlistenPresetsChanged = await listen('window-presets-changed', () => {
+    loadWindowPresets()
+  })
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleGlobalClick)
   document.removeEventListener('keydown', handleKeydown)
+  unlistenPresetsChanged?.()
+  unlistenPresetsChanged = null
 })
 </script>
 

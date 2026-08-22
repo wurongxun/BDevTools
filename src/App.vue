@@ -46,6 +46,8 @@ import WorkspaceSelectDialog from '@/components/WorkspaceSelectDialog.vue'
 import type { WindowRole } from '@/Types/workspace'
 import { useDocumentManagerStore } from '@/plugins/files/store/documents'
 import { windowService } from '@/services/windowService'
+import { workspaceService } from '@/services/workspaceService'
+import NotificationUtil from '@/utils/NotificationUtil'
 
 const { useWorkspaceStore, useSessionStore, fileTreeStore, useLayoutStore } = useStore()
 const docStore = useDocumentManagerStore()
@@ -122,6 +124,7 @@ async function initEditorWindow() {
   if (windowRole.value !== 'editor') return
 
   // 读取布局配置（由创建窗口的调用方保存到 settings.json）
+  let layoutWorkspaceId = ''
   try {
     const win = getCurrentWebviewWindow()
     const label = await win.label
@@ -130,11 +133,13 @@ async function initEditorWindow() {
       enabledPlugins: string[]
       focusMode: boolean
       presetId: string
+      workspaceId?: string
     }>(`window_layout_${label}`)
 
     if (layoutConfig) {
       // 应用布局配置到当前窗口的 layout store
       useLayoutStore.applyPreset(layoutConfig)
+      layoutWorkspaceId = layoutConfig.workspaceId || ''
       // 清理临时配置，避免重复读取
       await settingsStore.delete(`window_layout_${label}`)
       await settingsStore.save()
@@ -147,18 +152,29 @@ async function initEditorWindow() {
   // 仅启动自动保存，用于保存当前窗口自身的状态
   useSessionStore.startAutoSave()
 
-  // 创建时已绑定工作区（注册表 meta）：直接加载，不弹选择窗
+  // 优先从注册表 meta 读取创建时绑定的工作区（比布局 JSON 更权威）
+  let boundMetaWorkspaceId = ''
   try {
     const win = getCurrentWebviewWindow()
     const list = await windowService.getWindowList()
     const meta = list.find((m) => m.label === win.label)
-    if (meta?.workspace_id) {
-      useWorkspaceStore.pendingWorkspaceSelection = false
-      await useWorkspaceStore.loadCurrentWorkspace(meta.workspace_id)
-      if (useWorkspaceStore.currentWorkspace) return
-    }
+    boundMetaWorkspaceId = meta?.workspace_id ?? ''
   } catch (e) {
     console.warn('读取窗口绑定工作区失败:', e)
+  }
+
+  // 已绑定工作区（注册表 meta 或布局配置）：未被占用则直接加载，不弹选择窗；
+  // 已被占用（同一工作区不能同时打开）：提示后降级弹窗选择
+  const boundWorkspaceId = boundMetaWorkspaceId || layoutWorkspaceId
+  if (boundWorkspaceId) {
+    const holder = await workspaceService.lockStatus(boundWorkspaceId).catch(() => null)
+    if (!holder) {
+      useWorkspaceStore.pendingWorkspaceSelection = false
+      await useWorkspaceStore.loadCurrentWorkspace(boundWorkspaceId)
+      if (useWorkspaceStore.currentWorkspace) return
+    } else {
+      NotificationUtil.warn(`绑定的工作区已在窗口 [${holder}] 中打开，请重新选择`)
+    }
   }
 
   // 未绑定工作区：弹窗让用户选择或新建临时工作区（pending 标志已在 setup 阶段置位）

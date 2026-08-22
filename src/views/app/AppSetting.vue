@@ -16,6 +16,10 @@ import { TreeNode } from '@/Types/entitys'
 import { check as check_, Update, DownloadEvent } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { pluginManager } from '@/core/pluginManager'
+import GlobalDialog from '@/components/GlobalDialog.vue'
+import { workspaceService } from '@/services/workspaceService'
+import type { WorkspaceSummary } from '@/Types/workspace'
+import { emit } from '@tauri-apps/api/event'
 
 const { appConfig } = useStore()
 const { t, locale } = useI18n()
@@ -140,9 +144,10 @@ onMounted(async () => {
 
   // 加载窗口预设
   await loadWindowPresets()
+  await loadWorkspaceOptions()
 })
 
-function show_setting() {}
+function show_setting() { }
 
 function query_setting_list() {
   // invoke('query_setting_list').then((res): void => {
@@ -217,11 +222,11 @@ async function handleRegisterAssociation() {
 }
 
 async function onReadLines() {
-    if (store) {
-      await store.set('read_lines', { value: read_lines.value })
-      await store.save();
-      userStore.setReadLines(read_lines.value)
-    }
+  if (store) {
+    await store.set('read_lines', { value: read_lines.value })
+    await store.save();
+    userStore.setReadLines(read_lines.value)
+  }
 }
 
 // 添加清除缓存和浏览器缓存的函数
@@ -246,6 +251,8 @@ interface WindowPresetConfig {
   height: number
   openOnStartup: boolean
   focusMode: boolean
+  /** 绑定的工作区 ID（可选；多个预设可绑同一工作区，但同时只能打开一个） */
+  workspaceId?: string
 }
 
 const windowPresets = ref<WindowPresetConfig[]>([])
@@ -276,6 +283,35 @@ const selectedSizeLabel = ref('中 (1024×768)')
 
 /** 所有已注册的插件 */
 const registeredPlugins = computed(() => pluginManager.plugins)
+
+/** 可绑定的工作区列表（排除临时工作区） */
+const workspaceOptions = ref<WorkspaceSummary[]>([])
+
+/** 加载工作区列表（供预设绑定选择） */
+async function loadWorkspaceOptions() {
+  try {
+    const list = await workspaceService.list()
+    const detail = await Promise.all(list.map(ws => workspaceService.get(ws.id).catch(() => null)))
+    workspaceOptions.value = list.filter((_, i) => detail[i]?.settings?.isTemporary !== true)
+  } catch (e) {
+    console.warn('加载工作区列表失败:', e)
+  }
+}
+
+/** 预设绑定的工作区名称（卡片展示用） */
+function presetWorkspaceName(preset: WindowPresetConfig): string {
+  if (!preset.workspaceId) return ''
+  return workspaceOptions.value.find(ws => ws.id === preset.workspaceId)?.name ?? '(工作区已删除)'
+}
+
+/** 预设变更后广播通知，其他窗口的菜单栏监听后重新加载预设列表 */
+async function notifyPresetsChanged() {
+  try {
+    await emit('window-presets-changed')
+  } catch (e) {
+    console.warn('广播窗口预设变更失败:', e)
+  }
+}
 
 /** 当前编辑的预设是否为新建 */
 const editingIsNew = computed(() => isCreatingPreset.value)
@@ -326,7 +362,8 @@ function addWindowPreset() {
     width: 1024,
     height: 768,
     openOnStartup: false,
-    focusMode: false
+    focusMode: false,
+    workspaceId: ''
   }
   selectedSizeLabel.value = '中 (1024×768)'
   showWindowEditDialog.value = true
@@ -351,6 +388,7 @@ async function removeWindowPreset(id: string) {
   }
   windowPresets.value = windowPresets.value.filter(p => p.id !== id)
   await saveWindowPresets()
+  await notifyPresetsChanged()
 }
 
 /** 保存编辑的窗口预设 */
@@ -379,9 +417,10 @@ async function saveEditingPreset() {
     return
   }
 
-  // 主窗口预设：单独存储
+  // 主窗口预设：单独存储（主窗口始终使用默认工作区，不保存绑定）
   if (editingPreset.value.id === 'main') {
     const config = { ...editingPreset.value }
+    delete config.workspaceId
     mainWindowPreset.value = config
     if (store) {
       await store.set('main_window_preset', config)
@@ -395,6 +434,7 @@ async function saveEditingPreset() {
     }
     showWindowEditDialog.value = false
     editingPreset.value = null
+    await notifyPresetsChanged()
     return
   }
 
@@ -409,6 +449,7 @@ async function saveEditingPreset() {
   await saveWindowPresets()
   showWindowEditDialog.value = false
   editingPreset.value = null
+  await notifyPresetsChanged()
 }
 
 /** 尺寸选择变化 */
@@ -553,24 +594,21 @@ const app_updates_check = async () => {
     NotificationUtil.error('更新失败: ' + (error instanceof Error ? error.message : String(error)));
   }
 }
+
+function handleClose() {
+  showWindowEditDialog.value = false
+}
 </script>
 
 <template>
   <div class="settings-layout">
     <!-- 左侧导航 -->
     <div class="settings-nav">
-      <div
-        class="settings-nav-item"
-        :class="{ active: activeSettingTab === 'app' }"
-        @click="activeSettingTab = 'app'"
-      >
+      <div class="settings-nav-item" :class="{ active: activeSettingTab === 'app' }" @click="activeSettingTab = 'app'">
         应用设置
       </div>
-      <div
-        class="settings-nav-item"
-        :class="{ active: activeSettingTab === 'window' }"
-        @click="activeSettingTab = 'window'"
-      >
+      <div class="settings-nav-item" :class="{ active: activeSettingTab === 'window' }"
+        @click="activeSettingTab = 'window'">
         窗口设置
       </div>
     </div>
@@ -583,159 +621,126 @@ const app_updates_check = async () => {
         <div class="settings-section">
           <h2 class="section-title">{{ $t('settings.name') }}</h2>
 
-        <div class="settings-item">
-          <div class="setting-info">
-            <span class="setting-label">{{ $t('autostart.name') }}</span>
-            <span class="setting-description">{{ $t('autostart.hint') }}</span>
+          <div class="settings-item">
+            <div class="setting-info">
+              <span class="setting-label">{{ $t('autostart.name') }}</span>
+              <span class="setting-description">{{ $t('autostart.hint') }}</span>
+            </div>
+            <div class="setting-control">
+              <el-switch v-model="autostart" @change="autostart_change()" inline-prompt :active-icon="Check"
+                :inactive-icon="Close" />
+            </div>
           </div>
-          <div class="setting-control">
-            <el-switch
-              v-model="autostart"
-              @change="autostart_change()"
-              inline-prompt
-              :active-icon="Check"
-              :inactive-icon="Close"
-            />
+
+
+
+          <div class="settings-item">
+            <div class="setting-info">
+              <span class="setting-label">{{ $t('darkMode.name') }}</span>
+              <span class="setting-description"></span>
+            </div>
+            <div class="setting-control">
+              <el-switch v-model="dark" @change="dark_change()" inline-prompt :active-icon="Check"
+                :inactive-icon="Close" />
+            </div>
+          </div>
+
+          <div class="settings-item">
+            <div class="setting-info">
+              <span class="setting-label">{{ $t('locale.language') }}</span>
+              <span class="setting-description">选择界面显示语言</span>
+            </div>
+            <div class="setting-control">
+              <el-select v-model="language" @change="language_change" placeholder="选择语言" style="width: 180px">
+                <el-option v-for="item in language_options" :key="item.value" :label="item.label" :value="item.value"
+                  :disabled="item.disabled" />
+              </el-select>
+            </div>
           </div>
         </div>
 
-      
-
-        <div class="settings-item">
-          <div class="setting-info">
-            <span class="setting-label">{{ $t('darkMode.name') }}</span>
-            <span class="setting-description"></span>
-          </div>
-          <div class="setting-control">
-            <el-switch
-              v-model="dark"
-              @change="dark_change()"
-              inline-prompt
-              :active-icon="Check"
-              :inactive-icon="Close"
-            />
+        <!-- 网络设置 -->
+        <div class="settings-section">
+          <h2 class="section-title">网络</h2>
+          <div class="settings-item">
+            <div class="setting-info">
+              <span class="setting-label">网络检测</span>
+              <span class="setting-description">检测当前网络连接状态</span>
+            </div>
+            <div class="setting-control">
+              <el-button type="primary" disabled plain>检测网络</el-button>
+            </div>
           </div>
         </div>
 
-        <div class="settings-item">
-          <div class="setting-info">
-            <span class="setting-label">{{ $t('locale.language') }}</span>
-            <span class="setting-description">选择界面显示语言</span>
-          </div>
-          <div class="setting-control">
-            <el-select
-              v-model="language"
-              @change="language_change"
-              placeholder="选择语言"
-              style="width: 180px"
-            >
-              <el-option
-                v-for="item in language_options"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-                :disabled="item.disabled"
-              />
-            </el-select>
-          </div>
-        </div>
-      </div>
-
-      <!-- 网络设置 -->
-      <div class="settings-section">
-        <h2 class="section-title">网络</h2>
-        <div class="settings-item">
-          <div class="setting-info">
-            <span class="setting-label">网络检测</span>
-            <span class="setting-description">检测当前网络连接状态</span>
-          </div>
-          <div class="setting-control">
-            <el-button type="primary" disabled plain>检测网络</el-button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 更新设置 -->
-      <div class="settings-section">
-        <h2 class="section-title">更新</h2>
-        <div class="settings-item">
-          <div class="setting-info">
-            <span class="setting-label">应用更新</span>
-            <span class="setting-description">手动检查新版本，获取最新功能和修复</span>
-            <span v-if="has_update && update_info" class="update-info">
-              发现新版本: {{ update_info.version }} ({{ update_info.date }})
-            </span>
-          </div>
-          <div class="setting-control">
-            <el-button
-              type="primary"
-              @click="app_updates_check"
-              :loading="!has_update"
-              plain
-            >
-              {{ has_update ? '立即更新' : '检查更新' }}
-            </el-button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 其他设置 -->
-      <div class="settings-section">
-        <h2 class="section-title">其他设置</h2>
-
-        <div class="settings-item">
-          <div class="setting-info">
-            <span class="setting-label">文本默认读取行数</span>
-            <span class="setting-description">编辑器打开文件时默认读取的行数，建议最大值不超过20万行，行数直接影响内存占用，请谨慎设置</span>
-          </div>
-          <div class="setting-control">
-            <div class="read-lines-control">
-              <el-input
-                v-model="read_lines"
-                placeholder="默认读取行数"
-                @keyup.enter="onReadLines"                style="width: 180px"
-              />
-              <el-button type="primary" @click="onReadLines" plain>
-                确认
+        <!-- 更新设置 -->
+        <div class="settings-section">
+          <h2 class="section-title">更新</h2>
+          <div class="settings-item">
+            <div class="setting-info">
+              <span class="setting-label">应用更新</span>
+              <span class="setting-description">手动检查新版本，获取最新功能和修复</span>
+              <span v-if="has_update && update_info" class="update-info">
+                发现新版本: {{ update_info.version }} ({{ update_info.date }})
+              </span>
+            </div>
+            <div class="setting-control">
+              <el-button type="primary" @click="app_updates_check" :loading="!has_update" plain>
+                {{ has_update ? '立即更新' : '检查更新' }}
               </el-button>
             </div>
           </div>
         </div>
-        <div class="settings-item">
-          <div class="setting-info">
-            <span class="setting-label">注册 </span>
-            <span class="setting-description">注册应用到windows"打开方式"列表 </span>
-          </div>
-          <div class="setting-control">
-            <el-button
-              type="primary"
-              @click="handleRegisterAssociation"
-              plain
-            >
-              注册
-            </el-button>
-          </div>
-        </div>
-        <div class="settings-item">
-          <div class="setting-info">
-            <span class="setting-label">清除缓存</span>
-            <span class="setting-description">清理应用缓存文件</span>
-          </div>
-          <div class="setting-control">
-            <el-button type="danger" disabled plain>清除缓存</el-button>
-          </div>
-        </div>
 
-        <div class="settings-item">
-          <div class="setting-info">
-            <span class="setting-label">清除浏览器缓存</span>
-            <span class="setting-description">清理内置浏览器缓存数据</span>
+        <!-- 其他设置 -->
+        <div class="settings-section">
+          <h2 class="section-title">其他设置</h2>
+
+          <div class="settings-item">
+            <div class="setting-info">
+              <span class="setting-label">文本默认读取行数</span>
+              <span class="setting-description">编辑器打开文件时默认读取的行数，建议最大值不超过20万行，行数直接影响内存占用，请谨慎设置</span>
+            </div>
+            <div class="setting-control">
+              <div class="read-lines-control">
+                <el-input v-model="read_lines" placeholder="默认读取行数" @keyup.enter="onReadLines" style="width: 180px" />
+                <el-button type="primary" @click="onReadLines" plain>
+                  确认
+                </el-button>
+              </div>
+            </div>
           </div>
-          <div class="setting-control">
-            <el-button type="danger" disabled plain>清除浏览器缓存</el-button>
+          <div class="settings-item">
+            <div class="setting-info">
+              <span class="setting-label">注册 </span>
+              <span class="setting-description">注册应用到windows"打开方式"列表 </span>
+            </div>
+            <div class="setting-control">
+              <el-button type="primary" @click="handleRegisterAssociation" plain>
+                注册
+              </el-button>
+            </div>
+          </div>
+          <div class="settings-item">
+            <div class="setting-info">
+              <span class="setting-label">清除缓存</span>
+              <span class="setting-description">清理应用缓存文件</span>
+            </div>
+            <div class="setting-control">
+              <el-button type="danger" disabled plain>清除缓存</el-button>
+            </div>
+          </div>
+
+          <div class="settings-item">
+            <div class="setting-info">
+              <span class="setting-label">清除浏览器缓存</span>
+              <span class="setting-description">清理内置浏览器缓存数据</span>
+            </div>
+            <div class="setting-control">
+              <el-button type="danger" disabled plain>清除浏览器缓存</el-button>
+            </div>
           </div>
         </div>
-      </div>
 
       </div>
 
@@ -745,49 +750,48 @@ const app_updates_check = async () => {
           <h2 class="section-title">窗口</h2>
           <p class="section-desc">配置应用启动时自动打开的窗口，以及每个窗口的功能和布局。</p>
 
-        <!-- 窗口预设列表 -->
-        <div class="window-preset-list">
-          <div
-            v-for="preset in allPresets"
-            :key="preset.id"
-            class="window-preset-card"
-          >
-            <div class="preset-info">
-              <div class="preset-name-row">
-                <span class="preset-name">{{ preset.name }}</span>
-                <el-tag v-if="preset.id === 'main'" size="small" type="primary">主窗口</el-tag>
-                <el-tag v-if="preset.openOnStartup && preset.id !== 'main'" size="small" type="success">启动时打开</el-tag>
-                <el-tag v-if="preset.focusMode" size="small" type="warning">专注模式</el-tag>
+          <!-- 窗口预设列表 -->
+          <div class="window-preset-list">
+            <div v-for="preset in allPresets" :key="preset.id" class="window-preset-card">
+              <div class="preset-info">
+                <div class="preset-name-row">
+                  <span class="preset-name">{{ preset.name }}</span>
+                  <el-tag v-if="preset.id === 'main'" size="small" type="primary">主窗口</el-tag>
+                  <el-tag v-if="preset.openOnStartup && preset.id !== 'main'" size="small" type="success">启动时打开</el-tag>
+                  <el-tag v-if="preset.focusMode" size="small" type="warning">专注模式</el-tag>
+                </div>
+                <div class="preset-meta">
+                  <span>插件: {{ preset.enabledPlugins.length > 0 ? preset.enabledPlugins.join(', ') : '全部' }}</span>
+                  <span class="preset-sep">|</span>
+                  <span>{{ preset.width }} × {{ preset.height }}</span>
+                  <template v-if="preset.workspaceId">
+                    <span class="preset-sep">|</span>
+                    <span>工作区: {{ presetWorkspaceName(preset) }}</span>
+                  </template>
+                </div>
               </div>
-              <div class="preset-meta">
-                <span>插件: {{ preset.enabledPlugins.length > 0 ? preset.enabledPlugins.join(', ') : '全部' }}</span>
-                <span class="preset-sep">|</span>
-                <span>{{ preset.width }} × {{ preset.height }}</span>
+              <div class="preset-actions">
+                <el-button size="small" @click="editWindowPreset(preset)" :icon="Edit" circle />
+                <el-button v-if="preset.id !== 'main'" size="small" @click="removeWindowPreset(preset.id)"
+                  :icon="Delete" circle type="danger" />
               </div>
-            </div>
-            <div class="preset-actions">
-              <el-button size="small" @click="editWindowPreset(preset)" :icon="Edit" circle />
-              <el-button v-if="preset.id !== 'main'" size="small" @click="removeWindowPreset(preset.id)" :icon="Delete" circle type="danger" />
             </div>
           </div>
-        </div>
 
-        <el-button type="primary" @click="addWindowPreset" plain>
-          <el-icon><Plus /></el-icon>
-          添加窗口
-        </el-button>
+          <el-button type="primary" @click="addWindowPreset" plain>
+            <el-icon>
+              <Plus />
+            </el-icon>
+            添加窗口
+          </el-button>
         </div>
       </div>
     </div>
 
     <!-- 窗口编辑弹窗 -->
-    <el-dialog
-      v-model="showWindowEditDialog"
-      :title="editingIsNew ? '添加窗口' : '编辑窗口'"
-      width="520px"
-      :close-on-click-modal="false"
-      append-to-body
-    >
+
+    <GlobalDialog v-model="showWindowEditDialog" :title="editingIsNew ? '添加窗口' : '编辑窗口'" width="60%"
+      @close="handleClose">
       <div v-if="editingPreset" class="window-edit-form">
         <!-- 窗口名称 -->
         <div class="form-item">
@@ -795,16 +799,22 @@ const app_updates_check = async () => {
           <el-input v-model="editingPreset.name" placeholder="输入窗口名称" />
         </div>
 
+        <!-- 绑定工作区（主窗口始终使用默认工作区，不提供绑定） -->
+        <div class="form-item" v-if="!isEditingMain">
+          <label class="form-label">绑定工作区</label>
+          <el-select v-model="editingPreset.workspaceId" placeholder="不绑定（打开时选择）" clearable
+            style="width: 100%">
+            <el-option v-for="ws in workspaceOptions" :key="ws.id" :label="ws.name" :value="ws.id" />
+          </el-select>
+          <span class="form-hint">多个窗口可绑定同一工作区，但同一工作区同时只能在一个窗口中打开</span>
+        </div>
+
         <!-- 启用插件 -->
         <div class="form-item">
           <label class="form-label">启用插件</label>
           <div class="plugin-checkbox-list">
-            <el-checkbox
-              v-for="plugin in registeredPlugins"
-              :key="plugin.id"
-              :model-value="editingPreset.enabledPlugins.includes(plugin.id)"
-              @change="togglePlugin(plugin.id)"
-            >
+            <el-checkbox v-for="plugin in registeredPlugins" :key="plugin.id"
+              :model-value="editingPreset.enabledPlugins.includes(plugin.id)" @change="togglePlugin(plugin.id)">
               {{ plugin.label }}
             </el-checkbox>
           </div>
@@ -829,13 +839,9 @@ const app_updates_check = async () => {
             <label class="form-label">启动时打开</label>
             <span class="form-hint">{{ isEditingMain ? '主窗口默认随应用启动，可手动关闭' : '应用启动时自动打开此窗口，至少保留一个' }}</span>
           </div>
-          <el-switch
-            v-model="editingPreset.openOnStartup"
+          <el-switch v-model="editingPreset.openOnStartup"
             :disabled="!isEditingMain && editingPreset.openOnStartup && !editingIsNew && savedStartupCount <= 1"
-            inline-prompt
-            :active-icon="Check"
-            :inactive-icon="Close"
-          />
+            inline-prompt :active-icon="Check" :inactive-icon="Close" />
         </div>
 
         <!-- 专注模式 -->
@@ -844,21 +850,15 @@ const app_updates_check = async () => {
             <label class="form-label">专注模式</label>
             <span class="form-hint">只保留一个插件，左侧边栏默认隐藏</span>
           </div>
-          <el-switch
-            :model-value="editingPreset.focusMode"
-            @change="toggleFocusMode"
-            inline-prompt
-            :active-icon="Check"
-            :inactive-icon="Close"
-          />
+          <el-switch :model-value="editingPreset.focusMode" @change="toggleFocusMode" inline-prompt :active-icon="Check"
+            :inactive-icon="Close" />
         </div>
       </div>
-
       <template #footer>
         <el-button @click="showWindowEditDialog = false">取消</el-button>
         <el-button type="primary" @click="saveEditingPreset">保存</el-button>
       </template>
-    </el-dialog>
+    </GlobalDialog>
   </div>
 </template>
 
@@ -915,6 +915,7 @@ const app_updates_check = async () => {
       background-color: theme.getVar('activityBarHover');
       color: theme.getVar('textColor');
     }
+
     font-weight: 500;
   }
 }
