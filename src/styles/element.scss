@@ -64,27 +64,27 @@ html.dark {
 .el-button {
   --el-button-size: var(--el-component-size);
   height: var(--el-button-size);
-  padding: 5px 12px;
+  padding: 2px 4px;
 
   &.is-circle {
     width: var(--el-button-size);
-    padding: 5px;
+    padding: 2px;
   }
 
   &--large {
     --el-button-size: var(--el-component-size-large);
-    padding: 8px 16px;
+    padding: 3px 6px;
   }
 
   &--small {
     --el-button-size: var(--el-component-size-small);
-    padding: 4px 9px;
+    padding: 2px 4px;
   }
 }
 
 // 表单行距同步收紧
 .el-form-item {
-  margin-bottom: 14px;
+  margin-bottom: 2px;
 }
 
 // tooltip 悬浮在标题栏等浅色区域时需要更强的层级感，

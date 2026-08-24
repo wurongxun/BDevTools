@@ -1,7 +1,6 @@
 <template>
   <div class="script-explorer">
     <div class="explorer-header">
-      <span class="title">查询文件</span>
       <el-tooltip content="新建查询" placement="top">
         <el-button :icon="Plus" size="small" circle @click="askNewFile(scriptsStore.scriptsDir)" />
       </el-tooltip>

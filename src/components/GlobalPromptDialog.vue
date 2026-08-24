@@ -59,7 +59,7 @@ const props = withDefaults(defineProps<Props>(), {
   placeholder: '',
   initialValue: '',
   width: '360px',
-  height: '',
+  height: '200px',
   verticalCenter: true,
   confirmButtonText: '确定',
   cancelButtonText: '取消'

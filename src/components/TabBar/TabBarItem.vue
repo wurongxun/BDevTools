@@ -58,6 +58,7 @@ const emit = defineEmits<{
 
 <style scoped lang="scss">
 @use '@/styles/theme.scss' as theme;
+@use '@/styles/variables' as variables;
 @use 'sass:color';
 
 .tab-bar-item {
@@ -73,7 +74,7 @@ const emit = defineEmits<{
   white-space: nowrap;
   position: relative;
   transition: background-color 0.15s, color 0.15s;
-  font-size: 13px;
+  font-size: variables.$font-size;
 
   @include theme.useTheme {
     background-color: color.adjust(theme.getVar('bgColor'), $lightness: 3%);
