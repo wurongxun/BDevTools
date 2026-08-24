@@ -121,5 +121,7 @@ pnpm tauri build
 应用图标出处：https://www.flaticon.com/free-icon/substance_9814620
 
 ## 应用截图
-
-![image](./App_2027.png)
+![image](./img_0.png)
+![image](./img_1.png)
+![image](./img_2.png)
+![image](./img_3.png)
