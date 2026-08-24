@@ -4,9 +4,15 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { SqlResult, TableDataResult, ApiResponse } from '../types'
 
-/** 执行 SQL */
-export function dbExecuteSql(configId: string, sql: string, database?: string): Promise<ApiResponse<SqlResult>> {
-  return invoke('db_execute_sql', { configId, sql, database })
+/** 执行 SQL（分页：默认 200 行/页，后端上限 1000；offset 用于翻页） */
+export function dbExecuteSql(
+  configId: string,
+  sql: string,
+  database?: string,
+  pageSize?: number,
+  offset?: number
+): Promise<ApiResponse<SqlResult>> {
+  return invoke('db_execute_sql', { configId, sql, database, pageSize, offset })
 }
 
 /** 分页查询表数据 */

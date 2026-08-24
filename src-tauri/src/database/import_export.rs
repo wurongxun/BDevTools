@@ -3,10 +3,13 @@
 */
 use crate::response::response::Response;
 use anyhow::{anyhow, Result};
+use futures_util::TryStreamExt;
 use serde::{Deserialize, Serialize};
+use sqlx::{Column, Row};
+use std::fs::File;
 use tauri::command;
-use super::pool::get_pool;
-use super::operations::execute_sql;
+use super::pool::{get_pool, DbPool};
+use super::operations;
 
 /// 导出结果
 #[derive(Serialize, Deserialize, Debug)]
@@ -104,39 +107,83 @@ pub async fn db_import_excel(
 
 // ==================== 内部辅助函数 ====================
 
-async fn export_to_csv(pool: &super::pool::DbPool, sql: &str, file_path: &str) -> Result<u64> {
-    let result = super::operations::execute_sql(pool, sql).await?;
+/// 导出表数据为 CSV（流式逐行写入，导出全量数据，不受查询行数上限限制）
+async fn export_to_csv(pool: &DbPool, sql: &str, file_path: &str) -> Result<u64> {
     let mut wtr = csv::Writer::from_path(file_path)?;
-
-    // 写入表头
-    wtr.write_record(&result.columns)?;
-
-    // 写入数据行
-    for row in &result.rows {
-        let str_row: Vec<String> = row.iter().map(|v| match v {
-            serde_json::Value::Null => String::new(),
-            serde_json::Value::String(s) => s.clone(),
-            other => other.to_string(),
-        }).collect();
-        wtr.write_record(&str_row)?;
-    }
+    let count = match pool {
+        DbPool::MySQL(p) => stream_mysql_to_csv(p, sql, &mut wtr).await?,
+        DbPool::PostgreSQL(p) => stream_pg_to_csv(p, sql, &mut wtr).await?,
+    };
     wtr.flush()?;
-    Ok(result.rows.len() as u64)
+    Ok(count)
 }
 
-async fn export_to_excel(pool: &super::pool::DbPool, sql: &str, file_path: &str, sheet_name: &str) -> Result<u64> {
-    let result = super::operations::execute_sql(pool, sql).await?;
+/// 流式读取 MySQL 结果集逐行写入 CSV（不在内存中积累全部行）
+async fn stream_mysql_to_csv(pool: &sqlx::mysql::MySqlPool, sql: &str, wtr: &mut csv::Writer<File>) -> Result<u64> {
+    let mut stream = sqlx::query(sql).fetch(pool);
+    let mut columns: Vec<String> = Vec::new();
+    let mut count = 0u64;
+    while let Some(row) = stream.try_next().await? {
+        if columns.is_empty() {
+            columns = row.columns().iter().map(|c| c.name().to_string()).collect();
+            wtr.write_record(&columns)?;
+        }
+        let str_row: Vec<String> = (0..columns.len())
+            .map(|i| value_to_csv_string(&operations::mysql_cell_to_value(&row, i)))
+            .collect();
+        wtr.write_record(&str_row)?;
+        count += 1;
+    }
+    Ok(count)
+}
+
+/// 流式读取 PostgreSQL 结果集逐行写入 CSV（不在内存中积累全部行）
+async fn stream_pg_to_csv(pool: &sqlx::postgres::PgPool, sql: &str, wtr: &mut csv::Writer<File>) -> Result<u64> {
+    let mut stream = sqlx::query(sql).fetch(pool);
+    let mut columns: Vec<String> = Vec::new();
+    let mut count = 0u64;
+    while let Some(row) = stream.try_next().await? {
+        if columns.is_empty() {
+            columns = row.columns().iter().map(|c| c.name().to_string()).collect();
+            wtr.write_record(&columns)?;
+        }
+        let str_row: Vec<String> = (0..columns.len())
+            .map(|i| value_to_csv_string(&operations::pg_cell_to_value(&row, i)))
+            .collect();
+        wtr.write_record(&str_row)?;
+        count += 1;
+    }
+    Ok(count)
+}
+
+/// JSON 值 → CSV 单元格字符串（NULL 导出为空串）
+fn value_to_csv_string(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::Null => String::new(),
+        serde_json::Value::String(s) => s.clone(),
+        other => other.to_string(),
+    }
+}
+
+/// 导出表数据为 Excel（导出全量数据，不受查询行数上限限制）
+async fn export_to_excel(pool: &DbPool, sql: &str, file_path: &str, sheet_name: &str) -> Result<u64> {
+    // Excel 工作簿需在内存中构建，全量读取（无行数上限）
+    let (columns, rows) = match pool {
+        DbPool::MySQL(p) => operations::fetch_mysql_rows(p, sql, usize::MAX).await?,
+        DbPool::PostgreSQL(p) => operations::fetch_pg_rows(p, sql, usize::MAX).await?,
+    };
+
     let mut workbook = rust_xlsxwriter::Workbook::new();
     let worksheet = workbook.add_worksheet();
     worksheet.set_name(sheet_name)?;
 
     // 写入表头
-    for (col_idx, col_name) in result.columns.iter().enumerate() {
+    for (col_idx, col_name) in columns.iter().enumerate() {
         worksheet.write_string(0, col_idx as u16, col_name)?;
     }
 
     // 写入数据
-    for (row_idx, row) in result.rows.iter().enumerate() {
+    for (row_idx, row) in rows.iter().enumerate() {
         for (col_idx, val) in row.iter().enumerate() {
             match val {
                 serde_json::Value::Null => { worksheet.write_string(row_idx as u32 + 1, col_idx as u16, "")?; }
@@ -155,7 +202,7 @@ async fn export_to_excel(pool: &super::pool::DbPool, sql: &str, file_path: &str,
     }
 
     workbook.save(file_path)?;
-    Ok(result.rows.len() as u64)
+    Ok(rows.len() as u64)
 }
 
 async fn import_from_csv(pool: &super::pool::DbPool, database: &str, table: &str, file_path: &str, has_header: bool) -> Result<ImportResult> {

@@ -16,7 +16,8 @@
       <span class="result-info">
         <template v-if="result.is_query">
           查询结果: {{ result.rows.length }} 行, 耗时 {{ result.execution_time_ms }} ms
-          <span v-if="result.rows.length > displayLimit" class="limit-hint">（仅显示前 {{ displayLimit }} 行）</span>
+          <span v-if="result.has_more" class="limit-hint">（还有更多数据，点击工具栏“下一页”继续查看）</span>
+          <span v-else-if="result.rows.length > displayLimit" class="limit-hint">（仅显示前 {{ displayLimit }} 行）</span>
         </template>
         <template v-else>
           执行完成: {{ result.affected_rows }} 行受影响, 耗时 {{ result.execution_time_ms }} ms

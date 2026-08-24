@@ -32,6 +32,8 @@ export interface SqlResult {
   affected_rows: number
   execution_time_ms: number
   is_query: boolean
+  /** 是否还有下一页数据（分页查询） */
+  has_more?: boolean
 }
 
 /** 表数据查询结果 */

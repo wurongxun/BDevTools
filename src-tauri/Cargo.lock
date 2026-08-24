@@ -12,6 +12,7 @@ dependencies = [
  "chrono",
  "csv",
  "encoding_rs",
+ "futures-util",
  "hex",
  "lazy_static",
  "log",

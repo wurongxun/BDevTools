@@ -13,18 +13,30 @@
       <el-select v-model="selectedDb" size="small" placeholder="选择数据库" style="width: 140px; margin-left: 8px;" :disabled="!selectedConfigId">
         <el-option v-for="db in databases" :key="db.name" :label="db.name" :value="db.name" />
       </el-select>
+      <el-select v-model="pageSize" size="small" style="width: 108px; margin-left: 8px;" @change="handlePageSizeChange">
+        <el-option v-for="s in PAGE_SIZE_OPTIONS" :key="s" :label="`${s} 行/页`" :value="s" />
+      </el-select>
       <span class="execution-info" v-if="lastResult">
         {{ lastResult.is_query ? `${lastResult.rows.length} 行` : `${lastResult.affected_rows} 行受影响` }}
         | {{ lastResult.execution_time_ms }} ms
+        <template v-if="lastResult.is_query"> | 第 {{ currentPage }} 页</template>
       </span>
+      <el-button-group v-if="lastResult && lastResult.is_query" class="pager">
+        <el-button size="small" :disabled="currentPage <= 1 || executing" @click="goPrevPage">
+          <el-icon><ArrowLeft /></el-icon> 上一页
+        </el-button>
+        <el-button size="small" :disabled="!canGoNext || executing" @click="goNextPage">
+          {{ prefetching ? '加载中' : '下一页' }} <el-icon><ArrowRight /></el-icon>
+        </el-button>
+      </el-button-group>
     </div>
     <div class="editor-wrapper" ref="monacoContainer"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { CaretRight, FolderOpened } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { CaretRight, FolderOpened, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import { dbExecuteSql } from '../api/operations'
 import { dbListDatabases } from '../api/metadata'
 import { useConnectionStore } from '../store'
@@ -54,6 +66,16 @@ const selectedConfigId = ref<string>(props.configId || '')
 const selectedDb = ref('')
 const databases = ref<DatabaseInfo[]>([])
 const lastResult = ref<SqlResult | null>(null)
+// 分页：默认 200 行/页（前后端一致），后端单次最大 1000 行
+const PAGE_SIZE_OPTIONS = [50, 100, 200, 500, 1000]
+const pageSize = ref(200)
+const currentPage = ref(1)
+const executing = ref(false)
+// 下一页预取缓存：当前页加载完成后后台预取，翻页时即时展示
+const nextPageCache = ref<SqlResult | null>(null)
+const prefetching = ref(false)
+// 预取时记录的查询快照，SQL/连接/库/行数变化后缓存作废
+let prefetchSnapshot = ''
 let editor: monaco.editor.IStandaloneCodeEditor | null = null
 
 // 从 store 获取连接列表
@@ -139,19 +161,42 @@ async function handleConnectionChange(configId: string) {
   }
 }
 
+function querySnapshot(): string {
+  return `${selectedConfigId.value}|${selectedDb.value}|${pageSize.value}|${editor?.getValue().trim() || ''}`
+}
+
+function invalidatePageCache() {
+  nextPageCache.value = null
+  prefetching.value = false
+  prefetchSnapshot = ''
+}
+
 async function handleExecute() {
-  if (!selectedConfigId.value || !editor) return
+  currentPage.value = 1
+  await executePage(1)
+}
+
+async function executePage(page: number) {
+  if (!selectedConfigId.value || !editor || executing.value) return
   const sql = editor.getValue().trim()
   if (!sql) return
 
+  executing.value = true
+  invalidatePageCache()
+  const snapshot = querySnapshot()
   try {
     const db = selectedDb.value || undefined
-    console.log('[SqlEditor] SQL :', selectedConfigId.value, sql, db)
-    const res = await dbExecuteSql(selectedConfigId.value, sql, db)
-    console.log('[SqlEditor] SQL 执行结果:', res.data)
+    const offset = (page - 1) * pageSize.value
+    console.log('[SqlEditor] SQL :', selectedConfigId.value, sql, db, `页=${page} 行数=${pageSize.value}`)
+    const res = await dbExecuteSql(selectedConfigId.value, sql, db, pageSize.value, offset)
     if (res.code === 200) {
+      currentPage.value = page
       lastResult.value = res.data
       emit('executed', res.data)
+      // 还有下一页：后台预取，保证翻页即时展示
+      if (res.data.is_query && res.data.has_more) {
+        prefetchNext(page + 1, snapshot)
+      }
     } else {
       console.error('[SqlEditor] SQL 执行失败:', res.msg)
       lastResult.value = { columns: [], rows: [], affected_rows: 0, execution_time_ms: 0, is_query: false }
@@ -160,6 +205,62 @@ async function handleExecute() {
   } catch (e: any) {
     console.error('[SqlEditor] SQL 执行异常:', e)
     emit('executed', { columns: ['Error'], rows: [[e.message || String(e)]], affected_rows: 0, execution_time_ms: 0, is_query: false })
+  } finally {
+    executing.value = false
+  }
+}
+
+/** 后台预取指定页（静默失败，不影响当前页） */
+async function prefetchNext(page: number, snapshot: string) {
+  if (prefetching.value || !selectedConfigId.value || !editor) return
+  prefetching.value = true
+  prefetchSnapshot = snapshot
+  try {
+    const db = selectedDb.value || undefined
+    const offset = (page - 1) * pageSize.value
+    const res = await dbExecuteSql(selectedConfigId.value, editor.getValue().trim(), db, pageSize.value, offset)
+    // 预取期间查询条件未变才保留缓存，否则作废（用户改了 SQL/连接/行数）
+    if (res.code === 200 && prefetchSnapshot === snapshot && querySnapshot() === snapshot) {
+      nextPageCache.value = res.data
+    }
+  } catch (e) {
+    console.warn('[SqlEditor] 预取下一页失败:', e)
+  } finally {
+    prefetching.value = false
+  }
+}
+
+const canGoNext = computed(() => {
+  return !!lastResult.value?.has_more || nextPageCache.value !== null
+})
+
+function goNextPage() {
+  if (nextPageCache.value) {
+    // 命中预取缓存：即时展示，并继续预取下下页
+    currentPage.value += 1
+    lastResult.value = nextPageCache.value
+    nextPageCache.value = null
+    emit('executed', lastResult.value)
+    if (lastResult.value.has_more) {
+      prefetchNext(currentPage.value + 1, querySnapshot())
+    }
+  } else {
+    executePage(currentPage.value + 1)
+  }
+}
+
+function goPrevPage() {
+  if (currentPage.value > 1) {
+    executePage(currentPage.value - 1)
+  }
+}
+
+/** 行数变化后重新查询（以前端设定为准），从第一页开始 */
+function handlePageSizeChange() {
+  invalidatePageCache()
+  if (lastResult.value && lastResult.value.is_query) {
+    currentPage.value = 1
+    executePage(1)
   }
 }
 
@@ -217,6 +318,9 @@ defineExpose({ getContent, setContent })
   margin-left: auto;
   font-size: 12px;
   color: #888;
+}
+.pager {
+  margin-left: 8px;
 }
 .editor-wrapper {
   flex: 1;

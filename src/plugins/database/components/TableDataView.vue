@@ -35,7 +35,7 @@
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
-        :page-sizes="[20, 50, 100, 200]"
+        :page-sizes="[50, 100, 200, 500, 1000]"
         layout="total, sizes, prev, pager, next"
         @size-change="loadData"
         @current-change="loadData"
@@ -94,7 +94,7 @@ const columns = ref<ColumnInfo[]>([])
 const tableData = ref<Record<string, any>[]>([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(200)
 const whereClause = ref('')
 const orderBy = ref('')
 const loading = ref(false)
