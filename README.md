@@ -1,6 +1,6 @@
-# MdViewer
+#  BackendDevelopmentTools
 
-一款基于 Tauri 的跨平台桌面笔记与远程管理工具，支持 Markdown 编辑、大日志文件阅览、SSH/SFTP 远程连接等功能。采用插件化架构，轻量高效，G 级大日志阅览查询无压力。
+一款基于 Tauri 的跨平台桌面后端管理工具，支持 Markdown 编辑、大日志文件阅览、SSH/SFTP 远程连接、数据库等功能。采用插件化架构，轻量高效，G 级大日志阅览查询无压力。
 
 ## 功能特性
 
