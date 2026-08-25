@@ -81,7 +81,7 @@ fn set_custom_dir(app: &tauri::AppHandle, workspace_id: &str, plugin_id: &str, p
 // ==================== Tauri 命令 ====================
 
 /// 获取插件在当前工作区的工作目录（自动创建）
-#[command]
+//#[command]
 pub fn workspace_get_plugin_dir(
     app: tauri::AppHandle,
     workspace_id: String,
@@ -107,7 +107,7 @@ pub fn workspace_get_plugin_dir(
 }
 
 /// 获取插件的子目录路径（自动创建）
-#[command]
+//#[command]
 pub fn workspace_get_plugin_subdir(
     app: tauri::AppHandle,
     workspace_id: String,
@@ -133,7 +133,7 @@ pub fn workspace_get_plugin_subdir(
 }
 
 /// 获取全局插件目录（跨工作区共享）
-#[command]
+//#[command]
 pub fn workspace_get_global_plugin_dir(
     plugin_id: String,
 ) -> Response<String> {
@@ -145,7 +145,7 @@ pub fn workspace_get_global_plugin_dir(
 }
 
 /// 设置插件自定义工作目录（传空字符串则恢复默认，按工作区隔离）
-#[command]
+//#[command]
 pub fn workspace_set_plugin_custom_dir(
     app: tauri::AppHandle,
     workspace_id: String,
@@ -164,7 +164,7 @@ pub fn workspace_set_plugin_custom_dir(
 }
 
 /// 获取插件自定义工作目录（None 表示使用默认，按工作区隔离）
-#[command]
+//#[command]
 pub fn workspace_get_plugin_custom_dir(
     app: tauri::AppHandle,
     workspace_id: String,

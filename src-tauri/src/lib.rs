@@ -20,6 +20,7 @@ mod window_manager;
 mod workspace;
 mod session;
 mod database;
+pub mod commands;
 
 use crate::app::app_store::{app_autostart, app_settings,app_openFile, APP};
 use crate::app::tray::create_tray;
@@ -52,18 +53,24 @@ use crate::window_manager::commands::{
     create_editor_window, get_window_list, close_window, focus_window,
     get_window_count, update_window_position_cmd,
 };
-use crate::workspace::commands::{
+// use crate::workspace::commands::{
+//     workspace_list, workspace_get, workspace_create, workspace_update,
+//     workspace_delete, workspace_get_default,
+// };
+
+use crate::commands::{
     workspace_list, workspace_get, workspace_create, workspace_update,
     workspace_delete, workspace_get_default,
 };
-use crate::workspace::lock::{
-    workspace_lock, workspace_unlock, workspace_lock_status,
-};
-use crate::workspace::plugin_dir::{
+use crate::commands::{
     workspace_get_plugin_dir, workspace_get_plugin_subdir,
     workspace_get_global_plugin_dir, workspace_set_plugin_custom_dir,
     workspace_get_plugin_custom_dir,
 };
+use crate::workspace::lock::{
+    workspace_lock, workspace_unlock, workspace_lock_status,
+};
+
 use crate::session::commands::{
     session_save, session_load, session_load_all, session_list,
     session_delete, session_clear, session_load_workspace, session_delete_workspace,
