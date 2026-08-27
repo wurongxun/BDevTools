@@ -7,7 +7,6 @@ use std::{
 
 use super::regexUtil;
 use crate::response::{resp_data::ResData, response::Response};
-use tauri::{AppHandle, Manager};
 
 /// 目录与文件信息（仅文件模块使用）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -337,15 +336,15 @@ pub fn get_directory_path(path: &str) -> Option<String> {
 
 /**
  * 获取默认文档目录数据
+ * @param document_dir 系统文档目录（不可用时返回失败）
  */
-pub fn default_document_data(app_handle: tauri::AppHandle) -> ResData<String> {
-    let app_dir = app_handle.path().document_dir();
-    match app_dir {
-        Ok(app_dir_) => {
+pub fn default_document_data(document_dir: Option<std::path::PathBuf>) -> ResData<String> {
+    match document_dir {
+        Some(app_dir_) => {
             let path_op = app_dir_.to_str();
             match path_op {
                 Some(path) => {
-                    return md_notebooks(&app_handle, path);
+                    return md_notebooks(path);
                 }
                 None => {
                     return ResData {
@@ -356,7 +355,7 @@ pub fn default_document_data(app_handle: tauri::AppHandle) -> ResData<String> {
                 }
             }
         }
-        Err(err) => {
+        None => {
             return ResData {
                 code: 500,
                 msg: "读取文档目录失败".to_string(),
@@ -365,7 +364,7 @@ pub fn default_document_data(app_handle: tauri::AppHandle) -> ResData<String> {
         }
     }
 }
-pub fn md_notebooks(app: &AppHandle, path_parameter: &str) -> ResData<String> {
+pub fn md_notebooks(path_parameter: &str) -> ResData<String> {
     let dir = PathBuf::from(path_parameter);
     let local_data_dir = dir.clone();
     let local_data_dir_ = dir.clone();

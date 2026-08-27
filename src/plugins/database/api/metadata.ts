@@ -1,7 +1,7 @@
 /**
  * 元数据查询 API
  */
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/api/rpc'
 import type { DatabaseInfo, TableInfo, ColumnInfo, IndexInfo, ApiResponse } from '../types'
 
 /** 获取数据库列表 */

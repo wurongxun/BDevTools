@@ -2,18 +2,15 @@ use anyhow::{anyhow, Result};
 use log::info;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use tauri_plugin_autostart::ManagerExt;
 use std::{path::PathBuf, result::Result::Ok};
-use tauri::{command, window, Manager, Window};
 use uuid::Uuid;
-use crate::{entity::structs::{Payload, SettingMap}, response::response::Response, sqlite::sqlite::exec};
-use tauri_plugin_notification::{NotificationExt, PermissionState};
-use tauri::{AppHandle, Emitter};
+use crate::{entity::structs::SettingMap, response::response::Response, sqlite::sqlite::exec};
+use crate::core::ctx::AppContext;
 /**
  *
  * 获取开机启动设置状态
  */
-pub async fn get_auto_start_state(app: &tauri::AppHandle) -> bool {
+pub async fn get_auto_start_state(ctx: &AppContext) -> bool {
     let res1 = exec(|conn| {
         let mut stmt = conn.prepare("select * from app_setting_info where app_setting_item_name='autostart'")?;
         let mut res = stmt.query(params![])?;
@@ -32,21 +29,13 @@ pub async fn get_auto_start_state(app: &tauri::AppHandle) -> bool {
     );
     match res1 {
         Ok(res) => {
-            // Get the autostart manager
-            let autostart_manager = app.autolaunch();
-            // 启用 autostart
+            // 通过上下文设置开机自启（平台能力由门面层注入）
+            ctx.set_autostart(res);
             if res {
-                let _ = autostart_manager.enable();
-                  // 检查 enable 状态
-                println!(
-                    "检查 enable 状态 registered for autostart? {}",
-                    autostart_manager.is_enabled().unwrap()
-                );
-            }else{
-                // 禁用 autostart
-                let _ = autostart_manager.disable();
+                println!("检查 autostart 已启用");
+            } else {
+                println!("检查 autostart 已禁用");
             }
-            
             return res;
         }
         Err(_) => {
@@ -56,7 +45,6 @@ pub async fn get_auto_start_state(app: &tauri::AppHandle) -> bool {
 }
 
 /// 查询设置数据
-#[command]
 pub async fn query_setting_item(id:String) -> Response<Vec<SettingMap>> {
     println!("query_setting_item");
     let res = exec(|conn| {
@@ -81,7 +69,6 @@ pub async fn query_setting_item(id:String) -> Response<Vec<SettingMap>> {
     }
 }
 /// 查询全部设置数据
-#[command]
 pub async fn query_setting_list() -> Response<Vec<SettingMap>> {
     println!("setting_list");
     let res = exec(|conn| {
@@ -110,8 +97,7 @@ pub async fn query_setting_list() -> Response<Vec<SettingMap>> {
     }
 }
 /// 更新设置数据
-#[command]
-pub async fn updatate_setting(app_handle: tauri::AppHandle,id:String,appSettingItemValue:String,appSettingtemName:String) -> Response<String> {
+pub async fn updatate_setting(ctx: &AppContext, id: String, appSettingItemValue: String, appSettingtemName: String) -> Response<String> {
     println!("updatate_setting_list");
     let res = exec(|conn| {
         let res = conn.execute(
@@ -123,21 +109,13 @@ pub async fn updatate_setting(app_handle: tauri::AppHandle,id:String,appSettingI
         }
         Ok(())
     });
-    get_auto_start_state(&app_handle).await;
+    get_auto_start_state(ctx).await;
     match res {
         Ok(_) => {
-            let _ = app_handle.emit("app_info_notification",  Payload {
-                message: "操作成功！".into(),
-            },);
-            // if app_handle.notification().permission_state().unwrap() == PermissionState::Unknown {
-            //     app_handle.notification().request_permission().unwrap();
-            // }
-            if app_handle.notification().permission_state().unwrap() == PermissionState::Granted {
-                app_handle.notification()
-                    .builder()
-                    .body("设置成功!")
-                    .show().unwrap();
-            }
+            ctx.emit("app_info_notification", serde_json::json!({
+                "message": "操作成功！"
+            }));
+            ctx.notify("设置成功!");
             let res1 = exec(|conn| {
               
                 let mut stmt = conn.prepare("select * from app_setting_info")?;
@@ -157,18 +135,10 @@ pub async fn updatate_setting(app_handle: tauri::AppHandle,id:String,appSettingI
             Response::new(200, "OK".to_string(), "操作成功！")
         }
         Err(e) => {
-            let _ = app_handle.emit("app_info_notification",  Payload {
-                message: "操作失败！".into(),
-            },);
-            // if app_handle.notification().permission_state().unwrap() == PermissionState::Unknown {
-            //     app_handle.notification().request_permission().unwrap();
-            // }
-            if app_handle.notification().permission_state().unwrap() == PermissionState::Granted {
-                app_handle.notification()
-                    .builder()
-                    .body("设置成功!")
-                    .show().unwrap();
-            }
+            ctx.emit("app_info_notification", serde_json::json!({
+                "message": "操作失败！"
+            }));
+            ctx.notify("设置成功!");
             Response::new(300, "OK".to_string(), &format!("{}", e))
         }
     }

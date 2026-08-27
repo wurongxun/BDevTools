@@ -105,7 +105,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import { open } from '@tauri-apps/plugin-dialog'
+import { open } from '@/core/runtime'
 import GlobalDialog from '@/components/GlobalDialog.vue'
 import { useConnectionStore } from '../../store'
 import { ConnectionType } from '../../types'

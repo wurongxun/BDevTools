@@ -56,7 +56,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { Document } from '@element-plus/icons-vue'
 import { title, login_desc } from '@/setting'
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { getCurrentWebviewWindow } from '@/core/runtime'
 
 const emit = defineEmits<{
   'login-success': []
@@ -143,7 +143,7 @@ const handleInitialization = async () => {
     // 如果是主窗口，发送事件通知后端
     if (label === 'main') {
       // 使用 emitTo 发送全局事件
-      const { emit } = await import('@tauri-apps/api/event')
+      const { emit } = await import('@/core/runtime')
       await emit('splash-screen-ready')
     }
   } catch (e) {

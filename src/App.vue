@@ -57,9 +57,8 @@
 
 <script lang="ts" setup>
 import { ref, shallowRef, computed, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
-import { load, Store } from '@tauri-apps/plugin-store'
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { Window } from '@tauri-apps/api/window'
+import { load, Store, getCurrentWebviewWindow } from '@/core/runtime'
+import type { Window } from '@/core/runtime'
 import useStore from '@/store'
 import Layout from '@/Layout/index.vue'
 import Common from '@/views/Common/Common.vue'
@@ -459,4 +458,10 @@ onBeforeUnmount(() => {
   word-break: break-all;
   font-size: 12px;
 }
+
+//#app {
+//  border-radius: 8px;
+//  box-shadow: 0 1px 5px rgba(0,0,0,0.15);
+//  overflow: hidden;
+//}
 </style>

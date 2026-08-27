@@ -60,8 +60,8 @@
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import GlobalDialog from '@/components/GlobalDialog.vue'
-import { save } from '@tauri-apps/plugin-dialog'
-import { open } from '@tauri-apps/plugin-dialog'
+import { save } from '@/core/runtime'
+import { open } from '@/core/runtime'
 import { dbExportCsv, dbExportExcel, dbImportCsv, dbImportExcel } from '../api/importExport'
 import type { ImportResult } from '../types'
 

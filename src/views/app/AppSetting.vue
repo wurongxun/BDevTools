@@ -1,25 +1,25 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, computed } from 'vue'
 import { Check, Close, Plus, Delete, Edit } from '@element-plus/icons-vue'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/api/rpc'
 import { ResponseData, SettingIdValueName, SettingMap } from '@/entity/entitys'
 import { useI18n } from 'vue-i18n'
 import useStore from '@/store/index'
-import { load, Store } from '@tauri-apps/plugin-store'
-import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart'
-import { open } from '@tauri-apps/plugin-dialog'
+import { load, Store } from '@/core/runtime'
+import { autostartEnable, autostartDisable } from '@/core/runtime'
+import { open } from '@/core/runtime'
 import { isDark, toggleDark } from '@/composables/useDark'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { tauri_request } from '@/utils/tauri_request'
 import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting'
 import { TreeNode } from '@/Types/entitys'
-import { check as check_, Update, DownloadEvent } from '@tauri-apps/plugin-updater'
-import { relaunch } from '@tauri-apps/plugin-process'
+import { checkUpdate, relaunch } from '@/core/runtime'
+import type { DownloadEvent } from '@/core/runtime'
 import { pluginManager } from '@/core/pluginManager'
 import GlobalDialog from '@/components/GlobalDialog.vue'
 import { workspaceService } from '@/services/workspaceService'
 import type { WorkspaceSummary } from '@/Types/workspace'
-import { emit } from '@tauri-apps/api/event'
+import { emit } from '@/core/runtime'
 
 const { appConfig } = useStore()
 const { t, locale } = useI18n()
@@ -89,7 +89,7 @@ onMounted(async () => {
 
   // 检查更新
   try {
-    const update_result = await check_();
+    const update_result = await checkUpdate();
     if (update_result) {
       has_update.value = true;
       update_info.value = {
@@ -178,9 +178,9 @@ async function autostart_change() {
     await store.set('auto_start', { value: autostart.value })
     await store.save()
     if (autostart.value) {
-      await enable()
+      await autostartEnable()
     } else {
-      await disable()
+      await autostartDisable()
     }
   }
 }
@@ -563,7 +563,7 @@ const app_updates_check = async () => {
     let contentLength = 0;
 
     // 重新检查更新以获取 Update 对象
-    const update = await check_();
+    const update = await checkUpdate();
     if (!update) {
       NotificationUtil.error('无法获取更新信息');
       return;

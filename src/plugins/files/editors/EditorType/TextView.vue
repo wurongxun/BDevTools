@@ -104,10 +104,10 @@
 </template>
 
 <script setup lang="ts" name="TextView">import { ref, watch, nextTick, onMounted, onActivated, onDeactivated,onBeforeUnmount, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/api/rpc'
 import { Search, ArrowUp, ArrowDown, Close, ArrowLeft, ArrowRight, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import NotificationUtil from '@/utils/NotificationUtil'
-import { load, Store } from '@tauri-apps/plugin-store'
+import { load, Store } from '@/core/runtime'
 import useStore from '@/store'
 const {appConfig } = useStore();
 /**

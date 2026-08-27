@@ -4,8 +4,8 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { Window } from '@tauri-apps/api/window'
+import { getCurrentWebviewWindow } from '@/core/runtime'
+import type { Window } from '@/core/runtime'
 import type { SessionSnapshot, WindowState, OpenFileInfo, LayoutState } from '@/Types/workspace'
 import { sessionService } from '@/services/sessionService'
 import useStore from '@/store'
@@ -281,7 +281,7 @@ export const useSessionStore = defineStore('session', () => {
           const stamp = new Date(conflict.draftSavedAt).toISOString().replace(/[:.]/g, '-')
           const target = `${conflict.path}.draft-${stamp}.bak`
           try {
-            const { invoke } = await import('@tauri-apps/api/core')
+            const { invoke } = await import('@/api/rpc')
             await invoke('save_note', { path: target, mdText: content })
           } catch (e) {
             console.warn('草稿另存失败:', e)

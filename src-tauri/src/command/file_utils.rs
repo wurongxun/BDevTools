@@ -1,3 +1,4 @@
+use crate::core::ctx::AppContext;
 use crate::{
     response::resp_data::ResData,
     utils::{
@@ -11,23 +12,18 @@ use std::{
     error::Error,
     path::{Path, PathBuf},
 };
-use tauri::AppHandle;
-use tauri_plugin_opener::OpenerExt;
 use std::fs;
 use std::io::Read;
 use chardetng::EncodingDetector;
 
-#[tauri::command]
 pub async fn my_read_file(path: std::path::PathBuf) -> String {
     // 读取文件内容，以文本字符串形式返回
     std::fs::read_to_string(path).unwrap()
 }
 
 // 打开目录（项目）
-#[tauri::command]
-pub async fn file_manager_open_path(app_handle: tauri::AppHandle, path: String) -> ResData<String> {
-    let re = app_handle.opener().open_path(path, None::<String>);
-    match re {
+pub async fn file_manager_open_path(ctx: &AppContext, path: String) -> ResData<String> {
+    match ctx.open_path(&path) {
         Ok(_) => {
             return ResData {
                 code: 200,
@@ -38,22 +34,24 @@ pub async fn file_manager_open_path(app_handle: tauri::AppHandle, path: String) 
         Err(e) => {
             return ResData {
                 code: 500,
-                msg: e.to_string(),
+                msg: e,
                 data: "".to_string(),
             };
         }
     }
 }
-#[tauri::command]
-pub async fn get_document_notebooks(app_handle: tauri::AppHandle, working_directory: Option<String>) -> ResData<String> {
+pub async fn get_document_notebooks(
+    ctx: &AppContext,
+    working_directory: Option<String>,
+) -> ResData<String> {
     // 优先使用前端传入的 per-window 工作目录参数
     if let Some(dir) = working_directory {
         if !dir.is_empty() {
-            return md_notebooks(&app_handle, &dir);
+            return md_notebooks(&dir);
         }
     }
-    // 未传入目录时返回默认空数据，不再从全局 settings.json 读取
-    default_document_data(app_handle)
+    // 未传入目录时返回默认文档目录数据
+    default_document_data(ctx.document_dir.clone())
 }
 /**
  * 更新文件夹名称
@@ -61,9 +59,7 @@ pub async fn get_document_notebooks(app_handle: tauri::AppHandle, working_direct
  * @param up_folder_name 文件夹名称
  */
 
-#[tauri::command]
 pub async fn up_folder_name(
-    app_handle: AppHandle,
     path: String,
     up_folder_name: String,
 ) -> Result<ResData<String>, String> {
@@ -108,7 +104,6 @@ pub async fn up_folder_name(
     }
 }
 // 检测文件编码
-#[tauri::command]
 pub async fn detect_file_encoding(path: String) -> Result<ResData<String>, String> {
     let mut file = fs::File::open(&path).map_err(|e| e.to_string())?;
     let mut sample = [0u8; 8192];

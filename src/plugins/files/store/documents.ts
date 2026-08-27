@@ -1,13 +1,13 @@
 // stores/documentManager.ts
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from '@/api/rpc'
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/entity/entitys'
 import { md5 } from '@/utils/Md5Utils'
 import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting'
 import NotificationUtil from '@/utils/NotificationUtil'
-import { load } from '@tauri-apps/plugin-store'
+import { load } from '@/core/runtime'
 import type { OpenFileInfo } from '@/Types/workspace'
 // 文件类型枚举
 export enum FileType {

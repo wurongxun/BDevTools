@@ -1,7 +1,7 @@
 /**
  * 导入导出 API
  */
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/api/rpc'
 import type { ExportResult, ImportResult, ApiResponse } from '../types'
 
 /** 导出为 CSV */

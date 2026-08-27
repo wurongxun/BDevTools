@@ -8,7 +8,6 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use sqlx::mysql::{MySqlPool, MySqlPoolOptions};
 use sqlx::postgres::{PgPool, PgPoolOptions};
-use tauri::command;
 use uuid::Uuid;
 use super::pool::{DbPool, set_pool, remove_pool};
 
@@ -62,7 +61,6 @@ pub fn init_db_connections_table() {
 }
 
 /// 创建数据库连接配置
-#[command]
 pub async fn db_connection_create(config: DbConnectionConfig) -> Response<Option<String>> {
     let id = Uuid::new_v4().to_string();
     let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
@@ -98,7 +96,6 @@ pub async fn db_connection_create(config: DbConnectionConfig) -> Response<Option
 }
 
 /// 删除数据库连接配置
-#[command]
 pub async fn db_connection_delete(id: String) -> Response<bool> {
     // 先断开连接
     remove_pool(&id);
@@ -114,7 +111,6 @@ pub async fn db_connection_delete(id: String) -> Response<bool> {
 }
 
 /// 更新数据库连接配置
-#[command]
 pub async fn db_connection_update(config: DbConnectionConfig) -> Response<bool> {
     let id = match &config.id {
         Some(id) => id.clone(),
@@ -154,7 +150,6 @@ pub async fn db_connection_update(config: DbConnectionConfig) -> Response<bool> 
 }
 
 /// 获取所有连接配置列表
-#[command]
 pub async fn db_connection_list() -> Response<Vec<DbConnectionConfig>> {
     let res = exec(|conn| {
         let mut stmt = conn.prepare("SELECT * FROM db_connections ORDER BY created_at DESC")?;
@@ -189,7 +184,6 @@ pub async fn db_connection_list() -> Response<Vec<DbConnectionConfig>> {
 }
 
 /// 测试数据库连接连通性
-#[command]
 pub async fn db_connection_test(config: DbConnectionConfig) -> Response<bool> {
     let result = test_connection(&config).await;
     match result {
@@ -199,7 +193,6 @@ pub async fn db_connection_test(config: DbConnectionConfig) -> Response<bool> {
 }
 
 /// 建立数据库连接（创建连接池）
-#[command]
 pub async fn db_connect(config_id: String) -> Response<bool> {
     // 从 SQLite 读取配置
     let config_res = exec(|conn| {
@@ -245,7 +238,6 @@ pub async fn db_connect(config_id: String) -> Response<bool> {
 }
 
 /// 断开数据库连接
-#[command]
 pub async fn db_disconnect(config_id: String) -> Response<bool> {
     if let Some(pool) = remove_pool(&config_id) {
         match pool {

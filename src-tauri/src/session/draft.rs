@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tauri::command;
 
 use crate::response::response::Response;
 
@@ -85,7 +84,6 @@ fn read_meta(meta_path: &PathBuf) -> Option<DraftMeta> {
 // ==================== Tauri 命令 ====================
 
 /// 保存草稿（同时记录目标文件当前指纹）
-#[command]
 pub fn draft_save(
     workspace_id: String,
     file_path: String,
@@ -126,7 +124,6 @@ pub fn draft_save(
 }
 
 /// 检查草稿状态：是否存在草稿、目标文件是否被外部修改
-#[command]
 pub fn draft_check(workspace_id: String, file_path: String) -> Response<DraftCheckResult> {
     let (draft_path, meta_path) = draft_file_paths(&workspace_id, &file_path);
     if !draft_path.exists() {
@@ -167,7 +164,6 @@ pub fn draft_check(workspace_id: String, file_path: String) -> Response<DraftChe
 }
 
 /// 读取草稿内容
-#[command]
 pub fn draft_load(workspace_id: String, file_path: String) -> Response<Option<String>> {
     let (draft_path, _) = draft_file_paths(&workspace_id, &file_path);
     let content = fs::read_to_string(&draft_path).ok();
@@ -175,7 +171,6 @@ pub fn draft_load(workspace_id: String, file_path: String) -> Response<Option<St
 }
 
 /// 删除指定文件的草稿（含元数据）
-#[command]
 pub fn draft_delete(workspace_id: String, file_path: String) -> Response<bool> {
     let (draft_path, meta_path) = draft_file_paths(&workspace_id, &file_path);
     let _ = fs::remove_file(&draft_path);

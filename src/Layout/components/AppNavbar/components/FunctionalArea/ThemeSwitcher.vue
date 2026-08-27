@@ -11,7 +11,7 @@
 import { isDark, toggleDark } from '@/composables/useDark'
 import useStore from '@/store'
 import { onMounted } from 'vue';
-import { load, Store } from '@tauri-apps/plugin-store';
+import { load, Store } from '@/core/runtime';
 
 const { system } = useStore()
 let store: Store | undefined = undefined;

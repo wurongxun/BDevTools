@@ -1,7 +1,7 @@
 /**
  * 数据库操作 API
  */
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/api/rpc'
 import type { SqlResult, TableDataResult, ApiResponse } from '../types'
 
 /** 执行 SQL（分页：默认 200 行/页，后端上限 1000；offset 用于翻页） */

@@ -84,8 +84,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { load, Store } from '@tauri-apps/plugin-store'
-import { invoke } from '@tauri-apps/api/core'
+import { load, Store } from '@/core/runtime'
+import { invoke } from '@/api/rpc'
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/Types/entitys'
 import NotificationUtil from '@/utils/NotificationUtil'
@@ -96,8 +96,7 @@ import WorkspaceManageDialog from '@/components/WorkspaceManageDialog.vue'
 import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
 import { useDocumentManagerStore } from '@/plugins/files/store/documents'
-import { open } from '@tauri-apps/plugin-dialog'
-import { listen } from '@tauri-apps/api/event'
+import { open, listen } from '@/core/runtime'
 import { openAppWindow, createEditorWindow, createPresetWindow } from '@/utils/WindowUtils'
 import type { WindowPresetConfig } from '@/utils/WindowUtils'
 import type { WindowMeta } from '@/Types/workspace'
@@ -301,7 +300,7 @@ const handleMenuCommand = async (item: MenuItem) => {
       break
     }
     case 'openFile': {
-      const { open } = await import('@tauri-apps/plugin-dialog')
+      const { open } = await import('@/core/runtime')
       const selected = await open({
         multiple: false,
         filters: [{ name: 'Markdown', extensions: ['*'] }]

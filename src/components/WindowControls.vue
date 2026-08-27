@@ -22,7 +22,7 @@
 <script lang="ts" setup>
 import { ref } from 'vue'
 import { Close, Minus } from '@element-plus/icons-vue'
-import { getCurrentWindow } from '@tauri-apps/api/window'
+import { getCurrentWindow } from '@/core/runtime'
 import WindowMaximizationIcon from '@/components/Icon/WindowMaximizationIcon.vue'
 import WindowRestoreIcon from '@/components/Icon/WindowRestoreIcon.vue'
 

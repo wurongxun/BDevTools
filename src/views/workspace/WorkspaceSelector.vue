@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import { open } from '@tauri-apps/plugin-dialog'
+import { invoke } from '@/api/rpc'
+import { open } from '@/core/runtime'
 import type { WorkspaceConfig, WorkspaceSummary } from '@/Types/workspace'
 import type { ResponseData } from '@/entity/entitys'
 import { workspaceService } from '@/services/workspaceService'

@@ -1,14 +1,14 @@
 import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
 import ToolUtils from '@/utils/ToolUtils'
-import { load, Store } from '@tauri-apps/plugin-store'
+import { load, Store } from '@/core/runtime'
 
 /**
  * @description 更换工作区：打开目录选择对话框，更新当前窗口的工作目录并刷新文件树
  * 工作目录存储在 per-window Pinia 状态中，每个窗口独立管理
  */
 export async function changeWorkspace() {
-  const { open } = await import('@tauri-apps/plugin-dialog')
+  const { open } = await import('@/core/runtime')
   const { fileTreeStore } = useStore()
 
   const file_directory = await open({

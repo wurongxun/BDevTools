@@ -35,8 +35,8 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { FolderOpened } from '@element-plus/icons-vue'
 import { usePluginDir } from '@/composables/usePluginDir'
-import { invoke } from '@tauri-apps/api/core'
-import { emit, listen } from '@tauri-apps/api/event'
+import { invoke } from '@/api/rpc'
+import { emit, listen } from '@/core/runtime'
 
 /** 插件自定义目录变更事件（跨窗口同步面板展示） */
 const PLUGIN_DIR_CHANGED_EVENT = 'plugin-dir-changed'

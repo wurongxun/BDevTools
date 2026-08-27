@@ -2,7 +2,7 @@
  * 工作区管理服务
  * 封装工作区配置相关的 Tauri invoke 调用
  */
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/api/rpc'
 import type { WorkspaceConfig, WorkspaceSummary } from '@/Types/workspace'
 import type { ResponseData } from '@/entity/entitys'
 

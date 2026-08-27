@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { invoke } from '@/api/rpc'
+import { listen } from '@/core/runtime'
 import type {
   RemoteConnection,
   ConnectionTab,

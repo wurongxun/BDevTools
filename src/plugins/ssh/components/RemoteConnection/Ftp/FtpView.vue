@@ -236,9 +236,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import { desktopDir, dirname } from '@tauri-apps/api/path'
-import { open } from '@tauri-apps/plugin-dialog'
+import { invoke } from '@/api/rpc'
+import { desktopDir, dirname, open } from '@/core/runtime'
 import { Upload, Download, FolderAdd, Delete, Refresh, EditPen, ArrowUp, ArrowDown, Star, Close } from '@element-plus/icons-vue'
 // 保留 Element Plus 图标导入（其他位置可能使用）
 import { ElInput } from 'element-plus'

@@ -2,7 +2,7 @@
  * 会话管理服务
  * 封装会话快照读写相关的 Tauri invoke 调用
  */
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/api/rpc'
 import type { SessionSnapshot, SessionSummary, DraftCheckResult, DraftMeta } from '@/Types/workspace'
 import type { ResponseData } from '@/entity/entitys'
 

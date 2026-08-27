@@ -21,7 +21,6 @@ pub struct LogSearchResult {
 }
 
 /// 在超大日志文件中搜索关键词（流式读取，内存占用极低）
-#[tauri::command]
 pub async fn search_log_file(
     file_path: String,
     keyword: String,

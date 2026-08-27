@@ -5,7 +5,6 @@ use window_shadows::set_shadow;
  * 关闭加载窗口  显示主窗口
  * @param window
  */
-#[tauri::command]
 pub async fn loding_window_close(window: tauri::Window) {
     // Close splashscreen
     if let Some(splashscreen) = window.get_webview_window("loding-window") {
@@ -18,7 +17,6 @@ pub async fn loding_window_close(window: tauri::Window) {
         .show()
         .unwrap();
 }
-#[tauri::command]
 pub async fn exit() {
     std::process::exit(0)
 }
@@ -27,7 +25,6 @@ pub async fn exit() {
  * @param handle
  * @param window
  */
-#[tauri::command]
 pub async fn about(handle: tauri::AppHandle, window: tauri::Window) {
     let about_window = tauri::WebviewWindowBuilder::new(
         &handle,
@@ -50,7 +47,6 @@ pub async fn about(handle: tauri::AppHandle, window: tauri::Window) {
  * @param handle
  * @param window
  */
-#[tauri::command]
 pub async fn note_book_window(handle: tauri::AppHandle, window: tauri::Window) {
     let note_book_window = tauri::WebviewWindowBuilder::new(
         &handle,
@@ -76,7 +72,6 @@ pub async fn note_book_window(handle: tauri::AppHandle, window: tauri::Window) {
  * @param handle
  * @param window
  */
-#[tauri::command]
 pub fn windows_minimize(handle: tauri::AppHandle, label: String) {
     //获取窗口实例
     println!("windows_minimize  {:?}", label);
@@ -88,7 +83,6 @@ pub fn windows_minimize(handle: tauri::AppHandle, label: String) {
  * @param handle
  * @param window
  */
-#[tauri::command]
 pub fn windows_hide(handle: tauri::AppHandle, label: String) {
     //获取窗口实例
     let window = handle.get_webview_window(label.as_str()).unwrap();
@@ -99,7 +93,6 @@ pub fn windows_hide(handle: tauri::AppHandle, label: String) {
  * @param handle
  * @param window
  */
-#[tauri::command]
 pub fn windows_maximize(handle: tauri::AppHandle, label: String) {
     //获取窗口实例
     let window = handle.get_webview_window(label.as_str()).unwrap();
@@ -110,7 +103,6 @@ pub fn windows_maximize(handle: tauri::AppHandle, label: String) {
  * @param handle
  * @param window
  */
-#[tauri::command]
 pub fn windows_center(handle: tauri::AppHandle, label: String) {
     //获取窗口实例
     let window = handle.get_webview_window(label.as_str()).unwrap();
@@ -122,7 +114,6 @@ pub fn windows_center(handle: tauri::AppHandle, label: String) {
  * @param handle
  * @param window
  */
-#[tauri::command]
 pub fn windows_unmaximize(handle: tauri::AppHandle, label: String) {
     //获取窗口实例
     let window = handle.get_webview_window(label.as_str()).unwrap();
@@ -133,7 +124,6 @@ pub fn windows_unmaximize(handle: tauri::AppHandle, label: String) {
  * @param handle
  * @param label
  */
-#[tauri::command]
 pub fn windows_close(handle: tauri::AppHandle, label: String) {
     //获取窗口实例
     let window = handle.get_webview_window(label.as_str()).unwrap();

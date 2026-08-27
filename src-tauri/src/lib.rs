@@ -1,7 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 use serde_json::json;
-use tauri::AppHandle;
 use tauri::Manager;
 use tauri::{App, Emitter, Listener};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
@@ -11,6 +10,7 @@ use tauri_plugin_window_state::{StateFlags, WindowExt};
 mod app;
 mod app_setup;
 mod command;
+mod core;
 mod entity;
 mod response;
 mod system_menu;
@@ -22,69 +22,36 @@ mod session;
 mod database;
 pub mod commands;
 
-use crate::app::app_store::{app_autostart, app_settings,app_openFile, APP};
+use crate::app::app_store::{app_settings, app_openFile, APP};
 use crate::app::tray::create_tray;
 use crate::app_setup::setup::setup_windows;
-use crate::command::app_window::{
-    about, loding_window_close, note_book_window, windows_close, windows_hide, windows_maximize,
-    windows_minimize,
-};
-use crate::command::file_command::{
-    create_folder, create_note_file, ensure_dir, get_note_list, get_path_childrenFoldersAndFiles,
-    list_script_files, read_note_file, remove_file, remove_folder, rename_script_file, save_note,
-    up_file_name, write_script_file,
-};
-use crate::command::file_utils::{file_manager_open_path, get_document_notebooks, up_folder_name,detect_file_encoding};
-use crate::command::file_association::{register_file_association, open_default_apps_settings};
-use crate::command::remote_conn::{
-    ssh_connect, ssh_write, ssh_disconnect, ssh_resize_pty, ssh_check,
-    sftp_connect, sftp_disconnect, sftp_list_dir, sftp_mkdir, sftp_remove,
-    sftp_upload, sftp_download, local_list_dir, sftp_rename, get_app_dir, sftp_check,
-};
-
-use crate::command::search_log_parallel::{
-    read_file_lines, count_file_lines, search_log_index, search_log_jump_to, search_log_page,
-    search_log_parallel, search_log_preview,
-};
-use crate::sqlite::ssh_connection::{
-    connection_create, connection_delete, connection_edit, connection_list,
-};
-use crate::window_manager::commands::{
-    create_editor_window, get_window_list, close_window, focus_window,
-    get_window_count, update_window_position_cmd,
-};
 use crate::commands::{
-    workspace_list, workspace_get, workspace_create, workspace_update,
-    workspace_delete, workspace_get_default,
-};
-use crate::commands::{
-    workspace_get_plugin_dir, workspace_get_plugin_subdir,
-    workspace_get_global_plugin_dir, workspace_set_plugin_custom_dir,
-    workspace_get_plugin_custom_dir,
-};
-use crate::workspace::lock::{
-    workspace_lock, workspace_unlock, workspace_lock_status,
-};
-
-use crate::session::commands::{
-    session_save, session_load, session_load_all, session_list,
-    session_delete, session_clear, session_load_workspace, session_delete_workspace,
-};
-use crate::session::draft::{
-    draft_save, draft_check, draft_load, draft_delete,
-};
-use crate::database::connection::{
-    db_connection_create, db_connection_delete, db_connection_update,
-    db_connection_list, db_connection_test, db_connect, db_disconnect,
-};
-use crate::database::operations::{
-    db_execute_sql, db_query_table_data, db_insert_row, db_update_row, db_delete_row,
-};
-use crate::database::metadata::{
-    db_list_databases, db_list_tables, db_table_columns, db_table_indexes, db_table_schema,
-};
-use crate::database::import_export::{
-    db_export_csv, db_export_excel, db_import_csv, db_import_excel,
+    about, close_window, connection_create, connection_delete, connection_edit,
+    connection_list, count_file_lines, create_editor_window, create_folder,
+    create_note_file, db_connect, db_connection_create, db_connection_delete,
+    db_connection_list, db_connection_test, db_connection_update, db_delete_row,
+    db_disconnect, db_execute_sql, db_export_csv, db_export_excel, db_import_csv,
+    db_import_excel, db_insert_row, db_list_databases, db_list_tables,
+    db_query_table_data, db_table_columns, db_table_indexes, db_table_schema,
+    db_update_row, detect_file_encoding, draft_check, draft_delete, draft_load,
+    draft_save, ensure_dir, file_manager_open_path, focus_window, get_app_dir,
+    get_document_notebooks, get_note_list, get_path_childrenFoldersAndFiles,
+    get_window_count, get_window_list, list_script_files, local_list_dir,
+    loding_window_close, note_book_window, open_default_apps_settings, read_file_lines,
+    read_note_file, register_file_association, remove_file, remove_folder,
+    rename_script_file, save_note, search_log_index, search_log_jump_to, search_log_page,
+    search_log_parallel, search_log_preview, session_clear, session_delete,
+    session_delete_workspace, session_list, session_load, session_load_all,
+    session_load_workspace, session_save, sftp_check, sftp_connect, sftp_disconnect,
+    sftp_download, sftp_list_dir, sftp_mkdir, sftp_remove, sftp_rename, sftp_upload,
+    ssh_check, ssh_connect, ssh_disconnect, ssh_resize_pty, ssh_write, up_file_name,
+    up_folder_name, update_window_position_cmd, windows_close, windows_hide,
+    windows_maximize, windows_minimize, workspace_create, workspace_delete,
+    workspace_get, workspace_get_default, workspace_get_global_plugin_dir,
+    workspace_get_plugin_custom_dir, workspace_get_plugin_dir,
+    workspace_get_plugin_subdir, workspace_list, workspace_lock, workspace_lock_status,
+    workspace_set_plugin_custom_dir, workspace_unlock, workspace_update,
+    write_script_file,
 };
 
 
@@ -233,8 +200,10 @@ pub fn run() {
             db_import_excel,
         ])
         .setup(move |app: &mut App| {
-            // 初始化 app_dir
-            APP.lock().update_app_dir(app.handle());
+            // 初始化 app 数据目录与配置目录（纯路径，无 tauri 依赖）
+            let home_dir = app.path().home_dir().unwrap_or_default();
+            let config_dir = app.path().app_config_dir().unwrap_or_default();
+            APP.lock().update_dirs(&home_dir, &config_dir);
             // 初始化工作区和会话目录
             crate::workspace::config::ensure_workspaces_dir();
             crate::session::snapshot::ensure_sessions_dir();
@@ -243,7 +212,7 @@ pub fn run() {
             {
                 let handle = app.handle();
                 create_tray(handle)?;
-                //app_autostart(handle);
+                // 开机自启：将来启用时构造 AppContext 传入 app_autostart(ctx)
             }
             let mut builder = tauri::Builder::default();
             #[cfg(desktop)]
@@ -273,7 +242,7 @@ pub fn run() {
 
                 if let Some(path) = file_path {
                     println!("打开文件 path {:?}", path);
-                    app_openFile(&path, &app.handle());
+                    app_openFile(&path);
                     let _ = handle.emit("file-opened-from-os", path);
 
                 }
@@ -329,24 +298,18 @@ pub fn run() {
                 );
                 crate::window_manager::registry::register_window(meta);
             }
-            app_settings(&app.handle());
+            app_settings();
 
             // 读取主窗口预设，判断是否显示主窗口（默认显示；有配置且 openOnStartup=false 时不显示）
             // 直接从磁盘读取 settings.json，避免 store 插件内存缓存与前端保存不同步的问题
             let show_main_window = {
                 let mut result = true; // 默认显示
-                if let Ok(config_dir) = app.path().app_data_dir() {
-                    let settings_path = config_dir.join("settings.json");
-                    if settings_path.exists() {
-                        if let Ok(content) = std::fs::read_to_string(&settings_path) {
-                            if let Ok(settings) = serde_json::from_str::<serde_json::Value>(&content) {
-                                if let Some(main_preset) = settings.get("main_window_preset") {
-                                    if let Some(open_on_startup) = main_preset.get("openOnStartup").and_then(|v| v.as_bool()) {
-                                        result = open_on_startup;
-                                    }
-                                }
-                            }
-                        }
+                let settings = crate::app::app_store::read_settings();
+                if let Some(main_preset) = settings.get("main_window_preset") {
+                    if let Some(open_on_startup) =
+                        main_preset.get("openOnStartup").and_then(|v| v.as_bool())
+                    {
+                        result = open_on_startup;
                     }
                 }
                 println!("[BackendDevelopmentTools] show_main_window = {}", result);

@@ -48,17 +48,17 @@ import {
 } from "vue";
 import { ElMessage } from "element-plus";
 import NotificationUtil from "@/utils/NotificationUtil";
-import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@/api/rpc";
+import { getCurrentWindow } from "@/core/runtime";
 import { MdEditor } from "md-editor-v3";
 import type { ExposeParam } from 'md-editor-v3';
 import "md-editor-v3/lib/style.css";
 import { ResponseData } from "@/entity/entitys";
-import { load, Store } from '@tauri-apps/plugin-store';
+import { load, Store } from "@/core/runtime";
 import { tauri_request } from "@/utils/tauri_request";
 import { Document } from '@element-plus/icons-vue';
 import { useDark } from '@vueuse/core'
-import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { listen, UnlistenFn } from "@/core/runtime";
 import useStore from '@/store'
 import { useDocumentManagerStore } from '../../store/documents'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'

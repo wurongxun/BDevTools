@@ -5,7 +5,6 @@ use crate::response::response::Response;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
-use tauri::command;
 use super::pool::get_pool;
 use super::operations::ColumnInfo;
 
@@ -38,7 +37,6 @@ pub struct IndexInfo {
 }
 
 /// 获取所有数据库列表
-#[command]
 pub async fn db_list_databases(config_id: String) -> Response<Vec<DatabaseInfo>> {
     let pool = match get_pool(&config_id) {
         Some(p) => p,
@@ -79,7 +77,6 @@ pub async fn db_list_databases(config_id: String) -> Response<Vec<DatabaseInfo>>
 }
 
 /// 获取指定数据库的所有表
-#[command]
 pub async fn db_list_tables(config_id: String, database: String) -> Response<Vec<TableInfo>> {
     let pool = match get_pool(&config_id) {
         Some(p) => p,
@@ -135,7 +132,6 @@ pub async fn db_list_tables(config_id: String, database: String) -> Response<Vec
 }
 
 /// 获取表的字段信息
-#[command]
 pub async fn db_table_columns(config_id: String, database: String, table: String) -> Response<Vec<ColumnInfo>> {
     let pool = match get_pool(&config_id) {
         Some(p) => p,
@@ -207,7 +203,6 @@ pub async fn db_table_columns(config_id: String, database: String, table: String
 }
 
 /// 获取表的索引信息
-#[command]
 pub async fn db_table_indexes(config_id: String, database: String, table: String) -> Response<Vec<IndexInfo>> {
     let pool = match get_pool(&config_id) {
         Some(p) => p,
@@ -268,7 +263,6 @@ pub async fn db_table_indexes(config_id: String, database: String, table: String
 }
 
 /// 获取建表 DDL
-#[command]
 pub async fn db_table_schema(config_id: String, database: String, table: String) -> Response<String> {
     let pool = match get_pool(&config_id) {
         Some(p) => p,

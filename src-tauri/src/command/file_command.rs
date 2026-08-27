@@ -2,12 +2,10 @@ use crate::response::resp_data::{ResData, ResDataNoData};
 use crate::utils::fileUtil::read_dir_info;
 use std::path::{Path, PathBuf};
 use chardetng::EncodingDetector;
-use tauri::{AppHandle, Manager};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 
 /// 确保目录存在（递归创建）
-#[tauri::command]
 pub async fn ensure_dir(path: String) -> Result<ResData<String>, String> {
     match tokio::fs::create_dir_all(&path).await {
         Ok(_) => Ok(ResData { code: 200, msg: "ok".to_string(), data: String::new() }),
@@ -16,11 +14,7 @@ pub async fn ensure_dir(path: String) -> Result<ResData<String>, String> {
 }
 
 // 获取目录下笔记
-#[tauri::command]
-pub async fn get_note_list(
-    app_handle: AppHandle,
-    path: String,
-) -> Result<ResData<Vec<String>>, String> {
+pub async fn get_note_list(path: String) -> Result<ResData<Vec<String>>, String> {
     let paths = tokio::fs::read_dir(PathBuf::from(path)).await;
     //文件夹下所有文件
     let mut notes: Vec<String> = vec![];
@@ -53,11 +47,7 @@ pub async fn get_note_list(
 // ... existing code ...
 
 // 读取本地笔记文件
-#[tauri::command]
-pub async fn read_note_file(
-    app_handle: tauri::AppHandle,
-    path: String,
-) -> Result<ResData<String>, String> {
+pub async fn read_note_file(path: String) -> Result<ResData<String>, String> {
     // 首先读取原始字节
     let bytes = tokio::fs::read(&path)
         .await
@@ -82,9 +72,7 @@ pub async fn read_note_file(
 // ... existing code ...
 
 // 创建本地文件夹
-#[tauri::command]
 pub async fn create_folder(
-    app_handle: tauri::AppHandle,
     father_path: String,
     new_folder_name: String,
 ) -> Result<ResData<String>, String> {
@@ -128,9 +116,7 @@ pub async fn create_folder(
  * @param notebook 文件夹/笔记本
  * @param newNoteMdFileName 笔记名 文件名
  */
-#[tauri::command]
 pub async fn create_note_file(
-    app_handle: tauri::AppHandle,
     father_path: String,
     new_note_md_file_name: String,
 ) -> Result<ResData<String>, String> {
@@ -176,9 +162,7 @@ pub async fn create_note_file(
  * @param md_title 标题/文件名
  * @param md_text 内容
  */
-#[tauri::command]
 pub async fn save_note(
-    app_handle: tauri::AppHandle,
     path: String,
     md_text: String,
 ) -> Result<ResData<String>, String> {
@@ -231,9 +215,7 @@ pub async fn save_note(
 /**
  * 更新文件名
  */
-#[tauri::command]
 pub async fn up_file_name(
-    app_handle: tauri::AppHandle,
     path: String,
     up_file_name: String,
 ) -> Result<ResData<String>, String> {
@@ -271,9 +253,7 @@ pub async fn up_file_name(
  * @param app_handle
  * @param path 文件夹
  */
-#[tauri::command]
 pub async fn remove_folder(
-    app_handle: tauri::AppHandle,
     path: String,
 ) -> Result<ResData<String>, String> {
     //检查路径是否存在
@@ -309,9 +289,7 @@ pub async fn remove_folder(
  * @param current_note 笔记
  *
  */
-#[tauri::command]
 pub async fn remove_file(
-    app_handle: tauri::AppHandle,
     path: String,
 ) -> Result<ResData<String>, String> {
     //检查路径是否存在
@@ -348,9 +326,7 @@ pub async fn remove_file(
  * @param app_handle
  * @param current_notebook 文件夹
  */
-#[tauri::command]
 pub async fn get_path_childrenFoldersAndFiles(
-    app_handle: tauri::AppHandle,
     path: String,
 ) -> Result<ResData<Vec<String>>, String> {
     // 检查路径是否存在
@@ -399,7 +375,6 @@ fn rename_file_path(original_path: &str, new_filename: &str, suffix: &str) -> St
 }
 
 /// 写入脚本文件（不存在则创建，存在则覆盖；供数据库插件查询文件管理器使用）
-#[tauri::command]
 pub async fn write_script_file(path: String, content: String) -> Result<ResData<String>, String> {
     match tokio::fs::write(&path, content.as_bytes()).await {
         Ok(_) => Ok(ResData {
@@ -416,7 +391,6 @@ pub async fn write_script_file(path: String, content: String) -> Result<ResData<
 }
 
 /// 重命名脚本文件（保留原扩展名，供数据库插件查询文件管理器使用）
-#[tauri::command]
 pub async fn rename_script_file(
     path: String,
     new_name: String,
@@ -493,7 +467,6 @@ async fn collect_script_entries(dir: &Path) -> Result<Vec<ScriptFileEntry>, Stri
 }
 
 /// 递归列出目录下所有文件与文件夹（数据库插件查询文件管理器）
-#[tauri::command]
 pub async fn list_script_files(path: String) -> Result<ResData<Vec<ScriptFileEntry>>, String> {
     let dir = PathBuf::from(&path);
     if !dir.exists() || !dir.is_dir() {

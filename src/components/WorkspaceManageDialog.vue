@@ -59,7 +59,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
-import { open } from '@tauri-apps/plugin-dialog'
+import { open } from '@/core/runtime'
 import GlobalDialog from './GlobalDialog.vue'
 import { useWorkspaceStore } from '@/store/modules/workspace'
 import { workspaceService } from '@/services/workspaceService'

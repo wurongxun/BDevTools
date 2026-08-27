@@ -111,7 +111,7 @@
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { Search, Sunny, Moon, Message } from '@element-plus/icons-vue'
-import { load, Store } from '@tauri-apps/plugin-store'
+import { load, Store } from '@/core/runtime'
 import { isDark, toggleDark } from '@/composables/useDark'
 import useStore from '@/store'
 import { TreeNode } from '@/Types/entitys'

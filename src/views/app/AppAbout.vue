@@ -65,8 +65,8 @@
 
 <script setup>
 import { ref, onMounted, reactive } from 'vue';
-import { getName, getTauriVersion, getVersion } from '@tauri-apps/api/app';
-import { arch, platform, type, version } from '@tauri-apps/plugin-os';
+import { getName, getTauriVersion, getVersion } from '@/core/runtime';
+import { osArch, osPlatform, osType, osVersion } from '@/core/runtime';
 import coffeeImage from '@/assets/coffee.jpg';
 
 const data = reactive({
@@ -84,10 +84,10 @@ onMounted(async () => {
     data.appName = await getName();
     data.tauriVersion = await getTauriVersion();
     data.appVersion = await getVersion();
-    data.archName = await arch();
-    data.platformName = await platform();
-    data.osType = await type();
-    data.osVersion = await version();
+    data.archName = await osArch();
+    data.platformName = await osPlatform();
+    data.osType = await osType();
+    data.osVersion = await osVersion();
   } catch (error) {
     console.error('获取应用信息失败:', error);
   }

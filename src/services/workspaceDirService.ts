@@ -2,7 +2,7 @@
  * 插件工作目录管理服务
  * 封装插件工作目录相关的 Tauri invoke 调用
  */
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/api/rpc'
 import type { ApiResponse } from '@/plugins/database/types'
 
 export const workspaceDirService = {

@@ -1,13 +1,11 @@
 use std::os::windows::process::CommandExt;
 use crate::response::resp_data::ResData;
-use tauri::AppHandle;
 use winreg::enums::*;
 use winreg::RegKey;
 
 const APP_PROG_ID: &str = "BackendDevelopmentTools.File";
 
-#[tauri::command]
-pub async fn register_file_association(app_handle: AppHandle) -> ResData<String> {
+pub async fn register_file_association() -> ResData<String> {
     let exe_path = std::env::current_exe()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_default();
@@ -28,7 +26,6 @@ pub async fn register_file_association(app_handle: AppHandle) -> ResData<String>
     }
 }
 
-#[tauri::command]
 pub async fn open_default_apps_settings() -> ResData<String> {
     let result = std::process::Command::new("cmd")
         .args(["/C", "start", "ms-settings:defaultappsbytype"])

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { SettingMap } from '@/entity/entitys'
-import { load, Store } from '@tauri-apps/plugin-store';
+import { load, Store } from '@/core/runtime';
 
 export const appConfigInfo = defineStore('app_Config', {
   state: () => ({

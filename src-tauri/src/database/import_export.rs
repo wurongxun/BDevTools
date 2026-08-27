@@ -7,7 +7,6 @@ use futures_util::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use sqlx::{Column, Row};
 use std::fs::File;
-use tauri::command;
 use super::pool::{get_pool, DbPool};
 use super::operations;
 
@@ -27,7 +26,6 @@ pub struct ImportResult {
 }
 
 /// 导出表数据为 CSV
-#[command]
 pub async fn db_export_csv(
     config_id: String,
     database: String,
@@ -47,7 +45,6 @@ pub async fn db_export_csv(
 }
 
 /// 导出表数据为 Excel
-#[command]
 pub async fn db_export_excel(
     config_id: String,
     database: String,
@@ -67,7 +64,6 @@ pub async fn db_export_excel(
 }
 
 /// 从 CSV 导入数据到表
-#[command]
 pub async fn db_import_csv(
     config_id: String,
     database: String,
@@ -87,7 +83,6 @@ pub async fn db_import_csv(
 }
 
 /// 从 Excel 导入数据到表
-#[command]
 pub async fn db_import_excel(
     config_id: String,
     database: String,

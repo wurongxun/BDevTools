@@ -92,7 +92,6 @@ pub fn get_lock_holder(workspace_id: &str) -> Option<String> {
 // ─── Tauri 命令 ───
 
 /// 尝试锁定工作区
-#[tauri::command]
 pub async fn workspace_lock(workspace_id: String, window_label: String) -> Response<bool> {
     match try_lock(&workspace_id, &window_label) {
         Ok(true) => Response::new(200, true, "锁定成功"),
@@ -109,7 +108,6 @@ pub async fn workspace_lock(workspace_id: String, window_label: String) -> Respo
 }
 
 /// 释放工作区锁
-#[tauri::command]
 pub async fn workspace_unlock(workspace_id: String, window_label: String) -> Response<bool> {
     let ok = unlock(&workspace_id, &window_label);
     if ok {
@@ -120,7 +118,6 @@ pub async fn workspace_unlock(workspace_id: String, window_label: String) -> Res
 }
 
 /// 查询工作区锁定状态
-#[tauri::command]
 pub async fn workspace_lock_status(workspace_id: String) -> Response<Option<String>> {
     let holder = get_lock_holder(&workspace_id);
     Response::new(200, holder.clone(), if holder.is_some() { "工作区已锁定" } else { "工作区未锁定" })

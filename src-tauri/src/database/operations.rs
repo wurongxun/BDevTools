@@ -8,7 +8,6 @@ use sqlx::mysql::MySqlPool;
 use sqlx::postgres::PgPool;
 use sqlx::{Row, Column, Executor, ValueRef};
 use futures_util::TryStreamExt;
-use tauri::command;
 use super::pool::{get_pool, DbPool};
 
 /// 查询默认每页行数（前后端一致）
@@ -51,7 +50,6 @@ pub struct ColumnInfo {
 }
 
 /// 执行 SQL 语句（分页：默认 200 行/页，前端可指定，后端上限 1000）
-#[command]
 pub async fn db_execute_sql(
     config_id: String,
     sql: String,
@@ -241,7 +239,6 @@ pub async fn execute_sql(pool: &DbPool, sql: &str) -> Result<SqlResult> {
 }
 
 /// 分页查询表数据
-#[command]
 pub async fn db_query_table_data(
     config_id: String,
     database: String,
@@ -310,7 +307,6 @@ pub async fn db_query_table_data(
 }
 
 /// 插入单行数据
-#[command]
 pub async fn db_insert_row(
     config_id: String,
     database: String,
@@ -343,7 +339,6 @@ pub async fn db_insert_row(
 }
 
 /// 更新单行数据
-#[command]
 pub async fn db_update_row(
     config_id: String,
     database: String,
@@ -377,7 +372,6 @@ pub async fn db_update_row(
 }
 
 /// 删除单行数据
-#[command]
 pub async fn db_delete_row(
     config_id: String,
     database: String,

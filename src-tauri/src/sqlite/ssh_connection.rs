@@ -6,8 +6,6 @@ use log::info;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, result::Result::Ok};
-use tauri::{command, window, Manager, Window};
-use tauri_plugin_notification::{NotificationExt, PermissionState};
 use uuid::Uuid;
 
 /// 数据对应字段
@@ -27,7 +25,6 @@ pub struct SshSubMenu {
 }
 
 /// 创建一个连接
-#[command]
 pub async fn connection_create(mut map: SshSubMenu) -> Response<Option<bool>> {
     let res = exec(|conn| {
         let count: u32 = conn
@@ -78,7 +75,6 @@ pub async fn connection_create(mut map: SshSubMenu) -> Response<Option<bool>> {
 }
 
 /// 删除一个连接
-#[command]
 pub async fn connection_delete(id: String) -> Response<bool> {
     let res = exec(|conn| {
         let mut stmt = conn.prepare("delete from connections where id =?1")?;
@@ -98,7 +94,6 @@ pub async fn connection_delete(id: String) -> Response<bool> {
 }
 
 /// 编辑一个连接
-#[command]
 pub async fn connection_edit(map: SshSubMenu) -> Response<bool> {
     let res = exec(|conn| {
         let affected = conn.execute(
@@ -126,7 +121,6 @@ pub async fn connection_edit(map: SshSubMenu) -> Response<bool> {
 }
 
 /// 查询连接列表
-#[command]
 pub async fn connection_list() -> Response<Vec<SshSubMenu>> {
     let res = exec(|conn| {
         let count: u32 = conn

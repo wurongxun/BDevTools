@@ -14,7 +14,6 @@ use crate::response::response::Response;
 use crate::window_manager::registry;
 
 /// 创建新的编辑器窗口
-#[tauri::command]
 pub async fn create_editor_window(
     app: tauri::AppHandle,
     workspace_id: Option<String>,
@@ -117,14 +116,12 @@ pub async fn create_editor_window(
 }
 
 /// 获取所有窗口列表
-#[tauri::command]
 pub async fn get_window_list() -> Response<Vec<WindowMeta>> {
     let windows = registry::get_all_windows();
     Response::new(200, windows, "获取窗口列表成功")
 }
 
 /// 关闭指定窗口
-#[tauri::command]
 pub async fn close_window(app: tauri::AppHandle, label: String) -> Response<bool> {
     let window = app.get_webview_window(&label);
     match window {
@@ -137,7 +134,6 @@ pub async fn close_window(app: tauri::AppHandle, label: String) -> Response<bool
 }
 
 /// 聚焦指定窗口（通用，使用 Win32 SetForegroundWindow 确保到最前）
-#[tauri::command]
 pub async fn focus_window(app: tauri::AppHandle, label: String) -> Response<bool> {
     let window = app.get_webview_window(&label);
     match window {
@@ -165,14 +161,12 @@ pub async fn focus_window(app: tauri::AppHandle, label: String) -> Response<bool
 }
 
 /// 获取窗口数量（不含主窗口）
-#[tauri::command]
 pub async fn get_window_count() -> Response<usize> {
     let count = registry::get_window_count(true);
     Response::new(200, count, "获取窗口数量成功")
 }
 
 /// 更新窗口位置信息（前端调用，用于同步注册表）
-#[tauri::command]
 pub async fn update_window_position_cmd(
     label: String,
     x: f64,

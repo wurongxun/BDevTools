@@ -13,7 +13,7 @@ import {
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
 import { ElMessage } from 'element-plus'
-import { convertFileSrc } from '@tauri-apps/api/core'
+import { convertFileSrc } from '@/core/runtime'
 import useStore from '@/store'
 import BookmarkTree from './Pdf/BookmarkTree.vue'
 import { DocumentState } from '../../store/documents'

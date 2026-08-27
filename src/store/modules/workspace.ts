@@ -9,8 +9,7 @@ import { workspaceService } from '@/services/workspaceService'
 import { setPluginWorkspaceId } from '@/composables/usePluginDir'
 import { fileTreeStore as getFileTreeStore } from '@/store/modules/fileTree'
 import { get_file_Api } from '@/api/file'
-import { load } from '@tauri-apps/plugin-store'
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { load, getCurrentWebviewWindow } from '@/core/runtime'
 import NotificationUtil from '@/utils/NotificationUtil'
 
 export const useWorkspaceStore = defineStore('workspace', () => {

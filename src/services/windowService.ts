@@ -2,8 +2,8 @@
  * 窗口管理服务
  * 封装所有窗口管理相关的 Tauri invoke 调用
  */
-import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { invoke } from '@/api/rpc'
+import { listen } from '@/core/runtime'
 import type { WindowMeta } from '@/Types/workspace'
 import type { ResponseData } from '@/entity/entitys'
 

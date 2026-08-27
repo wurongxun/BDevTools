@@ -21,7 +21,6 @@ pub struct LogSearchResult {
 }
 
 /// 使用 mmap 搜索超大日志文件（OS 管理内存分页，10GB+ 文件无压力）
-#[tauri::command]
 pub fn search_log_mmap(
     file_path: String,
     keyword: String,

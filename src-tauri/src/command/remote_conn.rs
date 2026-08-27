@@ -1,4 +1,5 @@
 /*! # 远程连接管理模块 - SSH终端 + SFTP文件操作 */
+use crate::core::ctx::AppContext;
 use crate::response::response::Response;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -10,7 +11,6 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use tauri::{command, AppHandle, Emitter};
 
 // 全局会话管理
 lazy_static::lazy_static! {
@@ -39,9 +39,8 @@ pub struct RemoteFileItem {
 // ===================== SSH 终端操作 =====================
 
 /// SSH 连接
-#[command]
 pub async fn ssh_connect(
-    app: AppHandle,
+    ctx: AppContext,
     tab_id: String,
     host: String,
     port: u16,
@@ -56,7 +55,7 @@ pub async fn ssh_connect(
 
     let result = tokio::task::spawn_blocking({
         let session_id = session_id.clone();
-        let app = app.clone();
+        let ctx = ctx.clone();
         move || -> Result<String> {
             let tcp = TcpStream::connect(format!("{}:{}", host, port))?;
             tcp.set_read_timeout(Some(Duration::from_secs(10)))?;
@@ -101,7 +100,7 @@ pub async fn ssh_connect(
             // 启动后台读取线程
             let inner_read = inner.clone();
             let sid = session_id.clone();
-            let app_read = app.clone();
+            let ctx_read = ctx.clone();
             thread::spawn(move || {
                 let mut buf = [0u8; 4096];
                 loop {
@@ -126,7 +125,7 @@ pub async fn ssh_connect(
                     };
 
                     if let Some(output) = data {
-                        let _ = app_read.emit("ssh-output", serde_json::json!({
+                        ctx_read.emit("ssh-output", serde_json::json!({
                             "tabId": tab_id,
                             "data": output
                         }));
@@ -149,7 +148,6 @@ pub async fn ssh_connect(
 }
 
 /// SSH 写入（用户输入）
-#[command]
 pub async fn ssh_write(session_id: String, data: String) -> Response<bool> {
     let sessions = SSH_SESSIONS.lock().unwrap();
     if let Some(inner) = sessions.get(&session_id) {
@@ -171,7 +169,6 @@ pub async fn ssh_write(session_id: String, data: String) -> Response<bool> {
 }
 
 /// SSH 断开连接
-#[command]
 pub async fn ssh_disconnect(session_id: String) -> Response<bool> {
     let mut sessions = SSH_SESSIONS.lock().unwrap();
     if sessions.remove(&session_id).is_some() {
@@ -182,7 +179,6 @@ pub async fn ssh_disconnect(session_id: String) -> Response<bool> {
 }
 
 /// SSH 连接状态检测
-#[command]
 pub async fn ssh_check(session_id: String) -> Response<bool> {
     let sessions = SSH_SESSIONS.lock().unwrap();
     match sessions.get(&session_id) {
@@ -196,7 +192,6 @@ pub async fn ssh_check(session_id: String) -> Response<bool> {
 }
 
 /// SSH 调整 PTY 大小
-#[command]
 pub async fn ssh_resize_pty(
     session_id: String,
     cols: u32,
@@ -219,7 +214,6 @@ pub async fn ssh_resize_pty(
 // ===================== SFTP 文件操作 =====================
 
 /// SFTP 连接
-#[command]
 pub async fn sftp_connect(
     tab_id: String,
     host: String,
@@ -273,7 +267,6 @@ pub async fn sftp_connect(
 }
 
 /// SFTP 断开连接
-#[command]
 pub async fn sftp_disconnect(session_id: String) -> Response<bool> {
     let mut sessions = SFTP_SESSIONS.lock().unwrap();
     sessions.remove(&session_id);
@@ -281,7 +274,6 @@ pub async fn sftp_disconnect(session_id: String) -> Response<bool> {
 }
 
 /// SFTP 连接状态检测
-#[command]
 pub async fn sftp_check(session_id: String) -> Response<bool> {
     let sessions = SFTP_SESSIONS.lock().unwrap();
     match sessions.get(&session_id) {
@@ -297,7 +289,6 @@ pub async fn sftp_check(session_id: String) -> Response<bool> {
 }
 
 /// SFTP 列出目录
-#[command]
 pub async fn sftp_list_dir(
     session_id: String,
     path: String,
@@ -372,7 +363,6 @@ pub async fn sftp_list_dir(
 }
 
 /// SFTP 创建目录
-#[command]
 pub async fn sftp_mkdir(session_id: String, path: String) -> Response<bool> {
     let sess = {
         let sessions = SFTP_SESSIONS.lock().unwrap();
@@ -398,7 +388,6 @@ pub async fn sftp_mkdir(session_id: String, path: String) -> Response<bool> {
 }
 
 /// SFTP 删除文件/目录
-#[command]
 pub async fn sftp_remove(session_id: String, path: String) -> Response<bool> {
     let sess = {
         let sessions = SFTP_SESSIONS.lock().unwrap();
@@ -434,9 +423,8 @@ pub async fn sftp_remove(session_id: String, path: String) -> Response<bool> {
 }
 
 /// SFTP 上传文件
-#[command]
 pub async fn sftp_upload(
-    app: AppHandle,
+    ctx: AppContext,
     session_id: String,
     local_path: String,
     remote_path: String,
@@ -472,7 +460,7 @@ pub async fn sftp_upload(
                     0
                 };
 
-                let _ = app.emit("transfer-progress", serde_json::json!({
+                ctx.emit("transfer-progress", serde_json::json!({
                     "tabId": "",
                     "taskId": task_id,
                     "progress": progress,
@@ -496,9 +484,8 @@ pub async fn sftp_upload(
 }
 
 /// SFTP 下载文件
-#[command]
 pub async fn sftp_download(
-    app: AppHandle,
+    ctx: AppContext,
     session_id: String,
     remote_path: String,
     local_path: String,
@@ -536,7 +523,7 @@ pub async fn sftp_download(
                     0
                 };
 
-                let _ = app.emit("transfer-progress", serde_json::json!({
+                ctx.emit("transfer-progress", serde_json::json!({
                     "tabId": "",
                     "taskId": task_id,
                     "progress": progress,
@@ -560,7 +547,6 @@ pub async fn sftp_download(
 }
 
 /// 本地目录列出
-#[command]
 pub async fn local_list_dir(path: String) -> Response<Vec<RemoteFileItem>> {
     let result = tokio::task::spawn_blocking(move || -> Result<Vec<RemoteFileItem>> {
         let dir_path = if path.is_empty() {
@@ -618,7 +604,6 @@ pub async fn local_list_dir(path: String) -> Response<Vec<RemoteFileItem>> {
 }
 
 /// SFTP 重命名文件/目录
-#[command]
 pub async fn sftp_rename(
     session_id: String,
     old_path: String,
@@ -647,7 +632,6 @@ pub async fn sftp_rename(
 }
 
 /// 获取应用数据目录路径
-#[command]
 pub async fn get_app_dir() -> Response<String> {
     let app_dir = &crate::app::app_store::APP.lock().app_dir;
     Response::new(200, app_dir.to_string_lossy().to_string(), "成功")

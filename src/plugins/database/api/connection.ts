@@ -1,7 +1,7 @@
 /**
  * 数据库连接管理 API
  */
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/api/rpc'
 import type { DbConnectionConfig, ApiResponse } from '../types'
 
 /** 创建连接配置 */

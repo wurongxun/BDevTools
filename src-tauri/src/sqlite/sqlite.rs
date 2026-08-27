@@ -5,8 +5,6 @@ use log::info;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, result::Result::Ok};
-use tauri::{command, window, Manager, Window};
-use tauri_plugin_notification::{NotificationExt, PermissionState};
 use uuid::Uuid;
 /// 创建数据库连接
 fn create_sqlite_connection() -> Result<Connection> {
@@ -221,9 +219,7 @@ pub fn init_table() {
 }
 
 /// 更新系统信息
-#[command]
 pub async fn update_sys_info(
-    window: Window,
     id: String,
     auto_refresh: bool,
     auto_refresh_time: isize,
@@ -259,7 +255,6 @@ pub struct SysInfo {
     pub pubsub: bool,
 }
 /// 查询系统信息
-#[command]
 pub async fn query_sys_info() -> Response<Option<SysInfo>> {
     let res = exec(|conn| {
         let res = conn.query_row("select * from sys_info", [], |row| {

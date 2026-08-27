@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke } from '@/api/rpc'
 import type { FtpFileItem, TransferTask, FtpPanelState } from '../types'
 import NotificationUtil from '@/utils/NotificationUtil'
 

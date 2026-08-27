@@ -105,7 +105,6 @@ fn read_line_lossy<R: BufRead>(
 }
 // ==================== 命令1：流式搜索（只存行号，低内存） ====================
 
-#[tauri::command]
 pub async fn search_log_parallel(
     file_path: String,
     keyword: String,
@@ -172,7 +171,6 @@ pub async fn search_log_parallel(
 
 // ==================== 命令2：建立搜索索引（单线程流式，低内存） ====================
 
-#[tauri::command]
 pub async fn search_log_index(
     file_path: String,
     keyword: String,
@@ -293,7 +291,6 @@ pub async fn search_log_index(
 
 // ==================== 命令3：分页获取搜索结果 ====================
 
-#[tauri::command]
 pub async fn search_log_page(
     search_id: String,
     page: u64,
@@ -339,7 +336,6 @@ pub async fn search_log_page(
 
 // ==================== 命令4：跳转到第 N 条搜索结果 ====================
 
-#[tauri::command]
 pub async fn search_log_jump_to(
     search_id: String,
     target_index: u64,
@@ -593,7 +589,6 @@ pub struct TextPreviewBlock {
 
 // ==================== 命令5：文本预览（流式读取，低内存） ====================
 
-#[tauri::command]
 pub async fn search_log_preview(
     search_id: String,
     target_index: u64,
@@ -771,7 +766,6 @@ fn resolve_encoding(name: &str) -> &'static Encoding {
     }
 }
 
-#[tauri::command]
 pub async fn read_file_lines(
     file_path: String,
     start_line: Option<u64>,
@@ -893,7 +887,6 @@ pub async fn read_file_lines(
 
 // ==================== 命令7：快速统计文件总行数 ====================
 
-#[tauri::command]
 pub async fn count_file_lines(
     file_path: String,
 ) -> Result<ResData<u64>, String> {
