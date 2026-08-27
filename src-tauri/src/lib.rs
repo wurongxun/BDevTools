@@ -47,10 +47,11 @@ use crate::commands::{
     ssh_check, ssh_connect, ssh_disconnect, ssh_resize_pty, ssh_write, up_file_name,
     up_folder_name, update_window_position_cmd, windows_close, windows_hide,
     windows_maximize, windows_minimize, workspace_create, workspace_delete,
-    workspace_get, workspace_get_default, workspace_get_global_plugin_dir,
-    workspace_get_plugin_custom_dir, workspace_get_plugin_dir,
-    workspace_get_plugin_subdir, workspace_list, workspace_lock, workspace_lock_status,
-    workspace_set_plugin_custom_dir, workspace_unlock, workspace_update,
+    workspace_get, workspace_get_default,
+    workspace_add_plugin_external_dir, workspace_get_plugin_dir,
+    workspace_get_plugin_subdir, workspace_list, workspace_list_plugin_external_dirs,
+    workspace_lock, workspace_lock_status, workspace_remove_plugin_external_dir,
+    workspace_unlock, workspace_update,
     write_script_file,
 };
 
@@ -156,9 +157,10 @@ pub fn run() {
             // 插件工作目录
             workspace_get_plugin_dir,
             workspace_get_plugin_subdir,
-            workspace_get_global_plugin_dir,
-            workspace_set_plugin_custom_dir,
-            workspace_get_plugin_custom_dir,
+            // 外部脚本目录（用户级，跨工作区共享）
+            workspace_list_plugin_external_dirs,
+            workspace_add_plugin_external_dir,
+            workspace_remove_plugin_external_dir,
             // 会话管理（主键：工作区 ID）
             session_save,
             session_load,

@@ -1,12 +1,11 @@
 /*! # 插件工作目录管理
-为每个插件在当前工作区下提供独立的工作目录。
-目录结构：
+为每个插件在当前工作区下提供独立的默认工作目录：
   {app_dir}/plugin_data/{workspace_id}/{plugin_id}/[subdirs...]
-  {app_dir}/plugin_data/_global/{plugin_id}/[subdirs...]
-自定义路径存储在 settings.json 中。
+同时支持用户级（跨工作区共享）的外部脚本目录挂载列表，
+外部目录路径存储在 settings.json 中，仅解除挂载不删除内容。
 */
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use crate::response::response::Response;
 
 /// 获取 app 根目录
@@ -45,11 +44,6 @@ fn get_plugin_dir_path(workspace_id: &str, plugin_id: &str) -> PathBuf {
     plugin_data_root().join(workspace_id).join(plugin_id)
 }
 
-/// 获取全局（跨工作区）插件目录
-fn get_global_plugin_dir_path(plugin_id: &str) -> PathBuf {
-    plugin_data_root().join("_global").join(plugin_id)
-}
-
 /// 确保目录存在，不存在则创建
 fn ensure_dir(path: &PathBuf) -> Result<(), String> {
     if !path.exists() {
@@ -59,33 +53,33 @@ fn ensure_dir(path: &PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-/// 从 settings.json 读取插件自定义目录（按工作区隔离）
-/// 优先读取 `plugin_dir.{workspace_id}.{plugin_id}`，
-/// 兼容旧版全局 key `plugin_dir.{plugin_id}` 作为迁移回退。
-fn get_custom_dir(workspace_id: &str, plugin_id: &str) -> Option<String> {
+// ==================== 外部脚本目录（用户级） ====================
+
+/// 读取插件外部脚本目录列表（用户级，跨工作区共享）
+fn get_external_dirs(plugin_id: &str) -> Vec<String> {
     let settings = read_settings();
-    // 新：按工作区隔离的 key
-    let scoped_key = format!("plugin_dir.{}.{}", workspace_id, plugin_id);
-    if let Some(v) = settings.get(&scoped_key) {
-        return v.as_str().map(|s: &str| s.to_string());
-    }
-    // 旧：全局 key（历史数据迁移回退，读取但不回写）
-    let legacy_key = format!("plugin_dir.{}", plugin_id);
-    settings.get(&legacy_key)
-        .and_then(|v: &serde_json::Value| v.as_str().map(|s: &str| s.to_string()))
+    let key = format!("plugin_external_dirs.{}", plugin_id);
+    settings
+        .get(&key)
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s: &str| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
-/// 向 settings.json 写入插件自定义目录（按工作区隔离）
-/// 保留文件中其他 key（window_presets 等），仅更新目标 key。
-fn set_custom_dir(workspace_id: &str, plugin_id: &str, path: &str) {
+/// 写入插件外部脚本目录列表（保留 settings.json 其他 key）
+fn set_external_dirs(plugin_id: &str, dirs: &[String]) {
     let mut settings = read_settings();
-    let key = format!("plugin_dir.{}.{}", workspace_id, plugin_id);
-    if path.is_empty() {
-        if let Some(obj) = settings.as_object_mut() {
+    let key = format!("plugin_external_dirs.{}", plugin_id);
+    if let Some(obj) = settings.as_object_mut() {
+        if dirs.is_empty() {
             obj.remove(&key);
+        } else {
+            obj.insert(key, serde_json::json!(dirs));
         }
-    } else if let Some(obj) = settings.as_object_mut() {
-        obj.insert(key, serde_json::json!(path));
     }
     let _ = fs::write(
         settings_path(),
@@ -93,26 +87,21 @@ fn set_custom_dir(workspace_id: &str, plugin_id: &str, path: &str) {
     );
 }
 
+/// 判断两个路径是否互为父子包含（规范化后按组件比较，避免 /a/foo 误判为 /a/foo2 的子路径）
+fn paths_related(a: &Path, b: &Path) -> bool {
+    let ca = fs::canonicalize(a).unwrap_or_else(|_| a.to_path_buf());
+    let cb = fs::canonicalize(b).unwrap_or_else(|_| b.to_path_buf());
+    ca.starts_with(&cb) || cb.starts_with(&ca)
+}
+
 // ==================== Tauri 命令 ====================
 
-/// 获取插件在当前工作区的工作目录（自动创建）
+/// 获取插件在当前工作区的工作目录（自动创建，仅默认路径）
 //#[command]
 pub fn workspace_get_plugin_dir(
     workspace_id: String,
     plugin_id: String,
 ) -> Response<String> {
-    // 优先使用自定义路径（按工作区隔离）
-    if let Some(custom) = get_custom_dir(&workspace_id, &plugin_id) {
-        if !custom.is_empty() {
-            let path = PathBuf::from(&custom);
-            if let Err(e) = ensure_dir(&path) {
-                return Response::<String>::new(500, String::new(), &e);
-            }
-            return Response::new(200, custom, "ok");
-        }
-    }
-
-    // 默认路径
     let dir = get_plugin_dir_path(&workspace_id, &plugin_id);
     if let Err(e) = ensure_dir(&dir) {
         return Response::<String>::new(500, String::new(), &e);
@@ -127,17 +116,7 @@ pub fn workspace_get_plugin_subdir(
     plugin_id: String,
     subdir: String,
 ) -> Response<String> {
-    // 优先使用自定义路径（按工作区隔离）
-    let base = if let Some(custom) = get_custom_dir(&workspace_id, &plugin_id) {
-        if !custom.is_empty() {
-            PathBuf::from(&custom)
-        } else {
-            get_plugin_dir_path(&workspace_id, &plugin_id)
-        }
-    } else {
-        get_plugin_dir_path(&workspace_id, &plugin_id)
-    };
-
+    let base = get_plugin_dir_path(&workspace_id, &plugin_id);
     let dir = base.join(&subdir);
     if let Err(e) = ensure_dir(&dir) {
         return Response::<String>::new(500, String::new(), &e);
@@ -145,44 +124,59 @@ pub fn workspace_get_plugin_subdir(
     Response::new(200, dir.to_string_lossy().to_string(), "ok")
 }
 
-/// 获取全局插件目录（跨工作区共享）
+/// 获取插件外部脚本目录列表（用户级，跨工作区共享）
 //#[command]
-pub fn workspace_get_global_plugin_dir(
-    plugin_id: String,
-) -> Response<String> {
-    let dir = get_global_plugin_dir_path(&plugin_id);
-    if let Err(e) = ensure_dir(&dir) {
-        return Response::<String>::new(500, String::new(), &e);
-    }
-    Response::new(200, dir.to_string_lossy().to_string(), "ok")
+pub fn workspace_list_plugin_external_dirs(plugin_id: String) -> Response<Vec<String>> {
+    let dirs = get_external_dirs(&plugin_id);
+    Response::new(200, dirs, "ok")
 }
 
-/// 设置插件自定义工作目录（传空字符串则恢复默认，按工作区隔离）
+/// 添加插件外部脚本目录（用户级，跨工作区共享）
+/// 校验：目录存在、不重复、与默认脚本目录及已有外部目录无父子包含关系。
 //#[command]
-pub fn workspace_set_plugin_custom_dir(
+pub fn workspace_add_plugin_external_dir(
     workspace_id: String,
     plugin_id: String,
-    custom_path: String,
+    path: String,
 ) -> Response<bool> {
-    // 验证路径有效性（非空时检查是否可访问）
-    if !custom_path.is_empty() {
-        let path = PathBuf::from(&custom_path);
-        if let Err(e) = ensure_dir(&path) {
-            return Response::new(500, false, &e);
+    let dir = PathBuf::from(&path);
+    if !dir.exists() || !dir.is_dir() {
+        return Response::new(500, false, "目录不存在或不可访问");
+    }
+    let mut dirs = get_external_dirs(&plugin_id);
+    if dirs.iter().any(|d| d == &path) {
+        return Response::new(200, true, "该目录已在列表中");
+    }
+    // 与默认脚本目录冲突检查
+    let default_scripts = get_plugin_dir_path(&workspace_id, &plugin_id).join("scripts");
+    if paths_related(&dir, &default_scripts) {
+        return Response::new(500, false, "该目录与应用默认脚本目录冲突");
+    }
+    // 与已有外部目录冲突检查
+    for d in &dirs {
+        if paths_related(&dir, &PathBuf::from(d)) {
+            return Response::new(500, false, "该目录与已挂载目录存在包含关系");
         }
     }
-    set_custom_dir(&workspace_id, &plugin_id, &custom_path);
-    Response::new(200, true, "设置成功")
+    dirs.push(path);
+    set_external_dirs(&plugin_id, &dirs);
+    Response::new(200, true, "添加成功")
 }
 
-/// 获取插件自定义工作目录（None 表示使用默认，按工作区隔离）
+/// 移除插件外部脚本目录（仅解除挂载，不删除目录内容）
 //#[command]
-pub fn workspace_get_plugin_custom_dir(
-    workspace_id: String,
+pub fn workspace_remove_plugin_external_dir(
     plugin_id: String,
-) -> Response<Option<String>> {
-    let custom = get_custom_dir(&workspace_id, &plugin_id);
-    Response::new(200, custom, "ok")
+    path: String,
+) -> Response<bool> {
+    let mut dirs = get_external_dirs(&plugin_id);
+    let before = dirs.len();
+    dirs.retain(|d| d != &path);
+    if dirs.len() == before {
+        return Response::new(200, false, "该目录未在列表中");
+    }
+    set_external_dirs(&plugin_id, &dirs);
+    Response::new(200, true, "已移除")
 }
 
 /// 删除指定工作区的全部插件数据目录（删除工作区时调用，避免孤儿数据）

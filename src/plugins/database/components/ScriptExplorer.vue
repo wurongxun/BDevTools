@@ -28,11 +28,12 @@
 
     <div class="explorer-body" v-loading="scriptsStore.loading">
       <el-tree
-        v-if="filteredTree.length > 0"
+        v-if="hasFiles"
         :data="filteredTree"
         :props="{ label: 'name', children: 'children' }"
         node-key="path"
         :expand-on-click-node="false"
+        default-expand-all
         @node-click="onNodeClick"
         @node-contextmenu.prevent="onNodeContextmenu"
       >
@@ -43,6 +44,12 @@
               <Document v-else />
             </el-icon>
             <span class="node-name" :title="data.path">{{ data.name }}</span>
+            <el-tag
+              v-if="data.isSourceRoot"
+              size="small"
+              class="source-tag"
+              :type="data.sourceKind === 'default' ? 'info' : 'warning'"
+            >{{ data.sourceKind === 'default' ? '本地' : '外部' }}</el-tag>
             <span
               v-if="!data.isDir"
               class="bind-badge"
@@ -71,8 +78,10 @@
       <template v-else>
         <div class="ctx-item" @click="askNewFile(ctxNode.path)">新建查询</div>
         <div class="ctx-item" @click="askNewFolder(ctxNode.path)">新建文件夹</div>
-        <div class="ctx-item" @click="askRename(ctxNode)">重命名</div>
-        <div class="ctx-item danger" @click="askDelete(ctxNode)">删除</div>
+        <template v-if="!ctxNode?.isSourceRoot">
+          <div class="ctx-item" @click="askRename(ctxNode)">重命名</div>
+          <div class="ctx-item danger" @click="askDelete(ctxNode)">删除</div>
+        </template>
       </template>
     </div>
 
@@ -191,6 +200,13 @@ const filteredTree = computed<ScriptFileNode[]>(() => {
       })
       .filter((n): n is ScriptFileNode => n !== null)
   return prune(scriptsStore.tree)
+})
+
+/** 树中是否存在任意文件（源根为空时展示空提示而非空文件夹） */
+const hasFiles = computed(() => {
+  const walk = (nodes: ScriptFileNode[]): boolean =>
+    nodes.some(n => (n.isDir ? walk(n.children) : true))
+  return walk(filteredTree.value)
 })
 
 // ==================== 徽章 ====================
@@ -320,6 +336,10 @@ const renameTarget = ref<ScriptFileNode | null>(null)
 function askRename(node: ScriptFileNode | null) {
   closeContextMenu()
   if (!node) return
+  if (node.isSourceRoot) {
+    ElMessage.warning('源目录不可重命名')
+    return
+  }
   renameTarget.value = node
   renameInitial.value = node.name
   renameDialogVisible.value = true
@@ -347,6 +367,10 @@ let pendingDeleteAction: (() => Promise<void>) | null = null
 function askDelete(node: ScriptFileNode | null) {
   closeContextMenu()
   if (!node) return
+  if (node.isSourceRoot) {
+    ElMessage.warning('源目录不可删除，可在插件设置中移除挂载')
+    return
+  }
   deleteMessage.value = node.isDir
     ? `确定删除文件夹「${node.name}」及其全部内容吗？`
     : `确定删除查询文件「${node.name}」吗？`
@@ -475,6 +499,11 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.source-tag {
+  flex-shrink: 0;
+  transform: scale(0.85);
+  margin-left: 2px;
 }
 .bind-badge {
   flex-shrink: 0;

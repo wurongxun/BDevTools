@@ -627,29 +627,29 @@ pub fn workspace_get_plugin_subdir(
     crate::workspace::plugin_dir::workspace_get_plugin_subdir(workspace_id, plugin_id, subdir)
 }
 
-/// 获取全局插件目录（跨工作区共享）
+/// 获取插件外部脚本目录列表（用户级，跨工作区共享）
 #[tauri::command]
-pub fn workspace_get_global_plugin_dir(plugin_id: String) -> Response<String> {
-    crate::workspace::plugin_dir::workspace_get_global_plugin_dir(plugin_id)
+pub fn workspace_list_plugin_external_dirs(plugin_id: String) -> Response<Vec<String>> {
+    crate::workspace::plugin_dir::workspace_list_plugin_external_dirs(plugin_id)
 }
 
-/// 设置插件自定义工作目录
+/// 添加插件外部脚本目录（用户级，跨工作区共享）
 #[tauri::command]
-pub fn workspace_set_plugin_custom_dir(
+pub fn workspace_add_plugin_external_dir(
     workspace_id: String,
     plugin_id: String,
-    custom_path: String,
+    path: String,
 ) -> Response<bool> {
-    crate::workspace::plugin_dir::workspace_set_plugin_custom_dir(workspace_id, plugin_id, custom_path)
+    crate::workspace::plugin_dir::workspace_add_plugin_external_dir(workspace_id, plugin_id, path)
 }
 
-/// 获取插件自定义工作目录
+/// 移除插件外部脚本目录（仅解除挂载，不删除目录内容）
 #[tauri::command]
-pub fn workspace_get_plugin_custom_dir(
-    workspace_id: String,
+pub fn workspace_remove_plugin_external_dir(
     plugin_id: String,
-) -> Response<Option<String>> {
-    crate::workspace::plugin_dir::workspace_get_plugin_custom_dir(workspace_id, plugin_id)
+    path: String,
+) -> Response<bool> {
+    crate::workspace::plugin_dir::workspace_remove_plugin_external_dir(plugin_id, path)
 }
 
 // ==================== 会话管理 ====================

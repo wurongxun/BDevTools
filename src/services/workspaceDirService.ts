@@ -18,21 +18,21 @@ export const workspaceDirService = {
     return res.code === 200 ? res.data : ''
   },
 
-  /** 获取全局插件目录（跨工作区共享） */
-  async getGlobalPluginDir(pluginId: string): Promise<string> {
-    const res = await invoke<ApiResponse<string>>('workspace_get_global_plugin_dir', { pluginId })
-    return res.code === 200 ? res.data : ''
+  /** 获取插件外部脚本目录列表（用户级，跨工作区共享） */
+  async listExternalDirs(pluginId: string): Promise<string[]> {
+    const res = await invoke<ApiResponse<string[]>>('workspace_list_plugin_external_dirs', { pluginId })
+    return res.code === 200 ? res.data : []
   },
 
-  /** 设置插件自定义工作目录（传空字符串恢复默认，按工作区隔离） */
-  async setCustomDir(workspaceId: string, pluginId: string, customPath: string): Promise<boolean> {
-    const res = await invoke<ApiResponse<boolean>>('workspace_set_plugin_custom_dir', { workspaceId, pluginId, customPath })
+  /** 添加插件外部脚本目录（校验冲突后持久化） */
+  async addExternalDir(workspaceId: string, pluginId: string, path: string): Promise<{ ok: boolean; msg?: string }> {
+    const res = await invoke<ApiResponse<boolean>>('workspace_add_plugin_external_dir', { workspaceId, pluginId, path })
+    return res.code === 200 ? { ok: true } : { ok: false, msg: res.msg }
+  },
+
+  /** 移除插件外部脚本目录（仅解除挂载，不删除内容） */
+  async removeExternalDir(pluginId: string, path: string): Promise<boolean> {
+    const res = await invoke<ApiResponse<boolean>>('workspace_remove_plugin_external_dir', { pluginId, path })
     return res.code === 200
-  },
-
-  /** 获取插件自定义工作目录（null 表示使用默认，按工作区隔离） */
-  async getCustomDir(workspaceId: string, pluginId: string): Promise<string | null> {
-    const res = await invoke<ApiResponse<string | null>>('workspace_get_plugin_custom_dir', { workspaceId, pluginId })
-    return res.code === 200 ? res.data : null
   },
 }

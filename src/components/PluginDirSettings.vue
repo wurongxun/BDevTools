@@ -2,43 +2,54 @@
   <div class="plugin-dir-settings">
     <div class="setting-item">
       <div class="setting-label">
-        <span class="label-text">工作目录</span>
-        <span class="label-desc">插件数据存储位置</span>
+        <span class="label-text">本地脚本目录</span>
+        <span class="label-desc">应用默认存储位置，按工作区隔离</span>
       </div>
       <div class="setting-control">
-        <el-input
-          v-model="customPath"
-          size="small"
-          placeholder="默认（留空使用默认路径）"
-          :readonly="!editing"
-        >
-          <template #prepend>
-            <el-tooltip :content="currentDir" placement="top" :disabled="!currentDir">
-              <span class="current-path">{{ currentDir || '加载中...' }}</span>
-            </el-tooltip>
-          </template>
-        </el-input>
-        <el-button v-if="!editing" size="small" @click="startEdit">自定义</el-button>
-        <template v-else>
-          <el-button size="small" type="primary" @click="saveEdit">保存</el-button>
-          <el-button size="small" @click="cancelEdit">取消</el-button>
-        </template>
-        <el-button size="small" @click="openInExplorer" :disabled="!currentDir" title="在文件管理器中打开">
+        <span class="current-path" :title="defaultDir">{{ defaultDir || '加载中...' }}</span>
+        <el-button size="small" @click="openInExplorer(defaultDir)" :disabled="!defaultDir" title="在文件管理器中打开">
           <el-icon><FolderOpened /></el-icon>
         </el-button>
       </div>
     </div>
+
+    <div v-for="dir in externalDirs" :key="dir" class="setting-item">
+      <div class="setting-label">
+        <span class="label-text">{{ dirName(dir) }}</span>
+        <span class="label-desc">外部脚本目录（跨工作区共享）</span>
+      </div>
+      <div class="setting-control">
+        <span class="current-path" :title="dir">{{ dir }}</span>
+        <el-button size="small" @click="openInExplorer(dir)" title="在文件管理器中打开">
+          <el-icon><FolderOpened /></el-icon>
+        </el-button>
+        <el-button size="small" type="danger" plain @click="removeDir(dir)">移除</el-button>
+      </div>
+    </div>
+
+    <el-button
+      size="small"
+      type="primary"
+      plain
+      class="add-btn"
+      :loading="adding"
+      @click="addDir"
+    >
+      <el-icon><FolderAdd /></el-icon>
+      添加外部脚本目录
+    </el-button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { FolderOpened } from '@element-plus/icons-vue'
+import { FolderOpened, FolderAdd } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { usePluginDir } from '@/composables/usePluginDir'
 import { invoke } from '@/api/rpc'
-import { emit, listen } from '@/core/runtime'
+import { open, emit, listen } from '@/core/runtime'
 
-/** 插件自定义目录变更事件（跨窗口同步面板展示） */
+/** 外部脚本目录变更事件（跨窗口同步面板展示与脚本树刷新） */
 const PLUGIN_DIR_CHANGED_EVENT = 'plugin-dir-changed'
 
 const props = defineProps<{
@@ -46,16 +57,22 @@ const props = defineProps<{
 }>()
 
 const pluginDir = usePluginDir(props.pluginId)
-const currentDir = ref('')
-const customPath = ref('')
-const editing = ref(false)
+const defaultDir = ref('')
+const externalDirs = ref<string[]>([])
+const adding = ref(false)
 let unlistenDirChanged: (() => void) | null = null
 
+/** 取路径最后一段作为显示名 */
+function dirName(path: string): string {
+  const n = path.replace(/\\/g, '/').replace(/\/+$/, '')
+  return n.split('/').filter(Boolean).pop() || n
+}
+
 onMounted(async () => {
-  await refreshDir()
-  // 其他窗口修改了自定义目录时同步刷新展示（Rust store 内存已共享，此处仅刷新 UI）
+  await refreshDirs()
+  // 其他窗口修改了外部目录时同步刷新展示（存储已共享，此处仅刷新 UI）
   unlistenDirChanged = await listen(PLUGIN_DIR_CHANGED_EVENT, () => {
-    refreshDir()
+    refreshDirs()
   })
 })
 
@@ -64,58 +81,66 @@ onUnmounted(() => {
   unlistenDirChanged = null
 })
 
-// 窗口切换工作区时重新解析插件目录（按工作区隔离）
+// 窗口切换工作区时刷新默认目录（外部目录用户级不变，一并刷新）
 watch(pluginDir.workspaceId, () => {
-  refreshDir()
+  refreshDirs()
 })
 
-async function refreshDir() {
-  currentDir.value = await pluginDir.getDir()
-  const custom = await pluginDir.getCustomDir()
-  customPath.value = custom || ''
+async function refreshDirs() {
+  defaultDir.value = await pluginDir.getDir()
+  externalDirs.value = await pluginDir.listExternalDirs()
 }
 
-function startEdit() {
-  editing.value = true
-}
-
-function cancelEdit() {
-  editing.value = false
-  // 恢复原值
-  pluginDir.getCustomDir().then(custom => {
-    customPath.value = custom || ''
-  })
-}
-
-async function saveEdit() {
-  editing.value = false
-  const success = await pluginDir.setCustomDir(customPath.value)
-  if (success) {
-    await refreshDir()
-    // 通知其他窗口的面板同步刷新（同窗口自身也会收到，幂等）
-    emit(PLUGIN_DIR_CHANGED_EVENT).catch(() => {})
+async function addDir() {
+  const selected = await open({ directory: true, multiple: false })
+  if (typeof selected !== 'string' || !selected) return
+  adding.value = true
+  try {
+    const res = await pluginDir.addExternalDir(selected)
+    if (res.ok) {
+      ElMessage.success('已添加')
+      await refreshDirs()
+      emit(PLUGIN_DIR_CHANGED_EVENT).catch(() => {})
+    } else {
+      ElMessage.error(res.msg || '添加失败')
+    }
+  } finally {
+    adding.value = false
   }
 }
 
-async function openInExplorer() {
-  if (currentDir.value) {
-    try {
-      await invoke('file_manager_open_path', { path: currentDir.value })
-    } catch (e) {
-      console.error('打开目录失败:', e)
-    }
+async function removeDir(path: string) {
+  const ok = await pluginDir.removeExternalDir(path)
+  if (ok) {
+    ElMessage.success('已移除挂载（目录内容未删除）')
+    await refreshDirs()
+    emit(PLUGIN_DIR_CHANGED_EVENT).catch(() => {})
+  } else {
+    ElMessage.error('移除失败')
+  }
+}
+
+async function openInExplorer(path: string) {
+  if (!path) return
+  try {
+    await invoke('file_manager_open_path', { path })
+  } catch (e) {
+    console.error('打开目录失败:', e)
   }
 }
 </script>
 
 <style scoped>
 .plugin-dir-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   padding: 8px 0;
 }
 .setting-item {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 .setting-label {
   display: flex;
@@ -140,11 +165,16 @@ async function openInExplorer() {
   flex: 1;
 }
 .current-path {
+  flex: 1;
+  min-width: 0;
   font-size: var(--font-size-sm);
-  max-width: 160px;
+  color: var(--el-text-color-regular);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  display: inline-block;
+  user-select: text;
+}
+.add-btn {
+  align-self: flex-start;
 }
 </style>

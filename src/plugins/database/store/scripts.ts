@@ -25,12 +25,20 @@ function norm(path: string): string {
   return path.replace(/\\/g, '/')
 }
 
+/** 取路径最后一段（外部目录的显示名） */
+function basename(path: string): string {
+  const n = norm(path).replace(/\/+$/, '')
+  return n.split('/').filter(Boolean).pop() || n
+}
+
 export const useScriptsStore = defineStore('dbScripts', () => {
   const pluginDir = usePluginDir('database')
 
-  /** scripts 目录绝对路径 */
+  /** scripts 目录绝对路径（默认源根） */
   const scriptsDir = ref('')
-  /** 目录树（已排除 index.json） */
+  /** 用户挂载的外部脚本目录列表（用户级，跨工作区共享） */
+  const externalDirs = ref<string[]>([])
+  /** 目录树（顶层为源根节点：默认源 + 外部源，已排除 index.json） */
   const tree = ref<ScriptFileNode[]>([])
   /** 绑定索引：归一化绝对路径 -> 连接/数据库 */
   const bindings = ref<Record<string, ScriptFileBinding>>({})
@@ -72,7 +80,8 @@ export const useScriptsStore = defineStore('dbScripts', () => {
     })
   }
 
-  /** 加载绑定索引并做一次对账：目录内已不存在的条目清除，目录外的条目（另存的绝对路径）保留 */
+  /** 加载绑定索引并做一次对账：仅保留当前树中真实存在的文件绑定。
+   * 覆盖默认源与外部源；外部目录被移除挂载或文件被外部删除时，对应绑定自动清理。 */
   async function loadIndex() {
     if (!scriptsDir.value) return
     const indexPath = norm(`${scriptsDir.value}/${INDEX_FILE}`)
@@ -86,12 +95,11 @@ export const useScriptsStore = defineStore('dbScripts', () => {
       // 索引不存在或损坏：视为空索引
     }
     const existing = collectFilePaths(tree.value)
-    const dirPrefix = norm(scriptsDir.value) + '/'
     const reconciled: Record<string, ScriptFileBinding> = {}
     let changed = false
     for (const [key, val] of Object.entries(raw)) {
       const nk = norm(key)
-      if (!nk.startsWith(dirPrefix) || existing.has(nk)) {
+      if (existing.has(nk)) {
         reconciled[nk] = val
       } else {
         changed = true
@@ -101,20 +109,55 @@ export const useScriptsStore = defineStore('dbScripts', () => {
     if (changed) await persistIndex()
   }
 
-  /** 刷新目录树 + 绑定索引 */
+  /** 列出单个目录的文件树（已过滤 index.json） */
+  async function listDir(dir: string): Promise<ScriptFileNode[]> {
+    const res = await tauri_request<ResponseData<ScriptFileEntryRaw[]>>('list_script_files', {
+      path: dir,
+    })
+    return res?.code === 200 ? mapEntries(res.data || []) : []
+  }
+
+  /** 刷新目录树 + 绑定索引（默认源 + 全部外部源） */
   async function refresh() {
     loading.value = true
     try {
       scriptsDir.value = await pluginDir.getSubDir('scripts')
-      if (!scriptsDir.value) return
-      const res = await tauri_request<ResponseData<ScriptFileEntryRaw[]>>('list_script_files', {
-        path: scriptsDir.value,
-      })
-      tree.value = res?.code === 200 ? mapEntries(res.data || []) : []
+      externalDirs.value = await pluginDir.listExternalDirs()
+      const roots: ScriptFileNode[] = []
+      // 默认源（本地脚本目录）
+      if (scriptsDir.value) {
+        roots.push({
+          name: '本地脚本',
+          path: norm(scriptsDir.value),
+          isDir: true,
+          isSourceRoot: true,
+          sourceKind: 'default',
+          children: await listDir(scriptsDir.value),
+        })
+      }
+      // 外部源（用户挂载的目录，脚本留在原处）
+      for (const dir of externalDirs.value) {
+        roots.push({
+          name: basename(dir),
+          path: norm(dir),
+          isDir: true,
+          isSourceRoot: true,
+          sourceKind: 'external',
+          children: await listDir(dir),
+        })
+      }
+      tree.value = roots
       await loadIndex()
     } finally {
       loading.value = false
     }
+  }
+
+  /** 移除外部脚本目录（仅解除挂载，不删除目录内容） */
+  async function removeExternalDir(path: string): Promise<boolean> {
+    const ok = await pluginDir.removeExternalDir(path)
+    if (ok) await refresh()
+    return ok
   }
 
   /** 保存文件与连接/数据库的绑定（保存 SQL 时自动调用） */
@@ -229,26 +272,35 @@ export const useScriptsStore = defineStore('dbScripts', () => {
     await refresh()
   }
 
-  // 工作区切换时重新加载（目录本身按工作区隔离）
+  // 工作区切换时重新加载（默认目录按工作区隔离，外部目录用户级不变）
   function onWorkspaceChanged() {
+    refresh()
+  }
+
+  // 外部目录挂载变化（设置面板操作后触发）时重新加载
+  function onPluginDirChanged() {
     refresh()
   }
 
   onMounted(() => {
     window.addEventListener('workspace-changed', onWorkspaceChanged)
+    window.addEventListener('plugin-dir-changed', onPluginDirChanged)
   })
 
   onUnmounted(() => {
     window.removeEventListener('workspace-changed', onWorkspaceChanged)
+    window.removeEventListener('plugin-dir-changed', onPluginDirChanged)
   })
 
   return {
     scriptsDir,
+    externalDirs,
     tree,
     bindings,
     loading,
     getBinding,
     refresh,
+    removeExternalDir,
     bindFile,
     unbindFile,
     createFile,

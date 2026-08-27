@@ -37,29 +37,28 @@ export function usePluginDir(pluginId: string) {
     return workspaceDirService.getPluginSubDir(workspaceId.value, pluginId, subdir)
   }
 
-  /** 获取全局插件目录 */
-  async function getGlobalDir(): Promise<string> {
-    return workspaceDirService.getGlobalPluginDir(pluginId)
+  /** 获取插件外部脚本目录列表（用户级，跨工作区共享） */
+  async function listExternalDirs(): Promise<string[]> {
+    return workspaceDirService.listExternalDirs(pluginId)
   }
 
-  /** 获取自定义目录（按当前工作区） */
-  async function getCustomDir(): Promise<string | null> {
-    if (!workspaceId.value) return null
-    return workspaceDirService.getCustomDir(workspaceId.value, pluginId)
+  /** 添加插件外部脚本目录 */
+  async function addExternalDir(path: string): Promise<{ ok: boolean; msg?: string }> {
+    if (!workspaceId.value) return { ok: false, msg: '工作区未就绪' }
+    return workspaceDirService.addExternalDir(workspaceId.value, pluginId, path)
   }
 
-  /** 设置自定义目录（按当前工作区） */
-  async function setCustomDir(path: string): Promise<boolean> {
-    if (!workspaceId.value) return false
-    return workspaceDirService.setCustomDir(workspaceId.value, pluginId, path)
+  /** 移除插件外部脚本目录（仅解除挂载） */
+  async function removeExternalDir(path: string): Promise<boolean> {
+    return workspaceDirService.removeExternalDir(pluginId, path)
   }
 
   return {
     workspaceId,
     getDir,
     getSubDir,
-    getGlobalDir,
-    getCustomDir,
-    setCustomDir,
+    listExternalDirs,
+    addExternalDir,
+    removeExternalDir,
   }
 }

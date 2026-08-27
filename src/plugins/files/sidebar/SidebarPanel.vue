@@ -10,7 +10,6 @@ import StringUtil from '@/utils/StringUtil'
 import { load, Store } from '@/core/runtime'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
 import { useDocumentManagerStore } from '../store/documents'
-import PluginDirSettings from '@/components/PluginDirSettings.vue'
 
 // 常量定义
 const INVALID_CHARS_REGEX = /.*[/\\:*?|].*/
@@ -318,13 +317,6 @@ function handleHeaderCommand(cmd: string) {
                 @rename-node="handleRenameNode"
             />
         </div>
-
-        <!-- 插件设置（可折叠） -->
-        <el-collapse class="sidebar-settings-collapse">
-            <el-collapse-item title="插件设置" name="settings">
-                <PluginDirSettings plugin-id="files" />
-            </el-collapse-item>
-        </el-collapse>
 
         <!-- 删除确认弹窗（统一使用 GlobalDialog） -->
         <GlobalDialog v-model="showDeleteConfirm" :title="'确认删除'" width="400px">

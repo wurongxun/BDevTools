@@ -10,8 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
-.tmp-build-check
-.tmp-build-verify
+.tmp-build-*
 ~
 *.local
 /target/

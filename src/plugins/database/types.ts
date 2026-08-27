@@ -123,12 +123,16 @@ export interface ScriptFileBinding {
   updatedAt?: number
 }
 
-/** 查询文件树节点（scripts 目录） */
+/** 查询文件树节点（scripts 目录；isSourceRoot 为源根节点——默认源或外部挂载源） */
 export interface ScriptFileNode {
   name: string
   path: string
   isDir: boolean
   children: ScriptFileNode[]
+  /** 是否为源根节点（默认源或外部挂载源，顶层节点） */
+  isSourceRoot?: boolean
+  /** 外部源标识：default 表示默认脚本目录，external 表示用户挂载的外部目录 */
+  sourceKind?: 'default' | 'external'
 }
 
 /** 统一响应 */
