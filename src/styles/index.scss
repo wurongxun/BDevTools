@@ -2,13 +2,17 @@
 @use './variables.scss';
 @use './mixin.scss';
 @use './theme.scss';
+@use './tokens.scss';
+
+// 生成设计令牌 CSS 变量（字体/字号/圆角/间距/阴影）
+@include tokens.tokensVars();
 
 @font-face {
   font-family: '阿里巴巴普惠体 2.0 55 Regular';
   font-weight: 400;
   src: url('../assets/font/alibaba.woff2'), url('../assets/font/alibaba.woff');
   font-display: swap;
-  font-size: variables.$font-size;
+  font-size: tokens.$font-size-base;
 }
 
 // 生成主题 CSS 变量（滚动条等全局样式使用）
@@ -24,9 +28,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-family:
-    '阿里巴巴普惠体 2.0 55 Regular', 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+  font-family: var(--font-family-base);
 }
 
 *,

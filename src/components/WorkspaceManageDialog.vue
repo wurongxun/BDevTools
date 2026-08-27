@@ -204,12 +204,12 @@ async function confirmDelete() {
   text-align: center;
   padding: 32px 0;
   opacity: 0.5;
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 .ws-item {
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   transition: background-color 0.15s;
   margin-bottom: 4px;
@@ -245,7 +245,7 @@ async function confirmDelete() {
 }
 
 .ws-item-name {
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 500;
   margin-bottom: 4px;
   display: flex;
@@ -258,9 +258,9 @@ async function confirmDelete() {
 }
 
 .ws-badge {
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-weight: 400;
 
   // 反色方案：两种主题下均保证高对比（浅色 hoverColor 太浅不适合做底色）
@@ -271,7 +271,7 @@ async function confirmDelete() {
 }
 
 .ws-item-folders {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   opacity: 0.6;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -289,8 +289,8 @@ async function confirmDelete() {
 .ws-edit-input {
   flex: 1;
   padding: 4px 8px;
-  font-size: 13px;
-  border-radius: 4px;
+  font-size: var(--font-size-md);
+  border-radius: var(--radius-md);
   outline: none;
 
   @include theme.useTheme {
@@ -307,9 +307,9 @@ async function confirmDelete() {
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   opacity: 0.6;
   transition: opacity 0.15s, background 0.15s;
 
@@ -331,7 +331,7 @@ async function confirmDelete() {
 }
 
 .ws-create-link {
-  font-size: 12px;
+  font-size: var(--font-size-base);
   cursor: pointer;
   opacity: 0.7;
   padding: 0 9px;

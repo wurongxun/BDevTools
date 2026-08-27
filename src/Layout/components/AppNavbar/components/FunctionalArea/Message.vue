@@ -118,7 +118,7 @@ const markAllAsRead = () => {
 @use '@/styles/variables.scss' as variables;
 
 .icon-box {
-  font-size: 20px;
+  font-size: var(--font-size-2xl);
   cursor: pointer;
   transition: color 0.2s ease;
   vertical-align: middle;
@@ -142,7 +142,7 @@ const markAllAsRead = () => {
 
     h3 {
       margin: 0;
-      font-size: 16px;
+      font-size: var(--font-size-xl);
       font-weight: 600;
       color: var(--el-text-color-primary);
     }
@@ -179,14 +179,14 @@ const markAllAsRead = () => {
     }
 
     .message-title {
-      font-size: 14px;
+      font-size: var(--font-size-lg);
       font-weight: 500;
       color: var(--el-text-color-primary);
       margin-bottom: 6px;
     }
 
     .message-text {
-      font-size: 13px;
+      font-size: var(--font-size-md);
       color: var(--el-text-color-regular);
       line-height: 1.5;
       margin-bottom: 6px;
@@ -197,7 +197,7 @@ const markAllAsRead = () => {
     }
 
     .message-time {
-      font-size: 12px;
+      font-size: var(--font-size-base);
       color: var(--el-text-color-secondary);
     }
   }
@@ -216,7 +216,7 @@ const markAllAsRead = () => {
   .el-popover__inner {
     padding: 0;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
-    border-radius: 8px;
+    border-radius: var(--radius-xl);
     overflow: hidden;
   }
 

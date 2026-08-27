@@ -727,7 +727,7 @@ function formatSize(bytes: number): string {
   gap: 4px;
   padding: 4px 8px;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   background: transparent;
   cursor: pointer;
   font-size: theme.getVar('fontSizeSmall');
@@ -886,7 +886,7 @@ function formatSize(bytes: number): string {
   }
   &::-webkit-scrollbar-thumb {
     background-color: rgba(155, 155, 155, 0.3);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
   }
 }
 
@@ -958,7 +958,7 @@ function formatSize(bytes: number): string {
   z-index: 9999;
   background-color: #2d2d2d;
   border: 1px solid #454545;
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   padding: 4px 0;
   min-width: 160px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);

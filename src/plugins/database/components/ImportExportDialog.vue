@@ -157,10 +157,10 @@ function handleClose() {
   overflow: auto;
   background: #fef0f0;
   padding: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
 }
 .error-item {
-  font-size: 12px;
+  font-size: var(--font-size-base);
   color: #f56c6c;
   line-height: 1.6;
 }

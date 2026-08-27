@@ -440,7 +440,7 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 .explorer-header .title {
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 600;
   flex: 1;
 }
@@ -455,7 +455,7 @@ onUnmounted(() => {
 }
 .empty-tip {
   padding: 16px;
-  font-size: 12px;
+  font-size: var(--font-size-base);
   color: var(--el-text-color-secondary);
   text-align: center;
 }
@@ -465,7 +465,7 @@ onUnmounted(() => {
   gap: 4px;
   flex: 1;
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 .node-icon {
   flex-shrink: 0;
@@ -480,9 +480,9 @@ onUnmounted(() => {
   flex-shrink: 0;
   margin-left: auto;
   padding: 0 6px;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
   color: var(--el-color-primary);
   background: var(--el-color-primary-light-9);
   max-width: 90px;
@@ -501,12 +501,12 @@ onUnmounted(() => {
   padding: 4px 0;
   background: var(--el-bg-color-overlay);
   border: 1px solid var(--el-border-color-light);
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   box-shadow: var(--el-box-shadow-light);
 }
 .ctx-item {
   padding: 6px 16px;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   cursor: pointer;
   color: var(--el-text-color-regular);
 }
@@ -517,13 +517,13 @@ onUnmounted(() => {
   color: var(--el-color-danger);
 }
 .delete-message {
-  font-size: 13px;
+  font-size: var(--font-size-md);
   color: var(--el-text-color-regular);
   line-height: 1.6;
 }
 .delete-sub {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--font-size-base);
   color: var(--el-text-color-secondary);
 }
 .binding-form {
@@ -539,7 +539,7 @@ onUnmounted(() => {
 .binding-label {
   width: 48px;
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   color: var(--el-text-color-regular);
 }
 </style>

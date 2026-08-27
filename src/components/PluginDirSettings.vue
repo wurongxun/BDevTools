@@ -122,12 +122,12 @@ async function openInExplorer() {
   flex-direction: column;
 }
 .label-text {
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 500;
   color: var(--el-text-color-primary);
 }
 .label-desc {
-  font-size: 12px;
+  font-size: var(--font-size-base);
   color: var(--el-text-color-secondary);
   margin-top: 2px;
 }
@@ -140,7 +140,7 @@ async function openInExplorer() {
   flex: 1;
 }
 .current-path {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;

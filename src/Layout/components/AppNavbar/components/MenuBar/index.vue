@@ -547,7 +547,7 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     cursor: pointer;
-    font-size: 12px;
+    font-size: var(--font-size-base);
     white-space: nowrap;
     transition: background-color 0.15s;
 
@@ -569,7 +569,7 @@ onUnmounted(() => {
       min-width: 200px;
       padding: 4px 0;
       z-index: 99999;
-      border-radius: 4px;
+      border-radius: var(--radius-md);
 
       @include theme.useTheme {
         background-color: theme.getVar('bgColor');
@@ -591,7 +591,7 @@ onUnmounted(() => {
         align-items: center;
         justify-content: space-between;
         padding: 5px 14px;
-        font-size: 12px;
+        font-size: var(--font-size-base);
         cursor: pointer;
         transition: background-color 0.15s;
         position: relative;
@@ -629,13 +629,13 @@ onUnmounted(() => {
         }
 
         .option-shortcut {
-          font-size: 11px;
+          font-size: var(--font-size-sm);
           opacity: 0.5;
           margin-left: 24px;
         }
 
         .submenu-arrow {
-          font-size: 9px;
+          font-size: var(--font-size-xs);
           opacity: 0.5;
           margin-left: 12px;
         }
@@ -651,7 +651,7 @@ onUnmounted(() => {
             overflow-y: auto;
             padding: 4px 0;
             z-index: 100000;
-            border-radius: 4px;
+            border-radius: var(--radius-md);
 
             @include theme.useTheme {
               background-color: theme.getVar('bgColor');
@@ -660,7 +660,7 @@ onUnmounted(() => {
             }
 
             .submenu-item .option-label {
-              font-size: 12px;
+              font-size: var(--font-size-base);
             }
           }
         }

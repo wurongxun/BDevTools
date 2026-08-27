@@ -114,7 +114,7 @@ async function handleConnectionSubmit(config: DbConnectionConfig) {
   gap: 8px;
 }
 .sidebar-header .title {
-  font-size: 13px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   flex: 1;
 }
@@ -123,7 +123,7 @@ async function handleConnectionSubmit(config: DbConnectionConfig) {
   flex-shrink: 0;
 }
 .sidebar-settings :deep(.el-collapse-item__header) {
-  font-size: 12px;
+  font-size: var(--font-size-base);
   height: 32px;
   line-height: 32px;
   padding: 0 12px;

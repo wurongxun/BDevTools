@@ -89,7 +89,7 @@ const handleCommand = (command: string | number | object) => {
   justify-content: center;
   padding: 8px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   transition: all 0.2s ease;
 
   &:hover {
@@ -108,7 +108,7 @@ const handleCommand = (command: string | number | object) => {
   transition: all 0.2s ease;
 
   &.setting-icon {
-    font-size: 20px;
+    font-size: var(--font-size-2xl);
   }
 }
 
@@ -140,7 +140,7 @@ const handleCommand = (command: string | number | object) => {
     padding: 6px 0;
     min-width: 160px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
-    border-radius: 8px;
+    border-radius: var(--radius-xl);
     overflow: hidden;
 
     .menu-item {
@@ -148,11 +148,11 @@ const handleCommand = (command: string | number | object) => {
       align-items: center;
       gap: 10px;
       padding: 10px 16px;
-      font-size: 14px;
+      font-size: var(--font-size-lg);
       transition: all 0.2s ease;
 
       .el-icon {
-        font-size: 16px;
+        font-size: var(--font-size-xl);
         opacity: 0.8;
       }
 

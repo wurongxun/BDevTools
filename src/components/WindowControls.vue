@@ -73,8 +73,8 @@ async function handleClose() {
   width: 26px;
   height: 24px;
   cursor: pointer;
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
   transition: background-color 0.15s;
   flex-shrink: 0;
 

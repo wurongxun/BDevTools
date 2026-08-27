@@ -40,7 +40,7 @@ defineEmits<{
   justify-content: center;
   background: none;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s, background-color 0.15s;

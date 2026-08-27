@@ -66,7 +66,7 @@
           <template #image>
             <el-icon :size="64" color="#409eff"><Coin /></el-icon>
           </template>
-          <p style="color: #909399; font-size: 14px;">从左侧选择连接，双击表查看数据，或右键新建查询</p>
+          <p style="color: #909399; font-size: var(--font-size-lg);">从左侧选择连接，双击表查看数据，或右键新建查询</p>
         </el-empty>
       </div>
     </div>
@@ -159,7 +159,7 @@ async function onSqlSaved(filePath: string, configId: string, database: string) 
   padding: 0 12px;
   cursor: pointer;
   color: #969696;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   border-right: 1px solid #3c3c3c;
   white-space: nowrap;
   min-width: 80px;
@@ -174,8 +174,8 @@ async function onSqlSaved(filePath: string, configId: string, database: string) 
   border-bottom: 2px solid #007acc;
 }
 .tab-close {
-  font-size: 12px;
-  border-radius: 3px;
+  font-size: var(--font-size-base);
+  border-radius: var(--radius-sm);
   padding: 2px;
 }
 .tab-close:hover {

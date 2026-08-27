@@ -738,7 +738,7 @@ onBeforeUnmount(() => {
     justify-content: center;
     width: 22px;
     height: 22px;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     transition: all 0.15s;
 
@@ -821,7 +821,7 @@ onBeforeUnmount(() => {
 
   &::-webkit-scrollbar { width: 6px; }
   &::-webkit-scrollbar-thumb {
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     @include theme.useTheme {
       background-color: theme.getVar('scrollbarThumb');
     }
@@ -890,7 +890,7 @@ onBeforeUnmount(() => {
 .section-count {
   font-weight: 400;
   padding: 0 5px;
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
   flex-shrink: 0;
 
   @include theme.useTheme {
@@ -1094,7 +1094,7 @@ onBeforeUnmount(() => {
   font-size: theme.getVar('fontSizeLg');
   cursor: pointer;
   padding: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   transition: all 0.15s;
 
   @include theme.useTheme {
@@ -1130,7 +1130,7 @@ onBeforeUnmount(() => {
 .tree-context-menu {
   position: fixed;
   z-index: 9999;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   padding: 4px 0;
   min-width: 180px;
 

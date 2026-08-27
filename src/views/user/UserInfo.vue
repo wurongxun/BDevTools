@@ -79,7 +79,7 @@ const activeName = ref('todo')
         justify-content: center;
         padding: 6px;
         text-align: left;
-        font-size: 13px;
+        font-size: var(--font-size-md);
 
         .label {
           display: inline-block;

@@ -141,13 +141,13 @@ onMounted(loadWorkspaces)
   margin-bottom: 24px;
 
   h2 {
-    font-size: 20px;
+    font-size: var(--font-size-2xl);
     font-weight: 600;
     margin: 0 0 8px;
   }
 
   .workspace-desc {
-    font-size: 13px;
+    font-size: var(--font-size-md);
     opacity: 0.6;
     margin: 0;
   }
@@ -162,7 +162,7 @@ onMounted(loadWorkspaces)
 
 .workspace-item {
   padding: 12px 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   transition: background-color 0.15s;
 
@@ -186,12 +186,12 @@ onMounted(loadWorkspaces)
 }
 
 .workspace-name {
-  font-size: 14px;
+  font-size: var(--font-size-lg);
   font-weight: 500;
 }
 
 .workspace-time {
-  font-size: 12px;
+  font-size: var(--font-size-base);
   opacity: 0.5;
 }
 
@@ -202,9 +202,9 @@ onMounted(loadWorkspaces)
 }
 
 .folder-tag {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   padding: 2px 8px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 
   @include theme.useTheme {
     background-color: theme.getVar('hoverBgColor', 'rgba(0,0,0,0.04)');
@@ -216,7 +216,7 @@ onMounted(loadWorkspaces)
   text-align: center;
   padding: 40px 0;
   opacity: 0.5;
-  font-size: 14px;
+  font-size: var(--font-size-lg);
 }
 
 .workspace-create {
@@ -227,7 +227,7 @@ onMounted(loadWorkspaces)
 
     label {
       display: block;
-      font-size: 13px;
+      font-size: var(--font-size-md);
       font-weight: 500;
       margin-bottom: 6px;
     }
@@ -236,8 +236,8 @@ onMounted(loadWorkspaces)
   .form-input {
     width: 100%;
     padding: 8px 12px;
-    border-radius: 4px;
-    font-size: 13px;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-md);
     box-sizing: border-box;
 
     @include theme.useTheme {
@@ -254,9 +254,9 @@ onMounted(loadWorkspaces)
   }
 
   .btn-pick {
-    font-size: 12px;
+    font-size: var(--font-size-base);
     padding: 4px 12px;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     cursor: pointer;
 
     @include theme.useTheme {
@@ -280,8 +280,8 @@ onMounted(loadWorkspaces)
 
 .btn {
   padding: 8px 20px;
-  border-radius: 4px;
-  font-size: 13px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
   cursor: pointer;
   border: none;
 

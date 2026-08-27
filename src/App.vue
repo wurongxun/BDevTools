@@ -456,11 +456,11 @@ onBeforeUnmount(() => {
 
 .conflict-path {
   word-break: break-all;
-  font-size: 12px;
+  font-size: var(--font-size-base);
 }
 
 //#app {
-//  border-radius: 8px;
+//  border-radius: var(--radius-xl);
 //  box-shadow: 0 1px 5px rgba(0,0,0,0.15);
 //  overflow: hidden;
 //}

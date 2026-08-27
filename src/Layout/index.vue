@@ -293,7 +293,7 @@ onUnmounted(() => {
       .resize-handle-line {
         width: 2px;
         height: 30px;
-        border-radius: 1px;
+        border-radius: var(--radius-xs);
         opacity: 0;
         transition: opacity 0.2s;
 

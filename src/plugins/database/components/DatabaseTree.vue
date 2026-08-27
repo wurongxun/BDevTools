@@ -304,7 +304,7 @@ defineExpose({ refreshTree })
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 .node-label {
   overflow: hidden;
@@ -312,7 +312,7 @@ defineExpose({ refreshTree })
   white-space: nowrap;
 }
 .connected-badge {
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   color: #67c23a;
   margin-left: 4px;
 }
@@ -328,14 +328,14 @@ defineExpose({ refreshTree })
   z-index: 9999;
   background: #fff;
   border: 1px solid #e4e7ed;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   padding: 4px 0;
   min-width: 120px;
 }
 .context-menu-item {
   padding: 6px 16px;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   cursor: pointer;
   white-space: nowrap;
   color: #333;

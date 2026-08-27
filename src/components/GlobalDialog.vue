@@ -89,7 +89,7 @@ const handleClose = (): void => {
   left: 50%;
   transform: translateX(-50%);
   width: 520px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   // 需高于布局层（侧边栏 z-index:1000、分割线 z-index:1001），
   // 但低于 Element Plus popper 基准层（2000+），保证弹窗内下拉菜单正常置顶
   z-index: 1501;
@@ -143,7 +143,7 @@ const handleClose = (): void => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   transition: all 0.2s;
 
   @include theme.useTheme {

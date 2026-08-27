@@ -104,7 +104,7 @@ const hasChildren = (bookmark: BookmarkItem): boolean => {
   align-items: center;
   padding: 8px 12px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   transition: all 0.2s;
   gap: 8px;
   min-height: 36px;

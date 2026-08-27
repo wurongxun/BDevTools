@@ -2,25 +2,26 @@
 @use 'element-plus/theme-chalk/dark/css-vars.css' as *;
 @use 'element-plus/theme-chalk/src/index.scss' as *;
 @use './theme.scss';
+@use './tokens.scss';
 
 // ============================================================
 // Element Plus 桌面密度覆盖：压缩默认 Web 风格的尺寸/圆角/投影，
-// 使 EP 控件观感贴近桌面工具（对齐 theme.scss 的 fontSizeSmall 体系）。
+// 使 EP 控件观感贴近桌面工具（对齐 tokens.scss 的令牌体系）。
 // 注意：仅对运行时经 var() 引用的变量生效；写死字面量的样式
 // （如按钮高度/padding）需要用规则直接覆盖。
 // ============================================================
 
 @mixin ep-desktop-common {
-  // 字号整体下调一档
-  --el-font-size-base: 12px;
-  --el-font-size-small: 12px;
-  --el-font-size-extra-small: 10px;
-  --el-font-size-medium: 13px;
-  --el-font-size-large: 14px;
+  // 字号整体下调一档（引用设计令牌，单一数据源）
+  --el-font-size-base: #{tokens.$font-size-base};
+  --el-font-size-small: #{tokens.$font-size-base};
+  --el-font-size-extra-small: #{tokens.$font-size-xs};
+  --el-font-size-medium: #{tokens.$font-size-md};
+  --el-font-size-large: #{tokens.$font-size-lg};
 
-  // 桌面硬朗小圆角
-  --el-border-radius-base: 3px;
-  --el-border-radius-small: 2px;
+  // 桌面硬朗小圆角（引用设计令牌）
+  --el-border-radius-base: #{tokens.$radius-sm};
+  --el-border-radius-small: #{tokens.$radius-xs};
   --el-border-radius-round: 14px;
 
   // 控件高度压缩（默认 32px → 26px，input/select 等经 var() 联动）

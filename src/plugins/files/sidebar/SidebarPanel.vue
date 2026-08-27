@@ -345,7 +345,7 @@ function handleHeaderCommand(cmd: string) {
     flex-direction: column;
     height: 100%;
     overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-family-base);
 
     @include theme.useTheme {
         background-color: theme.getVar('bgColor');
@@ -375,7 +375,7 @@ function handleHeaderCommand(cmd: string) {
 
 .header-more-btn {
     padding: 2px 4px;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
 
     @include theme.useTheme {
         color: theme.getVar('textSecondary');
@@ -404,7 +404,7 @@ function handleHeaderCommand(cmd: string) {
     flex-shrink: 0;
 
     :deep(.el-collapse-item__header) {
-        font-size: 12px;
+        font-size: var(--font-size-base);
         height: 32px;
         line-height: 32px;
         padding: 0 12px;

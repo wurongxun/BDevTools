@@ -25,6 +25,7 @@ export default defineConfig({
           @use "@/styles/variables.scss" as *;
           @use "@/styles/mixin.scss" as *;
           @use "@/styles/theme.scss" as *;
+          @use "@/styles/tokens.scss" as *;
         `
       }
     }

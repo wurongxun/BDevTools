@@ -19,7 +19,7 @@
   // margin: 2px;
   // min-height: calc(100% - 30px);
   padding: 10px 10px 10px 10px;
-  // border-radius: 5px;
+  // border-radius: var(--radius-md);
 
   @include useTheme {
     background-color: getVar('bgColor');

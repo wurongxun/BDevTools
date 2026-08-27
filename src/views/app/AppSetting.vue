@@ -893,8 +893,8 @@ function handleClose() {
 
 .settings-nav-item {
   padding: 8px 14px;
-  border-radius: 4px;
-  font-size: 13px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
   cursor: pointer;
   transition: background-color 0.15s;
   user-select: none;
@@ -947,7 +947,7 @@ function handleClose() {
 
 // ---- 分组区块（扁平化，无阴影） ----
 .settings-section {
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   padding: 16px;
   margin-bottom: 12px;
 
@@ -958,7 +958,7 @@ function handleClose() {
 }
 
 .section-title {
-  font-size: 14px;
+  font-size: var(--font-size-lg);
   margin: 0 0 12px 0;
   padding-bottom: 8px;
   font-weight: 600;
@@ -994,7 +994,7 @@ function handleClose() {
 
 .setting-label {
   display: block;
-  font-size: 13px;
+  font-size: var(--font-size-md);
 
   @include theme.useTheme {
     color: theme.getVar('textColor');
@@ -1003,7 +1003,7 @@ function handleClose() {
 
 .setting-description {
   display: block;
-  font-size: 12px;
+  font-size: var(--font-size-base);
 
   @include theme.useTheme {
     color: theme.getVar('textSecondary');
@@ -1012,7 +1012,7 @@ function handleClose() {
 
 .update-info {
   display: block;
-  font-size: 12px;
+  font-size: var(--font-size-base);
   margin-top: 4px;
   font-weight: 500;
 
@@ -1044,7 +1044,7 @@ function handleClose() {
 
 // ---- 窗口预设 ----
 .section-desc {
-  font-size: 12px;
+  font-size: var(--font-size-base);
   margin: -8px 0 12px 0;
 
   @include theme.useTheme {
@@ -1064,7 +1064,7 @@ function handleClose() {
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   transition: background-color 0.15s;
 
   @include theme.useTheme {
@@ -1092,7 +1092,7 @@ function handleClose() {
 }
 
 .preset-name {
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 500;
 
   @include theme.useTheme {
@@ -1101,7 +1101,7 @@ function handleClose() {
 }
 
 .preset-meta {
-  font-size: 12px;
+  font-size: var(--font-size-base);
 
   @include theme.useTheme {
     color: theme.getVar('textSecondary');
@@ -1123,7 +1123,7 @@ function handleClose() {
 .window-preset-empty {
   text-align: center;
   padding: 24px;
-  font-size: 13px;
+  font-size: var(--font-size-md);
 
   @include theme.useTheme {
     color: theme.getVar('textSecondary');
@@ -1150,7 +1150,7 @@ function handleClose() {
 }
 
 .form-label {
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 500;
 
   @include theme.useTheme {
@@ -1165,7 +1165,7 @@ function handleClose() {
 }
 
 .form-hint {
-  font-size: 12px;
+  font-size: var(--font-size-base);
 
   @include theme.useTheme {
     color: theme.getVar('textSecondary');
@@ -1190,7 +1190,7 @@ function handleClose() {
 }
 
 .size-sep {
-  font-size: 13px;
+  font-size: var(--font-size-md);
 
   @include theme.useTheme {
     color: theme.getVar('textSecondary');

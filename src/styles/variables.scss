@@ -1,21 +1,6 @@
-@use './mixin.scss';
-/* Variables */
-
-$menu-width: 220px;
-//侧边栏宽度
-$collapse-width: 64px;
+/* Variables —— 布局尺寸变量
+   已由 vite.config.ts additionalData 全局注入（as *），任意 scss 可直接使用。
+   设计令牌（字体/字号/圆角/间距/阴影）见 tokens.scss */
 $theme-color: #555555;
-$font-size: 12px;
-$dialog-width: 640px;
 $header-height: 32px;
 $tage-view-height: 26px;
-// The :export directive is the magic sauce for webpack
-// https://mattferderer.com/use-sass-variables-in-typescript-and-javascript
-:export {
-  menuWidth: $menu-width;
-  themeColor: $theme-color;
-  collapseWidth: $collapse-width;
-  headerHeight: $header-height;
-  tageViewHeight: $tage-view-height;
-}
-// @forward './mixin.scss';

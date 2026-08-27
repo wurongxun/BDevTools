@@ -58,7 +58,7 @@ onMounted(async () => {
   justify-content: space-between;
   height: 22px;
   padding: 0 8px;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   user-select: none;
   flex-shrink: 0;
 
@@ -83,7 +83,7 @@ onMounted(async () => {
   padding: 0 6px;
   height: 22px;
   cursor: default;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   transition: background-color 0.15s;
 
   &:hover {

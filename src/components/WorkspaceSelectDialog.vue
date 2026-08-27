@@ -144,7 +144,7 @@ function handleCreateTemp() {
 
 .ws-select-item {
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background-color 0.15s;
 
@@ -176,9 +176,9 @@ function handleCreateTemp() {
 }
 
 .ws-item-badge {
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   padding: 0 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 
   // 反色徽标，两种主题下均保证对比度
   @include theme.useTheme {
@@ -193,7 +193,7 @@ function handleCreateTemp() {
 }
 
 .ws-item-folders {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

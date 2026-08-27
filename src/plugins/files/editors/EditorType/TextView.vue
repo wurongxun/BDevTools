@@ -984,7 +984,7 @@ async function switchEncoding(enc: string) {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   @include useTheme {
     background-color: getVar(bgColor);
@@ -1102,7 +1102,7 @@ async function switchEncoding(enc: string) {
   flex: 1;
   overflow-x: scroll;
   overflow-y: auto;
-  font-family: 'Consolas', monospace;
+  font-family: var(--font-family-mono);
   font-size: getVar(fontSize);
   @include useTheme {
     background: getVar(bgColor);
@@ -1162,7 +1162,7 @@ async function switchEncoding(enc: string) {
 :deep(.match-hl) {
   background: #f5c542;
   color: #1e1e1e;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   padding: 0 2px;
 }
 

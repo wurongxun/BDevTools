@@ -46,7 +46,7 @@ defineProps<{
 }
 
 .common-topbar-title {
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 500;
   user-select: none;
   padding: 0 12px;

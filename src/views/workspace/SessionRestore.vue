@@ -161,13 +161,13 @@ onMounted(loadSessions)
   margin-bottom: 24px;
 
   h2 {
-    font-size: 20px;
+    font-size: var(--font-size-2xl);
     font-weight: 600;
     margin: 0 0 8px;
   }
 
   .session-desc {
-    font-size: 13px;
+    font-size: var(--font-size-md);
     opacity: 0.6;
     margin: 0;
   }
@@ -185,7 +185,7 @@ onMounted(loadSessions)
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   transition: background-color 0.15s;
 
@@ -222,15 +222,15 @@ onMounted(loadSessions)
 }
 
 .session-role {
-  font-size: 12px;
+  font-size: var(--font-size-base);
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background-color: $theme-color;
   color: #fff;
 }
 
 .session-label {
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -240,7 +240,7 @@ onMounted(loadSessions)
 .session-meta {
   display: flex;
   gap: 12px;
-  font-size: 12px;
+  font-size: var(--font-size-base);
   opacity: 0.5;
 }
 
@@ -248,7 +248,7 @@ onMounted(loadSessions)
   text-align: center;
   padding: 40px 0;
   opacity: 0.5;
-  font-size: 14px;
+  font-size: var(--font-size-lg);
 }
 
 .session-footer {
@@ -265,8 +265,8 @@ onMounted(loadSessions)
 
 .btn {
   padding: 8px 20px;
-  border-radius: 4px;
-  font-size: 13px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
   cursor: pointer;
   border: none;
 

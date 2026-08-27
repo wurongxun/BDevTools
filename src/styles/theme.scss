@@ -1,4 +1,5 @@
 @use 'sass:map'; // 导入 map 模块
+@use './tokens.scss'; // 字号取值统一引用设计令牌（单一数据源）
 
 $themes: (
   light: (
@@ -15,12 +16,12 @@ $themes: (
     activityBarActive: #212121,
     scrollbarThumb: #c1c1c1,
     scrollbarTrack: #f1f1f1,
-    fontSizeXs: 8px,
-    fontSizeSm: 10px,
-    fontSizeSmall: 12px,
-    fontSize: 12px,
-    fontSizeLg: 14px,
-    fontSizeXl: 24px
+    fontSizeXs: tokens.$font-size-xs,
+    fontSizeSm: tokens.$font-size-sm,
+    fontSizeSmall: tokens.$font-size-base,
+    fontSize: tokens.$font-size-base,
+    fontSizeLg: tokens.$font-size-lg,
+    fontSizeXl: tokens.$font-size-3xl
   ),
   dark: (
     // IDEA Darcula 风格配色
@@ -37,12 +38,12 @@ $themes: (
     activityBarActive: #bbbbbb, // 活动栏激活色
     scrollbarThumb: #505355, // 滚动条滑块 中灰
     scrollbarTrack: #323537, // 滚动条轨道 深灰
-    fontSizeXs: 8px,
-    fontSizeSm: 10px,
-    fontSizeSmall: 12px,
-    fontSize: 12px,
-    fontSizeLg: 14px,
-    fontSizeXl: 24px
+    fontSizeXs: tokens.$font-size-xs,
+    fontSizeSm: tokens.$font-size-sm,
+    fontSizeSmall: tokens.$font-size-base,
+    fontSize: tokens.$font-size-base,
+    fontSizeLg: tokens.$font-size-lg,
+    fontSizeXl: tokens.$font-size-3xl
   )
 );
 

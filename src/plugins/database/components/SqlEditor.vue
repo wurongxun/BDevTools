@@ -316,7 +316,7 @@ defineExpose({ getContent, setContent })
 }
 .execution-info {
   margin-left: auto;
-  font-size: 12px;
+  font-size: var(--font-size-base);
   color: #888;
 }
 .pager {

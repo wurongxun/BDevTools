@@ -749,7 +749,7 @@ onMounted(() => {
   align-items: center;
   padding: 8px 12px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   transition: all 0.2s;
   gap: 8px;
 }
@@ -815,7 +815,7 @@ onMounted(() => {
   display: block;
   margin: 0 auto;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
+  border-radius: var(--radius-md);
 }
 
 .loading-overlay,
@@ -850,7 +850,7 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   padding: 8px 16px;
-  border-radius: 30px;
+  border-radius: var(--radius-round);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
   z-index: 100;
   backdrop-filter: blur(10px);
@@ -864,7 +864,7 @@ onMounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.2);
   background-color: rgba(255, 255, 255, 0.1);
   color: #ffffff;
-  border-radius: 20px;
+  border-radius: var(--radius-round);
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s ease;

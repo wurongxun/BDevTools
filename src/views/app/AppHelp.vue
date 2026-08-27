@@ -256,7 +256,7 @@ onMounted(() => {
 .help-section {
   margin-bottom: 40px;
   /* background: white; */
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   padding: 25px;
 }
@@ -285,7 +285,7 @@ onMounted(() => {
 
 .feature-card {
   /* background: #f8f9fa; */
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   padding: 20px;
   transition: transform 0.3s, box-shadow 0.3s;
 }
@@ -315,7 +315,7 @@ onMounted(() => {
   margin-bottom: 25px;
   padding: 20px;
   /* background: #f8f9fa; */
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
 }
 
 .faq-item h3, .troubleshooting-item h3 {

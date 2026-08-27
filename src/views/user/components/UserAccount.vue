@@ -93,7 +93,7 @@ const resetForm = (formEl: FormInstance | undefined) => {
 
 :deep(.avatar-uploader .el-upload) {
   border: 1px dashed var(--el-border-color);
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   position: relative;
   overflow: hidden;
@@ -105,7 +105,7 @@ const resetForm = (formEl: FormInstance | undefined) => {
 }
 
 :deep(.el-icon.avatar-uploader-icon) {
-  font-size: 28px;
+  font-size: var(--font-size-4xl);
   color: #8c939d;
   width: 178px;
   height: 178px;

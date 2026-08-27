@@ -246,7 +246,7 @@ onUnmounted(() => {
         width: 120px;
         height: 120px;
         background: rgba(255, 255, 255, 0.15);
-        border-radius: 30px;
+        border-radius: var(--radius-round);
         backdrop-filter: blur(10px);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         margin-bottom: 24px;
@@ -258,7 +258,7 @@ onUnmounted(() => {
       }
 
       .app-title {
-        font-size: 42px;
+        font-size: var(--font-size-6xl);
         font-weight: 700;
         margin: 0 0 12px 0;
         letter-spacing: 2px;
@@ -266,7 +266,7 @@ onUnmounted(() => {
       }
 
       .app-subtitle {
-        font-size: 16px;
+        font-size: var(--font-size-xl);
         color: rgba(255, 255, 255, 0.85);
         margin: 0;
         font-weight: 300;
@@ -323,7 +323,7 @@ onUnmounted(() => {
       }
 
       .loading-text {
-        font-size: 16px;
+        font-size: var(--font-size-xl);
         color: rgba(255, 255, 255, 0.9);
         margin: 0 0 20px 0;
         min-height: 24px;
@@ -334,13 +334,13 @@ onUnmounted(() => {
         width: 100%;
         height: 4px;
         background: rgba(255, 255, 255, 0.2);
-        border-radius: 2px;
+        border-radius: var(--radius-xs);
         overflow: hidden;
 
         .progress-fill {
           height: 100%;
           background: linear-gradient(90deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 1));
-          border-radius: 2px;
+          border-radius: var(--radius-xs);
           transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
           box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         }
@@ -352,7 +352,7 @@ onUnmounted(() => {
       align-items: center;
       justify-content: center;
       gap: 12px;
-      font-size: 13px;
+      font-size: var(--font-size-md);
       color: rgba(255, 255, 255, 0.6);
       animation: fadeIn 0.8s ease-out 0.6s both;
 
@@ -451,16 +451,16 @@ onUnmounted(() => {
           height: 100px;
 
           .logo-icon {
-            font-size: 60px !important;
+            font-size: var(--font-size-7xl) !important;
           }
         }
 
         .app-title {
-          font-size: 32px;
+          font-size: var(--font-size-5xl);
         }
 
         .app-subtitle {
-          font-size: 14px;
+          font-size: var(--font-size-lg);
         }
       }
 

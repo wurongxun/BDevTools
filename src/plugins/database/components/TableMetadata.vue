@@ -98,9 +98,9 @@ async function loadDdl() {
 .ddl-content {
   background: #f5f7fa;
   padding: 12px;
-  border-radius: 4px;
-  font-family: 'Consolas', monospace;
-  font-size: 13px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-md);
   white-space: pre-wrap;
   overflow: auto;
   max-height: 500px;

@@ -385,7 +385,7 @@ onUnmounted(() => {
 .terminal-status {
   font-size: theme.getVar('fontSizeSm');
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 
   &.status-disconnected {
     color: #888;
@@ -417,7 +417,7 @@ onUnmounted(() => {
   gap: 4px;
   padding: 4px 8px;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   background: transparent;
   cursor: pointer;
   font-size: theme.getVar('fontSizeSmall');

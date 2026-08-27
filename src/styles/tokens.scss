@@ -1,0 +1,102 @@
+// ============================================================
+// tokens.scss —— 设计令牌唯一数据源（Design Tokens）
+// 统一管理：字体族 / 字号 / 圆角 / 间距 / 阴影
+//
+// 双通道：
+//   1) Sass 变量（编译期）：$radius-md、$font-size-base、$space-2 ...
+//      已被 vite.config.ts additionalData 全局注入，任意 scss 可直接使用。
+//   2) CSS 变量（运行时）：var(--radius-md)、var(--font-size-base) ...
+//      由下方 tokensVars mixin 生成，index.scss 调用一次即可全局生效。
+//
+// 注意：本文件只能包含变量/mixin 定义，不能输出 CSS 规则
+// （因 additionalData 会把本文件注入到每个 scss，规则会重复输出）。
+// ============================================================
+
+// ---------- 字体族 ----------
+$font-family-base: '阿里巴巴普惠体 2.0 55 Regular', 'Helvetica Neue', Helvetica,
+  'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+$font-family-mono: 'Consolas', 'Courier New', monospace;
+$font-family-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+// ---------- 字号（与 theme.scss 的 fontSize* 系列对齐） ----------
+$font-size-xs: 10px; // 辅助/角标
+$font-size-sm: 11px; // 次要信息
+$font-size-base: 12px; // 基准字号（对应 theme fontSizeSmall/fontSize）
+$font-size-md: 13px; // 略大正文
+$font-size-lg: 14px; // 强调正文（对应 theme fontSizeLg）
+$font-size-xl: 16px; // 面板标题
+$font-size-2xl: 20px; // 弹窗标题
+$font-size-3xl: 24px; // 大标题（对应 theme fontSizeXl）
+$font-size-4xl: 28px;
+$font-size-5xl: 32px;
+$font-size-6xl: 42px;
+$font-size-7xl: 60px; // 展示级
+
+// ---------- 圆角 ----------
+$radius-xs: 2px; // 细条/指示器
+$radius-sm: 3px; // Element 基础（控件）
+$radius-md: 4px; // 面板/卡片（默认）
+$radius-lg: 6px; // 较大容器
+$radius-xl: 8px; // 弹窗/悬浮层
+$radius-round: 20px; // 大圆角/胶囊
+$radius-full: 9999px; // 圆形元素（头像/圆形按钮/滚动条）
+
+// ---------- 间距（4px 网格） ----------
+$space-1: 4px;
+$space-2: 8px;
+$space-3: 12px;
+$space-4: 16px;
+$space-5: 20px;
+$space-6: 24px;
+$space-8: 32px;
+$space-10: 40px;
+$space-12: 48px;
+
+// ---------- 阴影（浮层分级） ----------
+$shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.12); // 浅浮层
+$shadow-md: 0 4px 16px rgba(0, 0, 0, 0.25); // 普通浮层/弹窗
+$shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.35); // 深色浮层/tooltip
+
+// 生成运行时 CSS 变量（由 index.scss 调用一次，勿在组件中重复调用）
+@mixin tokensVars() {
+  :root {
+    --font-family-base: #{$font-family-base};
+    --font-family-mono: #{$font-family-mono};
+    --font-family-system: #{$font-family-system};
+
+    --font-size-xs: #{$font-size-xs};
+    --font-size-sm: #{$font-size-sm};
+    --font-size-base: #{$font-size-base};
+    --font-size-md: #{$font-size-md};
+    --font-size-lg: #{$font-size-lg};
+    --font-size-xl: #{$font-size-xl};
+    --font-size-2xl: #{$font-size-2xl};
+    --font-size-3xl: #{$font-size-3xl};
+    --font-size-4xl: #{$font-size-4xl};
+    --font-size-5xl: #{$font-size-5xl};
+    --font-size-6xl: #{$font-size-6xl};
+    --font-size-7xl: #{$font-size-7xl};
+
+    --radius-xs: #{$radius-xs};
+    --radius-sm: #{$radius-sm};
+    --radius-md: #{$radius-md};
+    --radius-lg: #{$radius-lg};
+    --radius-xl: #{$radius-xl};
+    --radius-round: #{$radius-round};
+    --radius-full: #{$radius-full};
+
+    --space-1: #{$space-1};
+    --space-2: #{$space-2};
+    --space-3: #{$space-3};
+    --space-4: #{$space-4};
+    --space-5: #{$space-5};
+    --space-6: #{$space-6};
+    --space-8: #{$space-8};
+    --space-10: #{$space-10};
+    --space-12: #{$space-12};
+
+    --shadow-sm: #{$shadow-sm};
+    --shadow-md: #{$shadow-md};
+    --shadow-lg: #{$shadow-lg};
+  }
+}

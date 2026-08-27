@@ -418,7 +418,7 @@ const handleCreateNote = () => {
   position: relative;
   top: 45%;
   margin-top: -10px;
-  border-radius: 5px;
+  border-radius: var(--radius-md);
   font-size: theme.getVar('fontSizeXl');
   display: flex;
   align-items: center;
@@ -555,7 +555,7 @@ const handleCreateNote = () => {
 }
 
 .custom-dialog {
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
   overflow: hidden;
 }
 

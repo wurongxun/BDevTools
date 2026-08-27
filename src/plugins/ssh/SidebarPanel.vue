@@ -437,7 +437,7 @@ onMounted(() => {
   height: 100%;
   overflow: hidden;
   background-color: #1e1e1e;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-family-base);
 
   @include theme.useTheme {
     background-color: theme.getVar('bgColor');
@@ -480,7 +480,7 @@ onMounted(() => {
 .header-more-btn {
   color: #888;
   padding: 2px 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
 
   &:hover {
     color: #ccc;
@@ -498,7 +498,7 @@ onMounted(() => {
   &::-webkit-scrollbar { width: 6px; }
   &::-webkit-scrollbar-thumb {
     background-color: rgba(155, 155, 155, 0.2);
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     &:hover { background-color: rgba(155, 155, 155, 0.4); }
   }
   &::-webkit-scrollbar-track { background: transparent; }
@@ -556,7 +556,7 @@ onMounted(() => {
   color: #666;
   background-color: rgba(255, 255, 255, 0.06);
   padding: 0 5px;
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
   flex-shrink: 0;
 }
 
@@ -639,7 +639,7 @@ onMounted(() => {
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   color: #888;
   cursor: pointer;
   transition: all 0.1s;
@@ -675,7 +675,7 @@ onMounted(() => {
   z-index: 9999;
   background-color: #2d2d2d;
   border: 1px solid #454545;
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   padding: 4px 0;
   min-width: 180px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
@@ -759,7 +759,7 @@ onMounted(() => {
   top: 0;
   background-color: #2d2d2d;
   border: 1px solid #454545;
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   padding: 4px 0;
   min-width: 140px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
@@ -777,7 +777,7 @@ onMounted(() => {
   flex-shrink: 0;
 
   :deep(.el-collapse-item__header) {
-    font-size: 12px;
+    font-size: var(--font-size-base);
     height: 32px;
     line-height: 32px;
     padding: 0 12px;

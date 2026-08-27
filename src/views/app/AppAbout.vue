@@ -124,7 +124,7 @@ onMounted(async () => {
 .info-section {
   flex: 1;
   min-width: 300px;
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -132,7 +132,7 @@ onMounted(async () => {
 .coffee-section {
   flex: 1;
   min-width: 300px;
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -167,7 +167,7 @@ h2 {
 
 .info-value {
   color: #333;
-  font-size: 14px;
+  font-size: var(--font-size-lg);
 }
 
 .contact-info p {
@@ -186,7 +186,7 @@ h2 {
 .coffee-image {
   max-width: 100%;
   height: auto;
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
   margin-bottom: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -194,7 +194,7 @@ h2 {
 .coffee-text {
   color: #666;
   line-height: 1.6;
-  font-size: 14px;
+  font-size: var(--font-size-lg);
 }
 
 a {

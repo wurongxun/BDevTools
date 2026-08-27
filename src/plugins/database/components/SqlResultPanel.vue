@@ -67,7 +67,7 @@ const tableData = computed(() => {
   border-bottom: 1px solid #e4e7ed;
 }
 .result-info {
-  font-size: 12px;
+  font-size: var(--font-size-base);
   color: #606266;
 }
 .limit-hint {

@@ -600,7 +600,7 @@ function handleDragEnd() {
   padding: 2px 8px;
   background: transparent;
   border: 1px solid #3e3e3e;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: #cccccc;
   font-size: theme.getVar('fontSizeSm');
   cursor: pointer;
@@ -707,7 +707,7 @@ function handleDragEnd() {
   justify-content: center;
   background: none;
   border: none;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: #969696;
   cursor: pointer;
   opacity: 0;
@@ -739,9 +739,9 @@ function handleDragEnd() {
   color: #cccccc;
   padding: 6px 10px;
   border: 1px solid #3e3e3e;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: theme.getVar('fontSizeSmall');
-  font-family: 'Consolas', 'Courier New', monospace;
+  font-family: var(--font-family-mono);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   z-index: 9999;
   pointer-events: none;

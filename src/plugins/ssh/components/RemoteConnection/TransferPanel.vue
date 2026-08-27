@@ -161,7 +161,7 @@ function handleClearCompleted() {
   }
   &::-webkit-scrollbar-thumb {
     background-color: rgba(155, 155, 155, 0.3);
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
   }
 }
 

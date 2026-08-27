@@ -251,7 +251,7 @@ const handleSettingCommand = (command: string) => {
   width: 24px;
   height: 24px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   transition: background-color 0.15s;
   flex-shrink: 0;
 
