@@ -43,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { Connection, Coin, Grid, Document } from '@element-plus/icons-vue'
 import { useConnectionStore, useEditorStore } from '../store'
 import { dbListDatabases, dbListTables, dbTableColumns } from '../api/metadata'
@@ -71,6 +71,13 @@ const treeProps = {
 onMounted(() => {
   refreshTree()
 })
+
+// 连接列表变化（含异步加载完成/工作区切换）时自动刷新树，
+// 修复打开侧边栏时 connections 尚未加载完成导致列表为空的问题
+watch(
+  () => connectionStore.connections,
+  () => refreshTree()
+)
 
 function refreshTree() {
   treeKey.value++

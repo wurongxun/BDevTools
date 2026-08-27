@@ -24,7 +24,8 @@ const PLUGIN_PREFIX: &str = "plugins/";
 /// 解析存储文件为绝对路径：
 /// - 核心文件：限定 config_dir 根下指定文件名
 /// - 插件文件：限定 `plugins/<plugin_id>.json` 单层路径，禁止 `/`、`\`、`..`（防目录穿越）
-fn kv_file_path(file: &str) -> Result<PathBuf, String> {
+/// 其他模块（如 workspace/plugin_dir）读写插件配置时复用此校验，保证路径安全与约定一致。
+pub(crate) fn kv_file_path(file: &str) -> Result<PathBuf, String> {
     let config_dir = crate::app::app_store::APP.lock().config_dir.clone();
     if CORE_FILES.contains(&file) {
         return Ok(config_dir.join(file));

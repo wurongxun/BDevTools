@@ -4,8 +4,12 @@
     <div class="connections-section">
       <div class="sidebar-header">
         <span class="title">数据库连接</span>
-        <el-button :icon="Plus" size="small" circle @click="showConnectionDialog = true" />
-        <el-button :icon="Refresh" size="small" circle @click="refreshConnections" />
+        <button class="header-btn" title="新建连接" @click="showConnectionDialog = true">
+          <el-icon><Plus /></el-icon>
+        </button>
+        <button class="header-btn" title="刷新" @click="refreshConnections">
+          <el-icon><Refresh /></el-icon>
+        </button>
       </div>
       <DatabaseTree ref="treeRef" />
     </div>
@@ -88,8 +92,8 @@ async function handleConnectionSubmit(config: DbConnectionConfig) {
   background: var(--el-bg-color);
 }
 .connections-section {
-  flex: 1;
-  min-height: 120px;
+  flex: 1.2;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -100,23 +104,41 @@ async function handleConnectionSubmit(config: DbConnectionConfig) {
   height: auto;
 }
 .scripts-section {
-  flex-shrink: 0;
-  height: 42%;
-  min-height: 160px;
+  flex: 1;
+  min-height: 0;
   border-top: 1px solid var(--el-border-color-lighter);
   overflow: hidden;
 }
 .sidebar-header {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
+  justify-content: space-between;
+  padding: 6px 12px;
   border-bottom: 1px solid var(--el-border-color-lighter);
-  gap: 8px;
+  gap: 4px;
 }
 .sidebar-header .title {
   font-size: var(--font-size-base);
   font-weight: 600;
   flex: 1;
+}
+.header-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--el-text-color-secondary);
+  transition: all 0.15s;
+}
+.header-btn:hover {
+  color: var(--el-text-color-primary);
+  background-color: var(--el-fill-color-light);
 }
 .sidebar-settings {
   border-top: 1px solid var(--el-border-color-lighter);

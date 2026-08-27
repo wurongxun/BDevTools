@@ -2,7 +2,8 @@
 为每个插件在当前工作区下提供独立的默认工作目录：
   {app_dir}/plugin_data/{workspace_id}/{plugin_id}/[subdirs...]
 同时支持用户级（跨工作区共享）的外部脚本目录挂载列表，
-外部目录路径存储在 settings.json 中，仅解除挂载不删除内容。
+外部目录路径存储在 config_dir/plugins/<plugin_id>.json 的 externalDirs 字段中，
+仅解除挂载不删除内容（历史数据在 settings.json 的 plugin_external_dirs.*，首次读取时自动迁移）。
 */
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -54,13 +55,77 @@ fn ensure_dir(path: &PathBuf) -> Result<(), String> {
 }
 
 // ==================== 外部脚本目录（用户级） ====================
+// 存储位置：config_dir/plugins/<plugin_id>.json 的 externalDirs 字段（符合 KV 插件命名空间约定）
+// 历史数据在 settings.json 的 plugin_external_dirs.<plugin_id>，首次读取时自动迁移。
+
+/// 插件配置文件绝对路径（复用 kv_store 的命名空间校验，防目录穿越）
+fn plugin_config_path(plugin_id: &str) -> Result<PathBuf, String> {
+    crate::app::kv_store::kv_file_path(&format!("plugins/{}.json", plugin_id))
+}
+
+/// 读取插件配置文件（不存在或损坏时返回空对象）
+fn read_plugin_config(path: &Path) -> serde_json::Value {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| serde_json::json!({}))
+}
+
+/// 写回插件配置文件（确保 plugins 目录存在）
+fn write_plugin_config(path: &Path, value: &serde_json::Value) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("创建配置目录失败: {}", e))?;
+    }
+    let content = serde_json::to_string_pretty(value)
+        .map_err(|e| format!("序列化失败: {}", e))?;
+    fs::write(path, content).map_err(|e| format!("写入失败: {}", e))
+}
+
+/// 一次性迁移：把 settings.json 中旧 key plugin_external_dirs.<id> 迁移到 plugins/<id>.json
+fn migrate_legacy_external_dirs(plugin_id: &str) {
+    let mut settings = read_settings();
+    let key = format!("plugin_external_dirs.{}", plugin_id);
+    if settings.get(&key).is_none() {
+        return;
+    }
+    // 迁移数组到新位置（externalDirs 字段）
+    let dirs: Vec<String> = settings
+        .get(&key)
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s: &str| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    if !dirs.is_empty() {
+        set_external_dirs(plugin_id, &dirs);
+    }
+    // 从 settings.json 删除旧 key（保留其他 key）
+    if let Some(obj) = settings.as_object_mut() {
+        obj.remove(&key);
+        let _ = fs::write(
+            settings_path(),
+            serde_json::to_string_pretty(&settings).unwrap_or_default(),
+        );
+    }
+    println!(
+        "[PluginDir] 已将 plugin_external_dirs.{} 迁移至 plugins/{}.json（{} 条）",
+        plugin_id,
+        plugin_id,
+        dirs.len()
+    );
+}
 
 /// 读取插件外部脚本目录列表（用户级，跨工作区共享）
 fn get_external_dirs(plugin_id: &str) -> Vec<String> {
-    let settings = read_settings();
-    let key = format!("plugin_external_dirs.{}", plugin_id);
-    settings
-        .get(&key)
+    migrate_legacy_external_dirs(plugin_id);
+    let path = match plugin_config_path(plugin_id) {
+        Ok(p) => p,
+        Err(_) => return Vec::new(),
+    };
+    read_plugin_config(&path)
+        .get("externalDirs")
         .and_then(|v| v.as_array())
         .map(|arr| {
             arr.iter()
@@ -70,21 +135,26 @@ fn get_external_dirs(plugin_id: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// 写入插件外部脚本目录列表（保留 settings.json 其他 key）
+/// 写入插件外部脚本目录列表（保留插件配置文件其他字段）
 fn set_external_dirs(plugin_id: &str, dirs: &[String]) {
-    let mut settings = read_settings();
-    let key = format!("plugin_external_dirs.{}", plugin_id);
-    if let Some(obj) = settings.as_object_mut() {
+    let path = match plugin_config_path(plugin_id) {
+        Ok(p) => p,
+        Err(e) => {
+            println!("[PluginDir] 非法插件配置路径: {}", e);
+            return;
+        }
+    };
+    let mut config = read_plugin_config(&path);
+    if let Some(obj) = config.as_object_mut() {
         if dirs.is_empty() {
-            obj.remove(&key);
+            obj.remove("externalDirs");
         } else {
-            obj.insert(key, serde_json::json!(dirs));
+            obj.insert("externalDirs".to_string(), serde_json::json!(dirs));
         }
     }
-    let _ = fs::write(
-        settings_path(),
-        serde_json::to_string_pretty(&settings).unwrap_or_default(),
-    );
+    if let Err(e) = write_plugin_config(&path, &config) {
+        println!("[PluginDir] 写入插件配置失败: {}", e);
+    }
 }
 
 /// 判断两个路径是否互为父子包含（规范化后按组件比较，避免 /a/foo 误判为 /a/foo2 的子路径）
