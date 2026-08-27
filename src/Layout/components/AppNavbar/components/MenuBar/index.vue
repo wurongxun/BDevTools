@@ -56,9 +56,9 @@
                 <div
                   v-if="item.submenu.length > 0"
                   class="menu-option"
-                  @click.stop="handleMenuCommand({ label: '清除最近项目', command: 'clearRecentProjects' })"
+                  @click.stop="handleMenuCommand({ label: '清除最近文件夹', command: 'clearRecentProjects' })"
                 >
-                  <span class="option-label">清除最近项目</span>
+                  <span class="option-label">清除最近文件夹</span>
                 </div>
               </div>
             </div>
@@ -124,11 +124,6 @@ interface Menu {
   action?: string
 }
 
-const MAX_RECENT_PROJECTS = 20
-
-// ===== 最近项目状态 =====
-const recentProjects = ref<string[]>([])
-
 // ===== 窗口预设状态 =====
 const windowPresets = ref<WindowPresetConfig[]>([])
 const mainWindowPreset = ref<WindowPresetConfig>({
@@ -152,43 +147,9 @@ const hasFilesPlugin = computed(() => {
 })
 
 
-// ===== 最近项目持久化 =====
-async function loadRecentProjects() {
-  if (!store) {
-    store = await load('settings.json', { autoSave: false, defaults: {} })
-  }
-  const val = await store.get<string[]>('recent_projects')
-  recentProjects.value = val || []
-}
-
-async function saveRecentProjects() {
-  if (!store) {
-    store = await load('settings.json', { autoSave: false, defaults: {} })
-  }
-  await store.set('recent_projects', recentProjects.value)
-  await store.save()
-}
-
-function addRecentProject(dirPath: string) {
-  // 移除重复项，添加到最前
-  recentProjects.value = recentProjects.value.filter(p => p !== dirPath)
-  recentProjects.value.unshift(dirPath)
-  // 限制数量
-  if (recentProjects.value.length > MAX_RECENT_PROJECTS) {
-    recentProjects.value = recentProjects.value.slice(0, MAX_RECENT_PROJECTS)
-  }
-  saveRecentProjects()
-}
-
-function removeRecentProject(dirPath: string) {
-  recentProjects.value = recentProjects.value.filter(p => p !== dirPath)
-  saveRecentProjects()
-}
-
-function clearRecentProjects() {
-  recentProjects.value = []
-  saveRecentProjects()
-}
+// ===== 最近文件夹 =====
+// 统一从当前工作区的 folders 获取（打开文件夹时由 workspace store 置顶写入），不再单独维护
+const recentProjectDirs = computed(() => workspaceStore.currentFolders ?? [])
 
 /** 获取目录名用于显示 */
 function getDirName(dirPath: string): string {
@@ -204,9 +165,9 @@ const menus = computed<Menu[]>(() => {
     fileItems.push({ label: '打开文件', shortcut: 'Ctrl+O', command: 'openFile' })
     fileItems.push({ label: '打开文件夹', shortcut: 'Ctrl+Shift+O', command: 'openWorkingDirectory' })
 
-    // 最近项目子菜单
-    const submenuItems: MenuItem[] = recentProjects.value.map(p => ({
-      label: p,
+    // 最近文件夹子菜单（来源于当前工作区 folders）
+    const submenuItems: MenuItem[] = recentProjectDirs.value.map(p => ({
+      label: getDirName(p),
       command: 'openRecentProject',
       _dirPath: p
     } as MenuItem & { _dirPath: string }))
@@ -312,11 +273,8 @@ const handleMenuCommand = async (item: MenuItem) => {
       break
     }
     case 'openWorkingDirectory': {
+      // changeWorkspace 内 setWorkingDirectory 会触发 workspace store 的 watch，自动置顶写入 folders
       await changeWorkspace();
-      // 记录到最近项目
-      if (fileTreeStore.workingDirectory) {
-        addRecentProject(fileTreeStore.workingDirectory)
-      }
       break
     }
     case 'openWorkspace': {
@@ -337,14 +295,15 @@ const handleMenuCommand = async (item: MenuItem) => {
           await s.save()
         }
         await get_file_Api()
-        // 移到最近列表最前
-        addRecentProject(dirPath)
+        // setWorkingDirectory 已触发 workspace watch 将该目录置顶到 folders
       }
       break
     }
     case 'clearRecentProjects': {
-      clearRecentProjects()
-      NotificationUtil.success('已清除最近项目')
+      // 清空当前工作区的 folders（最近文件夹列表随工作区 folders 统一管理）
+      await workspaceStore.updateCurrentWorkspace({ folders: [] })
+      await workspaceStore.loadAllWorkspaces()
+      NotificationUtil.success('已清除最近文件夹')
       break
     }
 
@@ -510,7 +469,6 @@ const handleKeydown = (e: KeyboardEvent) => {
 onMounted(async () => {
   document.addEventListener('click', handleGlobalClick)
   document.addEventListener('keydown', handleKeydown)
-  await loadRecentProjects()
   await loadWindowPresets()
   // 加载当前工作区（新窗口等待用户选择期间不自动分配）
   if (!workspaceStore.pendingWorkspaceSelection) {

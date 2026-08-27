@@ -982,8 +982,11 @@ async function switchEncoding(enc: string) {
 .search-bar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
   padding: 8px 12px;
+  max-width: calc(100vw - 32px);
   border-radius: var(--radius-xl);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   @include useTheme {
@@ -994,6 +997,8 @@ async function switchEncoding(enc: string) {
 
 .search-input {
   width: 220px;
+  flex-shrink: 1;
+  min-width: 120px;
 }
 
 .search-actions {
@@ -1030,6 +1035,7 @@ async function switchEncoding(enc: string) {
 .block-nav {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 6px 12px;
   @include useTheme {

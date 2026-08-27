@@ -310,6 +310,8 @@ defineExpose({ getContent, setContent })
 .editor-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: 4px;
   padding: 6px 8px;
   background: #252526;
   border-bottom: 1px solid #3c3c3c;

@@ -49,8 +49,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       const folders = currentWorkspace.value.folders ?? []
       // 已是首位文件夹，无需重复写入
       if (folders[0] === dir) return
-      // 新文件夹置顶，去重，最多保留 10 个
-      const newFolders = [dir, ...folders.filter(f => f !== dir)].slice(0, 10)
+      // 新文件夹置顶，去重，最多保留 20 个
+      const newFolders = [dir, ...folders.filter(f => f !== dir)].slice(0, 20)
       await updateCurrentWorkspace({ folders: newFolders })
       // 刷新工作区列表（管理对话框中展示文件夹路径）
       await loadAllWorkspaces()
@@ -124,15 +124,20 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       }
     }
 
-    // 所有工作区都被占用或没有工作区，创建一个新的
-    const appDir = config?.folders?.[0] || ''
-    const newConfig = await workspaceService.create(
-      `工作区 ${allWorkspaces.value.length + 1}`,
-      appDir ? [appDir] : []
-    )
-    if (newConfig) {
-      await workspaceService.lock(newConfig.id, windowLabel.value).catch(() => {})
-      currentWorkspace.value = newConfig
+    // 所有工作区都被占用或没有工作区
+    // 1. 优先复用同文件夹的已有未锁定工作区，避免同一目录反复创建重复工作区
+    const dir = config?.folders?.[0] || ''
+    if (dir) {
+      const reusable = await findWorkspaceByFolder(dir)
+      if (reusable) {
+        currentWorkspace.value = reusable
+        await applyWorkspaceFolder(reusable)
+        return
+      }
+    }
+    // 2. 没有可复用：创建临时工作区（isTemporary，关闭窗口时询问保存/丢弃），不产生永久垃圾
+    const tempConfig = await createTempWorkspace()
+    if (tempConfig) {
       await loadAllWorkspaces()
     }
   }
@@ -147,6 +152,25 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       const holder = await workspaceService.lockStatus(summary.id).catch(() => null)
       if (!holder) {
         // 未被锁定，尝试锁定
+        const lockResult = await workspaceService.lock(summary.id, windowLabel.value).catch(() => ({ locked: false }))
+        if (lockResult.locked) {
+          return await workspaceService.get(summary.id)
+        }
+      }
+    }
+    return null
+  }
+
+  /** 在已有工作区中查找包含指定文件夹且未被锁定的工作区（复用，避免同目录重复创建） */
+  async function findWorkspaceByFolder(dir: string): Promise<WorkspaceConfig | null> {
+    const list = allWorkspaces.value.length > 0
+      ? allWorkspaces.value
+      : await workspaceService.list()
+
+    for (const summary of list) {
+      if (!summary.folders.includes(dir)) continue
+      const holder = await workspaceService.lockStatus(summary.id).catch(() => null)
+      if (!holder) {
         const lockResult = await workspaceService.lock(summary.id, windowLabel.value).catch(() => ({ locked: false }))
         if (lockResult.locked) {
           return await workspaceService.get(summary.id)
