@@ -4,7 +4,6 @@ use serde_json::json;
 use tauri::Manager;
 use tauri::{App, Emitter, Listener};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
-use tauri_plugin_store::StoreExt;
 use tauri_plugin_window_state::{StateFlags, WindowExt};
 
 mod app;
@@ -36,7 +35,8 @@ use crate::commands::{
     db_update_row, detect_file_encoding, draft_check, draft_delete, draft_load,
     draft_save, ensure_dir, file_manager_open_path, focus_window, get_app_dir,
     get_document_notebooks, get_note_list, get_path_childrenFoldersAndFiles,
-    get_window_count, get_window_list, list_script_files, local_list_dir,
+    get_window_count, get_window_list, kv_delete, kv_entries, kv_get, kv_set,
+    list_script_files, local_list_dir,
     loding_window_close, note_book_window, open_default_apps_settings, read_file_lines,
     read_note_file, register_file_association, remove_file, remove_folder,
     rename_script_file, save_note, search_log_index, search_log_jump_to, search_log_page,
@@ -70,7 +70,6 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_os::init())
-        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
@@ -161,6 +160,11 @@ pub fn run() {
             workspace_list_plugin_external_dirs,
             workspace_add_plugin_external_dir,
             workspace_remove_plugin_external_dir,
+            // 通用 KV 存储（替代 tauri-plugin-store）
+            kv_get,
+            kv_set,
+            kv_delete,
+            kv_entries,
             // 会话管理（主键：工作区 ID）
             session_save,
             session_load,
@@ -336,59 +340,56 @@ pub fn run() {
             // 启动时自动创建 openOnStartup=true 的预设窗口（Rust 层直接创建，无需等待前端加载）
             {
                 let handle = app.handle().clone();
-                if let Ok(store) = handle.store("settings.json") {
-                    if let Some(presets_val) = store.get("window_presets") {
-                        if let Some(presets) = presets_val.as_array() {
-                            for preset in presets {
-                                let open_on_startup = preset.get("openOnStartup")
-                                    .and_then(|v| v.as_bool())
-                                    .unwrap_or(false);
-                                if !open_on_startup {
-                                    continue;
-                                }
-                                let preset_id = preset.get("id")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string();
-                                let name = preset.get("name")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string();
-                                let width = preset.get("width")
-                                    .and_then(|v| v.as_f64())
-                                    .unwrap_or(960.0);
-                                let height = preset.get("height")
-                                    .and_then(|v| v.as_f64())
-                                    .unwrap_or(640.0);
-                                let focus_mode = preset.get("focusMode")
-                                    .and_then(|v| v.as_bool())
-                                    .unwrap_or(false);
-                                let enabled_plugins = preset.get("enabledPlugins")
-                                    .and_then(|v| v.as_array())
-                                    .map(|arr| {
-                                        arr.iter()
-                                            .filter_map(|item| item.as_str().map(String::from))
-                                            .collect::<Vec<String>>()
-                                    })
-                                    .unwrap_or_default();
-                                // 预设绑定的工作区（可选；空字符串视为未绑定）
-                                let workspace_id = preset.get("workspaceId")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string())
-                                    .filter(|s| !s.is_empty());
-
-                                crate::window_manager::commands::create_preset_window_from_preset(
-                                    &handle,
-                                    &preset_id,
-                                    &name,
-                                    width,
-                                    height,
-                                    enabled_plugins,
-                                    focus_mode,
-                                    workspace_id,
-                                );
-                            }
+                let presets_val = crate::app::app_store::read_settings().get("window_presets").cloned();
+                if let Some(presets) = presets_val.as_ref().and_then(|v| v.as_array()) {
+                    for preset in presets {
+                        let open_on_startup = preset.get("openOnStartup")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        if !open_on_startup {
+                            continue;
                         }
+                        let preset_id = preset.get("id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let name = preset.get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let width = preset.get("width")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(960.0);
+                        let height = preset.get("height")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(640.0);
+                        let focus_mode = preset.get("focusMode")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        let enabled_plugins = preset.get("enabledPlugins")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|item| item.as_str().map(String::from))
+                                    .collect::<Vec<String>>()
+                            })
+                            .unwrap_or_default();
+                        // 预设绑定的工作区（可选；空字符串视为未绑定）
+                        let workspace_id = preset.get("workspaceId")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
+                            .filter(|s| !s.is_empty());
+
+                        crate::window_manager::commands::create_preset_window_from_preset(
+                            &handle,
+                            &preset_id,
+                            &name,
+                            width,
+                            height,
+                            enabled_plugins,
+                            focus_mode,
+                            workspace_id,
+                        );
                     }
                 }
             }

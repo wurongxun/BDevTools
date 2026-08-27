@@ -19,10 +19,10 @@ import { pluginManager } from '@/core/pluginManager'
 import GlobalDialog from '@/components/GlobalDialog.vue'
 import { workspaceService } from '@/services/workspaceService'
 import type { WorkspaceSummary } from '@/Types/workspace'
-import { emit } from '@/core/runtime'
+import { publish } from '@/core/runtime'
 
 const { appConfig } = useStore()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 /** 当前激活的设置页签 */
 const activeSettingTab = ref<'app' | 'window'>('app')
@@ -165,12 +165,13 @@ function setting_change() {
 }
 
 async function language_change() {
-  locale.value = language.value
-  console.log('locale.value:=================', locale.value)
+  // setLanguage 内部同步切换 i18n；再广播给其他窗口
+  userStore.setLanguage(language.value)
   if (store) {
     await store.set('language', { value: language.value })
     await store.save()
   }
+  await publish('language-changed', { language: language.value })
 }
 
 async function autostart_change() {
@@ -307,7 +308,7 @@ function presetWorkspaceName(preset: WindowPresetConfig): string {
 /** 预设变更后广播通知，其他窗口的菜单栏监听后重新加载预设列表 */
 async function notifyPresetsChanged() {
   try {
-    await emit('window-presets-changed')
+    await publish('window-presets-changed')
   } catch (e) {
     console.warn('广播窗口预设变更失败:', e)
   }

@@ -36,7 +36,6 @@ tauri-plugin-fs = "2"
 lazy_static = "1.5.0"
 parking_lot = "0.12.3"
 tauri-plugin-dialog = "2"
-tauri-plugin-store = "2"
 tauri-plugin-os = "2"
 # 文件编码处理
 encoding_rs = "0.8"

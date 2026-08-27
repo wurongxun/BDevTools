@@ -142,9 +142,8 @@ const handleInitialization = async () => {
     
     // 如果是主窗口，发送事件通知后端
     if (label === 'main') {
-      // 使用 emitTo 发送全局事件
-      const { emit } = await import('@/core/runtime')
-      await emit('splash-screen-ready')
+      const { publish } = await import('@/core/runtime')
+      await publish('splash-screen-ready')
     }
   } catch (e) {
     console.warn('Failed to notify splash ready:', e)

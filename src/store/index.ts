@@ -10,6 +10,8 @@ import { useWorkspaceStore } from './modules/workspace'
 import { useSessionStore } from './modules/session'
 import useLayoutStore from './modules/layout'
 const pinia = createPinia()
+/** pinia 实例（main.ts 启动阶段在组件外获取 store 时使用） */
+export { pinia }
 
 export default function useStore() {
   return {

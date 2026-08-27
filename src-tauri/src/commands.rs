@@ -652,6 +652,33 @@ pub fn workspace_remove_plugin_external_dir(
     crate::workspace::plugin_dir::workspace_remove_plugin_external_dir(plugin_id, path)
 }
 
+// ==================== 通用 KV 存储（替代 tauri-plugin-store） ====================
+
+/// 读取指定 key（不存在返回 null）
+#[tauri::command]
+pub fn kv_get(file: String, key: String) -> Response<Option<serde_json::Value>> {
+    crate::app::kv_store::kv_get(file, key)
+}
+
+/// 写入指定 key（即时落盘）
+#[tauri::command]
+pub fn kv_set(file: String, key: String, value: serde_json::Value) -> Response<bool> {
+    crate::app::kv_store::kv_set(file, key, value)
+}
+
+/// 删除指定 key（即时落盘）
+#[tauri::command]
+pub fn kv_delete(file: String, key: String) -> Response<bool> {
+    crate::app::kv_store::kv_delete(file, key)
+}
+
+/// 读取全部键值对（返回 [key, value] 数组）
+#[tauri::command]
+pub fn kv_entries(file: String) -> Response<Vec<(String, serde_json::Value)>> {
+    crate::app::kv_store::kv_entries(file)
+}
+
+
 // ==================== 会话管理 ====================
 
 /// 保存会话快照

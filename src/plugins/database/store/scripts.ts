@@ -6,6 +6,7 @@
 import { defineStore } from 'pinia'
 import { ref, onMounted, onUnmounted } from 'vue'
 import { tauri_request } from '@/utils/tauri_request'
+import { subscribe, type Unsubscribe } from '@/core/runtime'
 import { usePluginDir } from '@/composables/usePluginDir'
 import type { ResponseData } from '@/Types/entitys'
 import type { ScriptFileBinding, ScriptFileNode } from '../types'
@@ -277,19 +278,21 @@ export const useScriptsStore = defineStore('dbScripts', () => {
     refresh()
   }
 
-  // 外部目录挂载变化（设置面板操作后触发）时重新加载
+  // 外部目录挂载变化（设置面板操作后全局广播，同窗口与其他窗口均触发）时重新加载
   function onPluginDirChanged() {
     refresh()
   }
+  let unsubPluginDirChanged: Unsubscribe | null = null
 
-  onMounted(() => {
+  onMounted(async () => {
     window.addEventListener('workspace-changed', onWorkspaceChanged)
-    window.addEventListener('plugin-dir-changed', onPluginDirChanged)
+    unsubPluginDirChanged = await subscribe('plugin-dir-changed', onPluginDirChanged)
   })
 
   onUnmounted(() => {
     window.removeEventListener('workspace-changed', onWorkspaceChanged)
-    window.removeEventListener('plugin-dir-changed', onPluginDirChanged)
+    unsubPluginDirChanged?.()
+    unsubPluginDirChanged = null
   })
 
   return {

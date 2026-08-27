@@ -96,7 +96,7 @@ import WorkspaceManageDialog from '@/components/WorkspaceManageDialog.vue'
 import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
 import { useDocumentManagerStore } from '@/plugins/files/store/documents'
-import { open, listen } from '@/core/runtime'
+import { open, subscribe } from '@/core/runtime'
 import { openAppWindow, createEditorWindow, createPresetWindow } from '@/utils/WindowUtils'
 import type { WindowPresetConfig } from '@/utils/WindowUtils'
 import type { WindowMeta } from '@/Types/workspace'
@@ -517,7 +517,7 @@ onMounted(async () => {
     await workspaceStore.loadCurrentWorkspace(null)
   }
   // 监听窗口预设变更（设置窗口新增/修改/删除预设后广播），实时刷新窗口菜单
-  unlistenPresetsChanged = await listen('window-presets-changed', () => {
+  unlistenPresetsChanged = await subscribe('window-presets-changed', () => {
     loadWindowPresets()
   })
 })

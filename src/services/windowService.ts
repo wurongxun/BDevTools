@@ -3,7 +3,7 @@
  * 封装所有窗口管理相关的 Tauri invoke 调用
  */
 import { invoke } from '@/api/rpc'
-import { listen } from '@/core/runtime'
+import { subscribe } from '@/core/runtime'
 import type { WindowMeta } from '@/Types/workspace'
 import type { ResponseData } from '@/entity/entitys'
 
@@ -54,15 +54,11 @@ export const windowService = {
 
   /** 监听窗口创建事件 */
   onWindowCreated(callback: (meta: WindowMeta) => void) {
-    return listen<WindowMeta>('window-created', (event) => {
-      callback(event.payload)
-    })
+    return subscribe<WindowMeta>('window-created', callback)
   },
 
   /** 监听窗口销毁事件 */
   onWindowDestroyed(callback: (label: string) => void) {
-    return listen<string>('window-destroyed', (event) => {
-      callback(event.payload)
-    })
+    return subscribe<string>('window-destroyed', callback)
   }
 }

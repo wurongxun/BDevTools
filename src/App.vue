@@ -1,5 +1,6 @@
 <template>
-  <div id="app">
+  <el-config-provider :locale="epLocale">
+    <div id="app">
     <!-- 辅助窗口（设置/关于/帮助/终端）→ 直接渲染对应组件，不走 Router -->
     <Common v-if="windowRole === 'auxiliary'" :page-component="appPageComponent" :page-title="appPageTitle" />
     <!-- 主窗口 / 编辑器窗口 → 使用 Layout -->
@@ -52,13 +53,18 @@
         <el-button size="small" type="primary" @click="handleConflictAction('restore')">恢复草稿</el-button>
       </template>
     </GlobalDialog>
-  </div>
+    </div>
+  </el-config-provider>
 </template>
 
 <script lang="ts" setup>
 import { ref, shallowRef, computed, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { load, Store, getCurrentWebviewWindow } from '@/core/runtime'
 import type { Window } from '@/core/runtime'
+import { useI18n } from 'vue-i18n'
+import elZhCn from 'element-plus/es/locale/lang/zh-cn'
+import elZhTw from 'element-plus/es/locale/lang/zh-tw'
+import elEn from 'element-plus/es/locale/lang/en'
 import useStore from '@/store'
 import Layout from '@/Layout/index.vue'
 import Common from '@/views/Common/Common.vue'
@@ -73,6 +79,15 @@ import type { DraftConflict } from '@/store/modules/session'
 
 const { useWorkspaceStore, useSessionStore, fileTreeStore, useLayoutStore } = useStore()
 const docStore = useDocumentManagerStore()
+
+// ===== Element Plus 组件语言跟随 i18n（日期选择器/分页/弹窗按钮等内置文案） =====
+const { locale } = useI18n()
+const epLocale = computed(() => {
+  const lang = locale.value
+  if (lang === 'en') return elEn
+  if (lang === 'zh_TW' || lang === 'zh_HK') return elZhTw
+  return elZhCn
+})
 
 const windowRole = ref<WindowRole>('main')
 /** 关闭拦截递归保护标志 */

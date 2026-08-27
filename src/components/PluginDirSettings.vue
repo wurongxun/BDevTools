@@ -47,7 +47,7 @@ import { FolderOpened, FolderAdd } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { usePluginDir } from '@/composables/usePluginDir'
 import { invoke } from '@/api/rpc'
-import { open, emit, listen } from '@/core/runtime'
+import { open, publish, subscribe } from '@/core/runtime'
 
 /** 外部脚本目录变更事件（跨窗口同步面板展示与脚本树刷新） */
 const PLUGIN_DIR_CHANGED_EVENT = 'plugin-dir-changed'
@@ -71,7 +71,7 @@ function dirName(path: string): string {
 onMounted(async () => {
   await refreshDirs()
   // 其他窗口修改了外部目录时同步刷新展示（存储已共享，此处仅刷新 UI）
-  unlistenDirChanged = await listen(PLUGIN_DIR_CHANGED_EVENT, () => {
+  unlistenDirChanged = await subscribe(PLUGIN_DIR_CHANGED_EVENT, () => {
     refreshDirs()
   })
 })
@@ -100,7 +100,7 @@ async function addDir() {
     if (res.ok) {
       ElMessage.success('已添加')
       await refreshDirs()
-      emit(PLUGIN_DIR_CHANGED_EVENT).catch(() => {})
+      publish(PLUGIN_DIR_CHANGED_EVENT).catch(() => {})
     } else {
       ElMessage.error(res.msg || '添加失败')
     }
@@ -114,7 +114,7 @@ async function removeDir(path: string) {
   if (ok) {
     ElMessage.success('已移除挂载（目录内容未删除）')
     await refreshDirs()
-    emit(PLUGIN_DIR_CHANGED_EVENT).catch(() => {})
+    publish(PLUGIN_DIR_CHANGED_EVENT).catch(() => {})
   } else {
     ElMessage.error('移除失败')
   }

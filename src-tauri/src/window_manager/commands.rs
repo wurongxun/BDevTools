@@ -1,7 +1,6 @@
 /*! # 窗口管理 Tauri 命令 */
 use serde_json::json;
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
-use tauri_plugin_store::StoreExt;
 use uuid::Uuid;
 
 #[cfg(target_os = "windows")]
@@ -245,18 +244,21 @@ pub fn create_preset_window_from_preset(
             let _ = app.emit("window-created", &meta);
 
             // 将布局配置写入 settings.json，供新窗口前端读取（含工作区绑定）
-            if let Ok(store) = app.store("settings.json") {
-                let config_key = format!("window_layout_{}", label);
-                let _ = store.set(
-                    config_key,
-                    json!({
-                        "enabledPlugins": enabled_plugins,
-                        "focusMode": focus_mode,
-                        "presetId": preset_id,
-                        "workspaceId": workspace_id.unwrap_or_default()
-                    }),
-                );
-                let _ = store.save();
+            {
+                let mut settings = crate::app::app_store::read_settings();
+                if let Some(obj) = settings.as_object_mut() {
+                    let config_key = format!("window_layout_{}", label);
+                    obj.insert(
+                        config_key,
+                        json!({
+                            "enabledPlugins": enabled_plugins,
+                            "focusMode": focus_mode,
+                            "presetId": preset_id,
+                            "workspaceId": workspace_id.unwrap_or_default()
+                        }),
+                    );
+                }
+                crate::app::app_store::write_settings(&settings);
             }
 
             println!("[Rust] 预设窗口已创建: {} ({})", meta.title, label);

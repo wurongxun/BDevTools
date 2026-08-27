@@ -58,7 +58,7 @@ import { load, Store } from "@/core/runtime";
 import { tauri_request } from "@/utils/tauri_request";
 import { Document } from '@element-plus/icons-vue';
 import { useDark } from '@vueuse/core'
-import { listen, UnlistenFn } from "@/core/runtime";
+import { subscribe, Unsubscribe } from "@/core/runtime";
 import useStore from '@/store'
 import { useDocumentManagerStore } from '../../store/documents'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
@@ -226,7 +226,7 @@ onDeactivated(() => {
 })
 
 // 事件监听清理函数
-let unlistenClose: UnlistenFn | null = null;
+let unlistenClose: Unsubscribe | null = null;
 
 // --- 核心逻辑 ---
 
@@ -309,7 +309,7 @@ const listenClose = async () => {
   }
 
   try {
-    unlistenClose = await listen('close', async () => {
+    unlistenClose = await subscribe('close', async () => {
       // 关闭前保存
       if (data.currentChooseNoteAllPath_md &&
         data.editedMdtext_md !== data.notEditedMdtext_md &&

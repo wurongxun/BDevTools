@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@/api/rpc'
-import { listen } from '@/core/runtime'
+import { subscribe } from '@/core/runtime'
 import type {
   RemoteConnection,
   ConnectionTab,
@@ -304,10 +304,10 @@ export const useConnectionStore = defineStore('connection', () => {
    * 监听后端 SSH 输出事件
    */
   function setupSshOutputListener() {
-    listen<string>('ssh-output', (event) => {
-      // event.payload 格式: { tabId: string, data: string }
+    subscribe('ssh-output', (payload) => {
+      // payload 格式: { tabId: string, data: string }
       // 由具体 TerminalView 组件处理
-      window.dispatchEvent(new CustomEvent('ssh-output', { detail: event.payload }))
+      window.dispatchEvent(new CustomEvent('ssh-output', { detail: payload }))
     })
   }
 
@@ -315,8 +315,8 @@ export const useConnectionStore = defineStore('connection', () => {
    * 监听后端传输进度事件
    */
   function setupTransferProgressListener() {
-    listen<any>('transfer-progress', (event) => {
-      window.dispatchEvent(new CustomEvent('transfer-progress', { detail: event.payload }))
+    subscribe('transfer-progress', (payload) => {
+      window.dispatchEvent(new CustomEvent('transfer-progress', { detail: payload }))
     })
   }
 

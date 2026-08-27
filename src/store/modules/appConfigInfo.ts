@@ -1,13 +1,14 @@
 import { defineStore } from 'pinia'
 import { SettingMap } from '@/entity/entitys'
 import { load, Store } from '@/core/runtime';
+import i18n, { AppLocale } from '@/locales';
 
 export const appConfigInfo = defineStore('app_Config', {
   state: () => ({
     isDark: false,
     isDarkId: '',
     appConfig: [] as Array<SettingMap>,
-    language: 'zh-CN',
+    language: 'zh_CN',
     md_working_directory: '',
     read_lines: 50000,
     theme: 'light',
@@ -72,6 +73,8 @@ export const appConfigInfo = defineStore('app_Config', {
     },
     setLanguage(language: string) {
       this.language = language
+      // 同步切换 i18n（启动恢复与设置页切换共用此入口）
+      i18n.global.locale.value = language as AppLocale
     },
     setMdWorkingDirectory(md_working_directory: string) {
       this.md_working_directory = md_working_directory
