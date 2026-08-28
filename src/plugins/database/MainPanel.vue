@@ -43,6 +43,7 @@
         <div v-else-if="editorStore.activeTab.type === 'table'" class="table-tab">
           <TableDataView
             v-if="editorStore.activeTab.configId && editorStore.activeTab.database && editorStore.activeTab.table"
+            :key="editorStore.activeTab.id"
             :config-id="editorStore.activeTab.configId"
             :database="editorStore.activeTab.database"
             :table="editorStore.activeTab.table"
@@ -53,6 +54,7 @@
         <div v-else-if="editorStore.activeTab.type === 'metadata'" class="metadata-tab">
           <TableMetadata
             v-if="editorStore.activeTab.configId && editorStore.activeTab.database && editorStore.activeTab.table"
+            :key="editorStore.activeTab.id"
             :config-id="editorStore.activeTab.configId"
             :database="editorStore.activeTab.database"
             :table="editorStore.activeTab.table"
@@ -163,6 +165,10 @@ async function onSqlSaved(filePath: string, configId: string, database: string) 
   border-right: 1px solid #3c3c3c;
   white-space: nowrap;
   min-width: 80px;
+}
+.tab-title {
+  /* 表名/查询标题用等宽字体，避免阿里巴巴普惠体 13px 下 _ 不可见 */
+  font-family: var(--font-family-mono);
 }
 .tab-item:hover {
   color: #fff;

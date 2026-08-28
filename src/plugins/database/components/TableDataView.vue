@@ -117,10 +117,11 @@ onMounted(async () => {
   await loadData()
 })
 
-watch(() => [props.database, props.table], () => {
+watch(() => [props.database, props.table], async () => {
   page.value = 1
-  loadColumns()
-  loadData()
+  // 顺序加载：先列后数据，避免并发时旧表列名/新表数据错配
+  await loadColumns()
+  await loadData()
 })
 
 async function loadColumns() {

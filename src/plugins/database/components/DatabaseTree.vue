@@ -68,6 +68,11 @@ const treeProps = {
   isLeaf: 'isLeaf',
 }
 
+/** 生成 el-tree node-key：按段编码（名称可含 `_`/`|` 等），避免拼接碰撞导致下划线表名/库名节点不渲染 */
+function nodeId(prefix: string, parts: (string | undefined)[]): string {
+  return [prefix, ...parts.map(p => encodeURIComponent(p ?? ''))].join('|')
+}
+
 onMounted(() => {
   refreshTree()
 })
@@ -82,7 +87,7 @@ watch(
 function refreshTree() {
   treeKey.value++
   treeData.value = connectionStore.connections.map(conn => ({
-    id: `conn_${conn.id}`,
+    id: nodeId('conn', [conn.id]),
     label: conn.name,
     type: 'connection' as const,
     isLeaf: false,
@@ -120,7 +125,7 @@ async function loadNode(node: any, resolve: (data: TreeNode[]) => void) {
       const res = await dbListDatabases(connId)
       if (res.code === 200) {
         resolve(res.data.map(db => ({
-          id: `db_${connId}_${db.name}`,
+          id: nodeId('db', [connId, db.name]),
           label: db.name,
           type: 'database' as const,
           isLeaf: false,
@@ -140,7 +145,7 @@ async function loadNode(node: any, resolve: (data: TreeNode[]) => void) {
       const res = await dbListTables(connId, dbName)
       if (res.code === 200) {
         resolve(res.data.map(tbl => ({
-          id: `tbl_${connId}_${dbName}_${tbl.name}`,
+          id: nodeId('tbl', [connId, dbName, tbl.name]),
           label: tbl.name,
           type: 'table' as const,
           isLeaf: false,
@@ -161,7 +166,7 @@ async function loadNode(node: any, resolve: (data: TreeNode[]) => void) {
       const res = await dbTableColumns(connId, dbName, tableName)
       if (res.code === 200) {
         resolve(res.data.map(col => ({
-          id: `col_${connId}_${dbName}_${tableName}_${col.name}`,
+          id: nodeId('col', [connId, dbName, tableName, col.name]),
           label: `${col.name} (${col.data_type})`,
           type: 'column' as const,
           isLeaf: true,
@@ -312,6 +317,9 @@ defineExpose({ refreshTree })
   align-items: center;
   gap: 4px;
   font-size: var(--font-size-md);
+  /* 库名/表名/列名是代码标识符，用等宽字体渲染；
+     阿里巴巴普惠体在 13px 小字号下 _ 字形位于基线下方且笔画过细，Windows 下几乎不可见 */
+  font-family: var(--font-family-mono);
 }
 .node-label {
   overflow: hidden;
