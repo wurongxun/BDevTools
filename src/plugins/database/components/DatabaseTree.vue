@@ -12,13 +12,24 @@
     >
       <template #default="{ node, data }">
         <span class="tree-node" @contextmenu.prevent="onTreeNodeContextmenu($event, data)">
-          <el-icon v-if="data.type === 'connection'" :class="{ 'is-connected': isConnected(data.data?.id) }">
+          <el-icon
+            v-if="data.type === 'connection'"
+            :class="{ 'is-connected': isConnected(data.data?.id), 'is-disconnected': !isConnected(data.data?.id) }"
+          >
             <Connection />
           </el-icon>
           <el-icon v-else-if="data.type === 'database'"><Coin /></el-icon>
-          <el-icon v-else-if="data.type === 'table'"><Grid /></el-icon>
+          <el-icon
+            v-else-if="data.type === 'table'"
+            :class="{ 'is-connected': isTableActive(data) }"
+          >
+            <Grid />
+          </el-icon>
           <el-icon v-else-if="data.type === 'column'"><Document /></el-icon>
-          <span class="node-label">{{ node.label }}</span>
+          <span
+            class="node-label"
+            :class="{ 'is-connected': data.type === 'table' && isTableActive(data) }"
+          >{{ node.label }}</span>
           <span v-if="data.type === 'connection' && isConnected(data.data?.id)" class="connected-badge">已连接</span>
         </span>
       </template>
@@ -45,12 +56,13 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { Connection, Coin, Grid, Document } from '@element-plus/icons-vue'
-import { useConnectionStore, useEditorStore } from '../store'
+import { useConnectionStore, useEditorStore, useDbSidebarStore } from '../store'
 import { dbListDatabases, dbListTables, dbTableColumns } from '../api/metadata'
 import type { TreeNode } from '../types'
 
 const connectionStore = useConnectionStore()
 const editorStore = useEditorStore()
+const dbSidebar = useDbSidebarStore()
 
 const treeData = ref<TreeNode[]>([])
 const treeKey = ref(0)
@@ -84,6 +96,29 @@ watch(
   () => refreshTree()
 )
 
+// 跟踪「当前有活跃 tab 的连接」；当某连接的所有相关 tab 全部关闭时，
+// 主动断开后端连接池（activeConnections 中移除 + 后端 dbDisconnect），
+// 让挂起的 loadNode（el-tree lazy loading）因连接断开而失败 → resolve([]) → loading 图标消失。
+const watchedActiveConfigs = new Set<string>()
+function syncConnectionPoolOnTabsChange() {
+  for (const conn of connectionStore.connections) {
+    if (!conn.id) continue
+    const hasTabs = editorStore.hasTabsForConfig(conn.id)
+    if (hasTabs) {
+      watchedActiveConfigs.add(conn.id)
+    } else if (watchedActiveConfigs.has(conn.id)) {
+      // 之前有 tab 现在没了：断开后端连接
+      connectionStore.disconnect(conn.id).catch(() => {})
+      watchedActiveConfigs.delete(conn.id)
+    }
+  }
+}
+watch(
+  () => editorStore.tabs.map(t => t.configId).filter(Boolean).sort().join('|'),
+  () => syncConnectionPoolOnTabsChange(),
+  { immediate: true }
+)
+
 function refreshTree() {
   treeKey.value++
   treeData.value = connectionStore.connections.map(conn => ({
@@ -95,8 +130,21 @@ function refreshTree() {
   }))
 }
 
+/** 连接节点图标状态：后端连接成功即绿（与 tab 无关）；断开后灰显 */
 function isConnected(configId?: string): boolean {
   return configId ? connectionStore.isConnected(configId) : false
+}
+
+/** 表节点图标/表名状态：该表有打开的 Tab（表数据/表结构）时表名变绿，全部关闭后变灰 */
+function isTableActive(node: TreeNode): boolean {
+  try {
+    const d = node?.data
+    if (!node || node.type !== 'table' || !d) return false
+    return !!editorStore.hasTabForTable(d.configId, d.database, d.name)
+  } catch {
+    // 渲染期异常兜底：不因状态判断影响树节点显示
+    return false
+  }
 }
 
 async function loadNode(node: any, resolve: (data: TreeNode[]) => void) {
@@ -253,6 +301,8 @@ function handleRefresh() {
 function handleNewQuery() {
   closeContextMenu()
   if (contextNodeData.value?.id) {
+    // 脚本区默认折叠；新建查询时自动展开，与左侧脚本区(可另存/关联)联动可见
+    dbSidebar.setScriptsExpanded(true)
     editorStore.openTab({
       title: '新查询',
       type: 'sql',
@@ -334,6 +384,9 @@ defineExpose({ refreshTree })
 .is-connected {
   color: #67c23a;
 }
+.is-disconnected {
+  color: var(--el-text-color-disabled);
+}
 </style>
 
 <style>
@@ -341,22 +394,23 @@ defineExpose({ refreshTree })
 .context-menu {
   position: fixed;
   z-index: 9999;
-  background: #fff;
-  border: 1px solid #e4e7ed;
   border-radius: var(--radius-md);
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.2);
   padding: 4px 0;
   min-width: 120px;
+  /* 用设计令牌跟随 light/dark：light=#fff / dark=#3c3f41 */
+  background: var(--bgColor);
+  border: 1px solid var(--borderColor);
 }
 .context-menu-item {
   padding: 6px 16px;
   font-size: var(--font-size-md);
   cursor: pointer;
   white-space: nowrap;
-  color: #333;
+  color: var(--textColor);
 }
 .context-menu-item:hover {
-  background-color: #ecf5ff;
-  color: #409eff;
+  background-color: var(--hoverColor);
+  color: var(--activityBarActive);
 }
 </style>

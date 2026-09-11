@@ -1,8 +1,13 @@
 pub mod app_window;
 pub mod file_command;
 pub mod file_utils;
-mod log_search_file;
-mod log_search_mmap;
+pub mod log_index;
+pub mod log_stream;
 pub(crate) mod search_log_parallel;
 pub(crate) mod file_association;
 pub mod remote_conn;
+pub mod mat_hprof;
+pub(crate) mod mat_graph;
+pub mod mat_leak;
+pub mod mat_refs;
+pub mod mat_cfg;

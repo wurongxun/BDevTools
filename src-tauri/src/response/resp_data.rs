@@ -8,10 +8,3 @@ where
     pub msg: String,
     pub data: T,
 }
-
-// 封装响应数据 不带data
-#[derive(serde::Serialize)]
-pub struct ResDataNoData {
-    pub code: u32,
-    pub msg: String,
-}

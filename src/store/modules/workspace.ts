@@ -79,19 +79,36 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
-  /** 将工作区的首个文件夹应用到文件树（并持久化到 settings.json） */
-  async function applyWorkspaceFolder(config: WorkspaceConfig) {
-    if (config.folders.length === 0) return
-    const dir = config.folders[0]
+  /** 将工作区的首个文件夹应用到文件树（并持久化到 settings.json）
+   * @param opts.force 强制刷新文件树（切换工作区场景：旧工作区的树必须清掉后加载新目录，
+   *                   仅靠「树为空」判断会因旧树还在而漏掉加载）
+   */
+  async function applyWorkspaceFolder(config: WorkspaceConfig, opts?: { force?: boolean }) {
     const ftStore = getFileTreeStore()
-    if (ftStore.workingDirectory === dir) return
-    ftStore.setWorkingDirectory(dir)
-    await get_file_Api()
-    try {
-      const store = await load('settings.json', { autoSave: false, defaults: {} })
-      await store.set('md_working_directory', { value: dir })
-      await store.save()
-    } catch { /* ignore */ }
+    const dir = config.folders[0]
+    // 工作区没有关联文件夹：清空文件树，避免残留上一个工作区的目录
+    if (!dir) {
+      if (ftStore.tree_node.length > 0 || ftStore.search_data.length > 0) {
+        ftStore.addTreeNode([])
+        ftStore.addSearchData([])
+      }
+      return
+    }
+    const dirChanged = ftStore.workingDirectory !== dir
+    if (dirChanged) {
+      ftStore.setWorkingDirectory(dir)
+    }
+    // 目录变化 / 强制刷新 / 树为空 时加载当前工作目录的树（get_file_Api 用 workingDirectory 请求并覆盖 tree_node）
+    if (dirChanged || opts?.force || ftStore.tree_node.length === 0) {
+      await get_file_Api()
+    }
+    if (dirChanged) {
+      try {
+        const store = await load('settings.json', { autoSave: false, defaults: {} })
+        await store.set('md_working_directory', { value: dir })
+        await store.save()
+      } catch { /* ignore */ }
+    }
   }
 
   /** 加载当前窗口的工作区配置（并自动加锁）
@@ -180,7 +197,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     return null
   }
 
-  /** 切换工作区（带锁保护）
+  /** 切换工作区（带锁保护 + 文档迁移 + 会话恢复）
+   * 流程：锁定目标 → 保存并关闭当前工作区打开的文件 → 切到新工作区并加载其文件树
+   *       → 恢复新工作区上次打开的文件
    * @returns { success: boolean, error?: string }  */
   async function switchWorkspace(id: string): Promise<{ success: boolean; error?: string }> {
     // 如果已经是当前工作区，无需切换
@@ -203,16 +222,44 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       await workspaceService.unlock(oldId, windowLabel.value).catch(() => {})
     }
 
+    // ===== 切换前：保存并关闭当前工作区打开的文件（与窗口关闭流程同序） =====
+    // 动态 import 避免与 session/documents store 的模块循环依赖
+    const { useSessionStore } = await import('./session')
+    const { useDocumentManagerStore } = await import('@/plugins/files/store/documents')
+    const sessionStore = useSessionStore()
+    const docStore = useDocumentManagerStore()
+    try {
+      // 1. 脏文档先落盘（内容保存后快照/草稿记录干净状态）
+      await docStore.saveAllDocuments()
+      // 2. 清理已落盘文档的草稿（内容已保存，草稿失去保护意义；未保存文档草稿保留）
+      if (oldId) {
+        await sessionStore.cleanupSavedDrafts(oldId)
+      }
+      // 3. 保存旧工作区会话快照（记录打开文件列表，切回旧工作区时可恢复）
+      await sessionStore.saveSnapshot()
+      // 4. 关闭全部文档（清理编辑器实例 / openfile.json 记录，避免旧工作区文件残留）。
+      //    注意：这是工作区切换的清理动作，不是用户关闭意图 —— syncSession:false 跳过
+      //    快照剔除，否则会把第 3 步刚保存的旧工作区快照清空，切回时无法恢复。
+      docStore.closeAllDocuments({ syncSession: false })
+    } catch (e) {
+      console.warn('切换工作区前保存/关闭文档失败:', e)
+    }
+
     const config = await workspaceService.get(id)
     if (config) {
       currentWorkspace.value = config
       setPluginWorkspaceId(id)
 
-      // 联动文件树：切换到工作区的第一个文件夹
-      await applyWorkspaceFolder(config)
+      // 联动文件树：切换到工作区的第一个文件夹（强制刷新，旧树清掉后加载新目录）
+      await applyWorkspaceFolder(config, { force: true })
 
       // 广播工作区切换事件，供各插件监听
       window.dispatchEvent(new CustomEvent('workspace-changed', { detail: { workspaceId: id, config } }))
+
+      // ===== 切换后：恢复新工作区上次打开的文件 =====
+      // 清除该工作区的恢复幂等标记（同一窗口内可能切换回来，需要允许再次恢复）
+      sessionStore.resetRestored(id)
+      await sessionStore.tryRestoreSession(id)
     }
 
     return { success: true }

@@ -1,20 +1,27 @@
 <template>
   <div class="window-controls">
     <el-tooltip content="最小化" placement="bottom">
-      <el-icon class="ctrl-btn" @click="handleMinimize">
-        <Minus />
-      </el-icon>
+      <button type="button" class="ctrl-btn" aria-label="最小化窗口" @click="handleMinimize">
+        <el-icon><Minus /></el-icon>
+      </button>
     </el-tooltip>
     <el-tooltip :content="isMaximized ? '还原' : '最大化'" placement="bottom">
-      <el-icon class="ctrl-btn" @click="handleToggleMaximize">
-        <WindowRestoreIcon v-if="isMaximized" />
-        <WindowMaximizationIcon v-else />
-      </el-icon>
+      <button
+        type="button"
+        class="ctrl-btn"
+        :aria-label="isMaximized ? '还原窗口' : '最大化窗口'"
+        @click="handleToggleMaximize"
+      >
+        <el-icon>
+          <WindowRestoreIcon v-if="isMaximized" />
+          <WindowMaximizationIcon v-else />
+        </el-icon>
+      </button>
     </el-tooltip>
     <el-tooltip content="关闭" placement="bottom">
-      <el-icon class="ctrl-btn ctrl-close" @click="handleClose">
-        <Close />
-      </el-icon>
+      <button type="button" class="ctrl-btn ctrl-close" aria-label="关闭窗口" @click="handleClose">
+        <el-icon><Close /></el-icon>
+      </button>
     </el-tooltip>
   </div>
 </template>
@@ -66,17 +73,24 @@ async function handleClose() {
 }
 
 // 紧凑方形按钮，与 FunctionalArea 的 .fa-icon 规格一致，在 32px 标题栏内垂直居中
+// 命中区 32×26：宽度按桌面窗口控制惯例取 32px，高度受限于 32px 标题栏
 .ctrl-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 24px;
+  width: 32px;
+  height: 26px;
   cursor: pointer;
   border-radius: var(--radius-md);
   font-size: var(--font-size-base);
   transition: background-color 0.15s;
   flex-shrink: 0;
+  // 语义化 <button> 需要抹平浏览器默认外观
+  appearance: none;
+  border: none;
+  padding: 0;
+  background: transparent;
+  font-family: inherit;
 
   @include theme.useTheme {
     color: theme.getVar('textSecondary');

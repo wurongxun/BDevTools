@@ -206,17 +206,4 @@ a:hover {
   text-decoration: underline;
 }
 
-@media (max-width: 768px) {
-  .about-content {
-    flex-direction: column;
-  }
-  
-  .info-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .about-container {
-    padding: 10px;
-  }
-}
 </style>

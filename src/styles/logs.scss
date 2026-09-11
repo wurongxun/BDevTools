@@ -1,0 +1,135 @@
+/*!
+ * 日志工作台配色令牌
+ *
+ * 行内高亮 span（.lg-*）由 v-html 注入，不受组件 scoped 样式约束，
+ * 因此统一定义在全局；明暗两套取值，随 html.dark 自动切换。
+ */
+
+html {
+  /* 行与槽位 */
+  --log-row-hover-bg: rgba(0, 0, 0, 0.04);
+  --log-row-current-bg: rgba(64, 158, 255, 0.12);
+  --log-gutter-fg: #a8abb2;
+
+  /* 级别：ERROR/WARN 用背景，INFO/DEBUG/TRACE 用文字色 */
+  --log-level-error-bg: rgba(245, 108, 108, 0.14);
+  --log-level-error-fg: #c45656;
+  --log-level-fatal-bg: rgba(220, 38, 38, 0.22);
+  --log-level-fatal-fg: #a8071a;
+  --log-level-warn-bg: rgba(230, 162, 60, 0.18);
+  --log-level-warn-fg: #8a5a00;
+  --log-level-info-fg: #1f7a3f;
+  --log-level-debug-fg: #7a7f87;
+  --log-level-trace-fg: #9ca3af;
+
+  /* 搜索命中：黄色背景；当前命中使用更重的橙色 */
+  --log-hit-bg: rgba(250, 204, 21, 0.65);
+  --log-hit-current-bg: rgba(249, 115, 22, 0.92);
+  --log-hit-current-fg: #ffffff;
+
+  /* 异常堆栈片段：类名 / 方法 / 文件 / 行号分开着色，便于定位代码 */
+  --log-stack-cls-fg: #7c3aed;
+  --log-stack-method-fg: #0369a1;
+  --log-stack-file-fg: #0f766e;
+  --log-stack-line-fg: #b45309;
+  --log-stack-message-fg: inherit;
+
+  /* 元信息（时间戳 / 线程 / logger） */
+  --log-meta-fg: #909399;
+}
+
+html.dark {
+  --log-row-hover-bg: rgba(255, 255, 255, 0.06);
+  --log-row-current-bg: rgba(64, 158, 255, 0.18);
+  --log-gutter-fg: #6b7075;
+
+  --log-level-error-bg: rgba(245, 108, 108, 0.18);
+  --log-level-error-fg: #f78989;
+  --log-level-fatal-bg: rgba(220, 38, 38, 0.3);
+  --log-level-fatal-fg: #fb7185;
+  --log-level-warn-bg: rgba(230, 162, 60, 0.2);
+  --log-level-warn-fg: #e6a23c;
+  --log-level-info-fg: #67c23a;
+  --log-level-debug-fg: #8d9095;
+  --log-level-trace-fg: #6b7280;
+
+  --log-hit-bg: rgba(250, 204, 21, 0.38);
+  --log-hit-current-bg: rgba(249, 115, 22, 0.85);
+  --log-hit-current-fg: #1f1305;
+
+  --log-stack-cls-fg: #a78bfa;
+  --log-stack-method-fg: #38bdf8;
+  --log-stack-file-fg: #5eead4;
+  --log-stack-line-fg: #fbbf24;
+
+  --log-meta-fg: #6b7280;
+}
+
+/* ===== 行内高亮（v-html 注入，必须全局） ===== */
+.lg-hit {
+  background: var(--log-hit-bg);
+  border-radius: 2px;
+}
+
+.lg-hit-current {
+  background: var(--log-hit-current-bg);
+  color: var(--log-hit-current-fg);
+  border-radius: 2px;
+}
+
+.lg-rule {
+  border-radius: 2px;
+}
+
+.lg-meta {
+  color: var(--log-meta-fg);
+}
+
+.lg-stack-cls {
+  color: var(--log-stack-cls-fg);
+}
+
+.lg-stack-method {
+  color: var(--log-stack-method-fg);
+}
+
+.lg-stack-file {
+  color: var(--log-stack-file-fg);
+}
+
+.lg-stack-line {
+  color: var(--log-stack-line-fg);
+  font-weight: 500;
+}
+
+.lg-stack-message {
+  color: var(--log-stack-message-fg);
+}
+
+/* ===== 级别文字色（行徽章与悬停浮层共用） ===== */
+.lv-error,
+.lv-fatal,
+.lv-text-error,
+.lv-text-fatal {
+  color: var(--log-level-error-fg);
+}
+
+.lv-warn,
+.lv-text-warn {
+  color: var(--log-level-warn-fg);
+}
+
+.lv-info,
+.lv-text-info {
+  color: var(--log-level-info-fg);
+}
+
+.lv-debug,
+.lv-text-debug {
+  color: var(--log-level-debug-fg);
+}
+
+.lv-trace,
+.lv-text-trace {
+  color: var(--log-level-trace-fg);
+}

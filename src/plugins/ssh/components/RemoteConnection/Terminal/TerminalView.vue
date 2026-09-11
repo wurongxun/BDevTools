@@ -347,7 +347,7 @@ onUnmounted(() => {
   height: 100%;
 
   @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
+    background-color: theme.getVar('appMainBgColor');
   }
 }
 
@@ -356,13 +356,11 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 4px 12px;
-  background-color: #252526;
-  border-bottom: 1px solid #2d2d2d;
   flex-shrink: 0;
 
   @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
-    border-bottom-color: theme.getVar('borderColor');
+    background-color: theme.getVar('sidebarBg');
+    border-bottom: 1px solid theme.getVar('borderColor');
   }
 }
 
@@ -375,7 +373,6 @@ onUnmounted(() => {
 .terminal-title {
   font-size: theme.getVar('fontSize');
   font-weight: 500;
-  color: #ccc;
 
   @include theme.useTheme {
     color: theme.getVar('textColor');

@@ -3,5 +3,7 @@ pub mod connection;
 pub mod operations;
 pub mod metadata;
 pub mod import_export;
-pub mod ssh_tunnel;
 pub mod pool;
+pub mod dialect;
+pub mod mssql;
+pub mod odbc;

@@ -1,18 +1,15 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
-use serde_json::json;
 use tauri::Manager;
 use tauri::{App, Emitter, Listener};
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tauri::WebviewWindowBuilder;
 use tauri_plugin_window_state::{StateFlags, WindowExt};
 
 mod app;
-mod app_setup;
 mod command;
 mod core;
 mod entity;
 mod response;
-mod system_menu;
 mod utils;
 mod sqlite;
 mod window_manager;
@@ -21,29 +18,36 @@ mod session;
 mod database;
 pub mod commands;
 
-use crate::app::app_store::{app_settings, app_openFile, APP};
+use crate::app::app_store::{app_open_file, app_settings, APP};
 use crate::app::tray::create_tray;
-use crate::app_setup::setup::setup_windows;
 use crate::commands::{
     about, close_window, connection_create, connection_delete, connection_edit,
     connection_list, count_file_lines, create_editor_window, create_folder,
     create_note_file, db_connect, db_connection_create, db_connection_delete,
     db_connection_list, db_connection_test, db_connection_update, db_delete_row,
-    db_disconnect, db_execute_sql, db_export_csv, db_export_excel, db_import_csv,
-    db_import_excel, db_insert_row, db_list_databases, db_list_tables,
+    db_disconnect, db_execute_sql, db_export_csv, db_export_excel, db_export_sql_csv,
+    db_export_sql_excel, db_import_csv, db_import_excel, db_insert_row, db_list_databases, db_list_tables,
     db_query_table_data, db_table_columns, db_table_indexes, db_table_schema,
     db_update_row, detect_file_encoding, draft_check, draft_delete, draft_load,
     draft_save, ensure_dir, file_manager_open_path, focus_window, get_app_dir,
-    get_document_notebooks, get_note_list, get_path_childrenFoldersAndFiles,
+    get_document_notebooks, get_file_size, get_note_list, get_path_childrenFoldersAndFiles,
     get_window_count, get_window_list, kv_delete, kv_entries, kv_get, kv_set,
-    list_script_files, local_list_dir,
-    loding_window_close, note_book_window, open_default_apps_settings, read_file_lines,
+    list_script_files,     local_list_dir, logs_index_build, logs_index_drop,
+    logs_index_export, logs_index_query,
+    loding_window_close, note_book_window, mat_hprof_header, mat_hprof_histogram,
+    mat_leak_suspects,
+    mat_analysis_limits,
+    mat_refs_build, mat_refs_inspect, mat_refs_instances, mat_refs_release,
+    mat_refs_search_classes,
+    open_default_apps_settings, read_file_lines,
     read_note_file, register_file_association, remove_file, remove_folder,
     rename_script_file, save_note, search_log_index, search_log_jump_to, search_log_page,
     search_log_parallel, search_log_preview, session_clear, session_delete,
     session_delete_workspace, session_list, session_load, session_load_all,
     session_load_workspace, session_save, sftp_check, sftp_connect, sftp_disconnect,
     sftp_download, sftp_list_dir, sftp_mkdir, sftp_remove, sftp_rename, sftp_upload,
+    logs_pull_remote,
+    logs_stream_start, logs_stream_stop,
     ssh_check, ssh_connect, ssh_disconnect, ssh_resize_pty, ssh_write, up_file_name,
     up_folder_name, update_window_position_cmd, windows_close, windows_hide,
     windows_maximize, windows_minimize, workspace_create, workspace_delete,
@@ -55,16 +59,13 @@ use crate::commands::{
     write_script_file,
 };
 
-
-struct Payload {
-    args: Vec<String>,
-    cwd: String,
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {}))
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // 二次启动实例时聚焦主窗口（原实现误写在被丢弃的 builder 上，从未生效）
+            let _ = app.get_webview_window("main").map(|w| w.set_focus());
+        }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
@@ -85,6 +86,7 @@ pub fn run() {
             get_document_notebooks,
             file_manager_open_path,
             get_note_list,
+            get_file_size,
             read_note_file,
             create_folder,
             ensure_dir,
@@ -113,6 +115,11 @@ pub fn run() {
             read_file_lines,
             count_file_lines,
             detect_file_encoding,
+            // 日志工作台：服务端索引与筛选（logs 插件）
+            logs_index_build,
+            logs_index_query,
+            logs_index_export,
+            logs_index_drop,
             register_file_association,
             open_default_apps_settings,
             ssh_connect,
@@ -128,6 +135,9 @@ pub fn run() {
             sftp_remove,
             sftp_upload,
             sftp_download,
+            logs_pull_remote,
+            logs_stream_start,
+            logs_stream_stop,
             local_list_dir,
             sftp_rename,
             get_app_dir,
@@ -165,6 +175,16 @@ pub fn run() {
             kv_set,
             kv_delete,
             kv_entries,
+            // Java 堆转储分析（mat 插件）
+            mat_hprof_header,
+            mat_hprof_histogram,
+            mat_leak_suspects,
+            mat_analysis_limits,
+            mat_refs_build,
+            mat_refs_release,
+            mat_refs_search_classes,
+            mat_refs_instances,
+            mat_refs_inspect,
             // 会话管理（主键：工作区 ID）
             session_save,
             session_load,
@@ -202,6 +222,8 @@ pub fn run() {
             // 导入导出
             db_export_csv,
             db_export_excel,
+            db_export_sql_csv,
+            db_export_sql_excel,
             db_import_csv,
             db_import_excel,
         ])
@@ -218,47 +240,22 @@ pub fn run() {
             {
                 let handle = app.handle();
                 create_tray(handle)?;
-                // 开机自启：将来启用时构造 AppContext 传入 app_autostart(ctx)
-            }
-            let mut builder = tauri::Builder::default();
-            #[cfg(desktop)]
-            {
-                builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
-                    let _ = app.get_webview_window("main")
-                        .expect("no main window")
-                        .set_focus();
-                }));
             }
             // 获取命令行参数，检查是否有文件关联打开的路径
             let args: Vec<String> = std::env::args().collect();
             let handle = app.handle().clone();
-            if args.len() > 1 {
-                let file_path = args[1..]
-                    .iter()
-                    .find(|arg| {
-                        let ext = std::path::Path::new(arg)
-                            .extension()
-                            .and_then(|e| e.to_str())
-                            .unwrap_or("");
-                        //全部返回
-                        true
-                        //matches!(ext.to_lowercase().as_str(), "md" | "png" | "jpg" | "jpeg" | "pdf")
-                    })
-                    .cloned();
-
-                if let Some(path) = file_path {
-                    println!("打开文件 path {:?}", path);
-                    app_openFile(&path);
-                    let _ = handle.emit("file-opened-from-os", path);
-
-                }
+            // 首个非程序路径参数即待打开文件（原实现逐个探测扩展名但谓词恒真，等价于取 args[1]）
+            if let Some(path) = args.get(1).cloned() {
+                println!("打开文件 path {:?}", path);
+                app_open_file(&path);
+                let _ = handle.emit("file-opened-from-os", path);
             }
-            let mut main_window = match WebviewWindowBuilder::new(
+            let main_window = match WebviewWindowBuilder::new(
                 app,
                 "main".to_string(),
                 tauri::WebviewUrl::App("index.html".into()),
             )
-            .title("BackendDevelopmentTools")
+            .title("BackendDevTools")
             .decorations(false)
             // 无边框窗口必须启用阴影，否则 Windows 下 DWM 会在左/右/底边露出 1px 黑线
             .shadow(true)
@@ -266,7 +263,6 @@ pub fn run() {
             .min_inner_size(640.0, 480.0)
             .center()
             .visible(false) // Tauri 2.0 Splash Screen: 初始隐藏，等待前端通知
-            // .menu(system_menu(&context))//窗口菜单
             .build()
             {
                 Ok(it) => it,
@@ -291,14 +287,14 @@ pub fn run() {
             //     Ok(it) => it,
             //     Err(err) => return Err(Box::new(err)),
             // };
-            main_window.restore_state(StateFlags::all() ^ StateFlags::VISIBLE); // 恢复窗口状态，但不恢复可见性（由 openOnStartup 配置控制）
+            let _ = main_window.restore_state(StateFlags::all() ^ StateFlags::VISIBLE); // 恢复窗口状态，但不恢复可见性（由 openOnStartup 配置控制）
             // 注册主窗口到全局注册表
             {
                 let meta = crate::window_manager::registry::create_window_meta(
                     "main".to_string(),
                     crate::entity::window::WindowRole::Main,
                     None,
-                    "BackendDevelopmentTools".to_string(),
+                    "BackendDevTools".to_string(),
                     Some("main".to_string()),
                     0.0, 0.0, 960.0, 640.0,
                 );
@@ -318,7 +314,7 @@ pub fn run() {
                         result = open_on_startup;
                     }
                 }
-                println!("[BackendDevelopmentTools] show_main_window = {}", result);
+                println!("[BackendDevTools] show_main_window = {}", result);
                 result
             };
             // Tauri 2.0 Splash Screen: 监听前端启动完成事件

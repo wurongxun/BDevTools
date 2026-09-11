@@ -1,5 +1,5 @@
 export default {
-  appName: 'BackendDevelopmentTools',
+  appName: 'BackendDevTools',
   settings: {
     name: 'Settings',
     projectSetting: '项目配置',

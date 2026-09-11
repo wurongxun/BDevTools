@@ -1,48 +1,35 @@
 <template>
   <div class="sql-editor" ref="editorContainer">
     <div class="editor-toolbar">
-      <el-button size="small" type="primary" @click="handleExecute" :disabled="!selectedConfigId">
+      <app-button size="small" type="primary" @click="handleExecute" :disabled="!selectedConfigId">
         <el-icon><CaretRight /></el-icon> 执行 (Ctrl+Enter)
-      </el-button>
-      <el-button size="small" @click="handleSave">
+      </app-button>
+      <app-button size="small" @click="handleSave">
         <el-icon><FolderOpened /></el-icon> 保存 (Ctrl+S)
-      </el-button>
+      </app-button>
       <el-select v-model="selectedConfigId" size="small" placeholder="选择连接" style="width: 140px; margin-left: 8px;" @change="handleConnectionChange">
         <el-option v-for="conn in connections" :key="conn.id" :label="conn.name" :value="conn.id" />
       </el-select>
       <el-select v-model="selectedDb" size="small" placeholder="选择数据库" style="width: 140px; margin-left: 8px;" :disabled="!selectedConfigId">
         <el-option v-for="db in databases" :key="db.name" :label="db.name" :value="db.name" />
       </el-select>
-      <el-select v-model="pageSize" size="small" style="width: 108px; margin-left: 8px;" @change="handlePageSizeChange">
-        <el-option v-for="s in PAGE_SIZE_OPTIONS" :key="s" :label="`${s} 行/页`" :value="s" />
-      </el-select>
-      <span class="execution-info" v-if="lastResult">
-        {{ lastResult.is_query ? `${lastResult.rows.length} 行` : `${lastResult.affected_rows} 行受影响` }}
-        | {{ lastResult.execution_time_ms }} ms
-        <template v-if="lastResult.is_query"> | 第 {{ currentPage }} 页</template>
-      </span>
-      <el-button-group v-if="lastResult && lastResult.is_query" class="pager">
-        <el-button size="small" :disabled="currentPage <= 1 || executing" @click="goPrevPage">
-          <el-icon><ArrowLeft /></el-icon> 上一页
-        </el-button>
-        <el-button size="small" :disabled="!canGoNext || executing" @click="goNextPage">
-          {{ prefetching ? '加载中' : '下一页' }} <el-icon><ArrowRight /></el-icon>
-        </el-button>
-      </el-button-group>
     </div>
     <div class="editor-wrapper" ref="monacoContainer"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { CaretRight, FolderOpened, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import { CaretRight, FolderOpened } from '@element-plus/icons-vue'
 import { dbExecuteSql } from '../api/operations'
 import { dbListDatabases } from '../api/metadata'
 import { useConnectionStore } from '../store'
 import { save } from '@/core/runtime'
-import { writeTextFile } from '@/core/runtime'
+import { tauri_request } from '@/utils/tauri_request'
+import type { ResponseData } from '@/Types/entitys'
 import { usePluginDir } from '@/composables/usePluginDir'
+import { isDark } from '@/composables/useDark'
 import type { SqlResult, DatabaseInfo } from '../types'
 import * as monaco from 'monaco-editor'
 
@@ -54,7 +41,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'executed': [result: SqlResult]
+  'executed': [entry: { sql: string; result: SqlResult }]
   'saved': [filePath: string, configId: string, database: string]
 }>()
 
@@ -66,17 +53,12 @@ const selectedConfigId = ref<string>(props.configId || '')
 const selectedDb = ref('')
 const databases = ref<DatabaseInfo[]>([])
 const lastResult = ref<SqlResult | null>(null)
-// 分页：默认 200 行/页（前后端一致），后端单次最大 1000 行
-const PAGE_SIZE_OPTIONS = [50, 100, 200, 500, 1000]
-const pageSize = ref(200)
-const currentPage = ref(1)
+// 分页统一在 SqlResultPanel 中按子结果独立管理，编辑器执行时仅取第一页（每页 200）
+const PAGE_SIZE = 200
 const executing = ref(false)
-// 下一页预取缓存：当前页加载完成后后台预取，翻页时即时展示
-const nextPageCache = ref<SqlResult | null>(null)
-const prefetching = ref(false)
-// 预取时记录的查询快照，SQL/连接/库/行数变化后缓存作废
-let prefetchSnapshot = ''
 let editor: monaco.editor.IStandaloneCodeEditor | null = null
+/** 最近一次实际执行的 SQL（供状态展示等使用） */
+let lastExecutedSql = ''
 
 // 从 store 获取连接列表
 const connections = connectionStore.connections
@@ -94,7 +76,11 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  // 完整释放：editor 实例 + 其持有的 model（不显式 dispose model 会残留在 Monaco 内存中）
+  const model = editor?.getModel()
   editor?.dispose()
+  editor = null
+  if (model) model.dispose()
 })
 
 function initEditor() {
@@ -102,7 +88,7 @@ function initEditor() {
   editor = monaco.editor.create(monacoContainer.value, {
     value: props.initialContent || '-- 输入 SQL 语句\n',
     language: 'sql',
-    theme: 'vs-dark',
+    theme: isDark.value ? 'vs-dark' : 'vs',
     minimap: { enabled: false },
     fontSize: 14,
     lineNumbers: 'on',
@@ -122,6 +108,11 @@ function initEditor() {
     handleSave()
   })
 }
+
+// 暗黑模式切换：Monaco 主题跟随全局单例（setTheme 为全局操作，已创建的实例实时生效）
+watch(isDark, (dark) => {
+  monaco.editor.setTheme(dark ? 'vs-dark' : 'vs')
+})
 
 async function loadDatabases(configId: string) {
   if (!configId) return
@@ -161,106 +152,53 @@ async function handleConnectionChange(configId: string) {
   }
 }
 
-function querySnapshot(): string {
-  return `${selectedConfigId.value}|${selectedDb.value}|${pageSize.value}|${editor?.getValue().trim() || ''}`
-}
-
-function invalidatePageCache() {
-  nextPageCache.value = null
-  prefetching.value = false
-  prefetchSnapshot = ''
-}
-
 async function handleExecute() {
-  currentPage.value = 1
-  await executePage(1)
+  await runSelectedOrAll()
 }
 
-async function executePage(page: number) {
+/** 按 `;` 拆分为多条独立 SQL 语句（简单实现，不处理字符串内的 `;`） */
+function splitSqlStatements(sql: string): string[] {
+  return sql.split(';').map(s => s.trim()).filter(Boolean)
+}
+
+/** 获取当前 Monaco 选区文本；无选区返回空字符串 */
+function getSelectedText(): string {
+  if (!editor) return ''
+  const sel = editor.getSelection()
+  if (!sel || sel.isEmpty()) return ''
+  return editor.getModel()?.getValueInRange(sel) ?? ''
+}
+
+/** 选区优先：选中文本（按 `;` 拆分）→ 否则全文（按 `;` 拆分）→ 逐条串行执行并 emit（每页固定 200） */
+async function runSelectedOrAll() {
   if (!selectedConfigId.value || !editor || executing.value) return
-  const sql = editor.getValue().trim()
-  if (!sql) return
+  const selected = getSelectedText()
+  const text = selected || editor.getValue()
+  const statements = splitSqlStatements(text)
+  if (statements.length === 0) return
 
   executing.value = true
-  invalidatePageCache()
-  const snapshot = querySnapshot()
   try {
-    const db = selectedDb.value || undefined
-    const offset = (page - 1) * pageSize.value
-    console.log('[SqlEditor] SQL :', selectedConfigId.value, sql, db, `页=${page} 行数=${pageSize.value}`)
-    const res = await dbExecuteSql(selectedConfigId.value, sql, db, pageSize.value, offset)
-    if (res.code === 200) {
-      currentPage.value = page
-      lastResult.value = res.data
-      emit('executed', res.data)
-      // 还有下一页：后台预取，保证翻页即时展示
-      if (res.data.is_query && res.data.has_more) {
-        prefetchNext(page + 1, snapshot)
+    for (const stmt of statements) {
+      const db = selectedDb.value || undefined
+      try {
+        const res = await dbExecuteSql(selectedConfigId.value, stmt, db, PAGE_SIZE, 0)
+        if (res.code === 200) {
+          lastResult.value = res.data
+          lastExecutedSql = stmt
+          // 透传执行的 SQL 原文，便于 SqlTab 存为子结果标签/展示
+          emit('executed', { sql: stmt, result: res.data })
+        } else {
+          const errResult = { columns: ['Error'], rows: [[res.msg]], affected_rows: 0, execution_time_ms: 0, is_query: false }
+          emit('executed', { sql: stmt, result: errResult })
+        }
+      } catch (e: any) {
+        const errResult = { columns: ['Error'], rows: [[e.message || String(e)]], affected_rows: 0, execution_time_ms: 0, is_query: false }
+        emit('executed', { sql: stmt, result: errResult })
       }
-    } else {
-      console.error('[SqlEditor] SQL 执行失败:', res.msg)
-      lastResult.value = { columns: [], rows: [], affected_rows: 0, execution_time_ms: 0, is_query: false }
-      emit('executed', { columns: ['Error'], rows: [[res.msg]], affected_rows: 0, execution_time_ms: 0, is_query: false })
     }
-  } catch (e: any) {
-    console.error('[SqlEditor] SQL 执行异常:', e)
-    emit('executed', { columns: ['Error'], rows: [[e.message || String(e)]], affected_rows: 0, execution_time_ms: 0, is_query: false })
   } finally {
     executing.value = false
-  }
-}
-
-/** 后台预取指定页（静默失败，不影响当前页） */
-async function prefetchNext(page: number, snapshot: string) {
-  if (prefetching.value || !selectedConfigId.value || !editor) return
-  prefetching.value = true
-  prefetchSnapshot = snapshot
-  try {
-    const db = selectedDb.value || undefined
-    const offset = (page - 1) * pageSize.value
-    const res = await dbExecuteSql(selectedConfigId.value, editor.getValue().trim(), db, pageSize.value, offset)
-    // 预取期间查询条件未变才保留缓存，否则作废（用户改了 SQL/连接/行数）
-    if (res.code === 200 && prefetchSnapshot === snapshot && querySnapshot() === snapshot) {
-      nextPageCache.value = res.data
-    }
-  } catch (e) {
-    console.warn('[SqlEditor] 预取下一页失败:', e)
-  } finally {
-    prefetching.value = false
-  }
-}
-
-const canGoNext = computed(() => {
-  return !!lastResult.value?.has_more || nextPageCache.value !== null
-})
-
-function goNextPage() {
-  if (nextPageCache.value) {
-    // 命中预取缓存：即时展示，并继续预取下下页
-    currentPage.value += 1
-    lastResult.value = nextPageCache.value
-    nextPageCache.value = null
-    emit('executed', lastResult.value)
-    if (lastResult.value.has_more) {
-      prefetchNext(currentPage.value + 1, querySnapshot())
-    }
-  } else {
-    executePage(currentPage.value + 1)
-  }
-}
-
-function goPrevPage() {
-  if (currentPage.value > 1) {
-    executePage(currentPage.value - 1)
-  }
-}
-
-/** 行数变化后重新查询（以前端设定为准），从第一页开始 */
-function handlePageSizeChange() {
-  invalidatePageCache()
-  if (lastResult.value && lastResult.value.is_query) {
-    currentPage.value = 1
-    executePage(1)
   }
 }
 
@@ -289,23 +227,39 @@ async function handleSave() {
       if (!selected) return
       filePath = selected
     }
-    await writeTextFile(filePath, content)
+    // 走后端 write_script_file（tokio 直接写，无 fs scope 权限限制，本地/外部脚本均可保存）
+    const res = await tauri_request<ResponseData<string>>('write_script_file', {
+      path: filePath,
+      content,
+    })
+    if (res?.code !== 200) {
+      console.error('[SqlEditor] 保存失败:', res?.msg)
+      ElMessage.error('保存失败: ' + (res?.msg || '未知错误'))
+      return
+    }
     console.log('[SqlEditor] SQL 已保存至:', filePath)
+    ElMessage.success('保存成功')
     emit('saved', filePath, selectedConfigId.value, selectedDb.value)
   } catch (e: any) {
     console.error('[SqlEditor] 保存失败:', e)
+    ElMessage.error('保存失败: ' + (e.message || e))
   }
 }
 
 defineExpose({ getContent, setContent })
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '@/styles/theme.scss' as theme;
+
 .sql-editor {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1e1e1e;
+  // 编辑器面背景跟随主面板（appMainBgColor），保持与下方内容区连体
+  @include theme.useTheme {
+    background: theme.getVar('appMainBgColor');
+  }
 }
 .editor-toolbar {
   display: flex;
@@ -313,16 +267,11 @@ defineExpose({ getContent, setContent })
   flex-wrap: wrap;
   row-gap: 4px;
   padding: 6px 8px;
-  background: #252526;
-  border-bottom: 1px solid #3c3c3c;
-}
-.execution-info {
-  margin-left: auto;
-  font-size: var(--font-size-base);
-  color: #888;
-}
-.pager {
-  margin-left: 8px;
+
+  @include theme.useTheme {
+    background: theme.getVar('sidebarBg');
+    border-bottom: 1px solid theme.getVar('borderColor');
+  }
 }
 .editor-wrapper {
   flex: 1;

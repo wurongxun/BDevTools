@@ -34,12 +34,6 @@ pub fn get_all_windows() -> Vec<WindowMeta> {
     registry.values().cloned().collect()
 }
 
-/// 获取指定窗口的元数据
-pub fn get_window(label: &str) -> Option<WindowMeta> {
-    let registry = WINDOW_REGISTRY.lock();
-    registry.get(label).cloned()
-}
-
 /// 获取窗口数量（可排除主窗口）
 pub fn get_window_count(exclude_main: bool) -> usize {
     let registry = WINDOW_REGISTRY.lock();

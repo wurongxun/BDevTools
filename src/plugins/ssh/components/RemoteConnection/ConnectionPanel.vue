@@ -60,10 +60,9 @@ function getConnection(connectionId: number): RemoteConnection | null {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background-color: #1e1e1e;
 
   @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
+    background-color: theme.getVar('appMainBgColor');
   }
 }
 
@@ -79,7 +78,10 @@ function getConnection(connectionId: number): RemoteConnection | null {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #666;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 
   .empty-content {
     text-align: center;
@@ -96,7 +98,10 @@ function getConnection(connectionId: number): RemoteConnection | null {
 
     .sub-text {
       font-size: theme.getVar('fontSizeSmall');
-      color: #555;
+
+      @include theme.useTheme {
+        color: theme.getVar('textDisabled');
+      }
     }
   }
 }

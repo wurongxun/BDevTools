@@ -4,7 +4,7 @@ import { Notebook } from '@element-plus/icons-vue'
 import { labelInner } from 'echarts/types/src/label/labelStyle.js'
 
 export default {
-  appName: 'BackendDevelopmentTools',
+  appName: 'BackendDevTools',
   settings: {
     name: '设置',
     projectSetting: '项目配置',

@@ -4,3 +4,4 @@
 export { useConnectionStore } from './connection'
 export { useEditorStore } from './editor'
 export { useScriptsStore } from './scripts'
+export { useDbSidebarStore } from './sidebar'

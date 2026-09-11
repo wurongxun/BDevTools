@@ -437,49 +437,4 @@ onUnmounted(() => {
   }
 }
 
-@media (max-width: 768px) {
-  .splash-container {
-    .splash-content {
-      padding: 30px 20px;
-
-      .logo-section {
-        margin-bottom: 40px;
-
-        .logo-wrapper {
-          width: 100px;
-          height: 100px;
-
-          .logo-icon {
-            font-size: var(--font-size-7xl) !important;
-          }
-        }
-
-        .app-title {
-          font-size: var(--font-size-5xl);
-        }
-
-        .app-subtitle {
-          font-size: var(--font-size-lg);
-        }
-      }
-
-      .loading-section {
-        .loading-spinner {
-          width: 60px;
-          height: 60px;
-
-          .spinner-ring:nth-child(2) {
-            width: 45px;
-            height: 45px;
-          }
-
-          .spinner-ring:nth-child(3) {
-            width: 30px;
-            height: 30px;
-          }
-        }
-      }
-    }
-  }
-}
 </style>

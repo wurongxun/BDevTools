@@ -17,14 +17,15 @@
         class="prompt-input"
         :class="{ 'is-error': !!error }"
         :placeholder="placeholder"
+        aria-describedby="prompt-error"
         @keyup.enter="handleConfirm"
         @input="error = ''"
       />
-      <div v-if="error" class="prompt-error">{{ error }}</div>
+      <div v-if="error" id="prompt-error" class="prompt-error" role="alert">{{ error }}</div>
     </div>
     <template #footer>
-      <el-button size="small" @click="visible = false">{{ cancelButtonText }}</el-button>
-      <el-button size="small" type="primary" @click="handleConfirm">{{ confirmButtonText }}</el-button>
+      <app-button size="small" @click="visible = false">{{ cancelButtonText }}</app-button>
+      <app-button size="small" type="primary" @click="handleConfirm">{{ confirmButtonText }}</app-button>
     </template>
   </GlobalDialog>
 </template>

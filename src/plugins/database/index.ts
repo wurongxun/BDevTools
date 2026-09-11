@@ -11,5 +11,8 @@ export default {
   sidebarPanel: markRaw(SidebarPanel),
   mainPanel: markRaw(MainPanel),
   workspaceDirs: ['scripts', 'exports'],
-  order: 3
+  order: 4,
+  // 数据库侧边栏内容多（连接树 + 脚本树 + 插件设置），声明更宽的默认/最小宽度
+  sidebarDefaultWidth: 260,
+  sidebarMinWidth: 180
 } satisfies ToolPlugin

@@ -30,7 +30,7 @@
       </div>
     </div>
     <template #footer>
-      <el-button size="small" type="primary" @click="handleCreateTemp">+ 新建工作区（临时）</el-button>
+      <app-button size="small" type="primary" @click="handleCreateTemp">+ 新建工作区（临时）</app-button>
     </template>
   </GlobalDialog>
 </template>

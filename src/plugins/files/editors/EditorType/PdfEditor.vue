@@ -6,7 +6,6 @@ import {
   nextTick,
   watch,
   computed,
-  ComputedRef,
   onActivated,
   onDeactivated
 } from 'vue'
@@ -14,6 +13,7 @@ import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
 import { ElMessage } from 'element-plus'
 import { convertFileSrc } from '@/core/runtime'
+import { isDark } from '@/composables/useDark'
 import useStore from '@/store'
 import BookmarkTree from './Pdf/BookmarkTree.vue'
 import { DocumentState } from '../../store/documents'
@@ -73,12 +73,15 @@ const savedState = new Map<
 >()
 
 // 主题切换功能 - 提前定义
+// 用组件自身的 canvasRef 而非 document.getElementById('the-canvas')：
+// 多 PDF 文档同时打开时模板存在重复 id，getElementById 只会命中第一个实例
 const toggleDarkMode = (isDarkMode: boolean) => {
-  const canvas = document.getElementById('the-canvas')
+  const canvas = canvasRef.value
+  if (!canvas) return
   if (isDarkMode) {
-    canvas?.classList.add('dark-mode')
+    canvas.classList.add('dark-mode')
   } else {
-    canvas?.classList.remove('dark-mode')
+    canvas.classList.remove('dark-mode')
   }
 }
 
@@ -387,10 +390,10 @@ watch(
 )
 
 
-// 监听暗黑模式变化
-let isDark: ComputedRef<boolean> = computed(() => system.isDark)
+// 监听暗黑模式变化：跟随全局主题单例（此前依赖 system store 的 isDark，
+// 其初始值仅读 localStorage 旧键且只在切换时被同步——「启动即暗色」场景下 PDF 会一直保持亮色）
 watch(
-  () => system.isDark,
+  isDark,
   (newValue, oldValue) => {
     console.log('Dark mode changed:', newValue, oldValue)
     toggleDarkMode(newValue)
@@ -531,6 +534,8 @@ onMounted(() => {
   onUnmounted(() => {
     console.log('[PdfPreview] Unmounting, cleaning up...')
     window.removeEventListener('keydown', handleKeydown)
+    // 移除捕获级 scroll 监听（组件卸载后不清理会持续持有组件闭包，导致内存无法回收）
+    window.removeEventListener('scroll', updateControlsPosition, true)
 
     if (resizeObserver) {
       resizeObserver.disconnect()
@@ -583,19 +588,19 @@ onMounted(() => {
           书签
         </span>
         <div class="bookmark-actions">
-          <el-button-group size="small">
+          <div class="el-button-group">
             <el-tooltip content="全部展开" placement="top">
-              <el-button @click="expandAllBookmarks">
+              <app-button size="small" @click="expandAllBookmarks">
                 <el-icon><ArrowDown /></el-icon>
-              </el-button>
+              </app-button>
             </el-tooltip>
             <el-tooltip content="全部折叠" placement="top">
-              <el-button @click="collapseAllBookmarks">
+              <app-button size="small" @click="collapseAllBookmarks">
                 <el-icon><ArrowRight /></el-icon>
-              </el-button>
+              </app-button>
             </el-tooltip>
-          </el-button-group>
-          <el-button size="small" @click="toggleBookmarkPanel" :icon="'Close'" />
+          </div>
+          <app-button size="small" @click="toggleBookmarkPanel" :icon="'Close'" />
         </div>
       </div>
 
@@ -637,14 +642,14 @@ onMounted(() => {
         }"
       >
         <!-- 书签按钮 -->
-        <el-button
+        <app-button
           @click="toggleBookmarkPanel"
           :type="showBookmarkPanel ? 'primary' : 'default'"
           size="small"
           title="书签"
         >
           <el-icon><FolderOpened /></el-icon>
-        </el-button>
+        </app-button>
 
         <button @click="onReduce" :disabled="scale <= 0.2 || loading" title="缩小 (Ctrl+-)">
           -
@@ -897,34 +902,6 @@ onMounted(() => {
   text-align: center;
 }
 
-@media (max-width: 768px) {
-  .pdf-wrapper.with-bookmark {
-    padding-left: 0;
-  }
-
-  .bookmark-panel {
-    width: 250px;
-  }
-
-  .pdf-controls {
-    flex-wrap: wrap;
-    width: 90%;
-    justify-content: center;
-    gap: 8px;
-    padding: 8px 16px;
-  }
-
-  .pdf-controls button {
-    padding: 6px 12px;
-    min-width: 50px;
-    font-size: theme.getVar('fontSize');
-  }
-
-  .pdf-controls span {
-    font-size: theme.getVar('fontSizeSmall');
-    min-width: 60px;
-  }
-}
 
 /* 给PDF渲染容器添加CSS滤镜来实现暗黑效果： */
 .pdf-container.dark-mode .pdf-canvas {

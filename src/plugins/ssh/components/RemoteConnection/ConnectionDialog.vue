@@ -18,9 +18,9 @@
 
       <el-form-item label="协议类型" prop="agreement">
         <el-radio-group v-model="form.agreement">
-          <el-radio-button value="ssh">SSH</el-radio-button>
-          <el-radio-button value="sftp">SFTP</el-radio-button>
-          <el-radio-button value="ftp">FTP</el-radio-button>
+          <el-radio-button size="small" value="ssh">SSH</el-radio-button>
+          <el-radio-button size="small" value="sftp">SFTP</el-radio-button>
+          <el-radio-button size="small" value="ftp">FTP</el-radio-button>
         </el-radio-group>
       </el-form-item>
 
@@ -44,8 +44,8 @@
 
       <el-form-item label="认证方式" prop="auth_type">
         <el-radio-group v-model="form.auth_type">
-          <el-radio-button value="password">密码</el-radio-button>
-          <el-radio-button value="pubkey">私钥</el-radio-button>
+          <el-radio-button size="small" value="password">密码</el-radio-button>
+          <el-radio-button size="small" value="pubkey">私钥</el-radio-button>
         </el-radio-group>
       </el-form-item>
 
@@ -57,7 +57,7 @@
             readonly
             style="flex: 1"
           />
-          <el-button size="default" @click="handleSelectKeyFile">浏览</el-button>
+          <app-button size="default" @click="handleSelectKeyFile">浏览</app-button>
         </div>
       </el-form-item>
 
@@ -94,10 +94,10 @@
     </el-form>
 
     <template #footer>
-      <el-button size="small" @click="handleClose">取消</el-button>
-      <el-button size="small" type="primary" @click="handleSubmit" :loading="submitting">
+      <app-button size="small" @click="handleClose">取消</app-button>
+      <app-button size="small" type="primary" @click="handleSubmit" :loading="submitting">
         {{ isEdit ? '保存' : '创建' }}
-      </el-button>
+      </app-button>
     </template>
   </GlobalDialog>
 </template>

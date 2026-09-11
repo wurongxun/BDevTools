@@ -18,8 +18,8 @@
         <el-input v-model.number="userInfoForm.email" type="text" :placeholder="userInfo.email" autocomplete="off" />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" @click="submitForm(formRef)">提 交</el-button>
-        <el-button @click="resetForm(formRef)">重 置</el-button>
+        <app-button type="primary" @click="submitForm(formRef)">提 交</app-button>
+        <app-button @click="resetForm(formRef)">重 置</app-button>
       </el-form-item>
     </el-form>
   </div>

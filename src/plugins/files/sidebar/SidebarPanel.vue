@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import FileInfoTree from './FileInfoTree.vue'
 import useStore from '@/store'
 import { tauri_request } from '@/utils/tauri_request'
@@ -57,10 +57,18 @@ onMounted(async () => {
         })
     }
     // 加载收藏和最近打开（由 FileInfoTree 内部处理显示）
-    docStore.loadFavorites()
-    docStore.loadRecentFiles()
-    // 确保文件树数据已加载
-    if (fileTreeStore.tree_node.length === 0) {
+    await docStore.loadFavorites()
+    await docStore.loadRecentFiles()
+    // 确保文件树数据已加载（工作目录就绪后才请求；未就绪时由 onActivated/工作区加载流程补上）
+    if (fileTreeStore.tree_node.length === 0 && fileTreeStore.workingDirectory) {
+        fileTreeStore.setFileTree()
+    }
+})
+
+// KeepAlive 缓存恢复（应用启动首挂载后，点击插件图标切换回来只触发 activated 而非 mounted）：
+// 若首挂载时工作区尚未就绪导致树未加载，这里在工作目录就绪后补加载
+onActivated(() => {
+    if (fileTreeStore.tree_node.length === 0 && fileTreeStore.workingDirectory) {
         fileTreeStore.setFileTree()
     }
 })
@@ -283,16 +291,16 @@ function handleHeaderCommand(cmd: string) {
 <template>
     <div class="explorer-sidebar">
         <!-- 头部 -->
-        <div class="explorer-header">
-            <span class="explorer-title">资源管理器</span>
+        <div class="panel-header">
+            <span class="panel-title">资源管理器</span>
             <el-dropdown trigger="click" @command="handleHeaderCommand">
-                <el-button size="small" link class="header-more-btn" title="更多操作">
+                <app-button size="small" link class="header-more-btn" title="更多操作">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                         <circle cx="4" cy="8" r="1.2" />
                         <circle cx="8" cy="8" r="1.2" />
                         <circle cx="12" cy="8" r="1.2" />
                     </svg>
-                </el-button>
+                </app-button>
                 <template #dropdown>
                     <el-dropdown-menu>
                         <el-dropdown-item command="closeAll">关闭所有编辑器</el-dropdown-item>
@@ -322,8 +330,8 @@ function handleHeaderCommand(cmd: string) {
         <GlobalDialog v-model="showDeleteConfirm" :title="'确认删除'" width="400px">
             <div class="delete-confirm-message">{{ deleteConfirmMessage }}</div>
             <template #footer>
-                <el-button size="small" @click="showDeleteConfirm = false">取消</el-button>
-                <el-button size="small" type="danger" plain @click="confirmDelete">删除</el-button>
+                <app-button size="small" @click="showDeleteConfirm = false">取消</app-button>
+                <app-button size="small" type="danger" plain @click="confirmDelete">删除</app-button>
             </template>
         </GlobalDialog>
     </div>
@@ -340,29 +348,28 @@ function handleHeaderCommand(cmd: string) {
     font-family: var(--font-family-base);
 
     @include theme.useTheme {
-        background-color: theme.getVar('bgColor');
+        background-color: theme.getVar('sidebarBg');
     }
 }
 
 // ===== 头部 =====
-.explorer-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 12px;
-    height: 35px;
-    flex-shrink: 0;
+// ===== 头部 =====
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  height: 35px;
+  flex-shrink: 0;
 }
-
-.explorer-title {
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-
-    @include theme.useTheme {
-        color: theme.getVar('textColor');
-        font-size: theme.getVar('fontSizeSmall');
-    }
+.panel-title {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+    font-size: theme.getVar('fontSizeSmall');
+  }
 }
 
 .header-more-btn {

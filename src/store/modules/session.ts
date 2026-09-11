@@ -29,6 +29,8 @@ export const useSessionStore = defineStore('session', () => {
   let autoSaveTimer: ReturnType<typeof setInterval> | null = null
   /** 本窗口已尝试恢复的工作区（幂等保护，避免重复恢复） */
   const restoredWorkspaces = new Set<string>()
+  /** 关闭文档后同步快照的串行队列：连续关闭多个 tab 时避免并发读写互相覆盖 */
+  let snapshotSyncQueue: Promise<unknown> = Promise.resolve()
 
   /**
    * 采集当前窗口状态生成快照
@@ -149,7 +151,8 @@ export const useSessionStore = defineStore('session', () => {
     for (const fileInfo of snapshot.open_files) {
       if (fileInfo.is_dirty) continue
       try {
-        await docStore.openDocument(fileInfo.path)
+        // 会话恢复不是用户主动打开：不记入「最近打开」
+        await docStore.openDocument(fileInfo.path, undefined, { recordRecent: false })
         // 恢复视图状态
         docStore.updateViewState(fileInfo.path, {
           cursor: { line: fileInfo.cursor_line, column: fileInfo.cursor_col },
@@ -208,7 +211,8 @@ export const useSessionStore = defineStore('session', () => {
           continue
         }
 
-        await docStore.openDocument(fileInfo.path)
+        // 会话恢复不是用户主动打开：不记入「最近打开」
+        await docStore.openDocument(fileInfo.path, undefined, { recordRecent: false })
         docStore.updateViewState(fileInfo.path, {
           cursor: { line: fileInfo.cursor_line, column: fileInfo.cursor_col },
           scrollTop: fileInfo.scroll_top
@@ -253,6 +257,56 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   /**
+   * 用户主动关闭文档后，从持久化会话快照中定向剔除对应路径。
+   *
+   * 背景：关闭 tab 时只删 openfile.json 记录，{workspace}.session.json 快照要到下次
+   * 窗口关闭/工作区切换/脏文档自动保存才会整体重写。若进程异常退出（崩溃/强杀/开发重启），
+   * 旧快照仍列出已关闭文件 → 下次启动 tryRestoreSession 又把它恢复出来，表现为「关闭无效」。
+   *
+   * 本方法在用户关闭动作发生时立刻把路径从快照中剔除，只做定向删除、不动其他字段
+   * （剩余文件的滚动位置/脏标记/草稿指纹保持原样），并串行排队防并发读写互相覆盖。
+   */
+  async function syncSnapshotAfterClosed(closedPaths: string[]) {
+    const valid = closedPaths.filter(Boolean)
+    if (valid.length === 0) return
+    const { useWorkspaceStore } = await import('./workspace')
+    const workspaceId = useWorkspaceStore().currentWorkspace?.id ?? null
+    if (!workspaceId) return
+
+    const task = snapshotSyncQueue.then(async () => {
+      try {
+        const snapshot = await sessionService.loadByWorkspace(workspaceId).catch(() => null)
+        if (!snapshot || !snapshot.open_files?.length) return
+        const closed = new Set(valid)
+        const kept = snapshot.open_files.filter((f) => !closed.has(f.path))
+        if (kept.length === snapshot.open_files.length) return
+        snapshot.open_files = kept
+        // 关闭的恰是活跃文件：活跃文件指向剩余第一个（保持与 closeDocument 的激活切换一致）
+        if (snapshot.active_file && closed.has(snapshot.active_file)) {
+          snapshot.active_file = kept[0]?.path ?? null
+        }
+        await sessionService.save(snapshot)
+      } catch (e) {
+        console.warn('同步会话快照（剔除已关闭文件）失败:', e)
+      }
+    })
+    snapshotSyncQueue = task.catch(() => {})
+    await task
+  }
+
+  /**
+   * 清除指定工作区（或全部）的恢复幂等标记
+   * 切换工作区场景：同一窗口内切回曾恢复过的工作区时，需要允许再次恢复其上次打开的文件
+   */
+  function resetRestored(workspaceId?: string) {
+    if (workspaceId) {
+      restoredWorkspaces.delete(workspaceId)
+    } else {
+      restoredWorkspaces.clear()
+    }
+  }
+
+  /**
    * 处理草稿冲突（用户在弹窗中选择后调用）
    * - restore：草稿覆盖到缓冲区并标脏（写盘仍需显式保存）
    * - saveAs：草稿另存为原文件旁的 .draft-时间戳.bak，缓冲区用磁盘版（最稳妥，两不丢）
@@ -268,7 +322,7 @@ export const useSessionStore = defineStore('session', () => {
       if (action === 'restore') {
         const content = await sessionService.draftLoad(workspaceId, conflict.path)
         if (content !== null) {
-          await docStore.openDocument(conflict.path)
+          await docStore.openDocument(conflict.path, undefined, { recordRecent: false })
           docStore.updateDocumentContent(conflict.path, content)
         }
         // 保留草稿：缓冲区仍为脏，若再次崩溃由下次快照/自动保存接续保护
@@ -290,7 +344,7 @@ export const useSessionStore = defineStore('session', () => {
       }
 
       // discard / saveAs 后清理草稿，缓冲区保留磁盘内容（若未打开则打开磁盘版）
-      await docStore.openDocument(conflict.path)
+      await docStore.openDocument(conflict.path, undefined, { recordRecent: false })
       await sessionService.draftDelete(workspaceId, conflict.path)
     } catch (e) {
       console.warn('处理草稿冲突失败:', e)
@@ -374,6 +428,8 @@ export const useSessionStore = defineStore('session', () => {
     saveSnapshot,
     restoreFromSnapshot,
     tryRestoreSession,
+    resetRestored,
+    syncSnapshotAfterClosed,
     resolveDraftConflict,
     cleanupSavedDrafts,
     loadCurrentWindowSnapshot,

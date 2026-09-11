@@ -2,7 +2,7 @@
   <GlobalDialog
     v-model="visible"
     :title="isEdit ? '编辑连接' : '新建连接'"
-    width="560px"
+    width="520px"
     @close="handleClose"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
@@ -13,6 +13,8 @@
         <el-select v-model="form.db_type" @change="onDbTypeChange">
           <el-option label="MySQL" value="mysql" />
           <el-option label="PostgreSQL" value="postgresql" />
+          <el-option label="SQL Server" value="sqlserver" />
+          <el-option label="Oracle" value="oracle" />
         </el-select>
       </el-form-item>
       <el-form-item label="主机地址" prop="host">
@@ -28,7 +30,10 @@
         <el-input v-model="form.password" type="password" show-password placeholder="数据库密码" />
       </el-form-item>
       <el-form-item label="默认数据库">
-        <el-input v-model="form.database_name" placeholder="可选，连接后选择的默认数据库" />
+        <el-input
+          v-model="form.database_name"
+          :placeholder="form.db_type === 'oracle' ? 'Oracle 服务名（SID/Service Name）或完整 ODBC 连接串' : '可选，连接后选择的默认数据库'"
+        />
       </el-form-item>
 
       <el-divider>SSH 隧道（可选）</el-divider>
@@ -54,9 +59,9 @@
       </template>
     </el-form>
     <template #footer>
-      <el-button size="small" sm @click="handleTest" :loading="testing">测试连接</el-button>
-      <el-button size="small" @click="handleClose">取消</el-button>
-      <el-button size="small" type="primary" @click="handleSubmit" :loading="submitting">确定</el-button>
+      <app-button size="small" @click="handleTest" :loading="testing">测试连接</app-button>
+      <app-button size="small" @click="handleClose">取消</app-button>
+      <app-button size="small" type="primary" @click="handleSubmit" :loading="submitting">确定</app-button>
     </template>
   </GlobalDialog>
 </template>
@@ -126,7 +131,20 @@ watch(() => props.modelValue, (val) => {
 })
 
 function onDbTypeChange(type: string) {
-  form.port = type === 'mysql' ? 3306 : 5432
+  const ports: Record<string, number> = {
+    mysql: 3306,
+    postgresql: 5432,
+    sqlserver: 1433,
+    oracle: 1521,
+  }
+  form.port = ports[type] ?? 3306
+  // SQL Server 默认库 master；Oracle 默认服务名留空（需用户填写服务名或完整连接串）
+  if (type === 'sqlserver' && !form.database_name) {
+    form.database_name = 'master'
+  }
+  if (type === 'oracle') {
+    form.database_name = ''
+  }
 }
 
 async function handleTest() {

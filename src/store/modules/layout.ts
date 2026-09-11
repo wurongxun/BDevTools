@@ -12,6 +12,8 @@ const useLayoutStore = defineStore('layout', {
     enabledPlugins: [] as string[],
     /** 专注模式：隐藏侧边栏 */
     focusMode: false,
+    /** 插件面板收起：仅隐藏 sidebarPanel（panel-area），保留活动栏图标列 */
+    sidebarPanelCollapsed: false,
     /** 关联的窗口预设 ID（可选） */
     presetId: ''
   }),
@@ -25,10 +27,21 @@ const useLayoutStore = defineStore('layout', {
       }
     },
 
+    /** 切换插件面板显隐 */
+    toggleSidebarPanel() {
+      this.sidebarPanelCollapsed = !this.sidebarPanelCollapsed
+    },
+
+    /** 设置插件面板显隐 */
+    setSidebarPanelCollapsed(collapsed: boolean) {
+      this.sidebarPanelCollapsed = collapsed
+    },
+
     /** 重置为默认布局（显示所有插件，非专注模式） */
     resetLayout() {
       this.enabledPlugins = []
       this.focusMode = false
+      this.sidebarPanelCollapsed = false
       this.presetId = ''
     }
   },

@@ -1,7 +1,8 @@
 <template>
   <div class="file-editor-container">
-    <!-- 有激活文档时显示编辑器 -->
-    <KeepAlive v-if="activeDocument">
+    <!-- 有激活文档时显示编辑器：KeepAlive 缓存切换过的文档实例（max 限制缓存数，超出淘汰最久未访问，
+         避免大量文档来回切换后编辑器实例无上限常驻导致内存膨胀） -->
+    <KeepAlive v-if="activeDocument" :max="8">
       <component
         :is="currentEditorComponent"
         :key="activeKey"
@@ -50,8 +51,11 @@ const currentEditorComponent = computed(() => {
     case 'markdown': return MdEditor
     case 'pdf': return PdfEditor
     case 'image': return ImageEditor
-    case 'code': return TextView
-    case 'text': return TextView
+    case 'code':
+    case 'text':
+      // 大文件分诊：content 为 string（≤1MB 已整读 / 新建 / 远程已下载）→ monaco 代码编辑器；
+      // content 为 null（>1MB，openDocument 未整读）→ TextView 只读分块查看（虚拟滚动，避免卡顿）
+      return typeof doc.content === 'string' ? CodeEditor : TextView
     default: return CodeEditor
   }
 })
@@ -81,7 +85,8 @@ function handleStateUpdate(state: any) {
   justify-content: center;
 
   @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
+    // 主区占位跟随主面板 appMainBgColor（与 Layout/.app-main 同源）
+    background-color: theme.getVar('appMainBgColor');
   }
 }
 

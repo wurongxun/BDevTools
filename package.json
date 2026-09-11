@@ -1,6 +1,6 @@
 {
-  "name": "backend-development-tools",
-  "version": "1.3.0",
+  "name": "backend_dev_tools",
+  "version": "1.4.0",
   "private": true,
   "scripts": {
     "dev": "vite",

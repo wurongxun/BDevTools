@@ -1,2 +1,2 @@
-pub mod fileUtil;
-pub mod regexUtil;
+pub mod file_util;
+pub mod regex_util;

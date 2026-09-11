@@ -8,6 +8,9 @@
 //! 命令名即暴露给前端的 invoke 名称，改名需同步前端。
 
 use std::collections::HashMap;
+use std::path::Path;
+
+use serde::Serialize;
 
 use tauri::Emitter;
 use tauri::Manager;
@@ -20,6 +23,16 @@ use crate::command::app_window;
 use crate::command::file_association;
 use crate::command::file_command::{self, ScriptFileEntry};
 use crate::command::file_utils;
+use crate::command::log_index::{
+    self, LogExportResult, LogIndexMeta, LogQueryResult,
+};
+use crate::command::log_stream;
+use crate::command::mat_hprof::{self, MatHeaderInfo, MatHistogramResult};
+use crate::command::mat_leak::{self, MatLeakSuspectsResult};
+use crate::command::mat_cfg::{self, MatLimitInfo};
+use crate::command::mat_refs::{
+    self, RefBuildInfo, RefInstances, RefObjectDetail, RefSearchResult,
+};
 use crate::command::remote_conn::{self, RemoteFileItem};
 use crate::command::search_log_parallel::{
     self, FileLinesResult, LogMatch, LogSearchResult, PageResult, SearchIndex, TextPreviewBlock,
@@ -28,9 +41,9 @@ use crate::database::connection::DbConnectionConfig;
 use crate::database::import_export::{ExportResult, ImportResult};
 use crate::database::metadata::{DatabaseInfo, IndexInfo, TableInfo};
 use crate::database::operations::{ColumnInfo, SqlResult, TableDataResult};
-use crate::entity::window::{
-    SessionSnapshot, SessionSummary, WindowMeta, WorkspaceConfig, WorkspaceSummary,
-};
+use crate::entity::session::{SessionSnapshot, SessionSummary};
+use crate::entity::window::WindowMeta;
+use crate::entity::workspace::{WorkspaceConfig, WorkspaceSummary};
 use crate::response::resp_data::ResData;
 use crate::response::response::Response;
 use crate::session::draft::{DraftCheckResult, DraftMeta};
@@ -124,6 +137,12 @@ pub async fn get_note_list(path: String) -> Result<ResData<Vec<String>>, String>
 #[tauri::command]
 pub async fn read_note_file(path: String) -> Result<ResData<String>, String> {
     file_command::read_note_file(path).await
+}
+
+/// 获取文件大小（字节），供大文件分诊
+#[tauri::command]
+pub async fn get_file_size(path: String) -> Result<ResData<u64>, String> {
+    file_command::get_file_size(path).await
 }
 
 /// 创建本地文件夹
@@ -314,6 +333,175 @@ pub async fn count_file_lines(file_path: String) -> Result<ResData<u64>, String>
     search_log_parallel::count_file_lines(file_path).await
 }
 
+// ==================== 日志工作台：服务端索引与筛选（logs 插件） ====================
+
+/// 建立日志索引（级别计数 / 时间范围 / 时间桶）
+#[tauri::command]
+pub async fn logs_index_build(
+    file_path: String,
+    encoding: Option<String>,
+) -> Result<ResData<LogIndexMeta>, String> {
+    log_index::log_index_build(file_path, encoding).await
+}
+
+/// 按级别与时间范围筛选，返回命中行的连续段
+#[tauri::command]
+pub async fn logs_index_query(
+    file_path: String,
+    encoding: Option<String>,
+    levels: Option<Vec<String>>,
+    ts_from: Option<i64>,
+    ts_to: Option<i64>,
+    invert: Option<bool>,
+    merge_gap: Option<u64>,
+    max_segments: Option<u64>,
+) -> Result<ResData<LogQueryResult>, String> {
+    log_index::log_index_query(
+        file_path,
+        encoding,
+        levels,
+        ts_from,
+        ts_to,
+        invert,
+        merge_gap,
+        max_segments,
+    )
+    .await
+}
+
+/// 按筛选条件流式导出日志到目标文件
+#[tauri::command]
+pub async fn logs_index_export(
+    file_path: String,
+    encoding: Option<String>,
+    dest_path: String,
+    levels: Option<Vec<String>>,
+    ts_from: Option<i64>,
+    ts_to: Option<i64>,
+    invert: Option<bool>,
+    with_line_number: Option<bool>,
+    with_bom: Option<bool>,
+) -> Result<ResData<LogExportResult>, String> {
+    log_index::log_index_export(
+        file_path,
+        encoding,
+        dest_path,
+        levels,
+        ts_from,
+        ts_to,
+        invert,
+        with_line_number,
+        with_bom,
+    )
+    .await
+}
+
+/// 释放指定文件的索引缓存
+#[tauri::command]
+pub async fn logs_index_drop(file_path: String) -> Result<ResData<bool>, String> {
+    log_index::log_index_drop(file_path).await
+}
+
+// ==================== Java 堆转储分析（mat 插件） ====================
+
+/// 读取堆转储文件头：格式识别（HPROF / PHD / 未知）+ 元信息
+#[tauri::command]
+pub async fn mat_hprof_header(path: String) -> Result<ResData<MatHeaderInfo>, String> {
+    let p = path.clone();
+    tokio::task::spawn_blocking(move || mat_hprof::mat_hprof_header(&p))
+        .await
+        .map_err(|e| format!("解析线程异常: {e}"))?
+}
+
+/// 生成按类聚合的浅堆直方图（Shallow Heap）
+#[tauri::command]
+pub async fn mat_hprof_histogram(
+    path: String,
+    limit: Option<usize>,
+) -> Result<ResData<MatHistogramResult>, String> {
+    let p = path.clone();
+    tokio::task::spawn_blocking(move || mat_hprof::mat_hprof_histogram(&p, limit))
+        .await
+        .map_err(|e| format!("解析线程异常: {e}"))?
+}
+
+/// 分析预算 / 规模上限明细（前端「分析预算」设置弹窗，不依赖任何 dump）
+#[tauri::command]
+pub async fn mat_analysis_limits() -> Result<ResData<MatLimitInfo>, String> {
+    tokio::task::spawn_blocking(mat_cfg::mat_analysis_limits)
+        .await
+        .map_err(|e| format!("解析线程异常: {e}"))?
+}
+
+/// Leak Suspects：支配树 + Retained Heap 的泄漏嫌疑分析（对象多时耗时数十秒级）
+#[tauri::command]
+pub async fn mat_leak_suspects(path: String) -> Result<ResData<MatLeakSuspectsResult>, String> {
+    let p = path.clone();
+    tokio::task::spawn_blocking(move || mat_leak::mat_leak_suspects(&p))
+        .await
+        .map_err(|e| format!("解析线程异常: {e}"))?
+}
+
+/// 引用追踪：构建（或复用）对象图会话，返回图规模与可达性汇总
+#[tauri::command]
+pub async fn mat_refs_build(path: String) -> Result<ResData<RefBuildInfo>, String> {
+    let p = path.clone();
+    tokio::task::spawn_blocking(move || mat_refs::mat_refs_build(&p))
+        .await
+        .map_err(|e| format!("解析线程异常: {e}"))?
+}
+
+/// 引用追踪：释放某 dump 的会话缓存（关闭 dump 时调用）
+#[tauri::command]
+pub async fn mat_refs_release(path: String) -> Result<ResData<bool>, String> {
+    let p = path.clone();
+    tokio::task::spawn_blocking(move || mat_refs::mat_refs_release(&p))
+        .await
+        .map_err(|e| format!("解析线程异常: {e}"))?
+}
+
+/// 引用追踪：类名搜索（大小写不敏感子串，按浅堆合计降序）
+#[tauri::command]
+pub async fn mat_refs_search_classes(
+    path: String,
+    query: String,
+    limit: Option<usize>,
+) -> Result<ResData<RefSearchResult>, String> {
+    let (p, q) = (path.clone(), query.clone());
+    tokio::task::spawn_blocking(move || {
+        mat_refs::mat_refs_search_classes(&p, &q, limit.unwrap_or(40))
+    })
+    .await
+    .map_err(|e| format!("解析线程异常: {e}"))?
+}
+
+/// 引用追踪：取某类实例样本（按浅堆降序 Top N）
+#[tauri::command]
+pub async fn mat_refs_instances(
+    path: String,
+    class_name: String,
+    limit: Option<usize>,
+) -> Result<ResData<RefInstances>, String> {
+    let (p, c) = (path.clone(), class_name.clone());
+    tokio::task::spawn_blocking(move || {
+        mat_refs::mat_refs_instances(&p, &c, limit.unwrap_or(300))
+    })
+    .await
+    .map_err(|e| format!("解析线程异常: {e}"))?
+}
+
+/// 引用追踪：单个对象详情（outgoing / incoming / Path to GC Roots）
+#[tauri::command]
+pub async fn mat_refs_inspect(
+    path: String,
+    obj_id: String,
+) -> Result<ResData<RefObjectDetail>, String> {
+    let (p, o) = (path.clone(), obj_id.clone());
+    tokio::task::spawn_blocking(move || mat_refs::mat_refs_inspect(&p, &o))
+        .await
+        .map_err(|e| format!("解析线程异常: {e}"))?
+}
+
 // ==================== 文件关联（Windows） ====================
 
 /// 注册文件关联
@@ -439,6 +627,84 @@ pub async fn sftp_download(
     task_id: String,
 ) -> Response<bool> {
     remote_conn::sftp_download(ctx_from_app(&app_handle), session_id, remote_path, local_path, task_id).await
+}
+
+/// 远程日志拉取结果
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogsPullRemoteResp {
+    pub local_path: String,
+    pub size: u64,
+}
+
+/// 从远程服务器拉取日志文件到本地缓存，并返回本地路径
+///
+/// 复用现有 SFTP 能力：建立 SFTP 会话 → 下载到 config_dir/plugin_data/logs_remote → 断开。
+/// 前端拿到本地缓存路径后，像打开本地文件一样走既有分块加载 / 索引 / 筛选 / 时间轴链路。
+#[tauri::command]
+pub async fn logs_pull_remote(
+    app_handle: tauri::AppHandle,
+    host: String,
+    port: u16,
+    username: String,
+    password: String,
+    auth_type: Option<String>,
+    private_key_path: Option<String>,
+    remote_path: String,
+) -> Response<LogsPullRemoteResp> {
+    let ctx = ctx_from_app(&app_handle);
+    let conn = remote_conn::sftp_connect(
+        "logs".to_string(),
+        host.clone(),
+        port,
+        username.clone(),
+        password.clone(),
+        auth_type.clone(),
+        private_key_path.clone(),
+    )
+    .await;
+    let session_id = match conn.data {
+        Some(sid) => sid,
+        None => {
+            return Response::new(
+                conn.code,
+                LogsPullRemoteResp { local_path: String::new(), size: 0 },
+                conn.msg.as_str(),
+            )
+        }
+    };
+
+    let cache_dir = ctx.config_dir.join("plugin_data").join("logs_remote");
+    let _ = std::fs::create_dir_all(&cache_dir);
+    let raw_name = Path::new(&remote_path)
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| "remote.log".to_string());
+    let safe_name: String = raw_name
+        .chars()
+        .map(|c| if c == '/' || c == '\\' || c == ':' || c == '?' || c == '*' { '_' } else { c })
+        .collect();
+    let local_path = cache_dir.join(safe_name).to_string_lossy().to_string();
+
+    let dl = remote_conn::sftp_download(
+        ctx.clone(),
+        session_id.clone(),
+        remote_path.clone(),
+        local_path.clone(),
+        "logs-pull".to_string(),
+    )
+    .await;
+    let _ = remote_conn::sftp_disconnect(session_id).await;
+
+    if dl.code != 200 {
+        return Response::new(
+            dl.code,
+            LogsPullRemoteResp { local_path: String::new(), size: 0 },
+            dl.msg.as_str(),
+        );
+    }
+    let size = std::fs::metadata(&local_path).map(|m| m.len()).unwrap_or(0);
+    Response::new(200, LogsPullRemoteResp { local_path, size }, "拉取成功")
 }
 
 /// 本地目录列出
@@ -942,6 +1208,26 @@ pub async fn db_export_excel(
     crate::database::import_export::db_export_excel(config_id, database, table, file_path).await
 }
 
+/// 按任意 SQL 语句导出结果为 CSV
+#[tauri::command]
+pub async fn db_export_sql_csv(
+    config_id: String,
+    sql: String,
+    file_path: String,
+) -> Response<ExportResult> {
+    crate::database::import_export::db_export_sql_csv(config_id, sql, file_path).await
+}
+
+/// 按任意 SQL 语句导出结果为 Excel
+#[tauri::command]
+pub async fn db_export_sql_excel(
+    config_id: String,
+    sql: String,
+    file_path: String,
+) -> Response<ExportResult> {
+    crate::database::import_export::db_export_sql_excel(config_id, sql, file_path).await
+}
+
 /// 从 CSV 导入数据到表
 #[tauri::command]
 pub async fn db_import_csv(
@@ -964,4 +1250,40 @@ pub async fn db_import_excel(
     file_path: String,
 ) -> Response<ImportResult> {
     crate::database::import_export::db_import_excel(config_id, database, table, file_path).await
+}
+
+// ==================== 实时流日志 ====================
+
+/// 启动实时日志流。
+/// - WebSocket：由前端原生 `WebSocket` 直连，后端不参与（此处返回提示）。
+/// - TCP：后端建立监听，按行推送 `logs-stream-line` 事件。
+#[tauri::command]
+pub async fn logs_stream_start(
+    app_handle: tauri::AppHandle,
+    stream_id: String,
+    protocol: String,
+    host: Option<String>,
+    port: Option<u16>,
+    #[allow(unused_variables)] url: Option<String>,
+) -> Response<String> {
+    if protocol == "tcp" {
+        let host = match host {
+            Some(h) => h,
+            None => return Response::new(400, String::new(), "缺少 host 参数"),
+        };
+        let port = match port {
+            Some(p) => p,
+            None => return Response::new(400, String::new(), "缺少 port 参数"),
+        };
+        log_stream::log_stream_start_tcp(app_handle, stream_id, host, port).await
+    } else {
+        // WebSocket 由前端处理，无需后端
+        Response::new(200, String::new(), "WebSocket 流由前端原生处理")
+    }
+}
+
+/// 停止指定实时流（TCP 后端任务 / WebSocket 前端已自行关闭）
+#[tauri::command]
+pub async fn logs_stream_stop(stream_id: String) -> Response<bool> {
+    log_stream::log_stream_stop(stream_id).await
 }

@@ -1,138 +1,84 @@
 <template>
   <div class="functional-area">
-    <!-- 搜索 -->
-    <!-- <div class="fa-item search-item" :class="{ 'is-expanded': isSearch }">
-      <el-icon class="fa-icon" @click="onSearchRoutes">
-        <Search />
+    <!-- 主题切换：开关语义用 aria-pressed 表达（WCAG 4.1.2） -->
+    <button
+      type="button"
+      class="fa-icon"
+      :aria-label="isDark ? '切换到浅色主题' : '切换到深色主题'"
+      :aria-pressed="isDark"
+      :title="isDark ? '切换到浅色主题' : '切换到深色主题'"
+      @click="dark_change"
+    >
+      <el-icon class="fa-el-icon">
+        <Moon v-if="isDark" />
+        <Sunny v-else />
       </el-icon>
-      <div class="search-input-wrap">
-        <el-autocomplete
-          ref="autoInputRef"
-          v-model="keyword"
-          :fetch-suggestions="querySearch"
-          clearable
-          class="inline-input w-50"
-          placeholder="Please Input File Name"
-          @blur="isSearch = false"
-          @select="handleSelect"
-        />
-      </div>
-    </div> -->
+    </button>
 
-
-
-
-    <!-- 消息 -->
-<!--    <el-popover-->
-<!--      placement="bottom-end"-->
-<!--      :width="350"-->
-<!--      trigger="click"-->
-<!--      popper-class="message-popover"-->
-<!--      :offset="12"-->
-<!--      :show-arrow="false"-->
-<!--    >-->
-<!--      <template #reference>-->
-<!--        <el-badge :is-dot="is_dot" :max="99">-->
-<!--          <el-icon class="fa-icon">-->
-<!--            <Message />-->
-<!--          </el-icon>-->
-<!--        </el-badge>-->
-<!--      </template>-->
-<!--      <div class="message-container">-->
-<!--        <div class="message-header">-->
-<!--          <h3>消息中心</h3>-->
-<!--          <el-button link type="primary" size="small" @click="markAllAsRead">全部已读</el-button>-->
-<!--        </div>-->
-<!--        <el-tabs v-model="activeName" class="message-tabs">-->
-<!--          <el-tab-pane :label="`未读 (${unreadCount})`" name="wait">-->
-<!--            <div v-if="messageList.length === 0" class="empty-state">-->
-<!--              <el-empty description="暂无未读消息" :image-size="80" />-->
-<!--            </div>-->
-<!--            <el-scrollbar v-else max-height="300px">-->
-<!--              <div-->
-<!--                v-for="(item, index) in messageList"-->
-<!--                :key="index"-->
-<!--                class="message-item"-->
-<!--                @click="readMessage(index)"-->
-<!--              >-->
-<!--                <div class="message-title">{{ item.title }}</div>-->
-<!--                <div class="message-text">{{ item.content }}</div>-->
-<!--                <div class="message-time">{{ item.time || '刚刚' }}</div>-->
-<!--              </div>-->
-<!--            </el-scrollbar>-->
-<!--          </el-tab-pane>-->
-<!--          <el-tab-pane :label="`已读 (${readCount})`" name="done">-->
-<!--            <div v-if="readMessageList.length === 0" class="empty-state">-->
-<!--              <el-empty description="暂无已读消息" :image-size="80" />-->
-<!--            </div>-->
-<!--            <el-scrollbar v-else max-height="300px">-->
-<!--              <div-->
-<!--                v-for="(item, index) in readMessageList"-->
-<!--                :key="index"-->
-<!--                class="message-item read"-->
-<!--              >-->
-<!--                <div class="message-title">{{ item.title }}</div>-->
-<!--                <div class="message-text">{{ item.content }}</div>-->
-<!--                <div class="message-time">{{ item.time }}</div>-->
-<!--              </div>-->
-<!--            </el-scrollbar>-->
-<!--          </el-tab-pane>-->
-<!--        </el-tabs>-->
-<!--      </div>-->
-<!--    </el-popover>-->
-
-    <!-- 主题切换 -->
-    <el-icon class="fa-icon" @click="dark_change" v-show="!isDark">
-      <Sunny />
-    </el-icon>
-    <el-icon class="fa-icon" @click="dark_change" v-show="isDark">
-      <Moon />
-    </el-icon>
     <!-- 切换侧边栏 -->
-    <div
+    <button
+      type="button"
       class="fa-icon"
       :class="{ 'is-active': !isCollapse }"
-      @click="toggleSidebar"
+      :aria-pressed="!isCollapse"
+      :aria-label="isCollapse ? '显示侧边栏' : '隐藏侧边栏'"
       :title="isCollapse ? '显示侧边栏' : '隐藏侧边栏'"
+      @click="toggleSidebar"
     >
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
         <rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
         <rect x="3" y="3" width="6" height="18" rx="1" :fill="!isCollapse ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.2" opacity="0.9"/>
       </svg>
-    </div>
+    </button>
+
+    <!-- 隐藏/显示插件面板（仅收起 sidebarPanel，保留活动栏图标列） -->
+    <button
+      type="button"
+      class="fa-icon"
+      :class="{ 'is-active': !sidebarPanelCollapsed }"
+      :aria-pressed="!sidebarPanelCollapsed"
+      :aria-label="sidebarPanelCollapsed ? '显示插件面板' : '隐藏插件面板'"
+      :title="sidebarPanelCollapsed ? '显示插件面板' : '隐藏插件面板'"
+      @click="toggleSidebarPanel"
+    >
+      <el-icon v-if="sidebarPanelCollapsed" class="fa-el-icon"><Expand /></el-icon>
+      <el-icon v-else class="fa-el-icon"><Fold /></el-icon>
+    </button>
+
     <!-- 功能图标与窗口控制按钮的视觉分隔 -->
-    <div class="fa-divider"></div>
+    <div class="fa-divider" aria-hidden="true"></div>
+
     <!-- 窗口控制 -->
     <WindowControls />
   </div>
 </template>
 
-<script lang="ts" setup name="FunctionalArea">import { ref, computed, onMounted } from 'vue'
+<script lang="ts" setup name="FunctionalArea">
+import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useI18n } from 'vue-i18n'
-import { Search, Sunny, Moon, Message } from '@element-plus/icons-vue'
+import { Sunny, Moon, Fold, Expand } from '@element-plus/icons-vue'
 import { load, Store } from '@/core/runtime'
 import { isDark, toggleDark } from '@/composables/useDark'
 import useStore from '@/store'
-import { TreeNode } from '@/Types/entitys'
 import WindowControls from '@/components/WindowControls.vue'
-import { openAppWindow } from '@/utils/WindowUtils'
-import { useDocumentManagerStore } from '@/plugins/files/store/documents'
+
 const store = useStore()
-const docStore = useDocumentManagerStore()
-const { t } = useI18n()
 
 const { isCollapse } = storeToRefs(store.system)
-const { search_data } = storeToRefs(store.fileTreeStore)
+const { sidebarPanelCollapsed } = storeToRefs(store.useLayoutStore)
 
 // ========== 侧边栏切换 ==========
 function toggleSidebar(){
-console.log(isCollapse.value)
   if (isCollapse.value) {
     store.system.expandCollapse()
   } else {
     store.system.packCollapse()
   }
+}
+
+// ========== 插件面板切换（仅隐藏 sidebarPanel，保留活动栏） ==========
+function toggleSidebarPanel(){
+  store.useLayoutStore.toggleSidebarPanel()
 }
 
 // ========== 主题切换 ==========
@@ -154,73 +100,6 @@ onMounted(async () => {
     store.system.toggleDark(isDark.value)
   }
 })
-
-// ========== 搜索 ==========
-
-let autoInputRef = ref<any>(null)
-let keyword = ref('')
-let isSearch = ref(false)
-
-let timeout: ReturnType<typeof setTimeout>
-const querySearch = (queryString: string, cb: (arg: any) => void) => {
-  const results = queryString ? search_data.value.filter(createFilter(queryString)) : search_data.value
-  clearTimeout(timeout)
-  timeout = setTimeout(() => cb(results), 3000 * Math.random())
-}
-const createFilter = (queryString: string) => {
-  return (file: TreeNode) => {
-    try {
-      return new RegExp(queryString, 'i').test(file.label)
-    } catch {
-      return file.label.toLowerCase().includes(queryString.toLowerCase())
-    }
-  }
-}
-const handleSelect = (route: TreeNode) => {
-  if (route.routerPath) docStore.openDocument(route.routerPath)
-}
-const onSearchRoutes = () => {
-  isSearch.value = true
-  setTimeout(() => autoInputRef.value?.focus(), 500)
-}
-
-// ========== 消息 ==========
-let is_dot = ref(true)
-let activeName = ref('wait')
-
-interface MessageItem {
-  title: string
-  content: string
-  time?: string
-  read?: boolean
-}
-
-const messageList = ref<MessageItem[]>([
-  { title: 'BackendDevelopmentTools 0.2.0 版发布', content: 'BackendDevelopmentTools 0.2.0 版发布啦，新增了多项功能和优化，请升级到最新版体验！', time: '2024-01-15 10:30' },
-  { title: '系统通知', content: '欢迎使用 BackendDevelopmentTools，这是一个基于 Tauri 的跨平台桌面工具。', time: '2024-01-14 09:00' }
-])
-const readMessageList = ref<MessageItem[]>([])
-const unreadCount = computed(() => messageList.value.length)
-const readCount = computed(() => readMessageList.value.length)
-
-const readMessage = (index: number) => {
-  const message = messageList.value.splice(index, 1)[0]
-  message.read = true
-  message.time = new Date().toLocaleString('zh-CN')
-  readMessageList.value.unshift(message)
-  if (messageList.value.length === 0) is_dot.value = false
-}
-const markAllAsRead = () => {
-  readMessageList.value.unshift(...messageList.value.map(msg => ({ ...msg, read: true, time: new Date().toLocaleString('zh-CN') })))
-  messageList.value = []
-  is_dot.value = false
-}
-
-// ========== 设置 ==========
-const handleSettingCommand = (command: string) => {
-  const pages: Record<string, string> = { setting: '/App/setting', about: '/App/about', help: '/App/help' }
-  if (pages[command]) openAppWindow(pages[command])
-}
 </script>
 
 <style scoped lang="scss">
@@ -254,6 +133,12 @@ const handleSettingCommand = (command: string) => {
   border-radius: var(--radius-md);
   transition: background-color 0.15s;
   flex-shrink: 0;
+  // 语义化 <button> 需要抹平浏览器默认外观
+  appearance: none;
+  border: none;
+  padding: 0;
+  background: transparent;
+  font-family: inherit;
 
   @include theme.useTheme {
     color: theme.getVar('textSecondary');
@@ -275,6 +160,14 @@ const handleSettingCommand = (command: string) => {
   svg {
     width: 14px;
     height: 14px;
+  }
+
+  // Element Plus 图标按钮：固定 14px，与自绘 SVG 图标视觉一致
+  .fa-el-icon {
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 </style>

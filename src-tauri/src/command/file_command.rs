@@ -1,9 +1,6 @@
-use crate::response::resp_data::{ResData, ResDataNoData};
-use crate::utils::fileUtil::read_dir_info;
+use crate::response::resp_data::ResData;
 use std::path::{Path, PathBuf};
 use chardetng::EncodingDetector;
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
 
 /// 确保目录存在（递归创建）
 pub async fn ensure_dir(path: String) -> Result<ResData<String>, String> {
@@ -58,7 +55,7 @@ pub async fn read_note_file(path: String) -> Result<ResData<String>, String> {
     let encoding = detector.guess(None, chardetng::Utf8Detection::Allow);
 
     // 根据检测到的编码解码文件内容
-    let (cow_text, _encoding_used, had_errors) = encoding.decode(&bytes);
+    let (cow_text, _encoding_used, _had_errors) = encoding.decode(&bytes);
     // 转换为 String
     let content = cow_text.into_owned();
 
@@ -113,8 +110,27 @@ pub async fn create_folder(
 }
 
 /**
- * @param notebook 文件夹/笔记本
- * @param newNoteMdFileName 笔记名 文件名
+ * 获取文件大小（字节）。供前端打开文件前做"大文件分诊"（小文件走代码编辑器、大文件走分块只读查看器）。
+ */
+pub async fn get_file_size(path: String) -> Result<ResData<u64>, String> {
+    match tokio::fs::metadata(&path).await {
+        Ok(meta) => Ok(ResData {
+            code: 200,
+            msg: "success".to_string(),
+            data: meta.len(),
+        }),
+        Err(e) => Ok(ResData {
+            code: 500,
+            msg: format!("获取文件大小失败: {}", e),
+            data: 0,
+        }),
+    }
+}
+
+/**
+ * 创建笔记文件
+ * @param father_path 父文件夹路径
+ * @param new_note_md_file_name 新笔记文件名
  */
 pub async fn create_note_file(
     father_path: String,
@@ -264,7 +280,7 @@ pub async fn remove_folder(
             data: String::new(),
         });
     }
-    let mut path_ = PathBuf::from(path);
+    let path_ = PathBuf::from(path);
     let remove_res = std::fs::remove_dir_all(path_);
     match remove_res {
         Ok(_) => {
@@ -300,7 +316,7 @@ pub async fn remove_file(
             data: String::new(),
         });
     }
-    let mut path_ = PathBuf::from(path);
+    let path_ = PathBuf::from(path);
 
     let remove_res = std::fs::remove_file(path_);
     match remove_res {
@@ -366,7 +382,7 @@ pub async fn get_path_childrenFoldersAndFiles(
 }
 fn rename_file_path(original_path: &str, new_filename: &str, suffix: &str) -> String {
     let path = Path::new(original_path);
-    let mut new_path = path.to_path_buf();
+    let new_path = path.to_path_buf();
     // 获取目录部分
     let parent = new_path.parent().unwrap_or_else(|| Path::new(""));
     // 添加新的文件名

@@ -1,33 +1,34 @@
 <template>
   <div class="plugin-dir-settings">
     <div class="setting-item">
-      <div class="setting-label">
-        <span class="label-text">本地脚本目录</span>
-        <span class="label-desc">应用默认存储位置，按工作区隔离</span>
-      </div>
+      <div class="setting-label" title="本地脚本目录（应用默认存储位置，按工作区隔离）">本地脚本目录</div>
       <div class="setting-control">
         <span class="current-path" :title="defaultDir">{{ defaultDir || '加载中...' }}</span>
-        <el-button size="small" @click="openInExplorer(defaultDir)" :disabled="!defaultDir" title="在文件管理器中打开">
+        <button
+          class="icon-btn"
+          :disabled="!defaultDir"
+          title="在文件管理器中打开"
+          @click="openInExplorer(defaultDir)"
+        >
           <el-icon><FolderOpened /></el-icon>
-        </el-button>
+        </button>
       </div>
     </div>
 
     <div v-for="dir in externalDirs" :key="dir" class="setting-item">
-      <div class="setting-label">
-        <span class="label-text">{{ dirName(dir) }}</span>
-        <span class="label-desc">外部脚本目录（跨工作区共享）</span>
-      </div>
+      <div class="setting-label" :title="`${dir}（外部脚本目录，跨工作区共享）`">{{ dirName(dir) }}</div>
       <div class="setting-control">
         <span class="current-path" :title="dir">{{ dir }}</span>
-        <el-button size="small" @click="openInExplorer(dir)" title="在文件管理器中打开">
+        <button class="icon-btn" title="在文件管理器中打开" @click="openInExplorer(dir)">
           <el-icon><FolderOpened /></el-icon>
-        </el-button>
-        <el-button size="small" type="danger" plain @click="removeDir(dir)">移除</el-button>
+        </button>
+        <button class="icon-btn danger" title="移除挂载（目录内容不会被删除）" @click="removeDir(dir)">
+          <el-icon><Close /></el-icon>
+        </button>
       </div>
     </div>
 
-    <el-button
+    <app-button
       size="small"
       type="primary"
       plain
@@ -36,14 +37,14 @@
       @click="addDir"
     >
       <el-icon><FolderAdd /></el-icon>
-      添加外部脚本目录
-    </el-button>
+      <span>添加外部脚本目录</span>
+    </app-button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { FolderOpened, FolderAdd } from '@element-plus/icons-vue'
+import { FolderOpened, FolderAdd, Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { usePluginDir } from '@/composables/usePluginDir'
 import { invoke } from '@/api/rpc'
@@ -134,47 +135,77 @@ async function openInExplorer(path: string) {
 .plugin-dir-settings {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 8px 0;
+  gap: 6px;
+  padding: 4px 0;
 }
+/* 每行：左标签 + 右控制（路径 + 图标按钮），单行紧凑布局 */
 .setting-item {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
 }
 .setting-label {
-  display: flex;
-  flex-direction: column;
-}
-.label-text {
+  flex-shrink: 0;
+  width: 88px;
   font-size: var(--font-size-md);
   font-weight: 500;
   color: var(--el-text-color-primary);
-}
-.label-desc {
-  font-size: var(--font-size-base);
-  color: var(--el-text-color-secondary);
-  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .setting-control {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
 }
-.setting-control .el-input {
-  flex: 1;
-}
+/* 路径：等宽字体 + 省略号（与项目「标识符文本用 --font-family-mono」约定一致） */
 .current-path {
   flex: 1;
   min-width: 0;
   font-size: var(--font-size-sm);
+  font-family: var(--font-family-mono);
   color: var(--el-text-color-regular);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   user-select: text;
 }
+/* 与 SidebarPanel/ScriptExplorer 的 .header-btn 同款 22×22 原生按钮 */
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--el-text-color-secondary);
+  font-size: var(--font-size-lg);
+  font-family: inherit;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.icon-btn:hover:not(:disabled) {
+  color: var(--el-text-color-primary);
+  background-color: var(--el-fill-color-light);
+}
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.icon-btn.danger:hover:not(:disabled) {
+  color: var(--el-color-danger);
+  background-color: var(--el-color-danger-light-9);
+}
 .add-btn {
   align-self: flex-start;
+  margin-top: 4px;
 }
 </style>

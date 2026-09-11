@@ -6,7 +6,7 @@
         :style="!isCollapse ? { width: sidebarWidth + 'px', minWidth: sidebarWidth + 'px', maxWidth: sidebarWidth + 'px', transition: isDragging ? 'none' : '' } : {}">
         <app-sidebar :hideActivityBar="isFocusMode" />
       </aside>
-      <div v-show="!isCollapse" class="resize-handle" :class="{ 'is-dragging': isDragging }" @mousedown="onResizeStart">
+      <div v-show="!isCollapse && !useLayoutStore.sidebarPanelCollapsed" class="resize-handle" :class="{ 'is-dragging': isDragging }" @mousedown="onResizeStart" role="separator" aria-orientation="vertical" tabindex="0" :aria-valuenow="sidebarWidth" :aria-valuemin="activeSidebarCfg.min" :aria-valuemax="activeSidebarCfg.max" aria-label="调整侧边栏宽度" @keydown="onResizeKeydown">
         <div class="resize-handle-line"></div>
       </div>
       <main ref="mainContentRef" class="app-content"
@@ -23,7 +23,6 @@
 <script setup lang="ts" name="Layout">
 import AppNavbar from './components/AppNavbar/index.vue'
 import AppEditorMain from './components/AppEditorMain/index.vue'
-import AppHeader from './components/AppHeader/index.vue'
 import AppSidebar from './components/AppSidebar/index.vue'
 import AppStatusBar from './components/AppStatusBar/index.vue'
 import useStore from '@/store/index'
@@ -53,6 +52,18 @@ const windowWidth = ref(window.innerWidth)
 const SIDEBAR_MIN_WIDTH = 60
 const SIDEBAR_MAX_WIDTH = 700
 const SIDEBAR_DEFAULT_WIDTH = 220
+/** 活动栏（activity-bar）固定宽度：插件面板收起时侧边栏收缩到该宽度 */
+const ACTIVITY_BAR_WIDTH = 48
+
+/** 当前激活插件的侧边栏布局配置（插件可声明 sidebarMinWidth/MaxWidth/DefaultWidth，未声明用全局默认） */
+const activeSidebarCfg = computed(() => {
+  const plugin = pluginManager.getPlugin(pluginManager.activeToolId.value)
+  return {
+    min: plugin?.sidebarMinWidth ?? SIDEBAR_MIN_WIDTH,
+    max: plugin?.sidebarMaxWidth ?? SIDEBAR_MAX_WIDTH,
+    def: plugin?.sidebarDefaultWidth ?? SIDEBAR_DEFAULT_WIDTH,
+  }
+})
 
 /** 每个插件独立的侧边栏宽度（持久化存储） */
 const pluginSidebarWidths: Record<string, number> = {}
@@ -60,9 +71,40 @@ const pluginSidebarWidths: Record<string, number> = {}
 /** 当前侧边栏宽度（直接驱动 DOM） */
 const sidebarWidth = ref(SIDEBAR_DEFAULT_WIDTH)
 
-/** 插件切换时恢复该插件记住的宽度 */
-watch(() => pluginManager.activeToolId.value, (newId) => {
-  sidebarWidth.value = pluginSidebarWidths[newId] ?? SIDEBAR_DEFAULT_WIDTH
+/** 插件切换时恢复该插件记住的宽度：无动画、宽度相同则跳过；切换后即时通知一次布局更新（消除延迟链） */
+watch(() => pluginManager.activeToolId.value, async (newId) => {
+  // 插件面板处于收起状态：保持活动栏宽度，不恢复插件记住的宽度
+  if (useLayoutStore.sidebarPanelCollapsed) {
+    sidebarWidth.value = ACTIVITY_BAR_WIDTH
+    await nextTick()
+    triggerLayoutUpdate('plugin-switch')
+    return
+  }
+  const target = pluginSidebarWidths[newId] ?? activeSidebarCfg.value.def
+  if (sidebarWidth.value !== target) {
+    const asideEl = sideBoxRef.value
+    // 无动画恢复，避免 300ms transition 造成「切换后布局慢慢变化」的滞后感
+    asideEl?.classList.add('no-transition')
+    sidebarWidth.value = target
+    requestAnimationFrame(() => asideEl?.classList.remove('no-transition'))
+  }
+  // 切换后立即（非 setTimeout 延迟）通知子组件按新容器重新测量布局（Monaco/xterm 等）
+  await nextTick()
+  triggerLayoutUpdate('plugin-switch')
+})
+
+/** 插件面板收起/展开：收起时缩到活动栏宽度，展开时恢复该插件记住的宽度 */
+watch(() => useLayoutStore.sidebarPanelCollapsed, async (collapsed) => {
+  const activeId = pluginManager.activeToolId.value
+  if (collapsed) {
+    // 记住收起前的宽度，展开时恢复
+    pluginSidebarWidths[activeId] = sidebarWidth.value
+    sidebarWidth.value = ACTIVITY_BAR_WIDTH
+  } else {
+    sidebarWidth.value = pluginSidebarWidths[activeId] ?? activeSidebarCfg.value.def
+  }
+  await nextTick()
+  triggerLayoutUpdate('panel-toggle')
 })
 const isDragging = ref(false)
 
@@ -73,11 +115,13 @@ const onResizeStart = (e: MouseEvent) => {
   const startWidth = sidebarWidth.value
   const asideEl = sideBoxRef.value
   if (!asideEl) return
+  // 拖拽钳制范围取当前激活插件的声明值
+  const { min, max } = activeSidebarCfg.value
 
   let currentWidth = startWidth
 
   const onMouseMove = (moveEvent: MouseEvent) => {
-    currentWidth = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startWidth + (moveEvent.clientX - startX)))
+    currentWidth = Math.min(max, Math.max(min, startWidth + (moveEvent.clientX - startX)))
     // 拖拽期间只操作 DOM，不触发 Vue 响应式更新
     asideEl.style.width = currentWidth + 'px'
     asideEl.style.minWidth = currentWidth + 'px'
@@ -102,24 +146,7 @@ const onResizeStart = (e: MouseEvent) => {
   document.addEventListener('mouseup', onMouseUp)
 }
 
-let windowWidth_2 = ref<number>(window.innerWidth)
-let lastWindowWidth = ref<number>(window.innerWidth)
-let windowWidthshrink = ref<Boolean>(false)
-
-const handleResize = () => {
-  updateWindowWidth();
-}
-const updateWindowWidth = () => {
-  windowWidth_2.value = window.innerWidth;
-  if (windowWidth_2.value < lastWindowWidth.value) {
-    console.log('窗口宽度在变小');
-    windowWidthshrink.value = true;
-  } else {
-    console.log('窗口宽度在变大或保持不变')
-    windowWidthshrink.value = false;
-  }
-  lastWindowWidth.value = windowWidth_2.value;
-}
+let prevWindowWidth = window.innerWidth
 
 // 触发自定义事件的辅助函数
 const triggerLayoutUpdate = (reason: string, collapseState?: boolean) => {
@@ -134,26 +161,38 @@ const triggerLayoutUpdate = (reason: string, collapseState?: boolean) => {
     }
   })
   window.dispatchEvent(event)
-  console.log('[Layout] Layout update triggered:', reason, '| isCollapse:', isCollapse.value, '| windowWidth:', windowWidth.value)
 }
 
-// 监听窗口大小变化，自动隐藏/显示侧边栏
+// 监听窗口大小变化，跨过 720px 阈值时自动折叠/展开侧边栏（仅按方向切换，避免缩放抖动）
 const handleWindowResize = () => {
-  windowWidth.value = window.innerWidth
-
-  // 窗口宽度小于 720px 时自动隐藏侧边栏
-  if (windowWidth.value < 720 && !isCollapse.value && windowWidthshrink.value) {
+  const w = window.innerWidth
+  windowWidth.value = w
+  if (w < 720 && !isCollapse.value && prevWindowWidth >= 720) {
     system.packCollapse()
-    console.log('[Layout] Auto-hiding sidebar (width < 720px):', windowWidth.value)
-  } else if (windowWidth.value >= 720 && isCollapse.value && !windowWidthshrink.value) {
+  } else if (w >= 720 && isCollapse.value && prevWindowWidth < 720) {
     system.expandCollapse()
-    console.log('[Layout] Auto-show sidebar (width >= 720px):', windowWidth.value)
   }
+  prevWindowWidth = w
 
   // 触发重新计算
   setTimeout(() => {
     triggerLayoutUpdate('window-resize')
   }, 100)
+}
+
+/** 键盘调节侧边栏宽度（WCAG 2.1.1/2.1.2）：分隔条聚焦后 ← → ±16px，Home/End 跳到最小/最大 */
+const onResizeKeydown = (e: KeyboardEvent) => {
+  const { min, max } = activeSidebarCfg.value
+  let next = sidebarWidth.value
+  if (e.key === 'ArrowLeft') next = Math.max(min, sidebarWidth.value - 16)
+  else if (e.key === 'ArrowRight') next = Math.min(max, sidebarWidth.value + 16)
+  else if (e.key === 'Home') next = min
+  else if (e.key === 'End') next = max
+  else return
+  e.preventDefault()
+  sidebarWidth.value = next
+  pluginSidebarWidths[pluginManager.activeToolId.value] = next
+  triggerLayoutUpdate('keyboard-resize')
 }
 
 // 监听侧边栏折叠状态变化
@@ -190,30 +229,23 @@ onMounted(async () => {
   // 加载工作区列表（用于菜单显示，currentWorkspace 由 App.vue 负责加载）
   await useWorkspaceStore.loadAllWorkspaces()
 
-  // 如果初始窗口宽度小于 720px，自动隐藏侧边栏
+  // 初始窗口宽度小于 720px 时自动隐藏侧边栏，跨过阈值再展开
   if (windowWidth.value < 720 && !isCollapse.value) {
     system.packCollapse()
-    console.log('[Layout] Initial auto-hide sidebar (width < 720px):', windowWidth.value)
   } else if (windowWidth.value >= 720 && isCollapse.value) {
     system.expandCollapse()
-    console.log('[Layout] Auto-show sidebar (width >= 720px):', windowWidth.value)
   }
 
   setTimeout(() => {
     triggerLayoutUpdate('initial-mount')
   }, 200)
 
-  // 监听窗口大小变化
+  // 监听窗口大小变化（仅保留一个 resize 处理，避免双份监听器互相覆盖，审查报告 #33）
   window.addEventListener('resize', handleWindowResize)
-  updateWindowWidth();
-  window.addEventListener('resize', handleResize);
-
-  console.log('[Layout] Mounted, initial sidebar state:', isCollapse.value, '| windowWidth:', windowWidth.value)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleWindowResize)
-  window.removeEventListener('resize', handleResize);
 })
 </script>
 
@@ -225,8 +257,8 @@ onUnmounted(() => {
 .main-box {
   display: flex;
   flex-direction: column;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   box-sizing: border-box;
 
@@ -255,6 +287,11 @@ onUnmounted(() => {
       box-sizing: border-box;
       overflow: hidden;
 
+      // 插件切换时无动画恢复宽度（避免切换后布局慢慢变化）
+      &.no-transition {
+        transition: none !important;
+      }
+
       @include theme.useTheme {
         background-color: theme.getVar('bgColor');
         border-right: none;
@@ -270,40 +307,45 @@ onUnmounted(() => {
 
     .resize-handle {
       flex-shrink: 0;
-      width: 1px;
+      width: var(--resize-handle-v-line-width);
       cursor: col-resize;
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 1001;
       position: relative;
+      background-color: var(--resize-handle-color);
       transition: background-color 0.2s;
 
-      @include theme.useTheme {
-        background-color: theme.getVar('borderColor');
+      // 扩大命中热区（透明、不占布局）：1px 的线太难精确点中，
+      // 向左右各扩 hit-area 让鼠标更容易触发 hover / mousedown。
+      &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: calc(-1 * var(--resize-handle-hit-area));
+        right: calc(-1 * var(--resize-handle-hit-area));
       }
 
       &:hover,
       &.is-dragging {
-        @include theme.useTheme {
-          background-color: $theme-color;
-        }
+        background-color: var(--resize-handle-color-active);
       }
 
       .resize-handle-line {
-        width: 2px;
-        height: 30px;
+        width: var(--resize-handle-v-line-width);
+        height: var(--resize-handle-v-line-height);
         border-radius: var(--radius-xs);
+        background-color: var(--resize-handle-color-active);
         opacity: 0;
-        transition: opacity 0.2s;
-
-        @include theme.useTheme {
-          background-color: $theme-color;
-        }
+        transition: width 0.2s ease, opacity 0.2s ease;
       }
 
+      // 悬停 / 拖拽中：中线增粗（1px → active 宽度）并显现，提示「此处可拖拽」
       &:hover .resize-handle-line,
       &.is-dragging .resize-handle-line {
+        width: var(--resize-handle-v-line-width-active);
         opacity: 1;
       }
     }

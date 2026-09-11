@@ -1,45 +1,70 @@
 <template>
-  <div class="menu-bar" >
+  <!-- 应用主菜单：menubar 语义 + 方向键导航（WCAG 2.1.1 / 4.1.2） -->
+  <div class="menu-bar" role="menubar" aria-label="应用主菜单">
     <div
-      v-for="menu in menus"
+      v-for="(menu, menuIndex) in menus"
       :key="menu.label"
       class="menu-item"
       :class="{ 'is-active': activeMenu === menu.label }"
-      @click="handleMenuClick(menu)"
-      @mouseenter="handleMouseEnter(menu.label)"
     >
-      <span>{{ menu.label }}</span>
+      <button
+        :ref="(el) => setTopRef(el, menuIndex)"
+        class="menu-btn"
+        type="button"
+        role="menuitem"
+        aria-haspopup="true"
+        :aria-expanded="activeMenu === menu.label"
+        @click="handleMenuClick(menu)"
+        @mouseenter="handleMouseEnter(menu.label)"
+        @keydown="onTopLevelKeydown($event, menu, menuIndex)"
+      >
+        <span>{{ menu.label }}</span>
+      </button>
       <transition name="menu-dropdown">
         <div
           v-if="activeMenu === menu.label"
+          :ref="(el) => setDropdownRef(el)"
           class="menu-dropdown"
+          role="menu"
+          :aria-label="menu.label"
           @mouseleave="closeMenu"
+          @keydown="onDropdownKeydown($event, menuIndex)"
         >
           <template v-for="(item, idx) in menu.items" :key="idx">
             <div
               v-if="item.divider"
               class="menu-divider"
+              role="separator"
             ></div>
             <!-- 子菜单项（如"最近的项目"） -->
             <div
               v-else-if="item.submenu"
               class="menu-option has-submenu"
+              role="menuitem"
+              tabindex="-1"
               :class="{ 'is-disabled': item.disabled }"
+              :aria-disabled="item.disabled || undefined"
               @mouseenter="activeSubmenu = item.command"
               @mouseleave="activeSubmenu = null"
+              @focus="activeSubmenu = item.command"
             >
               <span class="option-label">{{ item.label }}</span>
-              <span class="submenu-arrow">▶</span>
+              <span class="submenu-arrow" aria-hidden="true">▶</span>
               <!-- 子菜单弹出层 -->
               <div
                 v-if="activeSubmenu === item.command"
                 class="submenu-popup"
+                role="menu"
+                :aria-label="item.label"
                 @mouseenter="activeSubmenu = item.command"
                 @mouseleave="activeSubmenu = null"
               >
                 <div
                   v-if="item.submenu.length === 0"
                   class="menu-option is-disabled"
+                  role="menuitem"
+                  tabindex="-1"
+                  aria-disabled="true"
                 >
                   <span class="option-label">暂无记录</span>
                 </div>
@@ -47,15 +72,20 @@
                   v-for="(subItem, subIdx) in item.submenu"
                   :key="subIdx"
                   class="menu-option submenu-item"
+                  role="menuitem"
+                  tabindex="-1"
                   :class="{ 'is-disabled': subItem.disabled }"
+                  :aria-disabled="subItem.disabled || undefined"
                   @click.stop="handleMenuCommand(subItem)"
                 >
                   <span class="option-label" :title="subItem.label">{{ subItem.label }}</span>
                 </div>
-                <div v-if="item.submenu.length > 0" class="menu-divider"></div>
+                <div v-if="item.submenu.length > 0" class="menu-divider" role="separator"></div>
                 <div
                   v-if="item.submenu.length > 0"
                   class="menu-option"
+                  role="menuitem"
+                  tabindex="-1"
                   @click.stop="handleMenuCommand({ label: '清除最近文件夹', command: 'clearRecentProjects' })"
                 >
                   <span class="option-label">清除最近文件夹</span>
@@ -66,7 +96,10 @@
             <div
               v-else
               class="menu-option"
+              role="menuitem"
+              tabindex="-1"
               :class="{ 'is-disabled': item.disabled }"
+              :aria-disabled="item.disabled || undefined"
               @click.stop="handleMenuCommand(item)"
             >
               <span class="option-label">{{ item.label }}</span>
@@ -79,6 +112,15 @@
 
     <!-- 工作区管理对话框（基于 GlobalDialog 的共享组件） -->
     <WorkspaceManageDialog v-model="showWorkspaceDialog" />
+
+    <!-- 命名输入弹窗：替代浏览器原生 prompt()，与桌面应用观感一致且可主题化 -->
+    <GlobalPromptDialog
+      v-model="showNamePrompt"
+      :title="namePromptTitle"
+      :message="namePromptMessage"
+      :validator="validateName"
+      @confirm="handleNameConfirm"
+    />
   </div>
 </template>
 
@@ -92,6 +134,7 @@ import NotificationUtil from '@/utils/NotificationUtil'
 import { changeWorkspace } from '@/utils/index'
 import { useWorkspaceStore } from '@/store/modules/workspace'
 import WorkspaceManageDialog from '@/components/WorkspaceManageDialog.vue'
+import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
 
 import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
@@ -227,6 +270,50 @@ const getWorkingDirectory = async (): Promise<string> => {
   const val = await store.get<{ value: string }>('md_working_directory')
   return val?.value || ''
 }
+// ===== 命名输入弹窗（替代原生 prompt） =====
+const showNamePrompt = ref(false)
+const namePromptTitle = ref('')
+const namePromptMessage = ref('')
+const pendingNameAction = ref<'file' | 'folder'>('file')
+
+/** 文件名/文件夹名校验：拦截空值与 Windows 非法字符 */
+function validateName(value: string): string | true {
+  if (!value) return '名称不能为空'
+  if (/[\\/:*?"<>|]/.test(value)) return '名称不能包含 \\ / : * ? " < > | 字符'
+  return true
+}
+
+async function handleNameConfirm(name: string) {
+  const dir = await getWorkingDirectory()
+  if (!dir) {
+    NotificationUtil.warn('请先选择工作目录')
+    return
+  }
+  if (pendingNameAction.value === 'file') {
+    const res = await tauri_request<ResponseData<string>>('create_note_file', {
+      father_path: dir,
+      new_note_md_file_name: name
+    })
+    if (res?.code === 200) {
+      NotificationUtil.success('文件创建成功')
+      await get_file_Api()
+    } else {
+      NotificationUtil.error(res?.msg || '创建失败')
+    }
+  } else {
+    const res = await tauri_request<ResponseData<string>>('create_folder', {
+      father_path: dir,
+      new_folder_name: name
+    })
+    if (res?.code === 200) {
+      NotificationUtil.success('文件夹创建成功')
+      await get_file_Api()
+    } else {
+      NotificationUtil.error(res?.msg || '创建失败')
+    }
+  }
+}
+
 const handleMenuClick = (menu: Menu) => {
   if (menu.action) {
     handleMenuCommand({ label: '', command: menu.action })
@@ -235,7 +322,10 @@ const handleMenuClick = (menu: Menu) => {
   toggleMenu(menu.label)
 }
 const handleMenuCommand = async (item: MenuItem) => {
+  // 记录当前打开的顶级菜单，关闭后把焦点归还给它（WCAG 2.4.3）
+  const openedMenuIndex = menus.value.findIndex((m) => m.label === activeMenu.value)
   closeMenu()
+  if (openedMenuIndex >= 0) nextTick(() => focusTopMenu(openedMenuIndex))
   if (item.disabled) return
 
   switch (item.command) {
@@ -245,19 +335,11 @@ const handleMenuCommand = async (item: MenuItem) => {
         NotificationUtil.warn('请先选择工作目录')
         return
       }
-      const name = prompt('请输入文件名：')
-      if (name) {
-        const res = await tauri_request<ResponseData<string>>('create_note_file', {
-          father_path: dir,
-          new_note_md_file_name: name
-        })
-        if (res?.code === 200) {
-          NotificationUtil.success('文件创建成功')
-          await get_file_Api()
-        } else {
-          NotificationUtil.error(res?.msg || '创建失败')
-        }
-      }
+      // 用项目内输入弹窗替代浏览器原生 prompt()：可主题化、可校验
+      pendingNameAction.value = 'file'
+      namePromptTitle.value = '新建文件'
+      namePromptMessage.value = `将在 ${dir} 下创建文件`
+      showNamePrompt.value = true
       break
     }
     case 'openFile': {
@@ -267,7 +349,6 @@ const handleMenuCommand = async (item: MenuItem) => {
         filters: [{ name: 'Markdown', extensions: ['*'] }]
       })
       if (selected) {
-        console.log('[MenuBar] Open file:', selected)
         docStore.openDocument(selected);
       }
       break
@@ -313,19 +394,10 @@ const handleMenuCommand = async (item: MenuItem) => {
         NotificationUtil.warn('请先选择工作目录')
         return
       }
-      const name = prompt('请输入文件夹名：')
-      if (name) {
-        const res = await tauri_request<ResponseData<string>>('create_folder', {
-          father_path: dir,
-          new_folder_name: name
-        })
-        if (res?.code === 200) {
-          NotificationUtil.success('文件夹创建成功')
-          await get_file_Api()
-        } else {
-          NotificationUtil.error(res?.msg || '创建失败')
-        }
-      }
+      pendingNameAction.value = 'folder'
+      namePromptTitle.value = '新建文件夹'
+      namePromptMessage.value = `将在 ${dir} 下创建文件夹`
+      showNamePrompt.value = true
       break
     }
     case 'save': {
@@ -405,13 +477,11 @@ async function handleWindowPresetClick(presetId: string) {
   try {
     // 查询当前已打开的窗口列表
     const res = await invoke<ResponseData<WindowMeta[]>>('get_window_list')
-    console.log('[MenuBar] 窗口列表:', JSON.stringify(res.data))
     if (res.code === 200 && res.data) {
       // 优先按 preset_id 匹配，后备按窗口标题（即预设名称）匹配
       const matched = res.data.find(w => w.preset_id === presetId)
         || res.data.find(w => w.title === preset.name)
       if (matched) {
-        console.log('[MenuBar] 找到已打开窗口:', matched.label, 'preset_id:', matched.preset_id, 'title:', matched.title)
         await invoke('focus_window', { label: matched.label })
         return
       }
@@ -442,6 +512,134 @@ const closeMenu = () => {
   activeSubmenu.value = null
 }
 
+// ===== 键盘导航（桌面菜单栏标准交互） =====
+const topMenuRefs = ref<HTMLElement[]>([])
+let dropdownEl: HTMLElement | null = null
+
+function setTopRef(el: unknown, index: number) {
+  if (el) topMenuRefs.value[index] = el as HTMLElement
+}
+
+function setDropdownRef(el: unknown) {
+  dropdownEl = (el as HTMLElement) ?? null
+}
+
+/** 当前下拉面板中可操作的菜单项（排除分隔线与禁用项） */
+function getMenuOptions(): HTMLElement[] {
+  if (!dropdownEl) return []
+  return Array.from(dropdownEl.querySelectorAll<HTMLElement>('.menu-option:not(.is-disabled)'))
+}
+
+function focusMenuOption(index: number) {
+  const options = getMenuOptions()
+  if (options.length === 0) return
+  const target = (index + options.length) % options.length
+  options[target].focus()
+}
+
+function focusTopMenu(index: number) {
+  const count = menus.value.length
+  if (count === 0) return
+  topMenuRefs.value[(index + count) % count]?.focus()
+}
+
+/** 打开指定序号的顶级菜单并聚焦首项（← → 切换用） */
+function openMenuByIndex(index: number) {
+  const count = menus.value.length
+  if (count === 0) return
+  const target = (index + count) % count
+  activeMenu.value = menus.value[target].label
+  nextTick(() => {
+    topMenuRefs.value[target]?.focus()
+    focusMenuOption(0)
+  })
+}
+
+/** 顶级菜单按钮：↓/Enter/空格 展开，← → 切换相邻菜单 */
+function onTopLevelKeydown(e: KeyboardEvent, menu: Menu, index: number) {
+  switch (e.key) {
+    case 'ArrowDown':
+    case 'Enter':
+    case ' ':
+      e.preventDefault()
+      activeMenu.value = menu.label
+      nextTick(() => focusMenuOption(0))
+      break
+    case 'ArrowRight':
+      e.preventDefault()
+      openMenuByIndex(index + 1)
+      break
+    case 'ArrowLeft':
+      e.preventDefault()
+      openMenuByIndex(index - 1)
+      break
+    case 'Escape':
+      closeMenu()
+      break
+  }
+}
+
+/** 下拉面板：↑↓/Home/End 移动，Enter 激活，Esc 关闭并归还焦点，← → 切换顶级菜单 */
+function onDropdownKeydown(e: KeyboardEvent, menuIndex: number) {
+  const options = getMenuOptions()
+  const current = options.indexOf(document.activeElement as HTMLElement)
+
+  switch (e.key) {
+    case 'ArrowDown':
+      e.preventDefault()
+      focusMenuOption(current + 1)
+      break
+    case 'ArrowUp':
+      e.preventDefault()
+      focusMenuOption(current <= 0 ? options.length - 1 : current - 1)
+      break
+    case 'Home':
+      e.preventDefault()
+      focusMenuOption(0)
+      break
+    case 'End':
+      e.preventDefault()
+      focusMenuOption(options.length - 1)
+      break
+    case 'Enter':
+    case ' ':
+      e.preventDefault()
+      if (document.activeElement instanceof HTMLElement) document.activeElement.click()
+      break
+    case 'Escape':
+      e.preventDefault()
+      closeMenu()
+      nextTick(() => focusTopMenu(menuIndex))
+      break
+    case 'ArrowRight':
+      e.preventDefault()
+      openMenuByIndex(menuIndex + 1)
+      break
+    case 'ArrowLeft':
+      e.preventDefault()
+      openMenuByIndex(menuIndex - 1)
+      break
+    case 'Tab':
+      // 菜单栏内部用 Tab 退出，避免焦点陷入（WCAG 2.1.2）
+      e.preventDefault()
+      closeMenu()
+      nextTick(() => focusTopMenu(menuIndex))
+      break
+  }
+}
+
+/**
+ * 按 Alt+字母 匹配菜单：从 label 尾部的 (X) 中解析快捷键，
+ * 例如「文件(F)」→ f。原先硬编码 { f: '文件' }，与实际 label 不匹配导致快捷键恒失效。
+ */
+function resolveAltMenuLabel(key: string): string | undefined {
+  const lowered = key.toLowerCase()
+  return menus.value.find((m) => {
+    const matched = m.label.match(/\(([A-Za-z])\)\s*$/)
+    return matched?.[1]?.toLowerCase() === lowered
+  })?.label
+}
+
 const handleGlobalClick = (e: MouseEvent) => {
   const target = e.target as HTMLElement
   if (!target.closest('.menu-bar')) {
@@ -450,15 +648,25 @@ const handleGlobalClick = (e: MouseEvent) => {
 }
 
 const handleKeydown = (e: KeyboardEvent) => {
-  if (e.altKey) {
-    e.preventDefault()
-    const key = e.key.toLowerCase()
-    const menuMap: Record<string, string> = {
-      'f': '文件',
-      'e': '编码'
-    }
-    if (menuMap[key]) {
-      activeMenu.value = activeMenu.value === menuMap[key] ? null : menuMap[key]
+  // Alt 组合键：仅在命中菜单快捷键时拦截，避免吞掉其它 Alt 组合
+  if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    const label = resolveAltMenuLabel(e.key)
+    if (label) {
+      e.preventDefault()
+      e.stopPropagation()
+      if (activeMenu.value === label) {
+        closeMenu()
+        return
+      }
+      activeMenu.value = label
+      nextTick(() => {
+        const index = menus.value.findIndex((m) => m.label === label)
+        if (index >= 0) {
+          topMenuRefs.value[index]?.focus()
+          focusMenuOption(0)
+        }
+      })
+      return
     }
   }
   if (e.key === 'Escape') {
@@ -500,21 +708,37 @@ onUnmounted(() => {
 
   .menu-item {
     position: relative;
-    padding: 0 8px;
     height: 100%;
     display: flex;
     align-items: center;
-    cursor: pointer;
-    font-size: var(--font-size-base);
     white-space: nowrap;
-    transition: background-color 0.15s;
 
-    @include theme.useTheme {
-      color: theme.getVar('textColor');
+    .menu-btn {
+      height: 100%;
+      padding: 0 8px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      font-size: var(--font-size-base);
+      font-family: inherit;
+      transition: background-color 0.15s;
+      // 语义化 <button> 需要抹平浏览器默认外观
+      appearance: none;
+      border: none;
+      background: transparent;
+
+      @include theme.useTheme {
+        color: theme.getVar('textColor');
+      }
+
+      &:hover {
+        @include theme.useTheme {
+          background-color: theme.getVar('activityBarHover');
+        }
+      }
     }
 
-    &:hover,
-    &.is-active {
+    &.is-active .menu-btn {
       @include theme.useTheme {
         background-color: theme.getVar('activityBarHover');
       }
@@ -558,24 +782,41 @@ onUnmounted(() => {
           color: theme.getVar('textColor');
         }
 
-        &:hover {
+        &:hover,
+        &:focus-visible {
           @include theme.useTheme {
             background-color: theme.getVar('hoverColor');
+            // 文字保持主文本色：原先写死 #fff，在亮色 hover 底色 #ecf5ff 上仅 1.10:1，
+            // 文字等同消失（WCAG 1.4.3 需 4.5:1）
+            color: theme.getVar('textColor');
           }
-          color: #fff;
 
           .option-shortcut {
             opacity: 1;
           }
         }
 
-        &.is-disabled {
-          opacity: 0.4;
-          cursor: not-allowed;
+        // 暗色主题 hover 底色较深（IDEA_MENU_HOVER #4b6eaf），主文本色 #bbbbbb 仅 2.64:1，
+        // 改用纯白达到 5.06:1
+        html.dark &:hover,
+        html.dark &:focus-visible {
+          color: #fff;
+        }
 
-          &:hover {
+        &.is-disabled {
+          cursor: not-allowed;
+          // 用专用禁用色令牌替代 opacity: 0.4（后者实测仅 2.43:1 / 2.16:1）
+          @include theme.useTheme {
+            color: theme.getVar('textDisabled');
+          }
+
+          &:hover,
+          &:focus-visible {
             background-color: transparent;
-            color: inherit;
+
+            @include theme.useTheme {
+              color: theme.getVar('textDisabled');
+            }
           }
         }
 

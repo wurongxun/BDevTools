@@ -3,14 +3,21 @@
   <Teleport to="body">
     <div
       v-drag-pop-up
+      ref="dialogRef"
       class="global-dialog-wrapper"
       :class="{ 'is-vertical-center': verticalCenter }"
       :style="dialogStyle"
       v-if="dialogVisible"
+      role="dialog"
+      aria-modal="true"
+      :aria-labelledby="titleId"
+      tabindex="-1"
     >
       <div class="dialog-header">
-        <span class="title">{{ title }}</span>
-        <span class="close-btn" @click="handleClose">✕</span>
+        <span :id="titleId" class="title">{{ title }}</span>
+        <button type="button" class="close-btn" :aria-label="`关闭 ${title}`" @click="handleClose">
+          ✕
+        </button>
       </div>
       <div class="dialog-body">
         <slot />
@@ -22,13 +29,14 @@
     <div
       class="dialog-overlay"
       v-if="dialogVisible"
+      aria-hidden="true"
       @click="closeOnOverlay ? handleClose() : undefined"
     />
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, nextTick, onBeforeUnmount } from 'vue'
 import vDragPopUp from '@/directives/dragPopUp'
 
 interface Props {
@@ -57,21 +65,109 @@ interface Emits {
 
 const emit = defineEmits<Emits>()
 
-// 默认水平垂直居中；宽高均可通过 prop 定制，height 不传时内容自适应
+// 默认水平垂直居中；宽高均可通过 prop 定制，height 不传时内容自适应。
+// max-width/max-height 兜底：小窗口下固定宽度会被裁切（审查报告 #30）
 const dialogStyle = computed(() => ({
   width: props.width,
+  maxWidth: 'calc(100vw - 32px)',
+  maxHeight: 'calc(100vh - 32px)',
   ...(props.height ? { height: props.height } : {})
 }))
 
 const dialogVisible = ref<boolean>(props.modelValue)
 
+// 弹窗标题 id，供 aria-labelledby 关联
+const titleId = `global-dialog-title-${Math.random().toString(36).slice(2, 9)}`
+const dialogRef = ref<HTMLElement | null>(null)
+/** 打开前的焦点元素，关闭后归还焦点（WCAG 2.4.3 Focus Order） */
+let lastFocusedElement: HTMLElement | null = null
+
+/** 可聚焦元素选择器（排除 disabled / 隐藏元素） */
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])'
+].join(',')
+
+function getFocusableElements(): HTMLElement[] {
+  if (!dialogRef.value) return []
+  return Array.from(dialogRef.value.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (el) => el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement
+  )
+}
+
+/**
+ * 弹窗内的键盘处理（捕获阶段，位于 document 上）：
+ * - Esc 关闭弹窗
+ * - Tab / Shift+Tab 在弹窗内循环，避免焦点跑到背景控件（WCAG 2.1.2）
+ */
+function onKeydownCapture(e: KeyboardEvent) {
+  if (!dialogVisible.value) return
+
+  if (e.key === 'Escape') {
+    e.stopPropagation()
+    e.preventDefault()
+    handleClose()
+    return
+  }
+
+  if (e.key !== 'Tab') return
+
+  const focusable = getFocusableElements()
+  if (focusable.length === 0) {
+    e.preventDefault()
+    dialogRef.value?.focus()
+    return
+  }
+
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  const active = document.activeElement as HTMLElement | null
+
+  // 焦点已在弹窗外（例如误入背景控件），拉回弹窗内
+  if (!active || !dialogRef.value?.contains(active)) {
+    e.preventDefault()
+    first.focus()
+    return
+  }
+
+  if (e.shiftKey && active === first) {
+    e.preventDefault()
+    last.focus()
+  } else if (!e.shiftKey && active === last) {
+    e.preventDefault()
+    first.focus()
+  }
+}
+
 watch(() => props.modelValue, (val: boolean) => {
   dialogVisible.value = val
 })
 
-watch(dialogVisible, (val: boolean) => {
+watch(dialogVisible, async (val: boolean) => {
   emit('update:modelValue', val)
-  if (!val) emit('close')
+  if (val) {
+    lastFocusedElement = document.activeElement as HTMLElement | null
+    await nextTick()
+    // 焦点移入弹窗：优先聚焦首个可聚焦控件，否则回落到弹窗容器本身
+    const focusable = getFocusableElements()
+    const target = focusable.find((el) => !el.classList.contains('close-btn')) ?? focusable[0]
+    ;(target ?? dialogRef.value)?.focus()
+    document.addEventListener('keydown', onKeydownCapture, true)
+  } else {
+    document.removeEventListener('keydown', onKeydownCapture, true)
+    lastFocusedElement?.focus?.()
+    lastFocusedElement = null
+    emit('close')
+  }
+})
+
+// 组件卸载时兜底移除监听，避免监听器泄漏
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onKeydownCapture, true)
 })
 
 const handleClose = (): void => {
@@ -145,6 +241,13 @@ const handleClose = (): void => {
   cursor: pointer;
   border-radius: var(--radius-sm);
   transition: all 0.2s;
+  // 语义化 <button> 需要抹平浏览器默认外观
+  appearance: none;
+  border: none;
+  padding: 0;
+  background: transparent;
+  font-family: inherit;
+  flex-shrink: 0;
 
   @include theme.useTheme {
     font-size: theme.getVar('fontSizeSmall');

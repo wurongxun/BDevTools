@@ -13,12 +13,12 @@
       ]
     }"
   >
-    <div class="setting-trigger">
+    <button type="button" class="setting-trigger" aria-label="打开设置菜单" aria-haspopup="true">
       <svg-icon
         class-name="svg-icon setting-icon"
         icon-class="setting"
       />
-    </div>
+    </button>
     <template #dropdown>
       <el-dropdown-menu class="setting-dropdown-menu">
         <el-dropdown-item command="setting" class="menu-item">
@@ -91,6 +91,11 @@ const handleCommand = (command: string | number | object) => {
   cursor: pointer;
   border-radius: var(--radius-md);
   transition: all 0.2s ease;
+  // 语义化 <button> 需要抹平浏览器默认外观
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: inherit;
 
   &:hover {
     background-color: rgba(var(--el-color-primary-rgb), 0.1);
@@ -112,14 +117,8 @@ const handleCommand = (command: string | number | object) => {
   }
 }
 
-// 移除默认焦点样式
-:deep(.el-dropdown:focus) {
-  outline: none !important;
-}
-
-:deep(.el-dropdown > .setting-trigger:focus-visible) {
-  outline: none !important;
-}
+// 焦点样式由 index.scss 的全局 :focus-visible 基线统一提供，
+// 此处不再清除 outline（清除后键盘用户完全看不到焦点位置，违反 WCAG 2.4.7）
 </style>
 
 <style lang="scss">

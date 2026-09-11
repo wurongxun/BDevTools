@@ -13,5 +13,5 @@ export default {
   mainPanel: markRaw(MainPanel),
   tabBar: markRaw(ConnectionTabBar),
   workspaceDirs: ['keys', 'sessions'],
-  order: 2
+  order: 3
 } satisfies ToolPlugin

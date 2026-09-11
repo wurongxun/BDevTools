@@ -63,6 +63,40 @@ pub async fn db_export_excel(
     }
 }
 
+/// 按任意 SQL 语句导出结果为 CSV（全量，不受查询行数上限限制）
+pub async fn db_export_sql_csv(
+    config_id: String,
+    sql: String,
+    file_path: String,
+) -> Response<ExportResult> {
+    let pool = match get_pool(&config_id) {
+        Some(p) => p,
+        None => return Response::new(300, ExportResult { file_path: String::new(), row_count: 0 }, "未连接到数据库"),
+    };
+
+    match export_to_csv(&pool, &sql, &file_path).await {
+        Ok(count) => Response::new(200, ExportResult { file_path, row_count: count }, "导出成功"),
+        Err(e) => Response::new(300, ExportResult { file_path: String::new(), row_count: 0 }, &format!("导出失败: {}", e)),
+    }
+}
+
+/// 按任意 SQL 语句导出结果为 Excel（全量，不受查询行数上限限制）
+pub async fn db_export_sql_excel(
+    config_id: String,
+    sql: String,
+    file_path: String,
+) -> Response<ExportResult> {
+    let pool = match get_pool(&config_id) {
+        Some(p) => p,
+        None => return Response::new(300, ExportResult { file_path: String::new(), row_count: 0 }, "未连接到数据库"),
+    };
+
+    match export_to_excel(&pool, &sql, &file_path, "查询结果").await {
+        Ok(count) => Response::new(200, ExportResult { file_path, row_count: count }, "导出成功"),
+        Err(e) => Response::new(300, ExportResult { file_path: String::new(), row_count: 0 }, &format!("导出失败: {}", e)),
+    }
+}
+
 /// 从 CSV 导入数据到表
 pub async fn db_import_csv(
     config_id: String,
@@ -108,6 +142,14 @@ async fn export_to_csv(pool: &DbPool, sql: &str, file_path: &str) -> Result<u64>
     let count = match pool {
         DbPool::MySQL(p) => stream_mysql_to_csv(p, sql, &mut wtr).await?,
         DbPool::PostgreSQL(p) => stream_pg_to_csv(p, sql, &mut wtr).await?,
+        DbPool::SqlServer(p) => {
+            let (columns, rows) = p.query_rows(sql, usize::MAX).await?;
+            stream_generic_to_csv(&columns, &rows, &mut wtr)?
+        }
+        DbPool::Oracle(p) => {
+            let (columns, rows) = p.query_rows("", sql, usize::MAX).await?;
+            stream_generic_to_csv(&columns, &rows, &mut wtr)?
+        }
     };
     wtr.flush()?;
     Ok(count)
@@ -160,12 +202,28 @@ fn value_to_csv_string(v: &serde_json::Value) -> String {
     }
 }
 
+/// 把已在内存中的 (列名, 行) 结果集写入 CSV（用于 SQL Server / Oracle 后端）
+fn stream_generic_to_csv(
+    columns: &[String],
+    rows: &[Vec<serde_json::Value>],
+    wtr: &mut csv::Writer<File>,
+) -> Result<u64> {
+    wtr.write_record(columns)?;
+    for row in rows {
+        let str_row: Vec<String> = row.iter().map(value_to_csv_string).collect();
+        wtr.write_record(&str_row)?;
+    }
+    Ok(rows.len() as u64)
+}
+
 /// 导出表数据为 Excel（导出全量数据，不受查询行数上限限制）
 async fn export_to_excel(pool: &DbPool, sql: &str, file_path: &str, sheet_name: &str) -> Result<u64> {
     // Excel 工作簿需在内存中构建，全量读取（无行数上限）
     let (columns, rows) = match pool {
         DbPool::MySQL(p) => operations::fetch_mysql_rows(p, sql, usize::MAX).await?,
         DbPool::PostgreSQL(p) => operations::fetch_pg_rows(p, sql, usize::MAX).await?,
+        DbPool::SqlServer(p) => p.query_rows(sql, usize::MAX).await?,
+        DbPool::Oracle(p) => p.query_rows("", sql, usize::MAX).await?,
     };
 
     let mut workbook = rust_xlsxwriter::Workbook::new();

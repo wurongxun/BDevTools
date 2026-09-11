@@ -1,9 +1,10 @@
-use std::os::windows::process::CommandExt;
 use crate::response::resp_data::ResData;
-use winreg::enums::*;
-use winreg::RegKey;
 
-const APP_PROG_ID: &str = "BackendDevelopmentTools.File";
+// 本模块顶层不引任何 Windows-only 依赖，保证 Linux / macOS 可编译；
+// 系统文件关联在 Windows 上写注册表实现，其余平台命令保留但返回明确错误。
+
+#[cfg(target_os = "windows")]
+const APP_PROG_ID: &str = "BackendDevTools.File";
 
 pub async fn register_file_association() -> ResData<String> {
     let exe_path = std::env::current_exe()
@@ -26,32 +27,50 @@ pub async fn register_file_association() -> ResData<String> {
     }
 }
 
+/// Windows：`ms-settings:defaultappsbytype`（ShellExecute via cmd）；其余平台无标准 URI，
+/// 提示用户在系统设置中手动设置。
 pub async fn open_default_apps_settings() -> ResData<String> {
-    let result = std::process::Command::new("cmd")
-        .args(["/C", "start", "ms-settings:defaultappsbytype"])
-        .creation_flags(0x08000000)
-        .spawn();
-
-    match result {
-        Ok(_) => ResData {
-            code: 200,
-            msg: "打开设置成功".to_string(),
-            data: "".to_string(),
-        },
-        Err(e) => ResData {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let result = std::process::Command::new("cmd")
+            .args(["/C", "start", "ms-settings:defaultappsbytype"])
+            .creation_flags(0x08000000)
+            .spawn();
+        match result {
+            Ok(_) => ResData {
+                code: 200,
+                msg: "打开设置成功".to_string(),
+                data: "".to_string(),
+            },
+            Err(e) => ResData {
+                code: 500,
+                msg: format!("打开设置失败: {}", e),
+                data: "".to_string(),
+            },
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        ResData {
             code: 500,
-            msg: format!("打开设置失败: {}", e),
+            msg: "当前平台请在系统设置中手动设置默认应用".to_string(),
             data: "".to_string(),
-        },
+        }
     }
 }
 
+/// Windows：写 HKCU 注册表完成 ProgID / 扩展名关联 + 广播系统刷新。
+#[cfg(target_os = "windows")]
 fn do_register(exe_path: &str, extensions: &[&str]) -> Result<(), Box<dyn std::error::Error>> {
+    use winreg::enums::*;
+    use winreg::RegKey;
+
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
 
     // 注册 ProgID
     let (prog_key, _) = hkcu.create_subkey(format!("Software\\Classes\\{}", APP_PROG_ID))?;
-    prog_key.set_value("", &"BackendDevelopmentTools 文件")?;
+    prog_key.set_value("", &"BackendDevTools 文件")?;
 
     // 设置图标
     let (icon_key, _) =
@@ -96,7 +115,7 @@ fn do_register(exe_path: &str, extensions: &[&str]) -> Result<(), Box<dyn std::e
         .to_string();
     let (app_key, _) =
         hkcu.create_subkey(format!("Software\\Classes\\Applications\\{}", exe_name))?;
-    app_key.set_value("", &"BackendDevelopmentTools")?;
+    app_key.set_value("", &"BackendDevTools")?;
 
     let (app_cmd_key, _) = hkcu.create_subkey(format!(
         "Software\\Classes\\Applications\\{}\\shell\\open\\command",
@@ -109,13 +128,24 @@ fn do_register(exe_path: &str, extensions: &[&str]) -> Result<(), Box<dyn std::e
 
     Ok(())
 }
+
+/// 非 Windows：文件关联依赖平台机制（xdg-mime / LaunchServices），本工具暂不写，明确报错。
+#[cfg(not(target_os = "windows"))]
+fn do_register(
+    _exe_path: &str,
+    _extensions: &[&str],
+) -> Result<(), Box<dyn std::error::Error>> {
+    Err("当前平台暂不支持注册系统文件关联，请在系统设置中手动关联 .md 文件".into())
+}
+
+#[cfg(target_os = "windows")]
 fn notify_system_change() {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
     use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{
         SendMessageTimeoutW, SMTO_ABORTIFHUNG,
     };
-    use std::ffi::OsStr;
-    use std::os::windows::ffi::OsStrExt;
 
     unsafe {
         let setting = OsStr::new("Policy").encode_wide().chain(Some(0)).collect::<Vec<_>>();

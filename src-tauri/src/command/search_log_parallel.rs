@@ -1,7 +1,7 @@
 use crate::response::resp_data::ResData;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
@@ -48,13 +48,6 @@ pub struct SearchIndex {
     pub match_line_numbers: Vec<u64>,
 }
 
-#[derive(Deserialize)]
-pub struct PageRequest {
-    pub search_id: String,
-    pub page: u64,
-    pub page_size: u64,
-}
-
 #[derive(Serialize)]
 pub struct PageResult {
     pub matches: Vec<LogMatch>,
@@ -77,7 +70,8 @@ lazy_static! {
 }
 
 const INDEX_CHUNK_LINES: u64 = 50000;
-fn read_line_lossy<R: BufRead>(
+/// 逐行读取并按指定编码解码（log_index 模块复用）
+pub(crate) fn read_line_lossy<R: BufRead>(
     reader: &mut R,
     buf: &mut Vec<u8>,
     encoding: Option<&'static Encoding>,
@@ -368,125 +362,6 @@ pub async fn search_log_jump_to(
 
 // ==================== 内部工具函数 ====================
 
-struct ChunkInfo {
-    byte_start: u64,
-    byte_end: u64,
-    line_start: u64,
-}
-
-fn compute_chunk_infos(
-    file_path: &str,
-    num_chunks: usize,
-    chunk_size: u64,
-    file_size: u64,
-) -> Result<Vec<ChunkInfo>, String> {
-    let file = File::open(file_path).map_err(|e| format!("打开文件失败: {}", e))?;
-    let mut reader = BufReader::with_capacity(256 * 1024, file);
-
-    let mut infos: Vec<ChunkInfo> = Vec::with_capacity(num_chunks);
-    let mut current_byte: u64 = 0;
-    let mut current_line: u64 = 1;
-
-    for i in 0..num_chunks {
-        let byte_start = current_byte;
-        let line_start = current_line;
-
-        let rough_end = if i == num_chunks - 1 {
-            file_size
-        } else {
-            (i as u64 + 1) * chunk_size
-        };
-
-        let actual_end = align_to_newline(&mut reader, rough_end, file_size)?;
-        let newline_count = count_newlines(&mut reader, byte_start, actual_end)?;
-
-        current_byte = actual_end;
-        current_line += newline_count;
-
-        infos.push(ChunkInfo {
-            byte_start,
-            byte_end: actual_end,
-            line_start,
-        });
-    }
-
-    Ok(infos)
-}
-
-fn align_to_newline(reader: &mut BufReader<File>, pos: u64, file_size: u64) -> Result<u64, String> {
-    if pos >= file_size {
-        return Ok(file_size);
-    }
-
-    reader
-        .seek(SeekFrom::Start(pos))
-        .map_err(|e| format!("seek 失败: {}", e))?;
-
-    let mut buf = [0u8; 1];
-    let mut current = pos;
-    while current < file_size {
-        reader
-            .read_exact(&mut buf)
-            .map_err(|e| format!("读取失败: {}", e))?;
-        current += 1;
-        if buf[0] == b'\n' {
-            return Ok(current);
-        }
-    }
-    Ok(file_size)
-}
-
-fn count_newlines(reader: &mut BufReader<File>, start: u64, end: u64) -> Result<u64, String> {
-    reader
-        .seek(SeekFrom::Start(start))
-        .map_err(|e| format!("seek 失败: {}", e))?;
-
-    let size = (end - start) as usize;
-    let mut buffer = vec![0u8; size];
-    reader
-        .read_exact(&mut buffer)
-        .map_err(|e| format!("读取失败: {}", e))?;
-
-    let count = buffer.iter().filter(|&&b| b == b'\n').count() as u64;
-    Ok(count)
-}
-
-fn search_chunk_with_line_offset(
-    file_path: &str,
-    info: ChunkInfo,
-    keyword: &str,
-) -> Result<(Vec<LogMatch>, u64, u64), String> {
-    let mut file = File::open(file_path).map_err(|e| format!("打开文件失败: {}", e))?;
-    file.seek(SeekFrom::Start(info.byte_start))
-        .map_err(|e| format!("seek 失败: {}", e))?;
-
-    let size = (info.byte_end - info.byte_start) as usize;
-    let limited = file.take(size as u64);
-    let mut buf_reader = BufReader::with_capacity(64 * 1024, limited);
-    let mut line_buf = Vec::with_capacity(1024);
-
-    let mut matches = Vec::new();
-    let mut line_number = info.line_start;
-    let mut total_matches: u64 = 0;
-    let mut total_lines: u64 = 0;
-
-    while let Some((line, _)) =
-        read_line_lossy(&mut buf_reader, &mut line_buf, None).map_err(|e| format!("读取行失败: {}", e))?
-    {
-        if line.to_lowercase().contains(keyword) {
-            total_matches += 1;
-            matches.push(LogMatch {
-                line_number,
-                content: line,
-            });
-        }
-        line_number += 1;
-        total_lines += 1;
-    }
-
-    Ok((matches, total_matches, total_lines))
-}
-
 fn extract_matches_range(
     cached: &CachedSearch,
     global_start: u64,
@@ -749,7 +624,8 @@ pub struct FileLinesResult {
     pub has_more: bool,
 }
 
-fn resolve_encoding(name: &str) -> &'static Encoding {
+/// 编码名 → encoding_rs 静态编码（log_index 模块复用）
+pub(crate) fn resolve_encoding(name: &str) -> &'static Encoding {
     match name.to_uppercase().as_str() {
         "UTF-8" | "UTF8" => &encoding_rs::UTF_8,
         "GBK" | "GB2312" | "GB18030" | "CP936" => &encoding_rs::GBK,

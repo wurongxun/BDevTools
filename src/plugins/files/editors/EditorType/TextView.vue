@@ -20,18 +20,18 @@
             </template>
           </el-input>
           <div class="search-actions">
-            <el-button size="small" @click="prevMatch" :disabled="currentMatch <= 1">
+            <app-button size="small" @click="prevMatch" :disabled="currentMatch <= 1">
               <el-icon><ArrowUp /></el-icon>
-            </el-button>
+            </app-button>
             <el-input v-model="jumpTo" :min="1" :max="totalMatches" size="small" @change="jumpToMatch" controls-position="compact" />
-            <el-button size="small" @click="nextMatch" :disabled="currentMatch >= totalMatches">
+            <app-button size="small" @click="nextMatch" :disabled="currentMatch >= totalMatches">
               <el-icon><ArrowDown /></el-icon>
-            </el-button>
+            </app-button>
             <span class="match-count">{{ currentMatch }} / {{ totalMatches }}</span>
           </div>
-          <el-button size="small" text @click="showSearchBar = false">
+          <app-button size="small" text @click="showSearchBar = false">
             <el-icon><Close /></el-icon>
-          </el-button>
+          </app-button>
         </div>
       </div>
     </transition>
@@ -62,12 +62,12 @@
     </div>
     <!-- 块导航栏 -->
     <div class="block-nav">
-      <el-button size="small" @click="goToFirstBlock" :disabled="currentBlock <= 1 || totalBlocks <= 1 || isSearching" title="第一块 (Home)">
+      <app-button size="small" @click="goToFirstBlock" :disabled="currentBlock <= 1 || totalBlocks <= 1 || isSearching" title="第一块 (Home)">
         <el-icon><DArrowLeft /></el-icon>
-      </el-button>
-      <el-button size="small" @click="goToPrevBlock" :disabled="currentBlock <= 1 || isSearching" title="上一块 (PageUp)">
+      </app-button>
+      <app-button size="small" @click="goToPrevBlock" :disabled="currentBlock <= 1 || isSearching" title="上一块 (PageUp)">
         <el-icon><ArrowLeft /></el-icon>
-      </el-button>
+      </app-button>
       <div class="block-jump">
         <el-input
           v-model="jumpBlockInput"
@@ -79,12 +79,12 @@
         />
         <span class="block-total">/{{ totalBlocks }}</span>
       </div>
-      <el-button size="small" @click="goToNextBlock" :disabled="currentBlock >= totalBlocks || isSearching" title="下一块 (PageDown)">
+      <app-button size="small" @click="goToNextBlock" :disabled="currentBlock >= totalBlocks || isSearching" title="下一块 (PageDown)">
         <el-icon><ArrowRight /></el-icon>
-      </el-button>
-      <el-button size="small" @click="goToLastBlock" :disabled="currentBlock >= totalBlocks || isSearching" title="最后一块 (End)">
+      </app-button>
+      <app-button size="small" @click="goToLastBlock" :disabled="currentBlock >= totalBlocks || isSearching" title="最后一块 (End)">
         <el-icon><DArrowRight /></el-icon>
-      </el-button>
+      </app-button>
       <span class="line-range">行 {{ currentStartLine }}-{{ currentEndLine }}</span>
       <el-dropdown trigger="click" @command="onEncodingChange" class="encoding-selector">
         <span class="encoding-label">{{ currentEncoding }}</span>
@@ -969,7 +969,6 @@ async function switchEncoding(enc: string) {
   flex-direction: column;
   height: 100%;
   position: relative;
-  outline: none;
 }
 
 .search-bar-overlay {
@@ -1111,7 +1110,7 @@ async function switchEncoding(enc: string) {
   font-family: var(--font-family-mono);
   font-size: getVar(fontSize);
   @include useTheme {
-    background: getVar(bgColor);
+    background: getVar(appMainBgColor);
   }
 }
 

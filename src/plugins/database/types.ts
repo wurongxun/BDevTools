@@ -3,7 +3,7 @@
  */
 
 /** 数据库类型 */
-export type DbType = 'mysql' | 'postgresql'
+export type DbType = 'mysql' | 'postgresql' | 'sqlserver' | 'oracle'
 
 /** 数据库连接配置 */
 export interface DbConnectionConfig {
@@ -34,6 +34,8 @@ export interface SqlResult {
   is_query: boolean
   /** 是否还有下一页数据（分页查询） */
   has_more?: boolean
+  /** 查询结果总行数（仅纯 SELECT 首页统计；DML 或无法包装的语句为 null） */
+  total?: number | null
 }
 
 /** 表数据查询结果 */

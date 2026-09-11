@@ -104,6 +104,13 @@ pub fn kv_delete(file: String, key: String) -> Response<bool> {
     }
 }
 
+/// 直读某 key（供后端业务模块内部使用，如 MAT 插件读 `analysisBudgetGb` 覆盖项）。
+/// 文件不存在 / 损坏 / 路径校验失败均返回 None，调用方按默认值处理。
+pub(crate) fn kv_read_value(file: &str, key: &str) -> Option<Value> {
+    let path = kv_file_path(file).ok()?;
+    read_kv_file(&path).get(key).cloned()
+}
+
 /// 读取全部键值对（与 store 插件 entries() 一致，返回 [key, value] 数组）
 pub fn kv_entries(file: String) -> Response<Vec<(String, Value)>> {
     let path = match kv_file_path(&file) {

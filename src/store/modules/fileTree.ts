@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 
 import ToolUtils from '@/utils/ToolUtils'
 import { TreeNode } from '@/Types/entitys'
+import { get_file_Api } from '@/api/file'
 
 
 export const fileTreeStore = defineStore('fileTreeStore', {
@@ -24,15 +25,20 @@ export const fileTreeStore = defineStore('fileTreeStore', {
       this.workingDirectory = dir
     },
     /**
-     * @description 数组扁平化， 同时修改路由name为[父元素name -> name]
-     * @returns RouteRecordRaw[]
+     * 构建当前工作目录的文件树（真实加载：调用 get_document_notebooks 并写入 tree_node）
+     * 工作目录未就绪时清空树（此时无目录可加载）
      */
     async setFileTree() {
-      try {
-        this.routes_loading = true
+      if (!this.workingDirectory) {
         this.tree_node = []
+        return
+      }
+      this.routes_loading = true
+      try {
+        await get_file_Api()
       } catch (error) {
-        console.error('获取路由信息失败:', error)
+        console.error('获取文件树失败:', error)
+        this.tree_node = []
       } finally {
         this.routes_loading = false
       }

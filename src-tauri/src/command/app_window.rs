@@ -1,6 +1,5 @@
-use tauri::{App, Context, Manager};
-use tauri_plugin_window_state::{StateFlags, WindowExt};
-use window_shadows::set_shadow;
+use tauri::Manager;
+
 /**
  * 关闭加载窗口  显示主窗口
  * @param window
@@ -17,16 +16,13 @@ pub async fn loding_window_close(window: tauri::Window) {
         .show()
         .unwrap();
 }
-pub async fn exit() {
-    std::process::exit(0)
-}
+
 /**
  * 关于窗口
  * @param handle
- * @param window
  */
-pub async fn about(handle: tauri::AppHandle, window: tauri::Window) {
-    let about_window = tauri::WebviewWindowBuilder::new(
+pub async fn about(handle: tauri::AppHandle, _window: tauri::Window) {
+    tauri::WebviewWindowBuilder::new(
         &handle,
         "about-window", /* the unique window label */
         tauri::WebviewUrl::App("/Windows/About".into()),
@@ -38,16 +34,13 @@ pub async fn about(handle: tauri::AppHandle, window: tauri::Window) {
     .resizable(false) //是否可调整大小
     .build()
     .unwrap();
-    //#[cfg(any(target_os = "windows", target_os = "macos"))]
-    //set_shadow(&about_window, true).expect("Unsupported platform!");
 }
 
 /**
  * note_book_window窗口
  * @param handle
- * @param window
  */
-pub async fn note_book_window(handle: tauri::AppHandle, window: tauri::Window) {
+pub async fn note_book_window(handle: tauri::AppHandle, _window: tauri::Window) {
     let note_book_window = tauri::WebviewWindowBuilder::new(
         &handle,
         "note_book", /* the unique window label */
@@ -62,11 +55,9 @@ pub async fn note_book_window(handle: tauri::AppHandle, window: tauri::Window) {
     .center()
     .build()
     .unwrap();
-    // #[cfg(any(target_os = "windows", target_os = "macos"))]
-    // set_shadow(&about_window, true).expect("Unsupported platform!");
-    //let _ = note_book_window.restore_state(StateFlags::all()); // will restore the window's state from disk
     note_book_window.show().unwrap();
 }
+
 /**
  * 最小化
  * @param handle
@@ -74,10 +65,10 @@ pub async fn note_book_window(handle: tauri::AppHandle, window: tauri::Window) {
  */
 pub fn windows_minimize(handle: tauri::AppHandle, label: String) {
     //获取窗口实例
-    println!("windows_minimize  {:?}", label);
     let window = handle.get_webview_window(label.as_str()).unwrap();
     window.minimize().unwrap();
 }
+
 /**
  * 隐藏
  * @param handle
@@ -88,6 +79,7 @@ pub fn windows_hide(handle: tauri::AppHandle, label: String) {
     let window = handle.get_webview_window(label.as_str()).unwrap();
     window.hide().unwrap();
 }
+
 /**
  * 最大化maximize
  * @param handle
@@ -98,27 +90,7 @@ pub fn windows_maximize(handle: tauri::AppHandle, label: String) {
     let window = handle.get_webview_window(label.as_str()).unwrap();
     window.maximize().unwrap();
 }
-/**
- * 将窗口居中显示
- * @param handle
- * @param window
- */
-pub fn windows_center(handle: tauri::AppHandle, label: String) {
-    //获取窗口实例
-    let window = handle.get_webview_window(label.as_str()).unwrap();
-    window.center().unwrap();
-}
 
-/**
- * 取消最大化窗口
- * @param handle
- * @param window
- */
-pub fn windows_unmaximize(handle: tauri::AppHandle, label: String) {
-    //获取窗口实例
-    let window = handle.get_webview_window(label.as_str()).unwrap();
-    window.unmaximize();
-}
 /**
  * 窗口close
  * @param handle

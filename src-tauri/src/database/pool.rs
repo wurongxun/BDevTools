@@ -1,20 +1,25 @@
 /*! # 数据库连接池管理
-全局管理 MySQL / PostgreSQL 连接池，通过连接ID索引。
+全局管理 MySQL / PostgreSQL / SQL Server / Oracle 连接池，通过连接ID索引。
 */
 use sqlx::mysql::MySqlPool;
 use sqlx::postgres::PgPool;
 use std::collections::HashMap;
+use std::sync::Arc;
 use parking_lot::Mutex;
 use lazy_static::lazy_static;
+use super::mssql::SqlServerPool;
+use super::odbc::OraclePool;
 
 /// 数据库连接池枚举
 #[derive(Clone)]
 pub enum DbPool {
     MySQL(MySqlPool),
     PostgreSQL(PgPool),
+    SqlServer(Arc<SqlServerPool>),
+    Oracle(Arc<OraclePool>),
 }
 
-/// 全局连接池管理器
+// 全局连接池管理器
 lazy_static! {
     pub static ref POOL_MANAGER: Mutex<HashMap<String, DbPool>> = Mutex::new(HashMap::new());
 }

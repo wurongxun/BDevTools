@@ -99,7 +99,6 @@ pub async fn ssh_connect(
 
             // 启动后台读取线程
             let inner_read = inner.clone();
-            let sid = session_id.clone();
             let ctx_read = ctx.clone();
             thread::spawn(move || {
                 let mut buf = [0u8; 4096];
@@ -215,7 +214,7 @@ pub async fn ssh_resize_pty(
 
 /// SFTP 连接
 pub async fn sftp_connect(
-    tab_id: String,
+    _tab_id: String,
     host: String,
     port: u16,
     username: String,

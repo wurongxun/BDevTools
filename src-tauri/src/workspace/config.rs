@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::entity::window::{WorkspaceConfig, WorkspaceSummary};
+use crate::entity::workspace::{WorkspaceConfig, WorkspaceSummary};
 
 /// 获取工作区存储目录路径
 fn get_workspaces_dir() -> PathBuf {

@@ -17,7 +17,7 @@
           </el-form-item>
 
           <el-form-item>
-            <el-button @click="onSubmit(ruleFormRef)" type="primary">确 认</el-button>
+            <app-button @click="onSubmit(ruleFormRef)" type="primary">确 认</app-button>
           </el-form-item>
         </el-form>
       </el-col>

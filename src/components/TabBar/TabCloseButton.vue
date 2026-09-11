@@ -1,7 +1,8 @@
 <template>
   <button
+    type="button"
     class="tab-bar-close"
-    @click.stop="$emit('click')"
+    @click.stop="$emit('close', $event)"
     :title="title"
   >
     <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
@@ -23,14 +24,17 @@ withDefaults(defineProps<{
   title: '关闭'
 })
 
+// 事件名用 close 而非 click：
+// 1) click 是原生事件名，父组件写 @click.stop 时 Vue 的 withModifiers 包装函数会以 emit 的
+//    负载（无负载即 undefined）为参数调用，进而 e.stopPropagation() 抛 TypeError；
+// 2) 声明 click 后父组件的 @click 会被当作组件事件而非 DOM 监听，语义与原生点击混淆。
+// 关闭语义始终携带原生事件，父组件可安全使用 .stop/.prevent 修饰符。
 defineEmits<{
-  (e: 'click'): void
+  (e: 'close', event: MouseEvent): void
 }>()
 </script>
 
 <style scoped lang="scss">
-@use '@/styles/theme.scss' as theme;
-
 .tab-bar-close {
   flex-shrink: 0;
   width: 20px;
@@ -40,25 +44,19 @@ defineEmits<{
   justify-content: center;
   background: none;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   cursor: pointer;
-  opacity: 0;
+  // 常显（次级灰）：禁止 opacity:0 仅 hover 显现（键盘用户看不到，违反无障碍约定），
+  // 悬停/聚焦时加深并出现圆形底
+  opacity: 0.55;
   transition: opacity 0.15s, background-color 0.15s;
+  color: var(--el-text-color-secondary);
 
-  @include theme.useTheme {
-    color: theme.getVar('textColor');
-  }
-
-  *:hover > &,
-  &:hover {
+  &:hover,
+  &:focus-visible {
     opacity: 1;
-  }
-
-  &:hover {
-    @include theme.useTheme {
-      background-color: theme.getVar('activityBarHover');
-      color: theme.getVar('textColor');
-    }
+    background-color: var(--el-fill-color);
+    color: var(--el-text-color-primary);
   }
 }
 </style>

@@ -1,8 +1,9 @@
-@use './element.scss';
 @use './variables.scss';
 @use './mixin.scss';
 @use './theme.scss';
 @use './tokens.scss';
+@use './element.scss';
+@use './logs.scss';
 
 // 生成设计令牌 CSS 变量（字体/字号/圆角/间距/阴影）
 @include tokens.tokensVars();
@@ -37,9 +38,60 @@ body {
   box-sizing: border-box;
 }
 
-a:focus,
-a:active {
+// ============================================================
+// 键盘焦点可见基线（WCAG 2.4.7 Focus Visible / 2.4.11 Focus Appearance）
+// 全应用此前从未定义焦点样式，且多处显式 outline:none，
+// 键盘用户完全无法定位焦点。此处建立统一基线，颜色取自主题令牌。
+// 用 :where() 保持 0 特异性，避免与组件自身样式打架。
+// ============================================================
+:where(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    summary,
+    [role='tab'],
+    [role='menuitem'],
+    [role='button'],
+    [role='option'],
+    [role='switch'],
+    [role='separator'],
+    [tabindex]:not([tabindex='-1'])
+  ):focus-visible {
+  outline: 2px solid var(--focus-ring-color, #005a9e);
+  outline-offset: 1px;
+  border-radius: var(--radius-sm);
+}
+
+// 鼠标/触摸触发的焦点不显示焦点环，仅保留键盘导航时的可见指示
+:focus:not(:focus-visible) {
   outline: none;
+}
+
+// 尊重系统「减弱动态效果」设置（WCAG 2.3.3 Animation from Interactions）
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// 仅供屏幕阅读器的文本（配合 aria-label/aria-describedby 使用）
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 a,
@@ -48,10 +100,6 @@ a:hover {
   cursor: pointer;
   color: inherit;
   text-decoration: none;
-}
-
-.el-overlay-dialog {
-  @include mixin.scrollbar();
 }
 
 /* 页面过渡动画 */

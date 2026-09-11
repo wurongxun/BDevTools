@@ -235,7 +235,7 @@ let md_working_directory = ref<string>('')
 // ===== 收藏/最近打开 =====
 const favoriteFiles = computed(() => docStore.favoriteFiles)
 const recentFiles = computed(() => docStore.recentFiles)
-const expandedSections = ref<Set<string>>(new Set(['favorites', 'recent']))
+const expandedSections = ref<Set<string>>(new Set(['favorites']))
 
 function toggleSection(key: string) {
   if (expandedSections.value.has(key)) expandedSections.value.delete(key)
@@ -719,7 +719,7 @@ onBeforeUnmount(() => {
   user-select: none;
 
   @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
+    background-color: theme.getVar('sidebarBg');
     color: theme.getVar('textColor');
   }
 }
@@ -783,7 +783,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
 
   @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
+    background-color: theme.getVar('sidebarBg');
     border-bottom: 1px solid theme.getVar('borderColor');
   }
 }
@@ -794,7 +794,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
 
   @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
+    background-color: theme.getVar('sidebarBg');
   }
 
   &:hover {
@@ -1196,7 +1196,8 @@ onBeforeUnmount(() => {
     transition: background-color 0.15s;
 
     @include theme.useTheme {
-      background-color: theme.getVar('bgColor');
+      // 树项背景继承 sidebarBg（与 file-tree-container 同源），保持侧栏色板一致
+      background-color: theme.getVar('sidebarBg');
       color: theme.getVar('textColor');
     }
 

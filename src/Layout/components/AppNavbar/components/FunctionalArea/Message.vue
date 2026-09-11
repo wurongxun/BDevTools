@@ -18,9 +18,9 @@
     <div class="message-container">
       <div class="message-header">
         <h3>消息中心</h3>
-        <el-button link type="primary" size="small" @click="markAllAsRead">
+        <app-button link type="primary" size="small" @click="markAllAsRead">
           全部已读
-        </el-button>
+        </app-button>
       </div>
       <el-tabs v-model="activeName" class="message-tabs">
         <el-tab-pane :label="`未读 (${unreadCount})`" name="wait">
@@ -76,13 +76,13 @@ interface MessageItem {
 
 const messageList = ref<MessageItem[]>([
   {
-    title: 'BackendDevelopmentTools 0.2.0 版发布',
-    content: 'BackendDevelopmentTools 0.2.0 版发布啦，新增了多项功能和优化，请升级到最新版体验！',
+    title: 'BackendDevTools 0.2.0 版发布',
+    content: 'BackendDevTools 0.2.0 版发布啦，新增了多项功能和优化，请升级到最新版体验！',
     time: '2024-01-15 10:30'
   },
   {
     title: '系统通知',
-    content: '欢迎使用 BackendDevelopmentTools，这是一个基于 Tauri 的跨平台桌面工具。',
+    content: '欢迎使用 BackendDevTools，这是一个基于 Tauri 的跨平台桌面工具。',
     time: '2024-01-14 09:00'
   }
 ])

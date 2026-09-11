@@ -2,24 +2,14 @@ use crate::core::ctx::AppContext;
 use crate::{
     response::resp_data::ResData,
     utils::{
-        fileUtil::{default_document_data, md_notebooks, read_dir_info, DirAndFileInfo},
-        regexUtil,
+        file_util::{default_document_data, md_notebooks},
+        regex_util,
     },
 };
-use hex;
-use md5::Digest;
-use std::{
-    error::Error,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 use std::fs;
 use std::io::Read;
 use chardetng::EncodingDetector;
-
-pub async fn my_read_file(path: std::path::PathBuf) -> String {
-    // 读取文件内容，以文本字符串形式返回
-    std::fs::read_to_string(path).unwrap()
-}
 
 // 打开目录（项目）
 pub async fn file_manager_open_path(ctx: &AppContext, path: String) -> ResData<String> {
@@ -82,7 +72,7 @@ pub async fn up_folder_name(
     }
     //文件路径 转换  linux and mac  "//"  windows "\\"
     //将最后的文件夹名称替换为 up_folder_name
-    let up_folder_name = regexUtil::replace_last_path_component(&path, &up_folder_name);
+    let up_folder_name = regex_util::replace_last_path_component(&path, &up_folder_name);
 
     //文件夹拼接 更换"/"追后的字符
     let new_name_res = tokio::fs::rename(&path, &up_folder_name).await;

@@ -1,16 +1,23 @@
 <template>
   <div class="status-bar">
     <div class="status-bar-left">
-      <div class="status-item workspace-item" @click="showWorkspaceDialog = true" title="点击切换工作区">
-        <svg class="status-icon" viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+      <button
+        type="button"
+        class="status-item is-interactive"
+        :aria-label="`切换工作区，当前：${workspaceName}`"
+        title="点击切换工作区"
+        @click="showWorkspaceDialog = true"
+      >
+        <svg class="status-icon" viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true">
           <path d="M1.5 2h5l1 1.5h7v10h-13z" fill="none" stroke="currentColor" stroke-width="1.2"/>
         </svg>
         <span class="workspace-name">{{ workspaceName }}</span>
-      </div>
+      </button>
     </div>
     <div class="status-bar-right">
+      <!-- 纯展示项：不可点击，因此不参与 hover 高亮 -->
       <div class="status-item" v-if="workingDir" :title="workingDir">
-        <svg class="status-icon" viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+        <svg class="status-icon" viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true">
           <path d="M1 3h6l1.5 2H15v9H1z" fill="none" stroke="currentColor" stroke-width="1.2"/>
         </svg>
         <span class="dir-name">{{ dirName }}</span>
@@ -85,17 +92,24 @@ onMounted(async () => {
   cursor: default;
   border-radius: var(--radius-xs);
   transition: background-color 0.15s;
+  // 语义化 <button> 需要抹平浏览器默认外观
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
 
-  &:hover {
-    @include theme.useTheme {
-      color: theme.getVar('textColor');
-      background: theme.getVar('activityBarHover');
+  // 仅交互项才响应 hover：原先不可点击的目录项也会高亮，误导用户以为可点击
+  &.is-interactive {
+    cursor: pointer;
+
+    &:hover {
+      @include theme.useTheme {
+        color: theme.getVar('textColor');
+        background: theme.getVar('activityBarHover');
+      }
     }
   }
-}
-
-.workspace-item {
-  cursor: pointer;
 }
 
 .status-icon {

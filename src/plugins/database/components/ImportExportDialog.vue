@@ -5,7 +5,7 @@
     width="480px"
     @close="handleClose"
   >
-    <el-form label-width="100px">
+    <el-form label-width="150px">
       <el-form-item label="目标表">
         <span>{{ table }}</span>
       </el-form-item>
@@ -18,8 +18,10 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="保存路径">
-          <el-input v-model="exportPath" placeholder="选择文件保存路径" />
-          <el-button size="small" @click="chooseExportPath" style="margin-left: 8px">浏览</el-button>
+          <div class="path-field">
+            <el-input v-model="exportPath" small placeholder="选择文件保存路径" />
+            <app-button bare :icon="FolderOpened" title="浏览" aria-label="浏览保存路径" @click="chooseExportPath" />
+          </div>
         </el-form-item>
       </template>
 
@@ -31,8 +33,10 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="选择文件">
-          <el-input v-model="importPath" placeholder="选择要导入的文件" />
-          <el-button size="small" @click="chooseImportFile" style="margin-left: 8px">浏览</el-button>
+          <div class="path-field">
+            <el-input v-model="importPath" placeholder="选择要导入的文件" />
+            <app-button bare :icon="FolderOpened" title="浏览" aria-label="浏览导入文件" @click="chooseImportFile" />
+          </div>
         </el-form-item>
         <el-form-item v-if="importFormat === 'csv'" label="包含表头">
           <el-switch v-model="hasHeader" />
@@ -48,10 +52,10 @@
     </div>
 
     <template #footer>
-      <el-button size="small" @click="handleClose">关闭</el-button>
-      <el-button size="small" type="primary" @click="handleExecute" :loading="executing" :disabled="mode === 'import' && !importPath">
+      <app-button size="small" @click="handleClose">关闭</app-button>
+      <app-button size="small" type="primary" @click="handleExecute" :loading="executing" :disabled="mode === 'import' && !importPath">
         {{ mode === 'export' ? '导出' : '导入' }}
-      </el-button>
+      </app-button>
     </template>
   </GlobalDialog>
 </template>
@@ -59,6 +63,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { FolderOpened } from '@element-plus/icons-vue'
 import GlobalDialog from '@/components/GlobalDialog.vue'
 import { save } from '@/core/runtime'
 import { open } from '@/core/runtime'
@@ -148,6 +153,22 @@ function handleClose() {
 </script>
 
 <style scoped>
+.path-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+/* el-input 自带 width:100%，在 flex 行里必须交出宽度控制权，
+   否则占满整行把浏览按钮挤到下一行（外层 el-form-item__content 是 flex-wrap:wrap） */
+.path-field :deep(.el-input) {
+  flex: 1;
+  min-width: 0;
+}
+/* 浏览按钮是固定 22×22 图标按钮，禁止被压缩 */
+.path-field :deep(.el-button) {
+  flex: none;
+}
 .import-result {
   margin-top: 12px;
 }
@@ -155,13 +176,15 @@ function handleClose() {
   margin-top: 8px;
   max-height: 150px;
   overflow: auto;
-  background: #fef0f0;
+  /* 用 EP danger-light-9 软红底（light=#fef0f0 / dark=#4d1214 已注入），跟随主题 */
+  background: var(--el-color-danger-light-9);
   padding: 8px;
   border-radius: var(--radius-md);
 }
 .error-item {
   font-size: var(--font-size-base);
-  color: #f56c6c;
+  /* 错误文字用 EP danger（light=#f56c6c / dark 已注入），跟随主题 */
+  color: var(--el-color-danger);
   line-height: 1.6;
 }
 </style>

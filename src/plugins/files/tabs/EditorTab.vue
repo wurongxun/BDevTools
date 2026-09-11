@@ -40,7 +40,7 @@
       <!-- 修改指示器 -->
       <span v-if="doc.isDirty" class="tab-dirty-indicator">●</span>
       <!-- 关闭按钮 -->
-      <TabCloseButton @click="handleTabClose(doc.id)" />
+      <TabCloseButton @close="handleTabClose(doc.id)" />
     </TabBarItem>
 
     <!-- 右滚动按钮 + 下拉菜单 -->
@@ -124,6 +124,17 @@
       </div>
     </template>
   </TabBarContainer>
+
+  <!-- 关闭全部确认（Tauri WebView2 不支持原生 confirm，统一走 GlobalDialog） -->
+  <GlobalDialog v-model="showCloseAllConfirm" title="关闭全部" width="400px">
+    <div class="close-all-message">
+      确定要关闭所有打开的文件吗？未保存的更改会先自动保存。
+    </div>
+    <template #footer>
+      <app-button size="small" @click="showCloseAllConfirm = false">取消</app-button>
+      <app-button size="small" type="danger" plain @click="confirmCloseAllTabs">全部关闭</app-button>
+    </template>
+  </GlobalDialog>
 </template>
 
 <script setup lang="ts">
@@ -132,8 +143,12 @@ import { useDocumentManagerStore } from '../store/documents'
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { TabBarContainer, TabBarItem, TabCloseButton } from '@/components/TabBar'
 import FileIcon from './FileIcon.vue'
+import GlobalDialog from '@/components/GlobalDialog.vue'
 
 const docStore = useDocumentManagerStore();
+
+// 「关闭全部」确认弹窗
+const showCloseAllConfirm = ref(false)
 
 // TabBar 容器引用
 const tabBarContainer = ref<InstanceType<typeof TabBarContainer> | null>(null)
@@ -309,14 +324,15 @@ function closeFromDropdown(docId: string) {
   }
 }
 
-// 关闭所有标签页
+// 关闭所有标签页（先弹确认，避免误触；确认后走批量关闭，快照只同步一次）
 function closeAllTabs() {
-  if (confirm('确定要关闭所有打开的文件吗？')) {
-    documentList.value.forEach(doc => {
-      docStore.closeDocument(doc.id)
-    })
-    showDropdown.value = false
-  }
+  showCloseAllConfirm.value = true
+}
+
+function confirmCloseAllTabs() {
+  showCloseAllConfirm.value = false
+  docStore.closeAllDocuments()
+  showDropdown.value = false
 }
 
 // 点击外部关闭下拉菜单
@@ -652,22 +668,19 @@ function handleDragEnd() {
   }
 }
 
+// 激活项高亮统一走主题令牌 hoverColor（与菜单 hover、活动栏一致），
+// 不再硬编码 VS Code 蓝 #094771/#0e5f94（审查报告 #22：亮色主题下同样生效、与浅色体系冲突）
 .dropdown-item-active {
-  background-color: #094771;
-  color: #ffffff;
-
   @include theme.useTheme {
-    background-color: #094771;
-    color: #ffffff;
+    background-color: theme.getVar('hoverColor');
+    color: theme.getVar('textColor');
   }
 }
 
 .dropdown-item-active:hover {
-  background-color: #0e5f94;
-
   @include theme.useTheme {
-    background-color: #0e5f94;
-    color: #ffffff;
+    background-color: theme.getVar('activityBarHover');
+    color: theme.getVar('textColor');
   }
 }
 
@@ -697,24 +710,22 @@ function handleDragEnd() {
   font-size: theme.getVar('fontSize');
 }
 
-/* 下拉项关闭按钮 */
+/* 下拉项关闭按钮：命中区 24×24（WCAG 2.5.8），始终可见以保证键盘/触屏可发现（审查报告 #26） */
 .dropdown-close {
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: none;
   border: none;
   border-radius: var(--radius-sm);
-  color: #969696;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s, background-color 0.15s;
+  transition: background-color 0.15s;
 
   @include theme.useTheme {
-    color: color.adjust(theme.getVar('textColor'), $lightness: -30%);
+    color: theme.getVar('textSecondary');
   }
 }
 
@@ -770,20 +781,4 @@ function handleDragEnd() {
   }
 }
 
-/* 响应式调整 */
-@media (max-width: 768px) {
-  .tab-item {
-    min-width: 80px;
-    max-width: 150px;
-    padding: 0 8px;
-  }
-
-  .dropdown-menu {
-    max-width: 280px !important;
-  }
-
-  .file-path-tooltip {
-    max-width: 300px !important;
-  }
-}
 </style>

@@ -1,7 +1,7 @@
 /*! # 工作区管理 Tauri 命令 */
 use std::collections::HashMap;
 
-use crate::entity::window::{WorkspaceConfig, WorkspaceSummary};
+use crate::entity::workspace::{WorkspaceConfig, WorkspaceSummary};
 use crate::response::response::Response;
 use crate::workspace::config;
 

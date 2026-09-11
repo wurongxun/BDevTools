@@ -2,16 +2,19 @@
   <div class="script-explorer">
     <div class="explorer-header">
       <el-tooltip content="新建查询" placement="top">
-        <el-button :icon="Plus" size="small" circle @click="askNewFile(scriptsStore.scriptsDir)" />
+        <app-button bare :icon="Plus" @click="askNewFile(scriptsStore.scriptsDir)" />
       </el-tooltip>
       <el-tooltip content="新建文件夹" placement="top">
-        <el-button :icon="FolderAdd" size="small" circle @click="askNewFolder(scriptsStore.scriptsDir)" />
+        <app-button bare :icon="FolderAdd" @click="askNewFolder(scriptsStore.scriptsDir)" />
       </el-tooltip>
       <el-tooltip content="刷新" placement="top">
-        <el-button :icon="Refresh" size="small" circle @click="scriptsStore.refresh()" />
+        <app-button bare :icon="Refresh" @click="scriptsStore.refresh()" />
       </el-tooltip>
       <el-tooltip content="打开目录" placement="top">
-        <el-button :icon="FolderOpened" size="small" circle @click="openScriptsDir" />
+        <app-button bare :icon="FolderOpened" @click="openScriptsDir" />
+      </el-tooltip>
+      <el-tooltip content="插件设置" placement="top">
+        <app-button bare :icon="Setting" :class="{ active: settingsOpen }" @click="toggleSettings" />
       </el-tooltip>
     </div>
 
@@ -60,6 +63,13 @@
       </el-tree>
       <div v-else class="empty-tip">暂无查询文件，点击 + 新建</div>
     </div>
+
+    <!-- 插件设置（仅由 explorer-header 齿轮按钮展开/折叠） -->
+    <el-collapse-transition>
+      <div v-show="settingsOpen" class="script-settings">
+        <PluginDirSettings plugin-id="database" />
+      </div>
+    </el-collapse-transition>
 
     <!-- 右键菜单 -->
     <div
@@ -124,8 +134,8 @@
         <div class="delete-sub">该操作不可恢复。</div>
       </div>
       <template #footer>
-        <el-button size="small" @click="deleteDialogVisible = false">取消</el-button>
-        <el-button size="small" type="danger" plain @click="confirmDelete">删除</el-button>
+        <app-button size="small" @click="deleteDialogVisible = false">取消</app-button>
+        <app-button size="small" type="danger" plain @click="confirmDelete">删除</app-button>
       </template>
     </GlobalDialog>
 
@@ -160,8 +170,8 @@
         </div>
       </div>
       <template #footer>
-        <el-button size="small" @click="bindingDialogVisible = false">取消</el-button>
-        <el-button size="small" type="primary" @click="confirmChangeBinding">确定</el-button>
+        <app-button size="small" @click="bindingDialogVisible = false">取消</app-button>
+        <app-button size="small" type="primary" @click="confirmChangeBinding">确定</app-button>
       </template>
     </GlobalDialog>
   </div>
@@ -169,12 +179,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { Plus, FolderAdd, Refresh, FolderOpened, Folder, Document } from '@element-plus/icons-vue'
+import { Plus, FolderAdd, Refresh, FolderOpened, Setting, Folder, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { tauri_request } from '@/utils/tauri_request'
 import type { ResponseData } from '@/Types/entitys'
 import GlobalDialog from '@/components/GlobalDialog.vue'
 import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
+import PluginDirSettings from '@/components/PluginDirSettings.vue'
 import { useConnectionStore, useEditorStore, useScriptsStore } from '../store'
 import { dbListDatabases } from '../api/metadata'
 import type { ScriptFileNode, DatabaseInfo } from '../types'
@@ -182,6 +193,14 @@ import type { ScriptFileNode, DatabaseInfo } from '../types'
 const scriptsStore = useScriptsStore()
 const editorStore = useEditorStore()
 const connectionStore = useConnectionStore()
+
+// ==================== 插件设置 ====================
+// 底部「插件设置」面板：仅由 explorer-header 齿轮按钮展开/折叠
+const settingsOpen = ref(false)
+
+function toggleSettings() {
+  settingsOpen.value = !settingsOpen.value
+}
 
 // ==================== 过滤 ====================
 const filterConfigId = ref('')
@@ -458,15 +477,25 @@ onUnmounted(() => {
 .explorer-header {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 2px;
-  padding: 6px 8px;
+  padding: 4px 12px;
   border-bottom: 1px solid var(--el-border-color-lighter);
   flex-shrink: 0;
 }
-.explorer-header .title {
-  font-size: var(--font-size-md);
-  font-weight: 600;
-  flex: 1;
+/* 齿轮按钮：面板展开时高亮主色 */
+.explorer-header {
+  :deep(.is-bare.active) {
+    color: var(--el-color-primary);
+    background-color: var(--el-fill-color-light);
+  }
+}
+/* 插件设置面板（齿轮按钮展开后贴底显示；垂直间距由 PluginDirSettings 内部 padding 提供） */
+.script-settings {
+  flex-shrink: 0;
+  border-top: 1px solid var(--el-border-color-lighter);
+  padding: 0 12px;
+  overflow: hidden;
 }
 .filter-select {
   padding: 6px 8px 0;

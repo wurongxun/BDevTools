@@ -30,8 +30,21 @@ const userStore = appConfig
 let store: Store | undefined = undefined
 let autostart = ref<boolean>(false)
 let update_reminder = ref<boolean>(false)
-let dark = ref<boolean>(false)
-let theme = ref<string>('white')
+
+/**
+ * 暗色模式开关：以全局 useDark 状态为唯一真相（可写 computed），
+ * 避免设置页开关与顶栏主题按钮各持一份状态、切换后互不同步。
+ */
+const dark = computed<boolean>({
+  get: () => isDark.value,
+  set: (value: boolean) => {
+    void applyDarkChange(value)
+  }
+})
+
+/** 文本默认读取行数上限，与界面描述中的建议值保持一致 */
+const READ_LINES_MAX = 200000
+
 let language = ref<string>('')
 let read_lines = ref<number>(50000)
 let has_update = ref<boolean>(false)
@@ -133,13 +146,13 @@ onMounted(async () => {
   }
   let theme_val = await store.get<{ value: string }>('theme')
   if (theme_val !== undefined) {
-    theme.value = theme_val.value
     userStore.setTheme(theme_val.value)
   }
   let dark_val = await store.get<{ value: boolean }>('dark')
   if (dark_val !== undefined) {
-    dark.value = dark_val.value
-    userStore.setDark(dark.value)
+    userStore.setDark(dark_val.value)
+    // 与顶栏保持一致：以持久化的值为准同步主题状态
+    if (dark_val.value !== isDark.value) toggleDark()
   }
 
   // 加载窗口预设
@@ -193,25 +206,14 @@ async function software_change() {
   }
 }
 
-async function theme_change() {
+/** 应用暗色模式变更：持久化 + 切换主题 + 同步 store */
+async function applyDarkChange(value: boolean) {
   if (store) {
-    await store.set('theme', { value: theme.value })
+    await store.set('dark', { value })
     await store.save()
-    let el_color_primary = isDark.value ? 'black' : ''
-    document.documentElement.style.setProperty('--el-color-primary', el_color_primary)
   }
-}
-
-async function dark_change() {
-  if (store) {
-    await store.set('dark', { value: dark.value })
-    await store.save()
-    if (!isDark.value && dark.value) {
-      toggleDark()
-    } else if (isDark.value && !dark.value) {
-      toggleDark()
-    }
-  }
+  if (value !== isDark.value) toggleDark()
+  userStore.setDark(value)
 }
 // 步骤1：注册应用到"打开方式"列表
 async function handleRegisterAssociation() {
@@ -223,22 +225,23 @@ async function handleRegisterAssociation() {
 }
 
 async function onReadLines() {
-  if (store) {
-    await store.set('read_lines', { value: read_lines.value })
-    await store.save();
-    userStore.setReadLines(read_lines.value)
+  // 校验：必须是正整数且不超过建议上限，避免脏值直接落盘
+  const value = Number(read_lines.value)
+  if (!Number.isInteger(value) || value <= 0) {
+    NotificationUtil.warn('请输入大于 0 的整数行数')
+    return
   }
-}
-
-// 添加清除缓存和浏览器缓存的函数
-const clear_cache = () => {
-  // 实现清除缓存的逻辑
-  console.log('清除缓存')
-}
-
-const clear_browser_cache = () => {
-  // 实现清除浏览器缓存的逻辑
-  console.log('清除浏览器缓存')
+  if (value > READ_LINES_MAX) {
+    NotificationUtil.warn(`读取行数建议不超过 ${READ_LINES_MAX} 行，请重新设置`)
+    return
+  }
+  read_lines.value = value
+  if (store) {
+    await store.set('read_lines', { value })
+    await store.save()
+    userStore.setReadLines(value)
+    NotificationUtil.success(`已保存，默认读取 ${value} 行`)
+  }
 }
 
 // ==================== 窗口预设管理 ====================
@@ -604,14 +607,25 @@ function handleClose() {
 <template>
   <div class="settings-layout">
     <!-- 左侧导航 -->
-    <div class="settings-nav">
-      <div class="settings-nav-item" :class="{ active: activeSettingTab === 'app' }" @click="activeSettingTab = 'app'">
+    <div class="settings-nav" role="tablist" aria-label="设置分类" aria-orientation="vertical">
+      <button
+        type="button"
+        class="settings-nav-item"
+        role="tab"
+        :aria-selected="activeSettingTab === 'app'"
+        @click="activeSettingTab = 'app'"
+      >
         应用设置
-      </div>
-      <div class="settings-nav-item" :class="{ active: activeSettingTab === 'window' }"
-        @click="activeSettingTab = 'window'">
+      </button>
+      <button
+        type="button"
+        class="settings-nav-item"
+        role="tab"
+        :aria-selected="activeSettingTab === 'window'"
+        @click="activeSettingTab = 'window'"
+      >
         窗口设置
-      </div>
+      </button>
     </div>
 
     <!-- 右侧内容区 -->
@@ -641,8 +655,7 @@ function handleClose() {
               <span class="setting-description"></span>
             </div>
             <div class="setting-control">
-              <el-switch v-model="dark" @change="dark_change()" inline-prompt :active-icon="Check"
-                :inactive-icon="Close" />
+              <el-switch v-model="dark" inline-prompt :active-icon="Check" :inactive-icon="Close" />
             </div>
           </div>
 
@@ -666,10 +679,10 @@ function handleClose() {
           <div class="settings-item">
             <div class="setting-info">
               <span class="setting-label">网络检测</span>
-              <span class="setting-description">检测当前网络连接状态</span>
+              <span class="setting-description">检测当前网络连接状态（功能开发中，暂不可用）</span>
             </div>
             <div class="setting-control">
-              <el-button type="primary" disabled plain>检测网络</el-button>
+              <app-button type="primary" disabled plain title="功能开发中，暂不可用">检测网络</app-button>
             </div>
           </div>
         </div>
@@ -686,9 +699,9 @@ function handleClose() {
               </span>
             </div>
             <div class="setting-control">
-              <el-button type="primary" @click="app_updates_check" :loading="!has_update" plain>
+              <app-button type="primary" @click="app_updates_check" :loading="!has_update" plain>
                 {{ has_update ? '立即更新' : '检查更新' }}
-              </el-button>
+              </app-button>
             </div>
           </div>
         </div>
@@ -704,10 +717,19 @@ function handleClose() {
             </div>
             <div class="setting-control">
               <div class="read-lines-control">
-                <el-input v-model="read_lines" placeholder="默认读取行数" @keyup.enter="onReadLines" style="width: 180px" />
-                <el-button type="primary" @click="onReadLines" plain>
+                <el-input
+                  v-model="read_lines"
+                  type="number"
+                  :min="1"
+                  :max="READ_LINES_MAX"
+                  aria-label="文本默认读取行数"
+                  placeholder="默认读取行数"
+                  @keyup.enter="onReadLines"
+                  style="width: 180px"
+                />
+                <app-button type="primary" @click="onReadLines" plain>
                   确认
-                </el-button>
+                </app-button>
               </div>
             </div>
           </div>
@@ -717,9 +739,9 @@ function handleClose() {
               <span class="setting-description">注册应用到windows"打开方式"列表 </span>
             </div>
             <div class="setting-control">
-              <el-button type="primary" @click="handleRegisterAssociation" plain>
+              <app-button type="primary" @click="handleRegisterAssociation" plain>
                 注册
-              </el-button>
+              </app-button>
             </div>
           </div>
           <div class="settings-item">
@@ -728,7 +750,7 @@ function handleClose() {
               <span class="setting-description">清理应用缓存文件</span>
             </div>
             <div class="setting-control">
-              <el-button type="danger" disabled plain>清除缓存</el-button>
+              <app-button type="danger" disabled plain title="功能开发中，暂不可用">清除缓存</app-button>
             </div>
           </div>
 
@@ -738,7 +760,7 @@ function handleClose() {
               <span class="setting-description">清理内置浏览器缓存数据</span>
             </div>
             <div class="setting-control">
-              <el-button type="danger" disabled plain>清除浏览器缓存</el-button>
+              <app-button type="danger" disabled plain title="功能开发中，暂不可用">清除浏览器缓存</app-button>
             </div>
           </div>
         </div>
@@ -772,19 +794,19 @@ function handleClose() {
                 </div>
               </div>
               <div class="preset-actions">
-                <el-button size="small" @click="editWindowPreset(preset)" :icon="Edit" circle />
-                <el-button v-if="preset.id !== 'main'" size="small" @click="removeWindowPreset(preset.id)"
+                <app-button size="small" @click="editWindowPreset(preset)" :icon="Edit" circle />
+                <app-button v-if="preset.id !== 'main'" size="small" @click="removeWindowPreset(preset.id)"
                   :icon="Delete" circle type="danger" />
               </div>
             </div>
           </div>
 
-          <el-button type="primary" @click="addWindowPreset" plain>
+          <app-button type="primary" @click="addWindowPreset" plain>
             <el-icon>
               <Plus />
             </el-icon>
             添加窗口
-          </el-button>
+          </app-button>
         </div>
       </div>
     </div>
@@ -856,8 +878,8 @@ function handleClose() {
         </div>
       </div>
       <template #footer>
-        <el-button @click="showWindowEditDialog = false">取消</el-button>
-        <el-button type="primary" @click="saveEditingPreset">保存</el-button>
+        <app-button @click="showWindowEditDialog = false">取消</app-button>
+        <app-button type="primary" @click="saveEditingPreset">保存</app-button>
       </template>
     </GlobalDialog>
   </div>
@@ -865,6 +887,7 @@ function handleClose() {
 
 <style lang="scss" scoped>
 @use '@/styles/theme.scss' as theme;
+@use '@/styles/mixin.scss' as mixin;
 
 .settings-layout {
   width: 100%;
@@ -899,6 +922,12 @@ function handleClose() {
   cursor: pointer;
   transition: background-color 0.15s;
   user-select: none;
+  text-align: left;
+  // 语义化 <button> 需要抹平浏览器默认外观
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: inherit;
 
   @include theme.useTheme {
     color: theme.getVar('textSecondary');
@@ -911,7 +940,7 @@ function handleClose() {
     }
   }
 
-  &.active {
+  &[aria-selected='true'] {
     @include theme.useTheme {
       background-color: theme.getVar('activityBarHover');
       color: theme.getVar('textColor');
@@ -936,14 +965,8 @@ function handleClose() {
   overflow-y: auto;
   padding: 16px 20px;
   box-sizing: border-box;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-
-  &::-webkit-scrollbar {
-    width: 0;
-    height: 0;
-    background: transparent;
-  }
+  // 保留细滚动条：彻底隐藏会让用户失去"内容还有更多"的视觉线索
+  @include mixin.scrollbar();
 }
 
 // ---- 分组区块（扁平化，无阴影） ----

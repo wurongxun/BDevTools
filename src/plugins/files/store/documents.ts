@@ -7,7 +7,7 @@ import { ResponseData } from '@/entity/entitys'
 import { md5 } from '@/utils/Md5Utils'
 import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting'
 import NotificationUtil from '@/utils/NotificationUtil'
-import { load } from '@/core/runtime'
+import { load, type Store } from '@/core/runtime'
 import type { OpenFileInfo } from '@/Types/workspace'
 // 文件类型枚举
 export enum FileType {
@@ -79,14 +79,16 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
   // 最近关闭的文档（用于撤销关闭）
   const recentlyClosed = ref<Array<{ document: DocumentState; index: number }>>([])
 
-  // 收藏文件列表（持久化到 localStorage）
+  // 收藏文件列表（持久化到 KV：plugins/files.json）
   const favoriteFiles = ref<string[]>([])
-  // 最近打开文件列表（持久化到 localStorage）
+  // 最近打开文件列表（持久化到 KV：plugins/files.json）
   const recentFiles = ref<string[]>([])
 
   // 最大缓存文档数（超出则销毁最旧的）
   const MAX_CACHED_DOCUMENTS = 20
   const MAX_RECENT_FILES = 30
+  /** 代码/文本文件走 monaco 编辑器的最大字节数（>该值走 TextView 只读分块查看，避免整读卡顿/内存膨胀） */
+  const EDITOR_MAX_SIZE_BYTES = 1024 * 1024 // 1MB
 
   // 计算属性：获取当前激活的文档
   const activeDocument = computed(() => {
@@ -106,68 +108,155 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     return Array.from(documents.value.values()).some(doc => doc.isDirty)
   })
 
-  // ===== 收藏管理 =====
-  function loadFavorites() {
-    try {
-      const saved = localStorage.getItem('file-favorites')
-      if (saved) favoriteFiles.value = JSON.parse(saved)
-    } catch { /* ignore */ }
+  // ===== 收藏 / 最近打开 的持久化层 =====
+  // 走自研 KV 命令（约定：插件数据 plugins/<plugin_id>.json），不用 localStorage。
+  // 关键修正：store 创建时**立即**发起读取。此前由 SidebarPanel.onMounted 触发 load*()，
+  // 而 App 启动的会话恢复更早执行 openDocument → addRecentFile，会以空列表为基准写回磁盘，
+  // 把已持久化的「最近打开」整体冲掉（表现为：清空后下次启动又回来了）。
+  const FILES_STORE_FILE = 'plugins/files.json'
+  const KEY_FAVORITES = 'favorites'
+  const KEY_RECENT = 'recent'
+
+  /** 首次读取任务（单例，避免并发重复读） */
+  let listsReady: Promise<void> | null = null
+
+  function readPathList(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
   }
-  function saveFavorites() {
+
+  /** 读取旧版 localStorage 数据（一次性迁移用） */
+  function readLegacyList(key: string): string[] {
     try {
-      localStorage.setItem('file-favorites', JSON.stringify(favoriteFiles.value))
-    } catch { /* ignore */ }
+      const raw = localStorage.getItem(key)
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      const list = readPathList(parsed)
+      // 迁移成功即清理旧键，避免两套存储长期并存
+      localStorage.removeItem(key)
+      return list
+    } catch {
+      return []
+    }
+  }
+
+  function ensureListsLoaded(): Promise<void> {
+    if (!listsReady) {
+      listsReady = (async () => {
+        try {
+          const s = await load(FILES_STORE_FILE, { autoSave: false, defaults: {} })
+          const [fav, rec] = await Promise.all([s.get(KEY_FAVORITES), s.get(KEY_RECENT)])
+          let favList = readPathList(fav)
+          let recList = readPathList(rec)
+
+          // 一次性迁移：旧版本把数据存在 localStorage（项目约定已禁止 localStorage 存关键数据）。
+          // 无论 KV 是否已有数据都取一次并删除旧键，避免两套存储长期并存。
+          const legacyFav = readLegacyList('file-favorites')
+          const legacyRec = readLegacyList('file-recent')
+          if (favList.length === 0 && legacyFav.length > 0) {
+            favList = legacyFav
+            await s.set(KEY_FAVORITES, favList).catch(() => {})
+          }
+          if (recList.length === 0 && legacyRec.length > 0) {
+            recList = legacyRec
+            await s.set(KEY_RECENT, recList).catch(() => {})
+          }
+
+          favoriteFiles.value = favList
+          recentFiles.value = recList
+        } catch (e) {
+          console.warn('加载收藏/最近打开失败:', e)
+        }
+      })()
+    }
+    return listsReady
+  }
+  // 立即启动（不 await）：后续任何写操作都会先等它完成，保证不会用空列表覆盖磁盘数据
+  void ensureListsLoaded()
+
+  /** 写盘：必须等首次加载完成后再写，否则会把磁盘上的历史列表覆盖掉 */
+  async function persistList(key: string, value: string[]) {
+    await ensureListsLoaded()
+    try {
+      const s = await load(FILES_STORE_FILE, { autoSave: false, defaults: {} })
+      await s.set(key, value)
+    } catch (e) {
+      console.warn('保存收藏/最近打开失败:', e)
+    }
+  }
+
+  /** 列表变更串行化：连续打开多个文件时避免并发读写互相覆盖 */
+  let listChain: Promise<unknown> = Promise.resolve()
+  function withListLock(task: () => Promise<void>) {
+    const p = listChain.then(task, task)
+    listChain = p.catch(() => {})
+    return p
+  }
+
+  // ===== 收藏管理 =====
+  async function loadFavorites() {
+    await ensureListsLoaded()
   }
   function toggleFavorite(filePath: string) {
-    const idx = favoriteFiles.value.indexOf(filePath)
-    if (idx >= 0) {
-      favoriteFiles.value.splice(idx, 1)
-    } else {
-      favoriteFiles.value.push(filePath)
-    }
-    saveFavorites()
+    return withListLock(async () => {
+      await ensureListsLoaded()
+      const idx = favoriteFiles.value.indexOf(filePath)
+      if (idx >= 0) {
+        favoriteFiles.value.splice(idx, 1)
+      } else {
+        favoriteFiles.value.push(filePath)
+      }
+      await persistList(KEY_FAVORITES, favoriteFiles.value)
+    })
   }
   function isFavorite(filePath: string) {
     return favoriteFiles.value.includes(filePath)
   }
 
   // ===== 最近打开管理 =====
-  function loadRecentFiles() {
-    try {
-      const saved = localStorage.getItem('file-recent')
-      if (saved) recentFiles.value = JSON.parse(saved)
-    } catch { /* ignore */ }
-  }
-  function saveRecentFiles() {
-    try {
-      localStorage.setItem('file-recent', JSON.stringify(recentFiles.value))
-    } catch { /* ignore */ }
+  // 语义：「最近打开」是**用户主动打开过的文件历史**，与「当前打开的 tab」是两回事。
+  // 会话恢复（启动还原上次未关闭的 tab）不是用户主动打开动作，不写入该列表，
+  // 否则清空后下次启动会被恢复的 tab 重新填满，且列表将永远等于当前 tab 集合。
+  async function loadRecentFiles() {
+    await ensureListsLoaded()
   }
   function addRecentFile(filePath: string) {
-    // 移除重复项，添加到最前
-    recentFiles.value = recentFiles.value.filter(p => p !== filePath)
-    recentFiles.value.unshift(filePath)
-    // 限制数量
-    if (recentFiles.value.length > MAX_RECENT_FILES) {
-      recentFiles.value = recentFiles.value.slice(0, MAX_RECENT_FILES)
-    }
-    saveRecentFiles()
+    return withListLock(async () => {
+      await ensureListsLoaded()
+      // 移除重复项，添加到最前
+      const next = [filePath, ...recentFiles.value.filter(p => p !== filePath)]
+      // 限制数量
+      recentFiles.value = next.slice(0, MAX_RECENT_FILES)
+      await persistList(KEY_RECENT, recentFiles.value)
+    })
   }
   function removeRecentFile(filePath: string) {
-    recentFiles.value = recentFiles.value.filter(p => p !== filePath)
-    saveRecentFiles()
+    return withListLock(async () => {
+      await ensureListsLoaded()
+      recentFiles.value = recentFiles.value.filter(p => p !== filePath)
+      await persistList(KEY_RECENT, recentFiles.value)
+    })
   }
   function clearRecentFiles() {
-    recentFiles.value = []
-    saveRecentFiles()
+    return withListLock(async () => {
+      await ensureListsLoaded()
+      recentFiles.value = []
+      await persistList(KEY_RECENT, recentFiles.value)
+    })
   }
 
   /**
    * 打开或创建文档
+   * @param opts.recordRecent 是否记入「最近打开」（默认 true）。会话恢复路径必须传 false：
+   *   还原上次未关闭的 tab 不是用户主动打开动作，写进历史会让「最近打开」永远等于当前 tab 集合，
+   *   并导致用户清空历史后下次启动又被自动填满。
    */
-  async function openDocument(filePath: string, fileType?: FileType) {
+  async function openDocument(
+    filePath: string,
+    fileType?: FileType,
+    opts?: { recordRecent?: boolean },
+  ) {
     addAppOpenFile(filePath);
-    addRecentFile(filePath)
+    if (opts?.recordRecent !== false) void addRecentFile(filePath)
     // 如果文档已打开，直接激活
     if (documents.value.has(filePath)) {
       setActiveDocument(filePath)
@@ -202,6 +291,16 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
         const content = await loadFileContent(filePath, type)
         doc.content = content
         doc.originalContent = content
+        doc.isLoading = false
+        doc.lastModified = Date.now()
+      } else if (type === FileType.CODE || type === FileType.TEXT) {
+        // 代码/文本文件：大文件分诊 —— ≤1MB 整读供代码编辑器（monaco）；>1MB 不整读，由 TextView 分块只读加载
+        const size = await getFileSizeBytes(filePath)
+        if (size == null || size <= EDITOR_MAX_SIZE_BYTES) {
+          const content = await loadFileContent(filePath, type)
+          doc.content = content
+          doc.originalContent = content
+        }
         doc.isLoading = false
         doc.lastModified = Date.now()
       }
@@ -382,6 +481,10 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
       return await saveRemoteDocument(filePath)
     }
 
+    // 未命名文档没有真实磁盘路径：跳过落盘（否则会以相对路径写出 "untitled:xxx" 垃圾文件），
+    // 未保存内容由会话草稿机制保护（captureSnapshot → draftSave）
+    if (doc.id.startsWith('untitled:')) return true
+
     if (!doc.content||doc.content==doc.originalContent) return true;
 
     try {
@@ -415,10 +518,11 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
 
   /**
    * 保存所有未保存的文档
+   * 未命名文档（untitled:）无磁盘路径，跳过落盘（由会话草稿机制保护）
    */
   async function saveAllDocuments() {
     const unsavedDocs = Array.from(documents.value.values())
-      .filter(doc => doc.isDirty)
+      .filter(doc => doc.isDirty && !doc.id.startsWith('untitled:'))
 
     const savePromises = unsavedDocs.map(doc => saveDocument(doc.id))
     await Promise.allSettled(savePromises)
@@ -426,8 +530,13 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
 
   /**
    * 关闭文档
+   * @param opts.syncSession 是否同步剔除会话快照（默认 true）。
+   *   用户主动关闭 tab / 全部关闭 → true：立即从 {workspace}.session.json 剔除该路径，
+   *   防进程异常退出后旧快照下次启动把已关闭文件恢复出来（表现为「关闭无效」）。
+   *   工作区切换清理 / LRU 缓存逐出 → false：这两种不是用户关闭意图，不应动快照
+   *   （切换场景的快照在 closeAllDocuments 之前已整体保存，逐出场景保持旧语义）。
    */
-  function closeDocument(filePath: string) {
+  function closeDocument(filePath: string, opts?: { syncSession?: boolean }) {
     //删除打开方式 保存的文件
     deleteAppOpenFile(filePath)
     //删除打开记录
@@ -458,6 +567,11 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     if (activeDocumentPath.value === filePath) {
       const nextDoc = documentOrder.value[0] || null
       setActiveDocument(nextDoc)
+    }
+
+    // 用户主动关闭：同步剔除持久化会话快照（避免异常退出后旧快照复活已关闭 tab）
+    if (opts?.syncSession !== false) {
+      syncClosedSessionFiles([filePath])
     }
   }
 //  重排序方法
@@ -490,6 +604,54 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
       store.set(key, filePath)
     }
   }
+
+  /**
+   * 启动时恢复「上次未关闭的 tab」（openfile.json）。
+   *
+   * 与「最近打开」严格区分：
+   * - openfile.json = 当前仍打开、上次退出时未关闭的 tab（打开时写入、关闭时删除）
+   * - 最近打开 = 用户主动打开过的历史记录，不参与启动恢复
+   *
+   * 恢复前先校验文件是否仍存在，已被移动/删除的记录顺带清理，
+   * 避免失效路径每次启动都尝试打开并在标签栏留下空壳。
+   */
+  async function restoreOpenFiles() {
+    let store: Store | undefined
+    try {
+      store = await load('openfile.json', { autoSave: false, defaults: {} })
+    } catch (e) {
+      console.warn('加载 openfile.json 失败:', e)
+      return
+    }
+    if (!store) return
+
+    let entries: [string, unknown][] = []
+    try {
+      entries = await store.entries()
+    } catch (e) {
+      console.warn('读取 openfile.json 失败:', e)
+      return
+    }
+
+    for (const [key, value] of entries) {
+      const path = String(value ?? '')
+      if (!path) {
+        await store.delete(key).catch(() => false)
+        continue
+      }
+      // 文件已不存在：清理失效记录，不再恢复
+      const size = await getFileSizeBytes(path)
+      if (size == null) {
+        await store.delete(key).catch(() => false)
+        continue
+      }
+      try {
+        await openDocument(path, undefined, { recordRecent: false })
+      } catch (e) {
+        console.warn(`恢复文件失败: ${path}`, e)
+      }
+    }
+  }
   /**
    * 撤销关闭文档
    */
@@ -508,21 +670,46 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
   }
 
   /**
-   * 关闭所有文档
+   * 用户主动关闭文档后，同步剔除持久化会话快照（异步 fire-and-forget）。
+   * 动态 import 避免与 session store 形成静态循环依赖（session.ts 顶层引用了本 store）。
    */
-  function closeAllDocuments() {
+  function syncClosedSessionFiles(paths: string[]) {
+    if (!paths.length) return
+    void (async () => {
+      try {
+        const { useSessionStore } = await import('@/store/modules/session')
+        await useSessionStore().syncSnapshotAfterClosed(paths)
+      } catch (e) {
+        console.warn('同步会话快照失败:', e)
+      }
+    })()
+  }
+
+  /**
+   * 关闭所有文档
+   * @param opts.syncSession 默认 true（用户「全部关闭」→ 剔除快照）；工作区切换清理传 false
+   */
+  function closeAllDocuments(opts?: { syncSession?: boolean }) {
     const allIds = Array.from(documents.value.keys())
-    allIds.forEach(id => closeDocument(id))
+    allIds.forEach(id => closeDocument(id, { syncSession: false }))
+    // 批量关闭后统一同步一次快照（避免 N 次串行读写）
+    if (opts?.syncSession !== false) {
+      syncClosedSessionFiles(allIds)
+    }
   }
 
   /**
    * 关闭其他文档（保留指定文档）
+   * @param opts.syncSession 默认 true（用户「关闭其他」→ 剔除快照）
    */
-  function closeOtherDocuments(filePath: string) {
+  function closeOtherDocuments(filePath: string, opts?: { syncSession?: boolean }) {
     const otherIds = Array.from(documents.value.keys())
       .filter(id => id !== filePath)
 
-    otherIds.forEach(id => closeDocument(id))
+    otherIds.forEach(id => closeDocument(id, { syncSession: false }))
+    if (opts?.syncSession !== false) {
+      syncClosedSessionFiles(otherIds)
+    }
   }
 
   /**
@@ -533,6 +720,18 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     if (!doc) return
     try {
       doc.isLoading = true
+      // 代码/文本文件同样做大小分诊：>1MB 不整读（TextView 分块），避免 reload 卡顿
+      if (doc.type === FileType.CODE || doc.type === FileType.TEXT) {
+        const size = await getFileSizeBytes(filePath)
+        if (size != null && size > EDITOR_MAX_SIZE_BYTES) {
+          doc.content = null
+          doc.originalContent = null
+          doc.isDirty = false
+          doc.lastModified = Date.now()
+          doc.isLoading = false
+          return
+        }
+      }
       const content = await loadFileContent(filePath, doc.type)
       doc.content = content
       doc.originalContent = content
@@ -614,7 +813,8 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     // 获取最旧的文档（最后一个）
     const oldestId = documentOrder.value[documentOrder.value.length - 1]
     if (oldestId && oldestId !== activeDocumentPath.value) {
-      closeDocument(oldestId)
+      // 缓存逐出不是用户关闭意图：不剔除会话快照（保持旧语义）
+      closeDocument(oldestId, { syncSession: false })
     }
   }
 
@@ -626,7 +826,15 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
 
     const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp']
     const binaryExts = ['exe', 'dll', 'so', 'dylib', 'bin', 'dat']
-    const codeExts = ['js', 'ts', 'jsx', 'tsx', 'vue', 'py', 'java', 'cpp', 'c', 'h', 'rs', 'go', 'rb', 'php']
+    // 代码/文本类扩展（走 monaco 编辑或大文件分诊；与 detectLanguage 的 languageMap 对齐）
+    const codeExts = [
+      // 前端/脚本
+      'js', 'ts', 'jsx', 'tsx', 'vue', 'html', 'htm', 'css', 'scss', 'sass', 'less',
+      // 后端/通用编程语言
+      'py', 'java', 'kt', 'kts', 'swift', 'cpp', 'cc', 'cxx', 'c', 'h', 'hpp', 'rs', 'go', 'rb', 'php', 'cs',
+      // 数据/配置/标记
+      'json', 'xml', 'yaml', 'yml', 'toml', 'ini', 'sql', 'sh', 'bash', 'bat', 'ps1'
+    ]
 
 
     if (imageExts.includes(ext || '')) return FileType.IMAGE
@@ -652,24 +860,38 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
       'vue': 'vue',
       'py': 'python',
       'java': 'java',
+      'kt': 'kotlin',
+      'kts': 'kotlin',
+      'swift': 'swift',
       'cpp': 'cpp',
+      'cc': 'cpp',
+      'cxx': 'cpp',
       'c': 'c',
       'h': 'c',
+      'hpp': 'cpp',
       'rs': 'rust',
       'go': 'go',
       'rb': 'ruby',
       'php': 'php',
+      'cs': 'csharp',
       'html': 'html',
+      'htm': 'html',
       'css': 'css',
       'scss': 'scss',
+      'sass': 'scss',
+      'less': 'less',
       'json': 'json',
       'xml': 'xml',
       'yaml': 'yaml',
       'yml': 'yaml',
+      'toml': 'plaintext',
+      'ini': 'ini',
       'md': 'markdown',
       'sql': 'sql',
       'sh': 'shell',
-      'bash': 'shell'
+      'bash': 'shell',
+      'bat': 'bat',
+      'ps1': 'powershell'
     }
 
     return languageMap[ext || ''] || 'plaintext'
@@ -692,6 +914,20 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     } else {
       NotificationUtil.error("读取失败：" + res.msg);
       throw new Error('Failed to read file')
+    }
+  }
+
+  /**
+   * 获取文件大小（字节）。失败（不存在/读不到）返回 null。
+   * 供打开文档时做"大文件分诊"。
+   */
+  async function getFileSizeBytes(filePath: string): Promise<number | null> {
+    try {
+      const res = await tauri_request<ResponseData<number>>('get_file_size', { path: filePath })
+      if (res && res.code === 200 && typeof res.data === 'number') return res.data
+      return null
+    } catch {
+      return null
     }
   }
 
@@ -749,6 +985,7 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     closeOtherDocuments,
     reloadDocument,
     reorderDocuments,
+    restoreOpenFiles,
     createNewDocument,
     renameDocument,
     getDocumentStatus,

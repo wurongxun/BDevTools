@@ -5,13 +5,13 @@
         <el-icon><ArrowDown v-if="!isExpanded" /><ArrowUp v-else /></el-icon>
         传输队列 ({{ activeCount }} 进行中 / {{ completedCount }} 已完成)
       </span>
-      <el-button
+      <app-button
         size="small"
         @click.stop="handleClearCompleted"
         :disabled="completedCount === 0"
       >
         清除已完成
-      </el-button>
+      </app-button>
     </div>
 
     <div class="transfer-list" v-show="isExpanded">
@@ -108,15 +108,13 @@ function handleClearCompleted() {
 .transfer-panel {
   flex-shrink: 0;
   max-height: 200px;
-  background-color: #252526;
-  border-top: 1px solid #3e3e3e;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 
   @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
-    border-top-color: theme.getVar('borderColor');
+    background-color: theme.getVar('appMainBgColor');
+    border-top: 1px solid theme.getVar('borderColor');
   }
 }
 
@@ -127,15 +125,16 @@ function handleClearCompleted() {
   padding: 4px 12px;
   cursor: pointer;
   user-select: none;
-  background-color: #2d2d2d;
   flex-shrink: 0;
 
   @include theme.useTheme {
-    background-color: rgba(255, 255, 255, 0.03);
+    background-color: theme.getVar('sidebarBg');
   }
 
   &:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
+    }
   }
 }
 
@@ -144,7 +143,6 @@ function handleClearCompleted() {
   align-items: center;
   gap: 4px;
   font-size: theme.getVar('fontSizeSmall');
-  color: #ccc;
 
   @include theme.useTheme {
     color: theme.getVar('textColor');
@@ -167,7 +165,9 @@ function handleClearCompleted() {
 
 .transfer-item {
   padding: 6px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  @include theme.useTheme {
+    border-bottom: 1px solid theme.getVar('borderColor');
+  }
 }
 
 .transfer-info {
@@ -184,7 +184,6 @@ function handleClearCompleted() {
 .transfer-name {
   flex: 1;
   font-size: theme.getVar('fontSizeSmall');
-  color: #ccc;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -196,7 +195,10 @@ function handleClearCompleted() {
 
 .transfer-direction {
   font-size: theme.getVar('fontSizeSm');
-  color: #888;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 
 .transfer-progress {
@@ -207,22 +209,25 @@ function handleClearCompleted() {
   display: flex;
   justify-content: space-between;
   font-size: theme.getVar('fontSizeSm');
-  color: #888;
   margin-top: 2px;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 
 .transfer-status-text {
   &.transfer-completed {
-    color: #4ec9b0;
+    color: #4ec9b0; // 成功语义色：保留（与 SSH/SFTP 行业配色一致）
   }
   &.transfer-failed {
-    color: #f44747;
+    color: #f44747; // 失败语义色：保留
   }
 }
 
 .transfer-error {
   font-size: theme.getVar('fontSizeSm');
-  color: #f44747;
+  color: #f44747; // 错误语义色：保留
   margin-top: 2px;
 }
 </style>

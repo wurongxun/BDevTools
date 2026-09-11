@@ -4,11 +4,13 @@ SQL 执行、表数据增删改查。
 use crate::response::response::Response;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use sqlx::mysql::MySqlPool;
-use sqlx::postgres::PgPool;
 use sqlx::{Row, Column, Executor, ValueRef};
 use futures_util::TryStreamExt;
 use super::pool::{get_pool, DbPool};
+use super::dialect::{self, Dialect};
+use super::mssql::SqlServerPool;
+use super::odbc::OraclePool;
+use std::sync::Arc;
 
 /// 查询默认每页行数（前后端一致）
 pub const DEFAULT_PAGE_SIZE: usize = 200;
@@ -26,6 +28,9 @@ pub struct SqlResult {
     /// 是否还有下一页数据（达到行数上限且探测到后续行）
     #[serde(default)]
     pub has_more: bool,
+    /// 查询结果总行数（仅纯 SELECT 且为首页时统计；DML / 无法包装的语句为 None）
+    #[serde(default)]
+    pub total: Option<u64>,
 }
 
 /// 表数据查询结果
@@ -59,7 +64,7 @@ pub async fn db_execute_sql(
 ) -> Response<SqlResult> {
     let pool = match get_pool(&config_id) {
         Some(p) => p,
-        None => return Response::new(300, SqlResult { columns: vec![], rows: vec![], affected_rows: 0, execution_time_ms: 0, is_query: false, has_more: false }, "未连接到数据库"),
+        None => return Response::new(300, SqlResult { columns: vec![], rows: vec![], affected_rows: 0, execution_time_ms: 0, is_query: false, has_more: false, total: None }, "未连接到数据库"),
     };
 
     // 前端指定行数以前端为准，后端限制在 1..=1000；未指定时默认 200
@@ -87,7 +92,7 @@ pub async fn db_execute_sql(
             res.execution_time_ms = elapsed;
             Response::new(200, res, "执行成功")
         }
-        Err(e) => Response::new(300, SqlResult { columns: vec![], rows: vec![], affected_rows: 0, execution_time_ms: elapsed, is_query: false, has_more: false }, &format!("执行失败: {}", e)),
+        Err(e) => Response::new(300, SqlResult { columns: vec![], rows: vec![], affected_rows: 0, execution_time_ms: elapsed, is_query: false, has_more: false, total: None }, &format!("执行失败: {}", e)),
     }
 }
 
@@ -102,13 +107,15 @@ async fn execute_with_database(pool: &DbPool, database: &str, sql: &str, limit: 
             Executor::execute(&mut *conn, use_sql.as_str()).await?;
             if is_query {
                 let (exec_sql, max_rows, wrapped) = paged_exec_parts(sql, limit, offset);
+                // 总行数统计：仅首页且纯 SELECT 可包装时执行（best-effort，失败不影响主查询）
+                let total = count_total_mysql(&mut *conn, sql, wrapped, offset).await;
                 let (columns, mut rows) = fetch_mysql_rows(&mut *conn, &exec_sql, max_rows).await?;
                 let has_more = wrapped && rows.len() > limit;
                 if rows.len() > limit { rows.truncate(limit); }
-                Ok(SqlResult { columns, rows, affected_rows: 0, execution_time_ms: 0, is_query: true, has_more })
+                Ok(SqlResult { columns, rows, affected_rows: 0, execution_time_ms: 0, is_query: true, has_more, total })
             } else {
                 let result = sqlx::query(sql).execute(&mut *conn).await?;
-                Ok(SqlResult { columns: vec![], rows: vec![], affected_rows: result.rows_affected(), execution_time_ms: 0, is_query: false, has_more: false })
+                Ok(SqlResult { columns: vec![], rows: vec![], affected_rows: result.rows_affected(), execution_time_ms: 0, is_query: false, has_more: false, total: None })
             }
         }
         DbPool::PostgreSQL(p) => {
@@ -117,14 +124,24 @@ async fn execute_with_database(pool: &DbPool, database: &str, sql: &str, limit: 
             Executor::execute(&mut *conn, use_sql.as_str()).await?;
             if is_query {
                 let (exec_sql, max_rows, wrapped) = paged_exec_parts(sql, limit, offset);
+                // 总行数统计：仅首页且纯 SELECT 可包装时执行（best-effort，失败不影响主查询）
+                let total = count_total_pg(&mut *conn, sql, wrapped, offset).await;
                 let (columns, mut rows) = fetch_pg_rows(&mut *conn, &exec_sql, max_rows).await?;
                 let has_more = wrapped && rows.len() > limit;
                 if rows.len() > limit { rows.truncate(limit); }
-                Ok(SqlResult { columns, rows, affected_rows: 0, execution_time_ms: 0, is_query: true, has_more })
+                Ok(SqlResult { columns, rows, affected_rows: 0, execution_time_ms: 0, is_query: true, has_more, total })
             } else {
                 let result = sqlx::query(sql).execute(&mut *conn).await?;
-                Ok(SqlResult { columns: vec![], rows: vec![], affected_rows: result.rows_affected(), execution_time_ms: 0, is_query: false, has_more: false })
+                Ok(SqlResult { columns: vec![], rows: vec![], affected_rows: result.rows_affected(), execution_time_ms: 0, is_query: false, has_more: false, total: None })
             }
+        }
+        DbPool::SqlServer(p) => {
+            let setup = dialect::Dialect::SqlServer.use_database_sql(database);
+            execute_sql_paged_generic(p, Dialect::SqlServer, &setup, sql, limit, offset).await
+        }
+        DbPool::Oracle(p) => {
+            let setup = dialect::Dialect::Oracle.use_database_sql(database);
+            execute_sql_paged_generic(p, Dialect::Oracle, &setup, sql, limit, offset).await
         }
     }
 }
@@ -150,6 +167,57 @@ fn wrap_paged_sql(sql: &str, limit: usize, offset: u64) -> Option<String> {
     }
     let trimmed = stripped.trim_end_matches(';').trim_end();
     Some(format!("SELECT * FROM ( {} ) AS __bdt_page LIMIT {} OFFSET {}", trimmed, limit, offset))
+}
+
+/// 构造 COUNT 统计 SQL：仅纯 SELECT 可安全包装为子查询统计总数（判定与分页包装一致）
+fn wrap_count_sql(sql: &str) -> Option<String> {
+    let stripped = strip_leading_comments(sql);
+    let upper = stripped.to_uppercase();
+    if !upper.starts_with("SELECT") {
+        return None;
+    }
+    let trimmed = stripped.trim_end_matches(';').trim_end();
+    Some(format!("SELECT COUNT(*) AS __bdt_cnt FROM ( {} ) AS __bdt_cnt_sub", trimmed))
+}
+
+/// MySQL 总行数统计：仅首页（offset==0）且可包装时执行 COUNT 子查询（best-effort，失败返回 None）
+async fn count_total_mysql<'c, E>(executor: E, sql: &str, wrapped: bool, offset: u64) -> Option<u64>
+where
+    E: sqlx::Executor<'c, Database = sqlx::MySql>,
+{
+    if !wrapped || offset != 0 { return None; }
+    let cnt_sql = wrap_count_sql(sql)?;
+    count_rows_mysql(executor, &cnt_sql).await.ok().flatten()
+}
+
+/// PostgreSQL 总行数统计：语义同 MySQL 版本
+async fn count_total_pg<'c, E>(executor: E, sql: &str, wrapped: bool, offset: u64) -> Option<u64>
+where
+    E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+{
+    if !wrapped || offset != 0 { return None; }
+    let cnt_sql = wrap_count_sql(sql)?;
+    count_rows_pg(executor, &cnt_sql).await.ok().flatten()
+}
+
+/// 执行 MySQL COUNT 查询取第一列数值
+async fn count_rows_mysql<'c, E>(executor: E, sql: &str) -> Result<Option<u64>>
+where
+    E: sqlx::Executor<'c, Database = sqlx::MySql>,
+{
+    let row = sqlx::query(sql).fetch_one(executor).await?;
+    let n: i64 = row.try_get(0)?;
+    Ok(Some(n.max(0) as u64))
+}
+
+/// 执行 PostgreSQL COUNT 查询取第一列数值
+async fn count_rows_pg<'c, E>(executor: E, sql: &str) -> Result<Option<u64>>
+where
+    E: sqlx::Executor<'c, Database = sqlx::Postgres>,
+{
+    let row = sqlx::query(sql).fetch_one(executor).await?;
+    let n: i64 = row.try_get(0)?;
+    Ok(Some(n.max(0) as u64))
 }
 
 /// 流式读取 MySQL 查询，最多取 max_rows 行。
@@ -211,24 +279,32 @@ pub async fn execute_sql_paged(pool: &DbPool, sql: &str, limit: usize, offset: u
         DbPool::MySQL(p) => {
             if !is_query {
                 let result = sqlx::query(sql).execute(p).await?;
-                return Ok(SqlResult { columns: vec![], rows: vec![], affected_rows: result.rows_affected(), execution_time_ms: 0, is_query: false, has_more: false });
+                return Ok(SqlResult { columns: vec![], rows: vec![], affected_rows: result.rows_affected(), execution_time_ms: 0, is_query: false, has_more: false, total: None });
             }
             let (exec_sql, max_rows, wrapped) = paged_exec_parts(sql, limit, offset);
+            let total = count_total_mysql(p, sql, wrapped, offset).await;
             let (columns, mut rows) = fetch_mysql_rows(p, &exec_sql, max_rows).await?;
             let has_more = wrapped && rows.len() > limit;
             if rows.len() > limit { rows.truncate(limit); }
-            Ok(SqlResult { columns, rows, affected_rows: 0, execution_time_ms: 0, is_query: true, has_more })
+            Ok(SqlResult { columns, rows, affected_rows: 0, execution_time_ms: 0, is_query: true, has_more, total })
         }
         DbPool::PostgreSQL(p) => {
             if !is_query {
                 let result = sqlx::query(sql).execute(p).await?;
-                return Ok(SqlResult { columns: vec![], rows: vec![], affected_rows: result.rows_affected(), execution_time_ms: 0, is_query: false, has_more: false });
+                return Ok(SqlResult { columns: vec![], rows: vec![], affected_rows: result.rows_affected(), execution_time_ms: 0, is_query: false, has_more: false, total: None });
             }
             let (exec_sql, max_rows, wrapped) = paged_exec_parts(sql, limit, offset);
+            let total = count_total_pg(p, sql, wrapped, offset).await;
             let (columns, mut rows) = fetch_pg_rows(p, &exec_sql, max_rows).await?;
             let has_more = wrapped && rows.len() > limit;
             if rows.len() > limit { rows.truncate(limit); }
-            Ok(SqlResult { columns, rows, affected_rows: 0, execution_time_ms: 0, is_query: true, has_more })
+            Ok(SqlResult { columns, rows, affected_rows: 0, execution_time_ms: 0, is_query: true, has_more, total })
+        }
+        DbPool::SqlServer(p) => {
+            execute_sql_paged_generic(p, Dialect::SqlServer, "", sql, limit, offset).await
+        }
+        DbPool::Oracle(p) => {
+            execute_sql_paged_generic(p, Dialect::Oracle, "", sql, limit, offset).await
         }
     }
 }
@@ -236,6 +312,46 @@ pub async fn execute_sql_paged(pool: &DbPool, sql: &str, limit: usize, offset: u
 /// 执行 SQL（内部调用：不做分页包装，仅 1000 行安全上限）
 pub async fn execute_sql(pool: &DbPool, sql: &str) -> Result<SqlResult> {
     execute_sql_paged(pool, sql, MAX_PAGE_SIZE, 0).await
+}
+
+/// SQL Server / Oracle 的通用分页执行：两者后端都暴露了
+/// `query_rows(setup, sql, max_rows)` / `execute(setup, sql)` / `query_count(setup, sql)`，
+/// 仅分页包装语法随方言不同（由 `Dialect::wrap_paged_sql` 提供）。
+/// 抽成泛型助手避免两份几乎相同的分支逻辑。
+async fn execute_sql_paged_generic<P>(
+    pool: &P,
+    dialect: Dialect,
+    setup: &str,
+    sql: &str,
+    limit: usize,
+    offset: u64,
+) -> Result<SqlResult>
+where
+    P: SqlServerOrOracle,
+{
+    let is_query = is_select_query(sql);
+    if !is_query {
+        let affected = pool.execute(setup, sql).await?;
+        return Ok(SqlResult { columns: vec![], rows: vec![], affected_rows: affected, execution_time_ms: 0, is_query: false, has_more: false, total: None });
+    }
+    // 纯 SELECT 包装分页；SHOW/DESCRIBE/EXPLAIN 无法包装则直接限行读取
+    let (exec_sql, max_rows, wrapped) = if dialect::is_wrappable_select(sql) {
+        let body = dialect::strip_leading_comments(sql).trim_end_matches(';').trim_end();
+        (dialect.wrap_paged_sql(body, limit + 1, offset), limit + 1, true)
+    } else {
+        (sql.to_string(), limit, false)
+    };
+    // 总行数统计：仅首页且可包装时执行（best-effort）
+    let total = if wrapped && offset == 0 {
+        let body = dialect::strip_leading_comments(sql).trim_end_matches(';').trim_end();
+        pool.query_count(setup, &dialect.wrap_count_sql(body)).await.ok()
+    } else {
+        None
+    };
+    let (columns, mut rows) = pool.query_rows(setup, &exec_sql, max_rows).await?;
+    let has_more = wrapped && rows.len() > limit;
+    if rows.len() > limit { rows.truncate(limit); }
+    Ok(SqlResult { columns, rows, affected_rows: 0, execution_time_ms: 0, is_query: true, has_more, total })
 }
 
 /// 分页查询表数据
@@ -457,6 +573,12 @@ async fn query_count(pool: &DbPool, sql: &str) -> Result<u64> {
             let row: (i64,) = sqlx::query_as(sql).fetch_one(p).await?;
             Ok(row.0 as u64)
         }
+        DbPool::SqlServer(p) => {
+            SqlServerPool::query_count(p, sql).await
+        }
+        DbPool::Oracle(p) => {
+            OraclePool::query_count(p, "", sql).await
+        }
     }
 }
 
@@ -499,5 +621,38 @@ pub fn format_value(val: &serde_json::Value) -> String {
         serde_json::Value::Number(n) => n.to_string(),
         serde_json::Value::String(s) => format!("'{}'", s.replace('\'', "''")),
         _ => format!("'{}'", val.to_string().replace('\'', "''")),
+    }
+}
+
+/// SQL Server / Oracle 后端共有的「带前置切库语句」执行接口。
+/// SqlServerPool 的 TDS 协议建连时已绑定库，无需前置语句，故忽略 setup；
+/// OraclePool 通过 ODBC 每次操作即开即关，需要 setup（ALTER SESSION）先切 schema。
+trait SqlServerOrOracle {
+    async fn query_rows(&self, setup: &str, sql: &str, max_rows: usize) -> Result<(Vec<String>, Vec<Vec<serde_json::Value>>)>;
+    async fn execute(&self, setup: &str, sql: &str) -> Result<u64>;
+    async fn query_count(&self, setup: &str, sql: &str) -> Result<u64>;
+}
+
+impl SqlServerOrOracle for Arc<SqlServerPool> {
+    async fn query_rows(&self, _setup: &str, sql: &str, max_rows: usize) -> Result<(Vec<String>, Vec<Vec<serde_json::Value>>)> {
+        self.as_ref().query_rows(sql, max_rows).await
+    }
+    async fn execute(&self, _setup: &str, sql: &str) -> Result<u64> {
+        self.as_ref().execute(sql).await
+    }
+    async fn query_count(&self, _setup: &str, sql: &str) -> Result<u64> {
+        self.as_ref().query_count(sql).await
+    }
+}
+
+impl SqlServerOrOracle for Arc<OraclePool> {
+    async fn query_rows(&self, setup: &str, sql: &str, max_rows: usize) -> Result<(Vec<String>, Vec<Vec<serde_json::Value>>)> {
+        self.as_ref().query_rows(setup, sql, max_rows).await
+    }
+    async fn execute(&self, setup: &str, sql: &str) -> Result<u64> {
+        self.as_ref().execute(setup, sql).await
+    }
+    async fn query_count(&self, setup: &str, sql: &str) -> Result<u64> {
+        self.as_ref().query_count(setup, sql).await
     }
 }

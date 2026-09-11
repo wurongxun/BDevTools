@@ -1,74 +1,48 @@
 <template>
   <div class="db-main-panel">
-    <!-- Tab 栏 -->
-    <div class="tab-bar" v-if="editorStore.tabs.length > 0">
-      <div
+    <!-- Tab 栏（复用通用 TabBar：tab 多时横向滚动、固定最小宽度不挤压，与文件插件一致） -->
+    <TabBarContainer v-if="editorStore.tabs.length > 0">
+      <TabBarItem
         v-for="tab in editorStore.tabs"
         :key="tab.id"
-        class="tab-item"
-        :class="{ active: tab.id === editorStore.activeTabId }"
+        :active="tab.id === editorStore.activeTabId"
         @click="editorStore.activeTabId = tab.id"
+        @close="editorStore.closeTab(tab.id)"
       >
-        <span class="tab-title">{{ tab.title }}</span>
-        <el-icon class="tab-close" @click.stop="editorStore.closeTab(tab.id)"><Close /></el-icon>
-      </div>
-    </div>
+        <span class="tab-title" :title="tab.title">{{ tab.title }}</span>
+        <TabCloseButton @close="editorStore.closeTab(tab.id)" />
+      </TabBarItem>
+    </TabBarContainer>
 
     <!-- 主内容区 -->
     <div class="main-content">
-      <template v-if="editorStore.activeTab">
-        <!-- SQL 编辑器 Tab -->
-        <div v-if="editorStore.activeTab.type === 'sql'" class="sql-tab">
-          <div class="sql-editor-wrap">
-            <SqlEditor
-              :config-id="editorStore.activeTab.configId"
-              :database="editorStore.activeTab.database"
-              :initial-content="editorStore.activeTab.content"
-              :saved-file-path="editorStore.activeTab.filePath"
-              @executed="onSqlExecuted"
-              @saved="onSqlSaved"
+      <!--
+        tab 内容按 tab.id 缓存实例。每个 tab 独立 KeepAlive（v-for 常驻，v-if 在 component 上）：
+        切走 deactivated 卸载 DOM、切回 activated 恢复，编辑内容/查询结果/表格/筛选条件均保持；
+        关闭 tab 时对应 KeepAlive 随 v-for 条目移除而卸载，内部缓存的组件实例（Monaco/结果表格）
+        随之真正销毁并释放内存——避免单一 KeepAlive 缓存关闭 tab 实例直到超 max 才 LRU 淘汰
+        导致的「关闭后内存不降」。
+      -->
+      <template v-if="editorStore.tabs.length > 0">
+        <template v-for="tab in editorStore.tabs" :key="tab.id">
+          <KeepAlive>
+            <component
+              :is="tabComponentFor(tab)"
+              v-if="tab.id === editorStore.activeTabId"
+              :key="tab.id"
+              v-bind="tabPropsFor(tab)"
             />
-          </div>
-          <div
-            class="resize-handle"
-            :class="{ dragging: isDragging }"
-            @mousedown.prevent="onResizeStart"
-          ></div>
-          <div ref="resultPanelRef" class="sql-result-wrap" :style="{ height: resultHeight + 'px', transition: isDragging ? 'none' : '' }">
-            <SqlResultPanel :result="editorStore.activeTabResult" />
-          </div>
-        </div>
-
-        <!-- 表数据 Tab -->
-        <div v-else-if="editorStore.activeTab.type === 'table'" class="table-tab">
-          <TableDataView
-            v-if="editorStore.activeTab.configId && editorStore.activeTab.database && editorStore.activeTab.table"
-            :key="editorStore.activeTab.id"
-            :config-id="editorStore.activeTab.configId"
-            :database="editorStore.activeTab.database"
-            :table="editorStore.activeTab.table"
-          />
-        </div>
-
-        <!-- 表结构 Tab -->
-        <div v-else-if="editorStore.activeTab.type === 'metadata'" class="metadata-tab">
-          <TableMetadata
-            v-if="editorStore.activeTab.configId && editorStore.activeTab.database && editorStore.activeTab.table"
-            :key="editorStore.activeTab.id"
-            :config-id="editorStore.activeTab.configId"
-            :database="editorStore.activeTab.database"
-            :table="editorStore.activeTab.table"
-          />
-        </div>
+          </KeepAlive>
+        </template>
       </template>
 
       <!-- 无 Tab 时的欢迎页 -->
       <div v-else class="welcome">
         <el-empty description="数据库管理工具">
           <template #image>
-            <el-icon :size="64" color="#409eff"><Coin /></el-icon>
+            <el-icon :size="64"><Coin /></el-icon>
           </template>
-          <p style="color: #909399; font-size: var(--font-size-lg);">从左侧选择连接，双击表查看数据，或右键新建查询</p>
+          <p class="welcome-hint">从左侧选择连接，双击表查看数据，或右键新建查询</p>
         </el-empty>
       </div>
     </div>
@@ -76,147 +50,60 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Close, Coin } from '@element-plus/icons-vue'
-import { useEditorStore, useScriptsStore } from './store'
-import SqlEditor from './components/SqlEditor.vue'
-import SqlResultPanel from './components/SqlResultPanel.vue'
-import TableDataView from './components/TableDataView.vue'
+import { Coin } from '@element-plus/icons-vue'
+import { TabBarContainer, TabBarItem, TabCloseButton } from '@/components/TabBar'
+import { useEditorStore } from './store'
+import SqlTab from './components/SqlTab.vue'
+import TableViewer from './components/TableViewer.vue'
 import TableMetadata from './components/TableMetadata.vue'
+import type { EditorTab } from './types'
 
 const editorStore = useEditorStore()
-const scriptsStore = useScriptsStore()
 
-// ==================== 垂直 resize（编辑器 / 结果面板） ====================
-const RESULT_HEIGHT_DEFAULT = 250
-const RESULT_HEIGHT_MIN = 100
-
-const resultPanelRef = ref<HTMLElement>()
-const resultHeight = ref(RESULT_HEIGHT_DEFAULT)
-const isDragging = ref(false)
-
-function onResizeStart(e: MouseEvent) {
-  const sqlTab = resultPanelRef.value?.parentElement
-  if (!sqlTab) return
-  const tabRect = sqlTab.getBoundingClientRect()
-  const startY = e.clientY
-  const startH = resultHeight.value
-  isDragging.value = true
-  document.body.style.cursor = 'ns-resize'
-  document.body.style.userSelect = 'none'
-
-  const resultEl = resultPanelRef.value!
-
-  const onMouseMove = (moveEvent: MouseEvent) => {
-    const newH = Math.max(RESULT_HEIGHT_MIN, Math.min(tabRect.height - 150, startH - (moveEvent.clientY - startY)))
-    resultEl.style.height = newH + 'px'
-  }
-  const onMouseUp = () => {
-    document.removeEventListener('mousemove', onMouseMove)
-    document.removeEventListener('mouseup', onMouseUp)
-    document.body.style.cursor = ''
-    document.body.style.userSelect = ''
-    // 读取 DOM 最终值，交给 Vue 接管
-    resultHeight.value = parseInt(resultEl.style.height) || RESULT_HEIGHT_DEFAULT
-    isDragging.value = false
-  }
-  document.addEventListener('mousemove', onMouseMove)
-  document.addEventListener('mouseup', onMouseUp)
+/** 按 tab 类型选择内容组件（sql → SqlTab；table → TableViewer 数据/属性/预留；metadata → 详细元数据） */
+function tabComponentFor(tab: EditorTab): any {
+  const type = tab.type
+  if (type === 'sql') return SqlTab
+  if (type === 'table') return TableViewer
+  if (type === 'metadata') return TableMetadata
+  return null
 }
 
-function onSqlExecuted(result: any) {
-  if (editorStore.activeTabId) {
-    editorStore.setTabResult(editorStore.activeTabId, result)
-  }
-}
-
-async function onSqlSaved(filePath: string, configId: string, database: string) {
-  if (editorStore.activeTabId) {
-    editorStore.setTabFilePath(editorStore.activeTabId, filePath)
-    // 保存时自动落绑定：该文件默认对应的连接与数据库
-    await scriptsStore.bindFile(filePath, configId, database)
-    await scriptsStore.refresh()
+/** 按 tab 类型透传 props（SqlTab 接收 tab；TableViewer/TableMetadata 接收 configId/database/table） */
+function tabPropsFor(tab: EditorTab): Record<string, any> {
+  if (tab.type === 'sql') return { tab }
+  return {
+    configId: tab.configId,
+    database: tab.database,
+    table: tab.table,
   }
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '@/styles/theme.scss' as theme;
+
 .db-main-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--el-bg-color);
-}
-.tab-bar {
-  display: flex;
-  background: #252526;
-  border-bottom: 1px solid #3c3c3c;
-  overflow-x: auto;
-  min-height: 35px;
-}
-.tab-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  cursor: pointer;
-  color: #969696;
-  font-size: var(--font-size-md);
-  border-right: 1px solid #3c3c3c;
-  white-space: nowrap;
-  min-width: 80px;
+  // 主面板根背景用 appMainBgColor（与 Layout/.app-main 同源），
+  // 让 side / tab / main 三段色板协调。
+  @include theme.useTheme {
+    background: theme.getVar('appMainBgColor');
+  }
 }
 .tab-title {
   /* 表名/查询标题用等宽字体，避免阿里巴巴普惠体 13px 下 _ 不可见 */
   font-family: var(--font-family-mono);
-}
-.tab-item:hover {
-  color: #fff;
-  background: #2d2d2d;
-}
-.tab-item.active {
-  color: #fff;
-  background: #1e1e1e;
-  border-bottom: 2px solid #007acc;
-}
-.tab-close {
-  font-size: var(--font-size-base);
-  border-radius: var(--radius-sm);
-  padding: 2px;
-}
-.tab-close:hover {
-  background: #505050;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
 }
 .main-content {
   flex: 1;
   overflow: hidden;
-}
-.sql-tab {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-.sql-editor-wrap {
-  flex: 1;
-  min-height: 150px;
-  overflow: hidden;
-}
-.resize-handle {
-  height: 4px;
-  background: #3c3c3c;
-  cursor: ns-resize;
-  flex-shrink: 0;
-  position: relative;
-}
-.resize-handle:hover,
-.resize-handle.dragging {
-  background: #007acc;
-}
-.sql-result-wrap {
-  flex-shrink: 0;
-  overflow: hidden;
-  border-top: 1px solid #3c3c3c;
 }
 .table-tab, .metadata-tab {
   height: 100%;
@@ -227,5 +114,11 @@ async function onSqlSaved(filePath: string, configId: string, database: string) 
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.welcome-hint {
+  font-size: var(--font-size-lg);
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 </style>

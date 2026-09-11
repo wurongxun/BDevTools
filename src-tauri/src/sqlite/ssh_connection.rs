@@ -1,12 +1,11 @@
-/*! # sqlite连接管理模块*/
+/*! # SSH/SFTP 连接配置持久化（sqlite 表）
+存储 ssh/sftp 连接配置与收藏分组（favorites），供连接列表/右键子菜单使用。*/
+use crate::response::response::Response;
 use crate::sqlite::sqlite::exec;
-use crate::{entity::structs::Payload, response::response::Response};
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use log::info;
-use rusqlite::{params, Connection};
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use std::{path::PathBuf, result::Result::Ok};
-use uuid::Uuid;
 
 /// 数据对应字段
 #[derive(Serialize, Deserialize, Debug)]
@@ -25,7 +24,7 @@ pub struct SshSubMenu {
 }
 
 /// 创建一个连接
-pub async fn connection_create(mut map: SshSubMenu) -> Response<Option<bool>> {
+pub async fn connection_create(map: SshSubMenu) -> Response<Option<bool>> {
     let res = exec(|conn| {
         let count: u32 = conn
         .query_row("SELECT COUNT(*) FROM connections where favorites_name=?1 and name=?2",  params![map.favorites_name,map.name], |row| row.get(0))

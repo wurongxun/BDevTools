@@ -19,10 +19,10 @@
             <Document />
           </el-icon>
           <p class="placeholder-text">选择或创建一个笔记开始编辑</p>
-          <el-button v-if="notebooks_data && notebooks_data.children && notebooks_data.children.length > 0"
+          <app-button v-if="notebooks_data && notebooks_data.children && notebooks_data.children.length > 0"
                      class="create-note-button">
             创建新笔记
-          </el-button>
+          </app-button>
         </div>
       </div>
     </div>
@@ -57,8 +57,8 @@ import { ResponseData } from "@/entity/entitys";
 import { load, Store } from "@/core/runtime";
 import { tauri_request } from "@/utils/tauri_request";
 import { Document } from '@element-plus/icons-vue';
-import { useDark } from '@vueuse/core'
 import { subscribe, Unsubscribe } from "@/core/runtime";
+import { isDark } from '@/composables/useDark';
 import useStore from '@/store'
 import { useDocumentManagerStore } from '../../store/documents'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
@@ -71,12 +71,9 @@ const props = defineProps<{
   path: string
 }>()
 
-// 暗黑模式
-const isDark = useDark({
-  storageKey: 'theme-appearance',
-  valueDark: 'dark',
-  valueLight: 'light'
-})
+// 暗黑模式：editorTheme 跟随全局主题单例（composables/useDark，settings.json 持久化）。
+// 注意：不能在此再 new 一个 useDark 实例（此前 storageKey 'theme-appearance' 的独立实例与全局不同步，
+// 且初始值只读 localStorage/系统配色，导致编辑器主题与全局 html.dark 状态错位）。
 const editorTheme = computed(() => {
   return isDark.value ? 'dark' : 'light';
 });
@@ -533,26 +530,6 @@ const handleCreateNote = () => {
   text-align: right;
 }
 
-/* 响应式优化 */
-@media (max-width: 768px) {
-  .box {
-    flex-direction: column;
-  }
-
-  .left {
-    width: 100%;
-    height: 40%;
-  }
-
-  .mid {
-    width: 100%;
-    height: 60%;
-  }
-
-  .resize {
-    display: none;
-  }
-}
 
 .custom-dialog {
   border-radius: var(--radius-xl);

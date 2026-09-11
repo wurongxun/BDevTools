@@ -31,7 +31,7 @@
       <span class="conn-tab-label">{{ tab.title }}</span>
 
       <!-- 关闭按钮 -->
-      <TabCloseButton v-if="tab.closable" @click="handleTabClose(tab.id)" title="关闭连接" />
+      <TabCloseButton v-if="tab.closable" @close="handleTabClose(tab.id)" title="关闭连接" />
     </TabBarItem>
   </TabBarContainer>
 </template>

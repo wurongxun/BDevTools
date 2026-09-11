@@ -1,5 +1,5 @@
 /*! # 会话管理 Tauri 命令 */
-use crate::entity::window::{SessionSnapshot, SessionSummary};
+use crate::entity::session::{SessionSnapshot, SessionSummary};
 use crate::response::response::Response;
 use crate::session::snapshot;
 

@@ -1,21 +1,19 @@
 <template>
   <div class="app-main" :style="{ height: appMainHeight }">
     <el-header class="app-header">
-      <!-- 动态渲染当前窗口启用插件的 Tab 栏（v-show 保持存活，切换不重建） -->
+      <!-- 动态渲染当前窗口启用插件的 Tab 栏（KeepAlive 常驻：切走 deactivated 缓存实例、卸载 DOM，切回 activated 恢复，不重建） -->
       <template v-for="plugin in displayPlugins" :key="plugin.id">
-        <component
-          :is="plugin.tabBar"
-          v-show="isTabVisible(plugin.id)"
-        />
+        <KeepAlive>
+          <component :is="plugin.tabBar" v-if="isTabVisible(plugin.id)" />
+        </KeepAlive>
       </template>
     </el-header>
     <el-main class="app-main-content">
-      <!-- 动态渲染当前窗口启用插件的主面板（v-show 保持存活，切换不重建） -->
+      <!-- 动态渲染当前窗口启用插件的主面板（KeepAlive 常驻：切走 deactivated 缓存实例、卸载 DOM，切回 activated 恢复，不重建） -->
       <template v-for="plugin in displayPlugins" :key="plugin.id">
-        <component
-          :is="plugin.mainPanel"
-          v-show="isPanelVisible(plugin.id)"
-        />
+        <KeepAlive>
+          <component :is="plugin.mainPanel" v-if="isPanelVisible(plugin.id)" />
+        </KeepAlive>
       </template>
     </el-main>
   </div>

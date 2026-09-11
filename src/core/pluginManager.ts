@@ -25,6 +25,13 @@ export interface ToolPlugin {
   onActivate?: () => void | Promise<void>
   /** 插件停用回调 */
   onDeactivate?: () => void
+  // ===== 侧边栏布局声明（可选，未声明时全局 Layout 用默认值） =====
+  /** 侧边栏最小宽度（px） */
+  sidebarMinWidth?: number
+  /** 侧边栏最大宽度（px） */
+  sidebarMaxWidth?: number
+  /** 侧边栏默认宽度（px，首次切换该插件且未手动拖拽过时使用） */
+  sidebarDefaultWidth?: number
 }
 
 /**

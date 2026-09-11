@@ -1,6 +1,6 @@
 // ============================================================
 // tokens.scss —— 设计令牌唯一数据源（Design Tokens）
-// 统一管理：字体族 / 字号 / 圆角 / 间距 / 阴影
+// 统一管理：字体族 / 字号 / 圆角 / 间距 / 拖拽分隔线（尺寸+颜色）/ 阴影
 //
 // 双通道：
 //   1) Sass 变量（编译期）：$radius-md、$font-size-base、$space-2 ...
@@ -19,8 +19,10 @@ $font-family-mono: 'Consolas', 'Courier New', monospace;
 $font-family-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
 // ---------- 字号（与 theme.scss 的 fontSize* 系列对齐） ----------
-$font-size-xs: 10px; // 辅助/角标
-$font-size-sm: 11px; // 次要信息
+// 桌面应用可读下限：正文字号不低于 12px；11px 仅用于角标/徽标等非段落文本，
+// 不再提供 10px 文本档（低于可读下限，影响 WCAG 1.4.4 缩放与可读性）。
+$font-size-xs: 11px; // 角标/徽标（非段落文本的最小档）
+$font-size-sm: 12px; // 次要信息（状态栏/说明文字）
 $font-size-base: 12px; // 基准字号（对应 theme fontSizeSmall/fontSize）
 $font-size-md: 13px; // 略大正文
 $font-size-lg: 14px; // 强调正文（对应 theme fontSizeLg）
@@ -51,6 +53,23 @@ $space-6: 24px;
 $space-8: 32px;
 $space-10: 40px;
 $space-12: 48px;
+
+// ---------- 拖拽分隔线（resize-handle / resize-handle-line） ----------
+// 尺寸按方向区分：
+//   v —— 竖向分隔线（如 Layout 侧栏右缘）：线宽 = 2px，悬浮指示条高 = 30px
+//   h —— 横向分隔线（如 SqlTab 结果区上缘、DB 侧栏上下分区）：线高 = 4px（线宽通条 100%）
+// 颜色统一引用 Element Plus 语义变量：var() 为惰性解析，
+// html.dark 下 --el-* 被暗色主题覆盖，故明暗自动适配、无需额外 dark 分支。
+$resize-handle-v-line-width: 1px;
+$resize-handle-v-line-height: 30px;
+$resize-handle-h-line-height: 1px;
+// hover / 拖拽中的增粗尺寸（桌面应用：分隔线常态很细、悬停时变粗以提示可拖拽，离开恢复）
+$resize-handle-v-line-width-active: 3px; // 竖向线 hover 增粗后的宽度
+$resize-handle-h-line-height-active: 3px; // 横向线 hover 增粗后的高度
+$resize-handle-hit-area: 4px; // 每侧额外不可见热区（扩大可拖拽命中范围，视觉不占位）
+$resize-handle-color: var(--borderColor); // 常态：柔和分隔线（走 theme 的 borderColor 而非 --el-border-color，
+                                                              // 后者被覆盖为 borderStrong 用于控件边界，对比度太高做装饰线太显眼）
+$resize-handle-color-active: var(--el-color-primary); // hover / 拖拽中高亮
 
 // ---------- 阴影（浮层分级） ----------
 $shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.12); // 浅浮层
@@ -94,6 +113,15 @@ $shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.35); // 深色浮层/tooltip
     --space-8: #{$space-8};
     --space-10: #{$space-10};
     --space-12: #{$space-12};
+
+    --resize-handle-v-line-width: #{$resize-handle-v-line-width};
+    --resize-handle-v-line-height: #{$resize-handle-v-line-height};
+    --resize-handle-h-line-height: #{$resize-handle-h-line-height};
+    --resize-handle-v-line-width-active: #{$resize-handle-v-line-width-active};
+    --resize-handle-h-line-height-active: #{$resize-handle-h-line-height-active};
+    --resize-handle-hit-area: #{$resize-handle-hit-area};
+    --resize-handle-color: #{$resize-handle-color};
+    --resize-handle-color-active: #{$resize-handle-color-active};
 
     --shadow-sm: #{$shadow-sm};
     --shadow-md: #{$shadow-md};

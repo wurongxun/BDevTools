@@ -3,6 +3,7 @@
 @use 'element-plus/theme-chalk/src/index.scss' as *;
 @use './theme.scss';
 @use './tokens.scss';
+@use './mixin.scss';
 
 // ============================================================
 // Element Plus 桌面密度覆盖：压缩默认 Web 风格的尺寸/圆角/投影，
@@ -25,8 +26,9 @@
   --el-border-radius-round: 14px;
 
   // 控件高度压缩（默认 32px → 26px，input/select 等经 var() 联动）
+  // small 档取 24px：22px 低于 WCAG 2.5.8 目标尺寸下限（24×24）
   --el-component-size: 26px;
-  --el-component-size-small: 22px;
+  --el-component-size-small: 24px;
   --el-component-size-large: 34px;
 
   // 去掉 Web 式浮夸投影，改为紧凑深色阴影
@@ -39,13 +41,25 @@
 // 颜色类变量从 theme.scss 单一数据源生成，随 light/dark 切换
 @each $name, $vars in theme.$themes {
   html.#{$name} {
-    --el-border-color: #{map.get($vars, 'borderColor')};
+    // --el-border-color 用于输入控件边界，需满足 WCAG 1.4.11 的 3:1，
+    // 因此指向 borderStrong；light/lighter 用于表格线等纯装饰分隔线，保持柔和的 borderColor。
+    --el-border-color: #{map.get($vars, 'borderStrong')};
     --el-border-color-light: #{map.get($vars, 'borderColor')};
     --el-border-color-lighter: #{map.get($vars, 'borderColor')};
+    --el-border-color-extra-light: #{map.get($vars, 'borderColor')};
+    --el-border-color-dark: #{map.get($vars, 'borderStrong')};
+    --el-border-color-darker: #{map.get($vars, 'borderStrong')};
     --el-text-color-regular: #{map.get($vars, 'textColor')};
+    --el-text-color-primary: #{map.get($vars, 'textColor')};
     --el-text-color-secondary: #{map.get($vars, 'textSecondary')};
+    --el-text-color-placeholder: #{map.get($vars, 'textSecondary')};
+    // 禁用态：用专用令牌表达，替代对常规文字叠加 opacity 的做法
+    // （opacity 会把对比度压到 2.4:1 左右，见审查报告 K/20）
+    --el-text-color-disabled: #{map.get($vars, 'textDisabled')};
     --el-bg-color: #{map.get($vars, 'bgColor')};
     --el-bg-color-overlay: #{map.get($vars, 'bgColor')};
+    // 键盘焦点环（WCAG 2.4.7 / 2.4.11 Focus Appearance）
+    --focus-ring-color: #{map.get($vars, 'focusRing')};
     // 输入框背景：暗色下用稍深的 sidebarBg 与面板区分，亮色下纯白
     @if $name == 'dark' {
       --el-fill-color-blank: #{map.get($vars, 'sidebarBg')};
@@ -65,21 +79,70 @@ html.dark {
 .el-button {
   --el-button-size: var(--el-component-size);
   height: var(--el-button-size);
-  padding: 2px 4px;
+  // 内边距留白：2px 会让文字贴边，且点击命中区过窄
+  padding: 4px 10px;
 
   &.is-circle {
     width: var(--el-button-size);
-    padding: 2px;
+    padding: 4px;
+  }
+
+  // 纯图标模式（有 icon 无文字、非 circle）：收窄左右内边距，形成紧凑图标按钮
+  &.is-icon-only {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  // 无边框纯图标工具栏按钮（桌面风格，复刻各插件 .header-btn）：
+  // 透明背景、无边框、紧凑 22×22，hover 浮起浅色背景
+  &.is-bare {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--el-text-color-secondary);
+    font-size: var(--font-size-lg);
+    // 取消 EP 默认的兄弟间距（.el-button+.el-button{margin-left:12px}）：
+    // bare 图标按钮总是排列在 flex+gap 容器中，间距由容器 gap 决定，
+    // 若再叠加 12px margin 会出现「第二个按钮左边距过大」的不协调。
+    // 选择器特异性 (0,0,2) 与 EP 的 .el-button+.el-button 持平，
+    // 但本文件在 EP 之后引入，故此处规则胜出，将 bare 的左边距归零。
+    margin-left: 0;
+
+    &:hover:not(:disabled) {
+      color: var(--el-text-color-primary);
+      background-color: var(--el-fill-color-light);
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      border: none;
+    }
+
+    // 激活态：外部透传 class="active" 时高亮主色（如齿轮按钮展开态）
+    &.active {
+      color: var(--el-color-primary);
+      background-color: var(--el-fill-color-light);
+    }
   }
 
   &--large {
     --el-button-size: var(--el-component-size-large);
-    padding: 3px 6px;
+    padding: 5px 12px;
   }
 
   &--small {
     --el-button-size: var(--el-component-size-small);
-    padding: 2px 4px;
+    padding: 3px 8px;
+  }
+
+  // 禁用态：使用 token 化的禁用色，不再依赖 opacity 压暗
+  &.is-disabled,
+  &.is-disabled:hover {
+    color: var(--el-text-color-disabled);
+    border-color: var(--el-border-color-light);
   }
 }
 
@@ -92,4 +155,9 @@ html.dark {
 // 单独加深投影（不影响 dropdown/popover 等其他浮层）
 .el-popper.is-dark {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+// 弹窗遮罩层（dialog 全屏 backdrop）：用细滚动条样式，遮罩层通常内容少但要保持一致观感
+.el-overlay-dialog {
+  @include mixin.scrollbar();
 }

@@ -213,8 +213,8 @@
     <GlobalDialog v-model="showDeleteConfirm" title="确认删除" width="400px">
       <div class="ftp-delete-message">确定要删除选中的 {{ selectedRemoteFiles.length }} 个文件/目录吗？</div>
       <template #footer>
-        <el-button size="small" @click="showDeleteConfirm = false">取消</el-button>
-        <el-button size="small" type="danger" plain @click="confirmDeleteSelected">删除</el-button>
+        <app-button size="small" @click="showDeleteConfirm = false">取消</app-button>
+        <app-button size="small" type="danger" plain @click="confirmDeleteSelected">删除</app-button>
       </template>
     </GlobalDialog>
 
@@ -700,10 +700,9 @@ function formatSize(bytes: number): string {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: #1e1e1e;
 
   @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
+    background-color: theme.getVar('appMainBgColor');
   }
 }
 
@@ -715,7 +714,7 @@ function formatSize(bytes: number): string {
   flex-shrink: 0;
 
   @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
+    background-color: theme.getVar('sidebarBg');
     border-bottom: 1px solid theme.getVar('borderColor');
   }
 }
@@ -805,20 +804,17 @@ function formatSize(bytes: number): string {
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  background-color: #2d2d2d;
-  border-bottom: 1px solid #3e3e3e;
   flex-shrink: 0;
 
   @include theme.useTheme {
-    background-color: rgba(255, 255, 255, 0.03);
-    border-bottom-color: theme.getVar('borderColor');
+    background-color: theme.getVar('sidebarBg');
+    border-bottom: 1px solid theme.getVar('borderColor');
   }
 }
 
 .panel-title {
   font-size: theme.getVar('fontSizeSmall');
   font-weight: 500;
-  color: #ccc;
   white-space: nowrap;
 
   @include theme.useTheme {
@@ -831,16 +827,19 @@ function formatSize(bytes: number): string {
   align-items: center;
   gap: 2px;
   font-size: theme.getVar('fontSizeSmall');
-  color: #888;
   flex: 1;
   min-width: 0;
   overflow: hidden;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 
 .breadcrumb-item {
   cursor: pointer;
   white-space: nowrap;
-  color: #6699cc;
+  color: #6699cc; // 面包屑链接语义色（保留）：SSH 风格
 
   &:hover {
     color: #88bbff;
@@ -849,12 +848,14 @@ function formatSize(bytes: number): string {
 }
 
 .breadcrumb-sep {
-  color: #555;
   margin: 0 2px;
   cursor: default;
 
+  @include theme.useTheme {
+    color: theme.getVar('textDisabled');
+  }
+
   &:hover {
-    color: #555;
     text-decoration: none;
   }
 }
@@ -896,7 +897,6 @@ function formatSize(bytes: number): string {
   gap: 8px;
   padding: 4px 12px;
   font-size: theme.getVar('fontSize');
-  color: #ccc;
   cursor: pointer;
   transition: background-color 0.1s;
   user-select: none;
@@ -906,12 +906,16 @@ function formatSize(bytes: number): string {
   }
 
   &:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
+    }
   }
 }
 
 .file-item-selected {
-  background-color: rgba(0, 122, 204, 0.3) !important;
+  @include theme.useTheme {
+    background-color: theme.getVar('hoverColor') !important;
+  }
 }
 
 .file-icon {
@@ -933,7 +937,10 @@ function formatSize(bytes: number): string {
   width: 70px;
   text-align: right;
   font-size: theme.getVar('fontSizeSm');
-  color: #888;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 
 .file-time {
@@ -941,7 +948,10 @@ function formatSize(bytes: number): string {
   width: 130px;
   text-align: right;
   font-size: theme.getVar('fontSizeSm');
-  color: #888;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 }
 
 .empty-tip {
@@ -949,8 +959,11 @@ function formatSize(bytes: number): string {
   align-items: center;
   justify-content: center;
   height: 100px;
-  color: #666;
   font-size: theme.getVar('fontSize');
+
+  @include theme.useTheme {
+    color: theme.getVar('textDisabled');
+  }
 }
 
 .ftp-context-menu {
@@ -975,13 +988,18 @@ function formatSize(bytes: number): string {
   gap: 8px;
   padding: 8px 16px;
   font-size: theme.getVar('fontSize');
-  color: #ccc;
   cursor: pointer;
   transition: background-color 0.15s;
 
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
+
   &:hover {
-    background-color: rgba(0, 122, 204, 0.3);
-    color: #fff;
+    @include theme.useTheme {
+      background-color: theme.getVar('hoverColor');
+      color: theme.getVar('activityBarActive');
+    }
   }
 }
 </style>

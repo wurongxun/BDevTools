@@ -1,5 +1,8 @@
 # Logs
-logs
+# 注意：此处只忽略仓库根目录的 logs/ 输出目录。
+# 早期写法 `logs` 会连带忽略 src/plugins/logs/ 插件源码，导致插件不入库。
+/logs/
+!src/plugins/logs/
 *.log
 npm-debug.log*
 yarn-debug.log*

@@ -26,9 +26,9 @@
         <div class="temp-ws-sub">不保存将在关闭后清除。</div>
       </div>
       <template #footer>
-        <el-button size="small" @click="tempConfirmAction = 'cancel'; showTempWorkspaceConfirm = false">取消</el-button>
-        <el-button size="small" type="danger" plain @click="tempConfirmAction = 'discard'; showTempWorkspaceConfirm = false">不保存</el-button>
-        <el-button size="small" type="primary" @click="tempConfirmAction = 'save'; showTempWorkspaceConfirm = false">保存</el-button>
+        <app-button size="small" @click="tempConfirmAction = 'cancel'; showTempWorkspaceConfirm = false">取消</app-button>
+        <app-button size="small" type="danger" plain @click="tempConfirmAction = 'discard'; showTempWorkspaceConfirm = false">不保存</app-button>
+        <app-button size="small" type="primary" @click="tempConfirmAction = 'save'; showTempWorkspaceConfirm = false">保存</app-button>
       </template>
     </GlobalDialog>
 
@@ -48,9 +48,9 @@
         </div>
       </div>
       <template #footer>
-        <el-button size="small" type="danger" plain @click="handleConflictAction('discard')">放弃草稿</el-button>
-        <el-button size="small" @click="handleConflictAction('saveAs')">草稿另存为副本</el-button>
-        <el-button size="small" type="primary" @click="handleConflictAction('restore')">恢复草稿</el-button>
+        <app-button size="small" type="danger" plain @click="handleConflictAction('discard')">放弃草稿</app-button>
+        <app-button size="small" @click="handleConflictAction('saveAs')">草稿另存为副本</app-button>
+        <app-button size="small" type="primary" @click="handleConflictAction('restore')">恢复草稿</app-button>
       </template>
     </GlobalDialog>
     </div>
@@ -59,7 +59,7 @@
 
 <script lang="ts" setup>
 import { ref, shallowRef, computed, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
-import { load, Store, getCurrentWebviewWindow } from '@/core/runtime'
+import { load, getCurrentWebviewWindow } from '@/core/runtime'
 import type { Window } from '@/core/runtime'
 import { useI18n } from 'vue-i18n'
 import elZhCn from 'element-plus/es/locale/lang/zh-cn'
@@ -396,25 +396,10 @@ async function initApp() {
     console.warn('加载工作目录设置失败:', e)
   }
 
-  // 主窗口：从 openfile.json 加载文件（向后兼容）
-  let store: Store | undefined = undefined
-  try {
-    store = await load('openfile.json', {
-      autoSave: false,
-      defaults: {}
-    })
-    if (store) {
-      const entries = await store.entries()
-      for (const [, value] of entries) {
-        const s = String(value)
-        if (s) {
-          docStore.openDocument(s)
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('加载 openfile.json 失败:', e)
-  }
+  // 主窗口：从 openfile.json 恢复「上次未关闭的 tab」（失效记录会在恢复时清理）。
+  // 注意：这里只还原未关闭的 tab，不是「最近打开」列表；「最近打开」是用户主动打开的历史，
+  // 不参与启动恢复（详见 docStore.restoreOpenFiles / addRecentFile 的注释）。
+  await docStore.restoreOpenFiles()
 
   // 主窗口加载默认工作区（Layout 挂载前就绪）
   await useWorkspaceStore.loadCurrentWorkspace(null)

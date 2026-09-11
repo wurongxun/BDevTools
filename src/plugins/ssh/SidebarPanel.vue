@@ -5,9 +5,9 @@
       <span class="panel-title">连接管理器</span>
       <div class="header-actions">
         <el-dropdown trigger="click" @command="handleHeaderCommand">
-          <el-button size="small" link class="header-more-btn" title="更多操作">
+          <app-button size="small" link class="header-more-btn" title="更多操作">
             <el-icon><MoreFilled /></el-icon>
-          </el-button>
+          </app-button>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="addGroup">
@@ -93,7 +93,7 @@
 
       <div v-else class="connection-empty">
         <p>暂无连接</p>
-        <el-button size="small" @click="showConnectionDialog = true">新建连接</el-button>
+        <app-button size="small" @click="showConnectionDialog = true">新建连接</app-button>
       </div>
     </div>
 
@@ -190,8 +190,8 @@
     <GlobalDialog v-model="showDeleteConfirm" title="确认删除" width="400px">
       <div class="delete-confirm-message">{{ deleteConfirmMessage }}</div>
       <template #footer>
-        <el-button size="small" @click="showDeleteConfirm = false">取消</el-button>
-        <el-button size="small" type="danger" plain @click="confirmDelete">删除</el-button>
+        <app-button size="small" @click="showDeleteConfirm = false">取消</app-button>
+        <app-button size="small" type="danger" plain @click="confirmDelete">删除</app-button>
       </template>
     </GlobalDialog>
 
@@ -428,11 +428,11 @@ onMounted(() => {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background-color: #1e1e1e;
   font-family: var(--font-family-base);
 
+  // 侧边栏根背景用 sidebarBg（与 Layout/.panel-area 同源），保证 side 色板协调
   @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
+    background-color: theme.getVar('sidebarBg');
   }
 }
 
@@ -444,22 +444,14 @@ onMounted(() => {
   padding: 4px 12px;
   height: 35px;
   flex-shrink: 0;
-  // border-bottom: 1px solid #2d2d2d;
-
-  // @include theme.useTheme {
-  //   border-bottom-color: theme.getVar('borderColor');
-  // }
 }
-
 .panel-title {
-  font-size: theme.getVar('fontSizeSmall');
   font-weight: 600;
-  color: #bbb;
   text-transform: uppercase;
   letter-spacing: 1px;
-
   @include theme.useTheme {
     color: theme.getVar('textColor');
+    font-size: theme.getVar('fontSizeSmall');
   }
 }
 
@@ -470,13 +462,18 @@ onMounted(() => {
 }
 
 .header-more-btn {
-  color: #888;
   padding: 2px 4px;
   border-radius: var(--radius-md);
 
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+
   &:hover {
-    color: #ccc;
-    background-color: rgba(255, 255, 255, 0.08);
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+      background-color: theme.getVar('activityBarHover');
+    }
   }
 }
 
@@ -516,7 +513,9 @@ onMounted(() => {
   transition: background-color 0.1s;
 
   &:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
+    }
   }
 
   @include theme.useTheme {
@@ -526,9 +525,12 @@ onMounted(() => {
 
 .group-chevron {
   font-size: theme.getVar('fontSizeXs');
-  color: #888;
   transition: transform 0.15s ease;
   flex-shrink: 0;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 
   &.expanded {
     transform: rotate(90deg);
@@ -545,11 +547,14 @@ onMounted(() => {
 .group-count {
   font-size: theme.getVar('fontSizeXs');
   font-weight: 400;
-  color: #666;
-  background-color: rgba(255, 255, 255, 0.06);
   padding: 0 5px;
   border-radius: var(--radius-xl);
   flex-shrink: 0;
+
+  @include theme.useTheme {
+    color: theme.getVar('textDisabled');
+    background-color: theme.getVar('activityBarHover');
+  }
 }
 
 .group-content {
@@ -559,8 +564,11 @@ onMounted(() => {
 .group-empty {
   padding: 4px 12px 4px 36px;
   font-size: theme.getVar('fontSizeSmall');
-  color: #555;
   font-style: italic;
+
+  @include theme.useTheme {
+    color: theme.getVar('textDisabled');
+  }
 }
 
 // ===== 连接项 =====
@@ -575,31 +583,45 @@ onMounted(() => {
   font-size: theme.getVar('fontSize');
 
   &:hover {
-    background-color: rgba(255, 255, 255, 0.06);
-
-    .conn-hover-actions {
-      opacity: 1;
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
     }
   }
 
   &.conn-item-active {
-    background-color: rgba(0, 122, 204, 0.25);
+    @include theme.useTheme {
+      background-color: theme.getVar('hoverColor');
+    }
   }
 }
 
 .conn-icon {
   flex-shrink: 0;
-  color: #888;
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  line-height: 0; // 消除 span 内联 SVG 的 baseline 空隙，确保图标真正垂直居中
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+}
+
+// SVG 默认 display: inline 会引入 baseline 下空隙，统一 block 化，
+// 让连接图标与 action-btn（终端/文件管理）里的 SVG 在同一水平中心线上
+.conn-icon svg,
+.action-btn svg {
+  display: block;
 }
 
 .conn-name {
   flex: 1;
+  min-width: 0; // 允许在 flex 中收缩（不写会被内容撑开，无法 ellipsis）
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #ccc;
   font-size: theme.getVar('fontSize');
 
   @include theme.useTheme {
@@ -609,20 +631,31 @@ onMounted(() => {
 
 .conn-addr {
   font-size: theme.getVar('fontSizeSm');
-  color: #555;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0; // 允许收缩到 0（sidebar 极窄时先压缩地址而不是按钮）
   max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  @include theme.useTheme {
+    color: theme.getVar('textDisabled');
+  }
 }
 
+// 终端 / 文件管理按钮：永远可见，靠右悬浮，不被 sidebar 宽度挤压
+// 视觉行为参考 panel-header 的「更多操作」：基础态低饱和、hover 时变清晰
 .conn-hover-actions {
   display: flex;
   gap: 2px;
-  opacity: 0;
+  flex-shrink: 0; // 关键：永远不被压缩，按钮优先级最高
+  margin-left: auto; // 靠右悬浮（即使 conn-name / conn-addr 占满也保持靠右）
+  opacity: 0.55;
   transition: opacity 0.1s;
-  flex-shrink: 0;
+
+  &:hover {
+    opacity: 1;
+  }
 }
 
 .action-btn {
@@ -632,13 +665,20 @@ onMounted(() => {
   width: 22px;
   height: 22px;
   border-radius: var(--radius-md);
-  color: #888;
   cursor: pointer;
   transition: all 0.1s;
+  flex-shrink: 0;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
 
   &:hover {
-    color: #ccc;
-    background-color: rgba(255, 255, 255, 0.1);
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+      background-color: theme.getVar('activityBarHover');
+      opacity: 1; // 抵消父级 0.55，确保单独 hover 按钮时完全清晰
+    }
   }
 }
 
@@ -649,8 +689,11 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
-  color: #555;
   gap: 12px;
+
+  @include theme.useTheme {
+    color: theme.getVar('textDisabled');
+  }
 
   p { font-size: theme.getVar('fontSize'); margin: 0; }
 }
@@ -684,13 +727,18 @@ onMounted(() => {
   gap: 8px;
   padding: 6px 16px;
   font-size: theme.getVar('fontSize');
-  color: #ccc;
   cursor: pointer;
   transition: background-color 0.1s;
 
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
+
   &:hover {
-    background-color: rgba(0, 122, 204, 0.3);
-    color: #fff;
+    @include theme.useTheme {
+      background-color: theme.getVar('hoverColor');
+      color: theme.getVar('activityBarActive');
+    }
   }
 
   .el-icon {
@@ -699,16 +747,16 @@ onMounted(() => {
 }
 
 .context-menu-danger {
-  color: #e06c75;
+  color: var(--el-color-danger);
 
   &:hover {
-    background-color: rgba(224, 108, 117, 0.2);
-    color: #e06c75;
+    background-color: rgba(245, 108, 108, 0.15);
+    color: var(--el-color-danger);
   }
 }
 
 .context-menu-active {
-  color: #61afef;
+  color: var(--el-color-primary);
 }
 
 .context-menu-divider {
@@ -729,18 +777,26 @@ onMounted(() => {
   justify-content: space-between;
   padding: 6px 16px;
   font-size: theme.getVar('fontSize');
-  color: #ccc;
   cursor: pointer;
   transition: background-color 0.1s;
 
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
+
   &:hover {
-    background-color: rgba(0, 122, 204, 0.3);
-    color: #fff;
+    @include theme.useTheme {
+      background-color: theme.getVar('hoverColor');
+      color: theme.getVar('activityBarActive');
+    }
   }
 
   .submenu-arrow {
     font-size: theme.getVar('fontSizeXs');
-    color: #666;
+
+    @include theme.useTheme {
+      color: theme.getVar('textDisabled');
+    }
   }
 }
 

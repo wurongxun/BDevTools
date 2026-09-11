@@ -91,12 +91,17 @@ async function loadDdl() {
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '@/styles/theme.scss' as theme;
+
 .table-metadata {
   padding: 8px;
 }
 .ddl-content {
-  background: #f5f7fa;
+  // 用 bgColor 跟随主题（面板级），与暗色 #f5f7fa 浅灰硬编码脱钩
+  @include theme.useTheme {
+    background: theme.getVar('bgColor');
+  }
   padding: 12px;
   border-radius: var(--radius-md);
   font-family: var(--font-family-mono);

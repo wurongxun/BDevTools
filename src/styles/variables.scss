@@ -1,6 +1,15 @@
-/* Variables —— 布局尺寸变量
-   已由 vite.config.ts additionalData 全局注入（as *），任意 scss 可直接使用。
-   设计令牌（字体/字号/圆角/间距/阴影）见 tokens.scss */
-$theme-color: #555555;
-$header-height: 32px;
-$tage-view-height: 26px;
+@use 'sass:map';
+@use './theme.scss';
+@use './tokens.scss';
+
+/* Variables —— 布局尺寸 + 兼容业务侧的次级色变量
+   设计令牌（字体/字号/圆角/间距/阴影/分隔线）见 tokens.scss
+   主题色/边框色/背景色见 theme.scss —— 本文件禁止出现硬编码色值 */
+
+// 头部高度：复用 tokens 的 4px 网格间距（32px）
+$header-height: tokens.$space-8;
+
+// 次级文字/分隔线色（兼容老调用方）：取值随编译主题的 textSecondary
+// 注意：sass 变量是编译期常量，dark 模式下仍为 light 编译值。
+// 后续推荐新代码直接用 var(--textSecondary) CSS 变量，可运行时随主题切换。
+$theme-color: map.get(map.get(theme.$themes, theme.$currentTheme), 'textSecondary');

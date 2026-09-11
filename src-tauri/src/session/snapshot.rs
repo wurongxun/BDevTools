@@ -7,7 +7,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::entity::window::{SessionSnapshot, SessionSummary};
+use crate::entity::session::{SessionSnapshot, SessionSummary};
 
 /// 获取会话存储目录路径
 fn get_sessions_dir() -> PathBuf {

@@ -21,23 +21,31 @@
         <section id="product-intro" class="help-section">
           <h2>产品介绍</h2>
           <div class="section-content">
-            <p>{{ $t('appName')}} 是一款现代化的 Markdown 笔记应用，专为开发者和写作爱好者设计。它结合了简洁的界面与强大的功能，让您能够专注于内容创作。</p>
+            <p>
+              <strong>{{ $t('appName') }}</strong>
+              是一款面向开发者的桌面端工具集：写笔记、看日志、连服务器、查数据库、分析 Java 内存，
+              不必在多个软件之间来回切换,所有数据默认保存在本机。应用采用「插件」结构，互不干扰。
+            </p>
             <div class="features-grid">
               <div class="feature-card">
-                <h3>实时预览</h3>
-                <p>边写边看效果，所见即所得的编辑体验</p>
+                <h3><el-icon class="feature-ic"><Folder /></el-icon>文件</h3>
+                <p>文件树浏览、代码与 Markdown 编辑；超过 1MB 的大文件自动降级为只读虚拟滚动。</p>
               </div>
               <div class="feature-card">
-                <h3>云端同步</h3>
-                <p>多设备数据同步，随时随地访问您的笔记</p>
+                <h3><el-icon class="feature-ic"><DataLine /></el-icon>日志</h3>
+                <p>GB 级日志分块懒加载，支持关键词 / 正则检索、级别配色、自定义高亮与堆栈识别。</p>
               </div>
               <div class="feature-card">
-                <h3>语法高亮</h3>
-                <p>支持多种编程语言的代码高亮显示</p>
+                <h3><el-icon class="feature-ic"><Connection /></el-icon>SSH 连接</h3>
+                <p>多标签 SSH 终端与 SFTP 文件传输，连接可保存复用。</p>
               </div>
               <div class="feature-card">
-                <h3>导出功能</h3>
-                <p>支持导出为 PDF、HTML、Word 等多种格式</p>
+                <h3><el-icon class="feature-ic"><Coin /></el-icon>数据库</h3>
+                <p>多数据库连接与库表浏览，SQL 编写执行、结果分页查看，可导出 CSV / Excel。</p>
+              </div>
+              <div class="feature-card">
+                <h3><el-icon class="feature-ic"><DataAnalysis /></el-icon>内存分析</h3>
+                <p>Java 堆转储（.hprof / .phd）解析：直方图、泄漏检测（支配树 + Retained Heap）、GC Roots 引用追踪。</p>
               </div>
             </div>
           </div>
@@ -47,8 +55,7 @@
         <section id="company-info" class="help-section">
           <h2>关于我们</h2>
           <div class="section-content">
-            <p>我们是一家专注于开发高效工具软件的科技公司，致力于为用户提供简洁、强大且易用的生产力工具。自成立以来，我们始终坚持以用户需求为导向，不断创新和优化产品。</p>
-            <p>我们的团队由一群热爱技术、追求卓越的开发者和设计师组成，秉承"让创作更简单"的使命，持续为用户创造价值。</p>
+
           </div>
         </section>
 
@@ -78,28 +85,7 @@
         <!-- 常见问题 -->
         <section id="faq" class="help-section">
           <h2>常见问题解答</h2>
-          <div class="section-content">
-            <div class="faq-item">
-              <h3>Q: 如何恢复误删的笔记？</h3>
-              <p>A: 您可以在"回收站"中找到最近删除的笔记，并选择恢复或永久删除。</p>
-            </div>
-            <div class="faq-item">
-              <h3>Q: 支持哪些格式的文件导入？</h3>
-              <p>A: 目前支持 .md、.txt、.html 格式的文件导入，更多格式正在开发中。</p>
-            </div>
-            <div class="faq-item">
-              <h3>Q: 如何在多设备间同步数据？</h3>
-              <p>A: 登录您的账户后，数据会自动在所有设备间同步，确保一致性。</p>
-            </div>
-            <div class="faq-item">
-              <h3>Q: 是否支持离线使用？</h3>
-              <p>A: 是的，应用支持离线编辑，联网后会自动同步数据。</p>
-            </div>
-            <div class="faq-item">
-              <h3>Q: 忘记密码怎么办？</h3>
-              <p>A: 在登录页面点击"忘记密码"，按照提示操作即可重置密码。</p>
-            </div>
-          </div>
+
         </section>
 
         <!-- 问题解决指南 -->
@@ -115,19 +101,6 @@
                   <li>关闭不必要的后台程序以释放系统资源</li>
                   <li>清理应用缓存：设置 > 存储 > 清理缓存</li>
                   <li>重启应用</li>
-                </ol>
-              </div>
-            </div>
-            <div class="troubleshooting-item">
-              <h3>同步失败</h3>
-              <div class="solution">
-                <p><strong>可能原因：</strong>网络连接问题或账户异常</p>
-                <p><strong>解决方案：</strong></p>
-                <ol>
-                  <li>检查网络连接是否正常</li>
-                  <li>确认账户登录状态</li>
-                  <li>尝试退出账户后重新登录</li>
-                  <li>联系技术支持 support@mdnote.com</li>
                 </ol>
               </div>
             </div>
@@ -153,6 +126,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+// 插件介绍卡片图标：与 src/plugins/*/index.ts 中各插件图标一致
+import { Coin, Connection, DataAnalysis, DataLine, Folder } from '@element-plus/icons-vue'
 const { t } = useI18n();
 const activeSection = ref('product-intro')
 
@@ -299,6 +274,16 @@ onMounted(() => {
   margin-top: 0;
   color: #333;
   font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 卡片标题前的内置插件图标 */
+.feature-ic {
+  color: var(--el-color-primary);
+  font-size: var(--font-size-base);
+  flex-shrink: 0;
 }
 
 .guide-step {
@@ -331,24 +316,4 @@ onMounted(() => {
   margin-bottom: 8px;
 }
 
-@media (max-width: 768px) {
-  .help-content {
-    flex-direction: column;
-  }
-  
-  .help-sidebar {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid #e1e4e8;
-    max-height: 200px;
-  }
-  
-  .help-main {
-    padding: 15px;
-  }
-  
-  .features-grid {
-    grid-template-columns: 1fr;
-  }
-}
 </style>

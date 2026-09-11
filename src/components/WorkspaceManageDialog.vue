@@ -51,8 +51,8 @@
       <div class="ws-delete-sub">该操作不可恢复。</div>
     </div>
     <template #footer>
-      <el-button size="small" @click="showDeleteConfirm = false">取消</el-button>
-      <el-button size="small" type="danger" plain @click="confirmDelete">删除</el-button>
+      <app-button size="small" @click="showDeleteConfirm = false">取消</app-button>
+      <app-button size="small" type="danger" plain @click="confirmDelete">删除</app-button>
     </template>
   </GlobalDialog>
 </template>
@@ -291,10 +291,10 @@ async function confirmDelete() {
   padding: 4px 8px;
   font-size: var(--font-size-md);
   border-radius: var(--radius-md);
-  outline: none;
 
   @include theme.useTheme {
-    border: 1px solid theme.getVar('textSecondary');
+    // 控件边界使用 borderStrong（实测亮色 3.36:1 / 暗色 3.30:1，满足 WCAG 1.4.11 ≥3:1）
+    border: 1px solid theme.getVar('borderStrong');
     background: theme.getVar('bgColor');
     color: theme.getVar('textColor');
   }

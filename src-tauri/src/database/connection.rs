@@ -10,6 +10,8 @@ use sqlx::mysql::{MySqlPool, MySqlPoolOptions};
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use uuid::Uuid;
 use super::pool::{DbPool, set_pool, remove_pool};
+use super::mssql::SqlServerPool;
+use super::odbc::OraclePool;
 
 /// 数据库连接配置
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -30,34 +32,6 @@ pub struct DbConnectionConfig {
     pub ssh_key_path: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
-}
-
-/// 初始化 db_connections 表
-pub fn init_db_connections_table() {
-    let _ = exec(|conn| {
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS db_connections (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                db_type TEXT NOT NULL,
-                host TEXT NOT NULL,
-                port INTEGER NOT NULL,
-                username TEXT NOT NULL,
-                password TEXT NOT NULL,
-                database_name TEXT,
-                ssh_enabled INTEGER NOT NULL DEFAULT 0,
-                ssh_host TEXT,
-                ssh_port INTEGER,
-                ssh_username TEXT,
-                ssh_password TEXT,
-                ssh_key_path TEXT,
-                created_at TEXT,
-                updated_at TEXT
-            );"
-        )?;
-        Ok(())
-    });
-    println!("[database] db_connections table initialized");
 }
 
 /// 创建数据库连接配置
@@ -243,6 +217,8 @@ pub async fn db_disconnect(config_id: String) -> Response<bool> {
         match pool {
             DbPool::MySQL(p) => { p.close().await; }
             DbPool::PostgreSQL(p) => { p.close().await; }
+            DbPool::SqlServer(p) => { p.close().await; }
+            DbPool::Oracle(p) => { let _ = p.close().await; }
         }
         Response::new(200, true, "已断开连接")
     } else {
@@ -277,6 +253,14 @@ async fn test_connection(config: &DbConnectionConfig) -> Result<()> {
             );
             let pool = PgPool::connect(&url).await?;
             pool.close().await;
+            Ok(())
+        }
+        "sqlserver" => {
+            SqlServerPool::test_connection(config).await?;
+            Ok(())
+        }
+        "oracle" => {
+            OraclePool::test_connection(config).await?;
             Ok(())
         }
         _ => Err(anyhow!("不支持的数据库类型: {}", config.db_type)),
@@ -317,6 +301,12 @@ pub async fn create_pool(config: &DbConnectionConfig) -> Result<DbPool> {
                 .connect(&url)
                 .await?;
             Ok(DbPool::PostgreSQL(pool))
+        }
+        "sqlserver" => {
+            Ok(DbPool::SqlServer(std::sync::Arc::new(SqlServerPool::new(config))))
+        }
+        "oracle" => {
+            Ok(DbPool::Oracle(std::sync::Arc::new(OraclePool::new(config)?)))
         }
         _ => Err(anyhow!("不支持的数据库类型: {}", config.db_type)),
     }
