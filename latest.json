@@ -1,19 +1,11 @@
 {
-  "version": "v0.2.2",
-  "notes": "v0.2.2 release",
-  "pub_date": "2025-12-04T16:30:00+08:00",
+  "version": "1.4.1",
+  "notes": "本版更新（自 v1.3.0）\n- docs(terminal): 更新终端模块文档和样式配置\n- feat(terminal): 设置新会话默认工作目录为当前工作区目录\n- refactor(app): 重构应用设置页面UI结构\n- feat(terminal): 添加终端插件及停靠面板功能\n- 增加插件功能\n- feat(plugin): 实现第三方插件系统与管理界面\n- 添加功能doc\n- docs(help): 更新帮助页面内容并统一应用名称\n- feat(file-association): 添加跨平台文件关联功能支持\n- ``` refactor(mat): 优化堆转储分析性能和内存使用\n- feat(mat): 添加对象引用追踪功能\n- feat(mat): 添加内存泄漏检测功能和优化直方图表性能\n- feat(mat): 新增 Java 堆转储内存分析功能\n- refactor(theme): 统一暗黑模式色板使用设计令牌\n- chore(version): 升级项目版本至 1.4.0\n- …另有 39 条提交",
+  "pub_date": "2026-09-15T05:47:00.046Z",
   "platforms": {
-    "linux-x86_64": {
-      "signature": "",
-      "url": ""
-    },
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSVC9icDBxQzk4aWRVdzdGbFNjck5wck11aU9WekRHeVlqN0tuK0Y2SGNudDdXb3dwVGVUdXhOOGV0R0dTTWthQWYvYXpYOTFyYmtRdTJZOVBkOUFYZDNKRUtDZnJUNndvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzY0ODI5Nzc0CWZpbGU6TWRWaWV3ZXJfMC4yLjJfeDY0X2VuLVVTLm1zaQp0VndYZHUzYm5BR0prQkZDRm54UnpPTDFMSEZvVnVhamhmSlo5ZFowQk9GN3BXbGFzb05yUVJObmplRGw0bFV3ZDZ6YTlDRkExdlh3NHY3anFaMXNCdz09Cg==",
-      "url": "https://gitee.com/wurongxun/md-note/releases/download/v0.2.2/MdViewer_0.2.2_x64_en-US.msi"
-    },
-    "darwin-x86_64": {
-      "signature": "",
-      "url": ""
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTeENhOEJVN1hVbFk3dXVQdmh6eVM1RkNaTENwVUI1d05TSE43Tmc4SUlTMDBvanlkandvcVZBUmhrL1o5ZnhXQVFiTWN1WlpMdjRqWnpBUGI0ajFoMklLU3JsRmIrVmdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQyMjgwCWZpbGU6YmFja2VuZF9kZXZfdG9vbHNfMS40LjFfeDY0LXNldHVwLmV4ZQp5dS9LOTdydFJzK0pCODhMNDJkRjdQMjRnZmxiUDEvdlB1UDZuNmZ4VzZRdExqaXpUbmRSS3NDQ3AyTzJER2NySk1nc3huQjRPS2hvWW43dGlWUTBEUT09Cg==",
+      "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.4.1/backend_dev_tools_1.4.1_x64-setup.exe"
     }
   }
 }
