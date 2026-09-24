@@ -1,10 +1,10 @@
 {
   "version": "1.6.0",
   "notes": "1.6.0 - 2026-09-23 1、修复BUG 2、优化页面布局 3、增加新插件 4、优化日志插件逻辑 5、优化窗口逻辑",
-  "pub_date": "2026-09-23T08:00:00+08:00",
+  "pub_date": "2026-09-24 18:03:14 星期四（CST，UTC+0800）",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUOFVHSVdiU3RaUTVIUVV3Tjg4aUorQjZoVkpGSUNLd1l6aFRxRXNvaWN0cUhrd3dVanZoSk5PL0Q0YVF2SzJhWmdXbGxxd3VlOVV6ZTdEL0MyZ0JPZ1BqK0tQWEZUQXdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkwMTU2OTY5CWZpbGU6QkRldlRvb2xzXzEuNi4wX3g2NC1zZXR1cC5leGUKaFZTSDVTbkJYUFZxYUNjKzNZRUVXMkltN1RsaHpLYU85cTZoN2JPUDM3ZVhVR01sWWQrRmgvcERGMzJ4YnZ1SW9VQllBemFQYWVFWHJsRW9GTGRKQ1E9PQo=",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUOFVHSVdiU3RaUThadWVkMXZLdGpyVGQya0YwWWV3NEcxK2pGWlc1RkZKS3RMd1o0dzZlQXVGZ09sc2FIMGlPU3p3cC82b2hVd3M3MnR4Vlg4NTRyMVJWSkt2RVZsWGdnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkwMjQzOTQ0CWZpbGU6QkRldlRvb2xzXzEuNi4wX3g2NC1zZXR1cC5leGUKSGc5bVVoWmViUDZaT1IzKzdVUjFuajhjN1BCTU9rRDNTTWRCbWtlMHdzWWJrQ2NIaFZJNGVTL2tRQVcwR245ejlHZUhwSUhyK295VnlKeTdscW13QXc9PQo=",
       "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.6.0/BDevTools_1.6.0_x64-setup.exe"
     }
   }
