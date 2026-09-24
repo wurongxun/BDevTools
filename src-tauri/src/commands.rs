@@ -30,16 +30,20 @@ use crate::command::log_stream;
 use crate::command::mat_hprof::{self, MatHeaderInfo, MatHistogramResult};
 use crate::command::mat_leak::{self, MatLeakSuspectsResult};
 use crate::command::mat_cfg::{self, MatLimitInfo};
+use crate::command::plugin_host;
+use crate::command::plugin_wasm;
 use crate::command::mat_refs::{
     self, RefBuildInfo, RefInstances, RefObjectDetail, RefSearchResult,
 };
 use crate::command::remote_conn::{self, RemoteFileItem};
-use crate::command::search_log_parallel::{
-    self, FileLinesResult, LogMatch, LogSearchResult, PageResult, SearchIndex, TextPreviewBlock,
-};
+use crate::command::terminal;
+use crate::command::search_log_parallel::{self, FileLinesResult};
 use crate::database::connection::DbConnectionConfig;
 use crate::database::import_export::{ExportResult, ImportResult};
-use crate::database::metadata::{DatabaseInfo, IndexInfo, TableInfo};
+use crate::database::metadata::{
+    CatalogCapabilities, DatabaseIndexInfo, DatabaseObjectInfo, DatabaseInfo, DbAdminInfo, DbUserInfo,
+    IndexInfo, KeyValueRow, TableInfo,
+};
 use crate::database::operations::{ColumnInfo, SqlResult, TableDataResult};
 use crate::entity::session::{SessionSnapshot, SessionSummary};
 use crate::entity::window::WindowMeta;
@@ -263,58 +267,7 @@ pub fn windows_close(handle: tauri::AppHandle, label: String) {
     app_window::windows_close(handle, label)
 }
 
-// ==================== 大日志检索 ====================
-
-/// 流式搜索（只存行号，低内存）
-#[tauri::command]
-pub async fn search_log_parallel(
-    file_path: String,
-    keyword: String,
-    max_results: Option<u64>,
-) -> Result<ResData<LogSearchResult>, String> {
-    search_log_parallel::search_log_parallel(file_path, keyword, max_results).await
-}
-
-/// 建立搜索索引（单线程流式，低内存）
-#[tauri::command]
-pub async fn search_log_index(
-    file_path: String,
-    keyword: String,
-    encoding: Option<String>,
-) -> Result<ResData<SearchIndex>, String> {
-    search_log_parallel::search_log_index(file_path, keyword, encoding).await
-}
-
-/// 分页获取搜索结果
-#[tauri::command]
-pub async fn search_log_page(
-    search_id: String,
-    page: u64,
-    page_size: Option<u64>,
-) -> Result<ResData<PageResult>, String> {
-    search_log_parallel::search_log_page(search_id, page, page_size).await
-}
-
-/// 跳转到第 N 条搜索结果
-#[tauri::command]
-pub async fn search_log_jump_to(
-    search_id: String,
-    target_index: u64,
-    context_count: Option<u64>,
-) -> Result<ResData<Vec<LogMatch>>, String> {
-    search_log_parallel::search_log_jump_to(search_id, target_index, context_count).await
-}
-
-/// 文本预览（流式读取，低内存）
-#[tauri::command]
-pub async fn search_log_preview(
-    search_id: String,
-    target_index: u64,
-    context_lines: Option<u64>,
-    encoding: Option<String>,
-) -> Result<ResData<TextPreviewBlock>, String> {
-    search_log_parallel::search_log_preview(search_id, target_index, context_lines, encoding).await
-}
+// ==================== 大文件按行读取（保留） ====================
 
 /// 按行范围读取文件内容
 #[tauri::command]
@@ -344,9 +297,10 @@ pub async fn logs_index_build(
     log_index::log_index_build(file_path, encoding).await
 }
 
-/// 按级别与时间范围筛选，返回命中行的连续段
+/// 合并查询：**筛选 + 关键词一次完成**，同时返回渲染段与导航行号（§2.5）
 #[tauri::command]
-pub async fn logs_index_query(
+#[allow(clippy::too_many_arguments)]
+pub async fn logs_query_lines(
     file_path: String,
     encoding: Option<String>,
     levels: Option<Vec<String>>,
@@ -355,8 +309,13 @@ pub async fn logs_index_query(
     invert: Option<bool>,
     merge_gap: Option<u64>,
     max_segments: Option<u64>,
+    keyword: Option<String>,
+    mode: Option<String>,
+    ignore_case: Option<bool>,
+    max_matches: Option<u64>,
+    task_id: Option<String>,
 ) -> Result<ResData<LogQueryResult>, String> {
-    log_index::log_index_query(
+    log_index::log_query_lines(
         file_path,
         encoding,
         levels,
@@ -365,8 +324,28 @@ pub async fn logs_index_query(
         invert,
         merge_gap,
         max_segments,
+        keyword,
+        mode,
+        ignore_case,
+        max_matches,
+        task_id,
     )
     .await
+}
+
+/// 取消正在进行的查询任务（P6）；前端凭 `task_id` 静默丢弃结果
+#[tauri::command]
+pub fn logs_cancel(task_id: String) -> Result<ResData<bool>, String> {
+    let hit = log_index::cancel_query(task_id);
+    Ok(ResData {
+        code: 200,
+        msg: if hit {
+            "已请求取消".to_string()
+        } else {
+            "任务不存在或已结束".to_string()
+        },
+        data: hit,
+    })
 }
 
 /// 按筛选条件流式导出日志到目标文件
@@ -1184,6 +1163,83 @@ pub async fn db_table_schema(
     crate::database::metadata::db_table_schema(config_id, database, table).await
 }
 
+// ---- 目录能力声明与新增对象（走 catalog 抽象，各库按自身能力实现）----
+
+/// 查询当前连接支持哪些目录能力（前端据此决定渲染哪些树节点）
+#[tauri::command]
+pub async fn db_catalog_capabilities(config_id: String) -> Response<CatalogCapabilities> {
+    crate::database::metadata::db_catalog_capabilities(config_id).await
+}
+
+/// 获取指定库的视图列表
+#[tauri::command]
+pub async fn db_list_views(
+    config_id: String,
+    database: String,
+) -> Response<Vec<DatabaseObjectInfo>> {
+    crate::database::metadata::db_list_views(config_id, database).await
+}
+
+/// 获取指定库的存储过程列表
+#[tauri::command]
+pub async fn db_list_procedures(
+    config_id: String,
+    database: String,
+) -> Response<Vec<DatabaseObjectInfo>> {
+    crate::database::metadata::db_list_procedures(config_id, database).await
+}
+
+/// 获取指定库的触发器列表
+#[tauri::command]
+pub async fn db_list_triggers(
+    config_id: String,
+    database: String,
+) -> Response<Vec<DatabaseObjectInfo>> {
+    crate::database::metadata::db_list_triggers(config_id, database).await
+}
+
+/// 获取指定库的事件列表（仅 MySQL 支持）
+#[tauri::command]
+pub async fn db_list_events(
+    config_id: String,
+    database: String,
+) -> Response<Vec<DatabaseObjectInfo>> {
+    crate::database::metadata::db_list_events(config_id, database).await
+}
+
+/// 获取指定库的索引聚合
+#[tauri::command]
+pub async fn db_list_database_indexes(
+    config_id: String,
+    database: String,
+) -> Response<Vec<DatabaseIndexInfo>> {
+    crate::database::metadata::db_list_database_indexes(config_id, database).await
+}
+
+/// 获取实例用户列表
+#[tauri::command]
+pub async fn db_list_users(config_id: String) -> Response<Vec<DbUserInfo>> {
+    crate::database::metadata::db_list_users(config_id).await
+}
+
+/// 获取管理员列表（各库用自身原生语义判定）
+#[tauri::command]
+pub async fn db_list_admins(config_id: String) -> Response<Vec<DbAdminInfo>> {
+    crate::database::metadata::db_list_admins(config_id).await
+}
+
+/// 获取运行状态（scope: session | global）
+#[tauri::command]
+pub async fn db_show_status(config_id: String, scope: String) -> Response<Vec<KeyValueRow>> {
+    crate::database::metadata::db_show_status(config_id, scope).await
+}
+
+/// 获取系统变量（scope: session | global）
+#[tauri::command]
+pub async fn db_show_variables(config_id: String, scope: String) -> Response<Vec<KeyValueRow>> {
+    crate::database::metadata::db_show_variables(config_id, scope).await
+}
+
 // ==================== 数据库导入导出 ====================
 
 /// 导出表数据为 CSV
@@ -1286,4 +1342,212 @@ pub async fn logs_stream_start(
 #[tauri::command]
 pub async fn logs_stream_stop(stream_id: String) -> Response<bool> {
     log_stream::log_stream_stop(stream_id).await
+}
+
+// ==================== 第三方插件（安装 / 卸载 / 排序 / 调用预留） ====================
+
+/// 列出已安装第三方插件（内置插件由前端提供，不在此列）
+#[tauri::command]
+pub fn plugin_list() -> Response<Vec<plugin_host::InstalledPlugin>> {
+    plugin_host::plugin_list()
+}
+
+/// 安装插件：`source` 为插件目录或 .zip 包；同名插件覆盖安装
+#[tauri::command]
+pub async fn plugin_install(source: String) -> Response<plugin_host::InstalledPlugin> {
+    match tokio::task::spawn_blocking(move || plugin_host::plugin_install(source)).await {
+        Ok(r) => r,
+        Err(e) => Response::new(
+            500,
+            plugin_host::InstalledPlugin::empty(),
+            &format!("安装线程异常: {e}"),
+        ),
+    }
+}
+
+/// 卸载插件（removeData=true 时一并清理插件私有数据）
+#[tauri::command]
+pub async fn plugin_uninstall(id: String, remove_data: bool) -> Response<bool> {
+    match tokio::task::spawn_blocking(move || plugin_host::plugin_uninstall(id, remove_data)).await {
+        Ok(r) => r,
+        Err(e) => Response::new(500, false, &format!("卸载线程异常: {e}")),
+    }
+}
+
+/// 启用 / 禁用插件（内置与第三方同一套：禁用集合持久化在 settings.json）
+#[tauri::command]
+pub fn plugin_set_enabled(id: String, enabled: bool) -> Response<bool> {
+    plugin_host::plugin_set_enabled(id, enabled)
+}
+
+/// 被禁用的插件 ID 列表（内置 + 第三方统一集合；前端据此决定注册哪些插件）
+#[tauri::command]
+pub fn plugin_get_disabled() -> Response<Vec<String>> {
+    plugin_host::plugin_get_disabled()
+}
+
+/// 读取统一排序（内置 + 第三方插件 ID 的全量顺序）
+#[tauri::command]
+pub fn plugin_get_order() -> Response<Vec<String>> {
+    plugin_host::plugin_get_order()
+}
+
+/// 保存统一排序（内置 + 第三方插件 ID 的全量顺序）
+#[tauri::command]
+pub fn plugin_set_order(order: Vec<String>) -> Response<bool> {
+    plugin_host::plugin_set_order(order)
+}
+
+/// 调用插件后端逻辑（进 Extism WASM 沙箱）。
+/// Extism 的调用是同步阻塞的，必须放 blocking 线程池，否则卡死 Tauri 的 async 运行时。
+/// 插件未声明 wasm / 运行时未启用时返回 501 结构化错误。
+#[tauri::command]
+pub async fn plugin_call(id: String, func: String, input: String) -> Response<String> {
+    match tokio::task::spawn_blocking(move || plugin_host::plugin_call(id, func, input)).await {
+        Ok(r) => r,
+        Err(e) => Response::new(500, String::new(), &format!("插件调用线程异常: {e}")),
+    }
+}
+
+/// 第三方插件 WASM 运行时信息（是否启用 / 资源限制 / 支持的权限声明形态 / 调试开关）
+///
+/// 会读 settings.json（拿出错快照开关），所以走 blocking 线程池而不是主线程。
+#[tauri::command]
+pub async fn plugin_runtime_info() -> Response<plugin_wasm::RuntimeInfo> {
+    match tokio::task::spawn_blocking(plugin_host::plugin_runtime_info).await {
+        Ok(r) => r,
+        Err(e) => Response::new(
+            500,
+            plugin_wasm::runtime_info_placeholder(),
+            &format!("读取运行时信息线程异常: {e}"),
+        ),
+    }
+}
+
+/// 某插件上一次调用的资源占用（进程内存增量 / fuel / 出错快照）
+#[tauri::command]
+pub fn plugin_last_stats(id: String) -> Response<Option<plugin_wasm::CallStats>> {
+    plugin_host::plugin_last_stats(id)
+}
+
+/// 插件设置的当前值（已存的优先，没有则回落到清单 default）
+#[tauri::command]
+pub fn plugin_get_settings(id: String) -> Response<serde_json::Value> {
+    Response::new(200, plugin_host::plugin_settings_of(&id), "ok")
+}
+
+/// 写入插件设置值（按清单定义校验类型与范围；只覆盖提交上来的键）
+#[tauri::command]
+pub fn plugin_set_settings(id: String, values: String) -> Response<bool> {
+    match serde_json::from_str::<serde_json::Value>(&values) {
+        Ok(v) => match plugin_host::plugin_set_settings(&id, &v) {
+            Ok(()) => Response::new(200, true, "ok"),
+            Err(e) => Response::new(500, false, &e),
+        },
+        Err(e) => Response::new(500, false, &format!("设置值不是合法 JSON: {e}")),
+    }
+}
+
+/// 插件声明的 `fs` 作用域根目录（宿主文件对话框用它把用户选中的路径限制在声明范围内）
+///
+/// 只读查询，不进 blocking 线程池（解析清单 + 建一次能力上下文，量级很小）。
+#[tauri::command]
+pub fn plugin_fs_roots(id: String) -> Response<plugin_wasm::FsRoots> {
+    match plugin_wasm::fs_roots(&id) {
+        Ok(r) => Response::new(200, r, "ok"),
+        Err(e) => Response::new(500, plugin_wasm::FsRoots::default(), &e),
+    }
+}
+
+/// 设置「插件调用出错时导出线性内存快照」的调试开关（写 settings.json，需 blocking）
+#[tauri::command]
+pub async fn plugin_set_memdump(enabled: bool) -> Response<bool> {
+    match tokio::task::spawn_blocking(move || plugin_host::plugin_set_memdump(enabled)).await {
+        Ok(r) => r,
+        Err(e) => Response::new(500, false, &format!("更新出错快照开关线程异常: {e}")),
+    }
+}
+
+// ==================== 本地交互式终端（terminal 插件） ====================
+//
+// 输出流经 Tauri v2 `Channel` 推送（IPC 层自带消息序号，前端按序投递，不会乱序/丢块）。
+// 这里把 `Channel` 适配成业务模块的中性 `TermSink` 闭包，业务模块不感知任何 tauri 类型。
+
+/// 打开一个本地 PTY 会话（跨平台 shell），输出经 `onEvent` 持续推送
+#[tauri::command]
+pub async fn terminal_open(
+    options: terminal::TermOpenOptions,
+    on_event: tauri::ipc::Channel<terminal::TermEvent>,
+) -> Response<terminal::TermOpenResult> {
+    let sink: terminal::TermSink = std::sync::Arc::new(move |ev| {
+        if let Err(e) = on_event.send(ev) {
+            log::debug!("[terminal] 推送事件失败（会话可能已关闭）: {e}");
+        }
+    });
+    match tokio::task::spawn_blocking(move || terminal::terminal_open(options, sink)).await {
+        Ok(r) => r,
+        Err(e) => Response::new(500, terminal::empty_open_result_default(), &format!("打开终端线程异常: {e}")),
+    }
+}
+
+/// 向终端写入按键 / 粘贴内容
+///
+/// 注意 `async` 不是装饰：**Tauri 的同步命令跑在主线程**（就是 webview 的事件循环线程）上，
+/// 而「写 PTY」在 shell 不读 stdin 时（正在跑长命令 / 分页器）会阻塞住，
+/// 一旦阻塞主线程整个界面就无响应了（粘贴大段文本时最容易撞上）。
+/// 凡是有可能阻塞的命令一律 `async` + `spawn_blocking`（与 mat_* 一致）。
+#[tauri::command]
+pub async fn terminal_write(session_id: String, data: String) -> Response<bool> {
+    match tokio::task::spawn_blocking(move || terminal::terminal_write(session_id, data)).await {
+        Ok(r) => r,
+        Err(e) => Response::new(500, false, &format!("写入终端线程异常: {e}")),
+    }
+}
+
+/// 调整终端尺寸（内核据此向 shell 发 SIGWINCH / ConPTY 同步窗口大小）
+#[tauri::command]
+pub async fn terminal_resize(session_id: String, cols: u16, rows: u16) -> Response<bool> {
+    match tokio::task::spawn_blocking(move || terminal::terminal_resize(session_id, cols, rows)).await {
+        Ok(r) => r,
+        Err(e) => Response::new(500, false, &format!("调整终端尺寸线程异常: {e}")),
+    }
+}
+
+/// 关闭会话（kill shell + 释放会话表 + 清理集成脚本临时目录）
+///
+/// 释放 PTY 时 Windows 上会走 `ClosePseudoConsole`，它会等 conhost 退出；
+/// 该调用可能阻塞（见 `terminal::terminal_close` 的说明），绝不能落在主线程上。
+#[tauri::command]
+pub async fn terminal_close(session_id: String) -> Response<bool> {
+    match tokio::task::spawn_blocking(move || terminal::terminal_close(session_id)).await {
+        Ok(r) => r,
+        Err(e) => Response::new(500, false, &format!("关闭终端线程异常: {e}")),
+    }
+}
+
+/// 会话是否存活（前端自检 / 崩溃恢复用）
+#[tauri::command]
+pub async fn terminal_alive(session_id: String) -> Response<bool> {
+    match tokio::task::spawn_blocking(move || terminal::terminal_alive(session_id)).await {
+        Ok(r) => r,
+        Err(e) => Response::new(500, false, &format!("查询终端状态线程异常: {e}")),
+    }
+}
+
+/// 本机可用 shell 列表（「新建会话」下拉）
+#[tauri::command]
+pub async fn terminal_list_shells() -> Response<Vec<terminal::ShellInfo>> {
+    match tokio::task::spawn_blocking(terminal::terminal_list_shells).await {
+        Ok(r) => r,
+        Err(e) => Response::new(500, Vec::new(), &format!("探测 shell 线程异常: {e}")),
+    }
+}
+
+/// 终端默认启动信息（默认 shell / 默认 cwd / 平台）
+#[tauri::command]
+pub async fn terminal_defaults() -> Response<terminal::TermDefaults> {
+    match tokio::task::spawn_blocking(terminal::terminal_defaults).await {
+        Ok(r) => r,
+        Err(e) => Response::new(500, terminal::empty_defaults(), &format!("读取终端默认值线程异常: {e}")),
+    }
 }

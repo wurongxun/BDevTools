@@ -158,6 +158,83 @@ export function clampHitIndex(hits: LineHits[], n: number): number {
   return n
 }
 
+/**
+ * 行号数组中：行号 > lineIndex 的第一个下标；无则 -1。
+ *
+ * 全文件搜索的导航基于「行号数组」而非 LineHits[]（未加载的行没有命中区间），
+ * 因此二分查找需要一份针对 number[] 的实现。
+ */
+export function firstIndexAfter(lines: number[], lineIndex: number): number {
+  let lo = 0
+  let hi = lines.length - 1
+  let ans = -1
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    if (lines[mid] > lineIndex) {
+      ans = mid
+      hi = mid - 1
+    } else {
+      lo = mid + 1
+    }
+  }
+  return ans
+}
+
+/** 行号数组中：行号 < lineIndex 的最后一个下标；无则 -1 */
+export function lastIndexBefore(lines: number[], lineIndex: number): number {
+  let lo = 0
+  let hi = lines.length - 1
+  let ans = -1
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    if (lines[mid] < lineIndex) {
+      ans = mid
+      lo = mid + 1
+    } else {
+      hi = mid - 1
+    }
+  }
+  return ans
+}
+
+/**
+ * 行号数组中：与 lineIndex 完全相等的下标；无则 -1。
+ *
+ * 用途：导航不能用"上次记住的下标"直接 +1 —— 补载新命中后 navLines 会增长，
+ * 同一命中对应的下标可能已经位移，直接 +1 会跳到另一条命中上。
+ * 因此每次导航前先用行号把下标校准回去。
+ */
+export function indexOfSorted(lines: number[], lineIndex: number): number {
+  let lo = 0
+  let hi = lines.length - 1
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    if (lines[mid] === lineIndex) return mid
+    if (lines[mid] < lineIndex) lo = mid + 1
+    else hi = mid - 1
+  }
+  return -1
+}
+
+/**
+ * 在**互不重叠且按 start 升序**的段列表中，二分定位行号所属段；未落在任何段内返回 -1。
+ *
+ * 跳转前必须先做这一步：否则为了找一个"根本不在筛选结果里"的行号，
+ * 会把上千个段全部读一遍才肯罢休。
+ */
+export function segmentIndexOfLine(segs: { start: number; end: number }[], lineIndex: number): number {
+  let lo = 0
+  let hi = segs.length - 1
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    const s = segs[mid]
+    if (lineIndex < s.start) hi = mid - 1
+    else if (lineIndex > s.end) lo = mid + 1
+    else return mid
+  }
+  return -1
+}
+
 /** 重新编译时复用：判断搜索条件是否变化（避免无意义重扫） */
 export function sameOptions(a: SearchOptions, b: SearchOptions): boolean {
   return a.keyword === b.keyword && a.mode === b.mode && a.ignoreCase === b.ignoreCase

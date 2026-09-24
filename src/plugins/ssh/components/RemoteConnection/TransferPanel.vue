@@ -53,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ArrowDown, ArrowUp } from '@element-plus/icons-vue'
 import { useFtpStore } from '../../store'
 import type { TransferTask, TransferStatus } from '../../types'
@@ -72,6 +72,11 @@ const tasks = computed(() => panel.value?.transferTasks || [])
 const activeCount = computed(() =>
   tasks.value.filter(t => t.status === 'transferring' || t.status === 'pending').length
 )
+
+// 有传输任务进行中时自动展开队列，确保进度条与完成态可见（默认折叠会隐藏进度条）
+watch(activeCount, (count) => {
+  if (count > 0) isExpanded.value = true
+})
 
 const completedCount = computed(() =>
   tasks.value.filter(t => t.status === 'completed' || t.status === 'failed').length

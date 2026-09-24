@@ -11,6 +11,7 @@ import type {
 import { ConnectionType } from '../types'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { useWorkspaceConnections, WORKSPACE_CONNECTION_KEYS } from '@/composables/useWorkspaceConnections'
+import { useFtpStore } from './ftp'
 
 let tabIdCounter = 0
 function generateTabId(): string {
@@ -313,10 +314,20 @@ export const useConnectionStore = defineStore('connection', () => {
 
   /**
    * 监听后端传输进度事件
+   * 后端 emit 的 transfer-progress 事件（payload: { tabId, taskId, progress, transferredSize, speed }）
+   * 直接透传到 ftpStore.updateTransferProgress，驱动传输面板进度条实时更新。
    */
   function setupTransferProgressListener() {
-    subscribe('transfer-progress', (payload) => {
-      window.dispatchEvent(new CustomEvent('transfer-progress', { detail: payload }))
+    const ftpStore = useFtpStore()
+    subscribe('transfer-progress', (payload: any) => {
+      if (!payload || !payload.taskId) return
+      ftpStore.updateTransferProgress(
+        payload.tabId ?? '',
+        payload.taskId,
+        Number(payload.progress) || 0,
+        Number(payload.transferredSize) || 0,
+        payload.speed ?? ''
+      )
     })
   }
 

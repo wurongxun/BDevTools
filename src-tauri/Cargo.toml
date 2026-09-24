@@ -1,6 +1,6 @@
 [package]
-name = "backend_dev_tools"
-version = "1.4.0"
+name = "BDevTools"
+version = "1.6.0"
 description = "A backend development tools"
 authors = ["you"]
 edition = "2021"
@@ -14,6 +14,13 @@ edition = "2021"
 name = "backend_dev_tools_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+default = ["wasm-runtime"]
+# 第三方插件 WASM 运行时（Extism/wasmtime）。
+# 关闭（--no-default-features）后 plugin_call 回落为 501 预留错误，插件只能跑纯前端沙箱页面；
+# 用于不支持的平台（如 Android/iOS）或需要瘦身的构建。
+wasm-runtime = ["dep:extism"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -25,6 +32,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = "0.4"
 anyhow = "1.0.44"
+# 数据库目录（元数据）抽象：trait 内 async fn 需要 Box<dyn>，故引入该 proc-macro
+async-trait = "0.1"
 log = "0.4.0"
 md5 = "0.8"
 hex = "0.4"
@@ -44,6 +53,9 @@ uuid = { version = "1", features = ["v4"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
 # 系统通知
 tauri-plugin-notification = "2"
+# 沉浸式快捷键：F11 / Esc 在 OS 层拦截（第三方插件是跨源沙箱 iframe，
+# 其内部 keydown 不会冒泡到宿主 window，DOM 层监听对插件内的按键无能为力）
+tauri-plugin-global-shortcut = "2"
 # 数据库驱动（MySQL + PostgreSQL）
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "mysql", "postgres"] }
 # SQL Server 驱动：纯 Rust TDS 协议实现，无原生依赖（sqlx 自 0.7 起移除 mssql，故单独引入）
@@ -62,9 +74,29 @@ calamine = "0.26"
 rust_xlsxwriter = "0.80"
 # 正则表达式（跨平台）
 regex = "1.9.3"
+# 单文件内并行：ripgrep 的并行是跨文件级的，单文件内切分必须自己做（§2.8）
+rayon = "1"
+# SIMD 子串匹配（memchr::memmem）：文本模式下可在原始字节上匹配，免逐行解码
+memchr = "2"
+# 正则双引擎降级：regex 不支持前瞻/后顾/反向引用时换它（纯 Rust，借鉴 klogg 的 Hyperscan→Qt 正则）
+fancy-regex = "0.13"
 # Java 堆转储（HPROF）解析：零拷贝 mmap 解析（MAT 插件）
 jvm-hprof = "0.1"
 memmap2 = "0.9"
+# 第三方插件包（.zip）解包：只用 deflate，不引入 bzip2/zstd 等额外后端
+zip = { version = "2", default-features = false, features = ["deflate"] }
+# 本地交互式终端（terminal 插件）：跨平台 PTY 抽象
+# Windows 走 ConPTY、Unix 走 openpty，读写/resize(SIGWINCH)/kill/进程退出由该 crate 统一处理，
+# 避免自己写两套平台相关的 unsafe 代码。
+portable-pty = "0.9"
+# 终端输出流编码：PTY 吐出的是任意字节（含跨块截断的 UTF-8 序列），
+# 以 base64 原样透传给前端，由 xterm 按 Uint8Array 消费，避免边界处乱码。
+base64 = "0.22"
+# 第三方插件 WASM 运行时（可选，见 [features].wasm-runtime）。
+# Extism 基于 wasmtime，给插件侧提供 PDK 的 ABI；插件逻辑跑在这儿，宿主能力经 host function 注入。
+# host_http 直接用 Extism 内建的 `http_request`（含 allowed_hosts 白名单 + 响应体上限），
+# 因此不需要再引 reqwest。
+extism = { version = "1", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.44.0", features = [
@@ -72,6 +104,7 @@ windows = { version = "0.44.0", features = [
     "Win32_Security",
     "Win32_System_Threading",
     "Win32_System_SystemInformation",
+    "Win32_System_ProcessStatus",
     "Win32_UI_WindowsAndMessaging",
     'Win32_Globalization'
 ] }

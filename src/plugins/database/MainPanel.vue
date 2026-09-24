@@ -56,22 +56,46 @@ import { useEditorStore } from './store'
 import SqlTab from './components/SqlTab.vue'
 import TableViewer from './components/TableViewer.vue'
 import TableMetadata from './components/TableMetadata.vue'
+import ObjectListViewer from './components/ObjectListViewer.vue'
+import SystemInfoViewer from './components/SystemInfoViewer.vue'
 import type { EditorTab } from './types'
 
 const editorStore = useEditorStore()
 
-/** 按 tab 类型选择内容组件（sql → SqlTab；table → TableViewer 数据/属性/预留；metadata → 详细元数据） */
+/**
+ * 按 tab 类型选择内容组件
+ * - sql → SqlTab
+ * - table → TableViewer（数据 / 属性）
+ * - metadata → TableMetadata（表结构）
+ * - object-list → ObjectListViewer（用户 / 管理员 / 视图 / 索引 / 存储过程 / 触发器 / 事件）
+ * - system-info → SystemInfoViewer（会话·全局 状态与变量）
+ */
 function tabComponentFor(tab: EditorTab): any {
   const type = tab.type
   if (type === 'sql') return SqlTab
   if (type === 'table') return TableViewer
   if (type === 'metadata') return TableMetadata
+  if (type === 'object-list') return ObjectListViewer
+  if (type === 'system-info') return SystemInfoViewer
   return null
 }
 
-/** 按 tab 类型透传 props（SqlTab 接收 tab；TableViewer/TableMetadata 接收 configId/database/table） */
+/** 按 tab 类型透传 props */
 function tabPropsFor(tab: EditorTab): Record<string, any> {
   if (tab.type === 'sql') return { tab }
+  if (tab.type === 'object-list') {
+    return {
+      configId: tab.configId,
+      database: tab.database,
+      objectType: tab.objectType,
+    }
+  }
+  if (tab.type === 'system-info') {
+    return {
+      configId: tab.configId,
+      subType: tab.subType,
+    }
+  }
   return {
     configId: tab.configId,
     database: tab.database,

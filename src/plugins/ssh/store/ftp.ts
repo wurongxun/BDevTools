@@ -131,21 +131,24 @@ export const useFtpStore = defineStore('ftp', () => {
         startTime: Date.now()
       }
       panel.transferTasks.unshift(task)
+      // 取数组内的响应式代理再改属性；直接改原始 task 变量 Vue 追踪不到，
+      // 会导致 activeCount/completedCount 与状态文本永远不更新（队列卡在「进行中」）。
+      const rt = panel.transferTasks[0]
 
       try {
-        task.status = 'transferring'
+        rt.status = 'transferring'
         await invoke('sftp_upload', {
           sessionId,
           localPath: localFile,
           remotePath: task.remotePath,
           taskId: task.id
         })
-        task.status = 'completed'
-        task.progress = 100
+        rt.status = 'completed'
+        rt.progress = 100
         NotificationUtil.success(`${fileName} 上传完成`)
       } catch (error) {
-        task.status = 'failed'
-        task.error = String(error)
+        rt.status = 'failed'
+        rt.error = String(error)
         NotificationUtil.error(`${fileName} 上传失败: ${error}`)
       }
     }
@@ -179,21 +182,24 @@ export const useFtpStore = defineStore('ftp', () => {
         startTime: Date.now()
       }
       panel.transferTasks.unshift(task)
+      // 取数组内的响应式代理再改属性；直接改原始 task 变量 Vue 追踪不到，
+      // 会导致 activeCount/completedCount 与状态文本永远不更新（队列卡在「进行中」）。
+      const rt = panel.transferTasks[0]
 
       try {
-        task.status = 'transferring'
+        rt.status = 'transferring'
         await invoke('sftp_download', {
           sessionId,
           remotePath: remoteFile,
           localPath: task.localPath,
           taskId: task.id
         })
-        task.status = 'completed'
-        task.progress = 100
+        rt.status = 'completed'
+        rt.progress = 100
         NotificationUtil.success(`${fileName} 下载完成`)
       } catch (error) {
-        task.status = 'failed'
-        task.error = String(error)
+        rt.status = 'failed'
+        rt.error = String(error)
         NotificationUtil.error(`${fileName} 下载失败: ${error}`)
       }
     }
@@ -279,16 +285,31 @@ export const useFtpStore = defineStore('ftp', () => {
 
   /**
    * 更新传输进度（由事件监听触发）
+   * 后端 transfer-progress 事件往往未携带正确的 tabId（历史实现传空串），
+   * 因此优先按 taskId 跨面板查找任务，保证进度条实时更新且最终能落到正确任务上。
    */
   function updateTransferProgress(tabId: string, taskId: string, progress: number, transferredSize: number, speed: string) {
-    const panel = panels.value.get(tabId)
+    // 优先使用 tabId 定位面板；tabId 为空时退化为按 taskId 全局查找
+    let panel: FtpPanelState | undefined =
+      tabId ? panels.value.get(tabId) : undefined
+    if (!panel) {
+      for (const p of panels.value.values()) {
+        if (p.transferTasks.some(t => t.id === taskId)) {
+          panel = p
+          break
+        }
+      }
+    }
     if (!panel) return
 
     const task = panel.transferTasks.find(t => t.id === taskId)
     if (task) {
-      task.progress = progress
-      task.transferredSize = transferredSize
-      task.speed = speed
+      // 仅传输中/等待中的任务更新进度；已完成/失败/取消的任务不再回退
+      if (task.status === 'pending' || task.status === 'transferring') {
+        task.progress = progress
+        task.transferredSize = transferredSize
+        task.speed = speed
+      }
     }
   }
 

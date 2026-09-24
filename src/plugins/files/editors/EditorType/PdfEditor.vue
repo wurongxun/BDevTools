@@ -32,8 +32,27 @@ const CONTAINER_PADDING = 40
 const MAX_FIT_SCALE = 1.5
 const { appConfig, system } = useStore()
 const docStore = useDocumentManagerStore()
+
+const props = defineProps<{
+  /** 本实例负责的文档路径（父级 FileEditor 按文档 key 复用实例，一个实例只对应一个文档） */
+  path: string
+}>()
+
+const emit = defineEmits<{
+  /** 视图状态上报（页码 / 缩放 / 滚动位置）：由 FileEditor 收口写进 docStore.viewState */
+  'update-state': [state: Record<string, unknown>]
+}>()
+
 // 当前激活的文档路径
 const activeDocumentPath = computed(() => docStore.activeDocumentPath)
+
+/**
+ * 本实例真正负责的文档：优先父级传入的 path。
+ * 不能只用 activeDocumentPath —— 切 tab 时它已经指向新文档，而旧实例（即将 deactivate）
+ * 上的 watcher 会先一步触发，把新文档的 PDF 加载进旧实例，并把旧文档的状态写到新文档上。
+ */
+const docPath = computed(() => props.path || activeDocumentPath.value)
+
 const scale = ref<number>(1)
 const page_num = ref<number>(1)
 const page_count = ref<number>(0)
@@ -61,16 +80,109 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 // KeepAlive 缓存标志：防止 watch 在组件恢复时重复加载
 let isDeactivated = false
-// 保存组件状态（以文档ID为key，而非路由路径）
-const savedState = new Map<
-  string,
-  {
-    pageNum: number
-    scale: number
-    scrollTop: number
-    filePath: string
+
+// ==================== 视图状态（页码 / 缩放 / 滚动位置） ====================
+//
+// 真源只有一个：docStore.viewState（由 FileEditor 收口写入；会话快照 openfile.json 的
+// scroll_top 就是它）。组件内不再另存一份 Map —— 双份数据必然分叉，排查成本远高于收益。
+//
+// 为什么不能在 onDeactivated 里读 DOM 的 scrollTop（原实现就是这么写的）：
+// 本组件被两层 KeepAlive 包裹（插件级 AppEditorMain、文档级 FileEditor）。切走时 Vue 把
+// 组件根元素 move 到**脱离文档**的 storageContainer，此刻 el.scrollTop 立刻变 0
+// （clientHeight / scrollHeight 也一起变 0），移回文档后不会自动恢复 —— 读 DOM 只能拿到 0。
+// 所以位置必须在用户滚动过程中就记进 JS（liveScrollTop），detach 之后只用这个值。
+
+/** 用户滚动时记录的真实位置：KeepAlive detach 之后读 DOM 恒为 0，只能靠它上报/恢复 */
+const liveScrollTop = ref(0)
+/**
+ * 待恢复的滚动位置：切换页码 / 缩放会重建 canvas（scrollHeight 随之变化），
+ * 位置必须等渲染完成后再落，否则会被浏览器截断到旧的（更小的）内容高度内。
+ */
+let pendingScrollTop = 0
+/**
+ * 用户手动缩放过、或本次是从会话快照恢复的缩放：为真时容器尺寸变化不再强制「适配宽度」。
+ * 否则切回标签页时 ResizeObserver（detach → 尺寸 0 → 移回 → 尺寸恢复）会把缩放冲掉，
+ * canvas 尺寸一变，刚恢复的滚动位置也会被一起截断。
+ */
+let keepScale = false
+/** 视图状态上报去抖定时器 */
+let reportTimer: number | null = null
+
+/**
+ * 读某文档在 store 里记录的视图状态（页码 / 缩放 / 滚动位置）。
+ *
+ * 只有 PdfEditor 会写 page / pageScale（会话快照 openfile.json 只存 cursor_* / scroll_top 与
+ * scroll_left），所以「有 page」就等于「这份记录是完整的」。反过来：重启后拿到的记录只有
+ * scrollTop，而页码必然回落第 1 页、缩放回落适配宽度，若还按旧位置落滚动条就是
+ * 「页码与位置错位」，所以残缺记录一律不恢复（结果与此前一致：PDF 每次打开从第 1 页顶部开始）。
+ */
+function readViewState(filePath: string) {
+  const vs = docStore.documents.get(filePath)?.viewState || {}
+  const page = vs.page
+  if (typeof page !== 'number' || page <= 0) return { scrollTop: 0, page: 1, scale: 0 }
+  return {
+    scrollTop: typeof vs.scrollTop === 'number' && vs.scrollTop > 0 ? vs.scrollTop : 0,
+    page: page as number,
+    scale: typeof vs.pageScale === 'number' && vs.pageScale > 0 ? vs.pageScale : 0
   }
->()
+}
+
+/** 上报视图状态：必须带上自己的 path，父级按上报者收口（用 activeDocumentPath 收会串号） */
+function reportViewState() {
+  if (!props.path) return
+  // 文档还没加载完就别写：此刻 scale 还是初值 1、pageNum 还是 1，会把「适配宽度」覆盖成 1，
+  // 下次切回来就按 scale=1 渲染（PDF 宽度对不上容器）
+  if (!pdfDoc || page_count.value <= 0) return
+  emit('update-state', {
+    path: props.path,
+    scrollTop: liveScrollTop.value,
+    page: pageNum,
+    pageScale: scale.value
+  })
+}
+
+function scheduleReportViewState() {
+  if (reportTimer !== null) window.clearTimeout(reportTimer)
+  reportTimer = window.setTimeout(() => {
+    reportTimer = null
+    reportViewState()
+  }, 250)
+}
+
+/** 容器滚动：实时记录位置（detach 后读不到）+ 维护悬浮控件位置 */
+function onContainerScroll() {
+  const container = containerRef.value
+  if (container) liveScrollTop.value = container.scrollTop
+  updateControlsPosition()
+  scheduleReportViewState()
+}
+
+/**
+ * 把滚动位置落到真实滚动条上。
+ * 元素刚插回文档时 scrollHeight 可能还没算出来，赋值会被截断 → 下一帧补一次。
+ */
+function applyScrollTop(target: number) {
+  if (target <= 0) return
+  const put = (attempt: number) => {
+    const el = containerRef.value
+    if (!el || !el.isConnected) return
+    el.scrollTop = target
+    if (Math.abs(el.scrollTop - target) <= 1 || attempt >= 2) {
+      liveScrollTop.value = el.scrollTop
+      return
+    }
+    requestAnimationFrame(() => put(attempt + 1))
+  }
+  void nextTick(() => put(0))
+}
+
+/** 有等待恢复的位置则立刻落一次（canvas 渲染完成后调用；无待恢复值时是空操作） */
+function flushPendingScroll() {
+  if (pendingScrollTop <= 0) return
+  const target = pendingScrollTop
+  pendingScrollTop = 0
+  applyScrollTop(target)
+}
 
 // 主题切换功能 - 提前定义
 // 用组件自身的 canvasRef 而非 document.getElementById('the-canvas')：
@@ -85,28 +197,21 @@ const toggleDarkMode = (isDarkMode: boolean) => {
   }
 }
 
-// 获取当前文件路径
-const getCurrentFilePath = (): string => {
-  if (activeDocumentPath.value) {
-    return decodeURIComponent(activeDocumentPath.value as string)
-  }
-  return ''
-}
-
-// 缓存容器元素，避免重复查询
-let cachedContainer: HTMLElement | null = null
-const getContainer = (): HTMLElement | null => {
-  if (!cachedContainer) {
-    cachedContainer = document.querySelector('.pdf-container') as HTMLElement
-  }
-  return cachedContainer
-}
+/**
+ * 取本实例的滚动容器。
+ * 此前用 `document.querySelector('.pdf-container')` 查全局：多个 PDF 文档同时打开时
+ * DOM 里存在多个同 class 容器，querySelector 只命中第一个（很可能是别的文档的），
+ * 于是滚动位置读写、悬浮控件定位、适配宽度计算全部算在别人身上。
+ */
+const getContainer = (): HTMLElement | null => containerRef.value
 
 const updateControlsPosition = () => {
   const container = getContainer()
-  if (!container) return
+  if (!container || !container.isConnected) return
 
   const rect = container.getBoundingClientRect()
+  // KeepAlive detach 期间元素不在文档里，rect 全是 0 —— 会把悬浮控件甩到窗口左上角
+  if (rect.width === 0 && rect.height === 0) return
   const containerCenterY = rect.top + rect.height - 40
   const containerCenterX = rect.left + rect.width / 2
 
@@ -143,61 +248,57 @@ const debouncedResize = () => {
   }
   resizeTimer = window.setTimeout(async () => {
     updateControlsPosition()
-    if (pdfDoc) {
-      const fitScale = await calculateFitScale()
-      scale.value = fitScale
-      renderPage(pageNum)
+    if (!pdfDoc) return
+    // 手动缩放（或从快照恢复的缩放）优先：否则切回标签页时 RO 会按「适配宽度」把它冲掉
+    if (!keepScale) {
+      scale.value = await calculateFitScale()
     }
+    renderPage(pageNum)
   }, 150)
 }
 
-// 组件被激活时恢复状态
+// 组件被激活：恢复上次的页码 / 缩放 / 滚动位置
 onActivated(() => {
-  console.log('[PdfPreview] Activated, restoring state')
   isDeactivated = false
-  const docId = activeDocumentPath.value
-  if (!docId) return
+  const filePath = props.path
+  if (!filePath) return
 
-  const state = savedState.get(docId)
-  if (state && state.filePath === docId) {
-    pageNum = state.pageNum
-    scale.value = state.scale
+  const prevScale = scale.value
+  const prevPage = page_num.value
+  const vs = readViewState(filePath)
+  if (vs.scale > 0) {
+    scale.value = vs.scale
+    keepScale = true
+  }
+  if (vs.page > 1) pageNum = vs.page
+  liveScrollTop.value = vs.scrollTop
+  pendingScrollTop = vs.scrollTop
 
-    if (pdfDoc) {
-      renderPage(pageNum)
-      nextTick(() => {
-        const container = getContainer()
-        if (container) {
-          container.scrollTop = state.scrollTop
-        }
-      })
-    }
+  if (!pdfDoc) return
+  const willRebuild = pageNum !== prevPage || scale.value !== prevScale
+  queueRenderPage(pageNum)
+  if (!willRebuild) {
+    // canvas 尺寸不变 → 渲染回调里的 flushPendingScroll 不会触发，这里补一次
+    void nextTick(() => flushPendingScroll())
   }
 })
 
-// 组件被停用时保存状态
+// 组件被停用：上报状态。位置只能用组件内记录值 —— 此刻 DOM 已被 KeepAlive 移出文档，读 scrollTop 恒为 0
 onDeactivated(() => {
-  console.log('[PdfPreview] Deactivated, saving state')
   isDeactivated = true
-  const docId = activeDocumentPath.value
-  if (!docId) return
-
-  const container = getContainer()
-  const scrollTop = container ? container.scrollTop : 0
-
-  savedState.set(docId, {
-    pageNum,
-    scale: scale.value,
-    scrollTop,
-    filePath: docId
-  })
+  if (reportTimer !== null) {
+    window.clearTimeout(reportTimer)
+    reportTimer = null
+  }
+  reportViewState()
 })
 
 
-// 缩放控制
+// 缩放控制（手动缩放后锁定：窗口尺寸变化不再强制「适配宽度」，否则缩放会被 RO 冲掉）
 const onMagnify = () => {
   if (!pdfDoc || !ctx) return
   if (scale.value < MAX_SCALE) {
+    keepScale = true
     scale.value = Math.min(scale.value + SCALE_STEP, MAX_SCALE)
     renderPage(pageNum)
   }
@@ -206,6 +307,7 @@ const onMagnify = () => {
 const onReduce = () => {
   if (!pdfDoc || !ctx) return
   if (scale.value > MIN_SCALE) {
+    keepScale = true
     scale.value = Math.max(scale.value - SCALE_STEP, MIN_SCALE)
     renderPage(pageNum)
   }
@@ -238,11 +340,11 @@ const loadPdfFile = async () => {
       }
     }
 
-    if (!activeDocumentPath.value) {
+    if (!docPath.value) {
       throw new Error('No active document selected')
     }
 
-    const doc = docStore.documents.get(activeDocumentPath.value)
+    const doc = docStore.documents.get(docPath.value)
     if (!doc || !doc.id) {
       throw new Error('No PDF file path provided')
     }
@@ -274,8 +376,13 @@ const loadPdfFile = async () => {
     // 提取书签
     await extractBookmarks()
 
-    const fitScale = await calculateFitScale()
-    scale.value = fitScale
+    // 恢复上次的页码 / 缩放 / 位置（会话快照里有），没有记录才用「适配宽度」
+    const vs = readViewState(props.path)
+    keepScale = vs.scale > 0
+    scale.value = vs.scale > 0 ? vs.scale : await calculateFitScale()
+    if (vs.page > 1) pageNum = vs.page
+    liveScrollTop.value = vs.scrollTop
+    pendingScrollTop = vs.scrollTop
 
     renderPage(pageNum)
   } catch (err: any) {
@@ -376,16 +483,15 @@ const getErrorMessage = (err: any): string => {
   return err.message || 'Failed to load PDF'
 }
 
-// 监听激活文档变化 - 仅在组件处于激活状态时响应
+// 监听激活文档变化：只有「激活文档变成本实例负责的文档」才加载。
+// 否则切 tab 时旧实例的 watcher 会先于 deactivate 触发，把新文档的 PDF 加载进旧实例。
 watch(
   activeDocumentPath,
   async (newId, oldId) => {
     if (isDeactivated) return
     if (oldId === undefined) return
-    console.log('[PdfPreview] Active document changed:', newId)
-    if (newId) {
-      await loadPdfFile()
-    }
+    if (!newId || newId !== props.path) return
+    await loadPdfFile()
   }
 )
 
@@ -416,6 +522,8 @@ function renderPage(num: number) {
         canvas.height = Math.floor(viewport.height)
         canvas.style.display = 'block'
         canvas.style.margin = '0 auto'
+        // canvas 尺寸已按新视口设置 → scrollHeight 就绪，可以把待恢复的位置落下去
+        flushPendingScroll()
       }
 
       if (canvas && ctx) {
@@ -448,6 +556,8 @@ function renderPage(num: number) {
     })
 
   page_num.value = num
+  // 翻页/缩放后立刻把页码与缩放同步进 store（不必等用户滚动或切走）
+  scheduleReportViewState()
 }
 
 function queueRenderPage(num: number) {
@@ -532,7 +642,6 @@ onMounted(() => {
   let resizeObserver: ResizeObserver | null = null
 
   onUnmounted(() => {
-    console.log('[PdfPreview] Unmounting, cleaning up...')
     window.removeEventListener('keydown', handleKeydown)
     // 移除捕获级 scroll 监听（组件卸载后不清理会持续持有组件闭包，导致内存无法回收）
     window.removeEventListener('scroll', updateControlsPosition, true)
@@ -552,9 +661,12 @@ onMounted(() => {
       clearTimeout(resizeTimer)
       resizeTimer = null
     }
-
-    // 清理缓存
-    cachedContainer = null
+    // KeepAlive 淘汰（:max=8）走的是 unmount 而非 deactivate，这里兜底上报一次
+    if (reportTimer !== null) {
+      window.clearTimeout(reportTimer)
+      reportTimer = null
+    }
+    reportViewState()
   })
 
   toggleDarkMode(isDark.value)
@@ -621,7 +733,7 @@ onMounted(() => {
     </div>
 
     <!-- PDF 预览区域 -->
-    <div class="pdf-container" ref="containerRef">
+    <div class="pdf-container" ref="containerRef" @scroll="onContainerScroll">
       <!-- 加载状态 -->
       <div v-if="loading" class="loading-overlay">
         <div class="loading-spinner">Loading PDF...</div>
@@ -630,7 +742,7 @@ onMounted(() => {
       <div v-else-if="error" class="error-overlay">
         <div class="error-message">{{ error }}</div>
       </div>
-      <canvas ref="canvasRef" class="pdf-canvas" id="the-canvas"></canvas>
+      <canvas ref="canvasRef" class="pdf-canvas"></canvas>
 
       <div
         class="pdf-controls"

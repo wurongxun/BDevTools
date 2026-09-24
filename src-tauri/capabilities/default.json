@@ -35,6 +35,8 @@
     "core:window:allow-center",
     "core:window:allow-set-title",
     "os:default",
+    "core:event:allow-emit",
+    "core:event:allow-listen",
     "window-state:default",
     "autostart:allow-enable",
     "autostart:allow-disable",

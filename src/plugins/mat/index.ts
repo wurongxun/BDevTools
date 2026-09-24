@@ -16,6 +16,7 @@ import MainPanel from './MainPanel.vue'
 export default {
   id: 'mat',
   label: '内存分析',
+  description: 'Java 堆转储分析：直方图、泄漏检测、支配树与引用追踪',
   icon: markRaw(DataAnalysis),
   sidebarPanel: markRaw(SidebarPanel),
   mainPanel: markRaw(MainPanel),

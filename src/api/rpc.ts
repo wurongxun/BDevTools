@@ -9,6 +9,14 @@ import { invoke } from '@tauri-apps/api/core'
 /** 调用后端命令（与 Tauri invoke 同名同签名，便于调用点零改动地迁移） */
 export { invoke }
 
+/**
+ * IPC 流式通道（Tauri v2 Channel）。
+ * 用于「一次调用、多次回推」的场景（终端输出、流式日志），
+ * 与全局事件（runtime.publish/subscribe）的区别：Channel 的生命周期绑定在单次 invoke 上，
+ * 天然按会话隔离且带消息序号（IPC 层保证按序投递）。
+ */
+export { Channel } from '@tauri-apps/api/core'
+
 /** 推荐使用的统一调用入口 */
 export function call<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   return invoke<T>(cmd, args)

@@ -31,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { ArrowDown, ArrowUp, Close, WarningFilled } from '@element-plus/icons-vue'
 import { useLogStore } from '../store/logs'
 import LogToolbar from './LogToolbar.vue'
@@ -48,8 +48,17 @@ const rulesVisible = ref(false)
 const exportVisible = ref(false)
 const showTimeline = ref(true)
 
-function onGoto(lineNo: number | null) {
-  if (lineNo && lineNo > 0) viewRef.value?.scrollToLine(lineNo)
+/**
+ * 跳转到指定行（命中导航 / 时间轴联动）。
+ *
+ * 搜索命中现在覆盖整个文件，目标行很可能还在未加载区，
+ * 因此先补载到该行，等 DOM 高度更新后再滚动——否则会被旧的滚动高度裁掉。
+ */
+async function onGoto(lineNo: number | null) {
+  if (!lineNo || lineNo <= 0) return
+  await store.ensureLineLoaded(lineNo)
+  await nextTick()
+  viewRef.value?.scrollToLine(lineNo)
 }
 
 /**

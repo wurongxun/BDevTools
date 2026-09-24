@@ -9,10 +9,11 @@
       </template>
     </el-header>
     <el-main class="app-main-content">
-      <!-- 动态渲染当前窗口启用插件的主面板（KeepAlive 常驻：切走 deactivated 缓存实例、卸载 DOM，切回 activated 恢复，不重建） -->
+      <!-- 动态渲染当前窗口启用插件的主面板（KeepAlive 常驻：切走 deactivated 缓存实例、卸载 DOM，切回 activated 恢复，不重建）
+           只声明 dockPanel 的插件没有 mainPanel，此处跳过（它的面板由 Layout 停靠在主区边缘） -->
       <template v-for="plugin in displayPlugins" :key="plugin.id">
         <KeepAlive>
-          <component :is="plugin.mainPanel" v-if="isPanelVisible(plugin.id)" />
+          <component :is="plugin.mainPanel" v-if="plugin.mainPanel && isPanelVisible(plugin.id)" />
         </KeepAlive>
       </template>
     </el-main>

@@ -10,8 +10,9 @@ use std::net::TcpStream;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
 
+use std::collections::VecDeque;
+use std::time::{Duration, Instant};
 // 全局会话管理
 lazy_static::lazy_static! {
     static ref SSH_SESSIONS: Mutex<HashMap<String, Arc<Mutex<SshSessionInner>>>> = Mutex::new(HashMap::new());
@@ -66,18 +67,16 @@ pub async fn ssh_connect(
 
             // 根据认证方式选择认证
             if auth == "pubkey" && !key_path.is_empty() {
-                session.userauth_pubkey_file(
-                    &username,
-                    None,
-                    Path::new(&key_path),
-                    None,
-                )?;
+                session.userauth_pubkey_file(&username, None, Path::new(&key_path), None)?;
             } else {
                 session.userauth_password(&username, &password)?;
             }
 
             if !session.authenticated() {
-                return Err(anyhow::anyhow!("认证失败，请检查用户名和{}", if auth == "pubkey" { "私钥" } else { "密码" }));
+                return Err(anyhow::anyhow!(
+                    "认证失败，请检查用户名和{}",
+                    if auth == "pubkey" { "私钥" } else { "密码" }
+                ));
             }
 
             let mut channel = session.channel_session()?;
@@ -124,10 +123,13 @@ pub async fn ssh_connect(
                     };
 
                     if let Some(output) = data {
-                        ctx_read.emit("ssh-output", serde_json::json!({
-                            "tabId": tab_id,
-                            "data": output
-                        }));
+                        ctx_read.emit(
+                            "ssh-output",
+                            serde_json::json!({
+                                "tabId": tab_id,
+                                "data": output
+                            }),
+                        );
                     }
                     // 无数据时短暂休眠，避免 CPU 空转
                     thread::sleep(Duration::from_millis(20));
@@ -184,18 +186,22 @@ pub async fn ssh_check(session_id: String) -> Response<bool> {
         Some(inner) => {
             let guard = inner.lock().unwrap();
             let alive = guard.channel.is_some() && guard.session.authenticated();
-            Response::new(200, alive, if alive { "连接正常" } else { "连接已断开" })
+            Response::new(
+                200,
+                alive,
+                if alive {
+                    "连接正常"
+                } else {
+                    "连接已断开"
+                },
+            )
         }
         None => Response::new(300, false, "会话不存在"),
     }
 }
 
 /// SSH 调整 PTY 大小
-pub async fn ssh_resize_pty(
-    session_id: String,
-    cols: u32,
-    rows: u32,
-) -> Response<bool> {
+pub async fn ssh_resize_pty(session_id: String, cols: u32, rows: u32) -> Response<bool> {
     let sessions = SSH_SESSIONS.lock().unwrap();
     if let Some(inner) = sessions.get(&session_id) {
         let mut guard = inner.lock().unwrap();
@@ -234,12 +240,7 @@ pub async fn sftp_connect(
 
         // 根据认证方式选择认证
         if auth == "pubkey" && !key_path.is_empty() {
-            session.userauth_pubkey_file(
-                &username,
-                None,
-                Path::new(&key_path),
-                None,
-            )?;
+            session.userauth_pubkey_file(&username, None, Path::new(&key_path), None)?;
         } else {
             session.userauth_password(&username, &password)?;
         }
@@ -288,16 +289,12 @@ pub async fn sftp_check(session_id: String) -> Response<bool> {
 }
 
 /// SFTP 列出目录
-pub async fn sftp_list_dir(
-    session_id: String,
-    path: String,
-) -> Response<Vec<RemoteFileItem>> {
+pub async fn sftp_list_dir(session_id: String, path: String) -> Response<Vec<RemoteFileItem>> {
     let sess = {
         let sessions = SFTP_SESSIONS.lock().unwrap();
         sessions.get(&session_id).cloned()
     };
     if let Some(sess) = sess {
-
         let result = tokio::task::spawn_blocking(move || -> Result<Vec<RemoteFileItem>> {
             let sftp = sess.sftp()?;
             let entries = sftp.readdir(Path::new(&path))?;
@@ -323,10 +320,7 @@ pub async fn sftp_list_dir(
                     })
                     .unwrap_or_default();
 
-                let permissions = stat
-                    .perm
-                    .map(|p| format!("{:o}", p))
-                    .unwrap_or_default();
+                let permissions = stat.perm.map(|p| format!("{:o}", p)).unwrap_or_default();
 
                 files.push(RemoteFileItem {
                     name,
@@ -368,7 +362,6 @@ pub async fn sftp_mkdir(session_id: String, path: String) -> Response<bool> {
         sessions.get(&session_id).cloned()
     };
     if let Some(sess) = sess {
-
         let result = tokio::task::spawn_blocking(move || -> Result<bool> {
             let sftp = sess.sftp()?;
             sftp.mkdir(Path::new(&path), 0o755)?;
@@ -393,7 +386,6 @@ pub async fn sftp_remove(session_id: String, path: String) -> Response<bool> {
         sessions.get(&session_id).cloned()
     };
     if let Some(sess) = sess {
-
         let result = tokio::task::spawn_blocking(move || -> Result<bool> {
             let sftp = sess.sftp()?;
             let p = Path::new(&path);
@@ -442,8 +434,9 @@ pub async fn sftp_upload(
             let mut remote_file = sftp.create(Path::new(&remote_path))?;
             let mut local_file = std::fs::File::open(local)?;
 
-            let mut buffer = [0u8; 8192];
+            let mut buffer = [0u8; 65536];
             let mut transferred: u64 = 0;
+            let mut last_progress: i64 = -1;
 
             loop {
                 let bytes_read = local_file.read(&mut buffer)?;
@@ -459,14 +452,33 @@ pub async fn sftp_upload(
                     0
                 };
 
-                ctx.emit("transfer-progress", serde_json::json!({
+                // 进度事件节流：仅在整数百分比变化时发送（同 sftp_download）
+                if (progress as i64) != last_progress {
+                    last_progress = progress as i64;
+                    ctx.emit(
+                        "transfer-progress",
+                        serde_json::json!({
+                            "tabId": "",
+                            "taskId": task_id,
+                            "progress": progress,
+                            "transferredSize": transferred,
+                            "speed": ""
+                        }),
+                    );
+                }
+            }
+
+            // 收尾：保证最终 100% 一定送达
+            ctx.emit(
+                "transfer-progress",
+                serde_json::json!({
                     "tabId": "",
                     "taskId": task_id,
-                    "progress": progress,
+                    "progress": 100,
                     "transferredSize": transferred,
                     "speed": ""
-                }));
-            }
+                }),
+            );
 
             Ok(true)
         })
@@ -495,6 +507,62 @@ pub async fn sftp_download(
         sessions.get(&session_id).cloned()
     };
     if let Some(sess) = sess {
+        // let result = tokio::task::spawn_blocking(move || -> Result<bool> {
+        //     let sftp = sess.sftp()?;
+        //     let remote = Path::new(&remote_path);
+        //
+        //     let stat = sftp.stat(remote)?;
+        //     let file_size = stat.size.unwrap_or(0);
+        //
+        //     let mut remote_file = sftp.open(remote)?;
+        //     let mut local_file = std::fs::File::create(Path::new(&local_path))?;
+        //
+        //     let mut buffer = [0u8; 65536];
+        //     let mut transferred: u64 = 0;
+        //     let mut last_progress: i64 = -1;
+        //
+        //     loop {
+        //         let bytes_read = remote_file.read(&mut buffer)?;
+        //         if bytes_read == 0 {
+        //             break;
+        //         }
+        //         local_file.write_all(&buffer[..bytes_read])?;
+        //         transferred += bytes_read as u64;
+        //
+        //         let progress = if file_size > 0 {
+        //             (transferred as f64 / file_size as f64 * 100.0) as u32
+        //         } else {
+        //             0
+        //         };
+        //
+        //         // 进度事件节流：仅在整数百分比变化时发送。
+        //         // 早期实现每 8KB 分片 emit 一次，大文件会产生上万条 IPC 事件，
+        //         // 既拖慢传输，也会把命令自身的响应挤在消息队列尾部
+        //         //（表现为「文件已下完，队列仍显示进行中」）。
+        //         if (progress as i64) != last_progress {
+        //             last_progress = progress as i64;
+        //             ctx.emit("transfer-progress", serde_json::json!({
+        //                 "tabId": "",
+        //                 "taskId": task_id,
+        //                 "progress": progress,
+        //                 "transferredSize": transferred,
+        //                 "speed": ""
+        //             }));
+        //         }
+        //     }
+        //
+        //     // 收尾：保证最终 100% 一定送达（节流可能刚好跳过 100）
+        //     ctx.emit("transfer-progress", serde_json::json!({
+        //         "tabId": "",
+        //         "taskId": task_id,
+        //         "progress": 100,
+        //         "transferredSize": transferred,
+        //         "speed": ""
+        //     }));
+        //
+        //     Ok(true)
+        // })
+        // .await;
         let result = tokio::task::spawn_blocking(move || -> Result<bool> {
             let sftp = sess.sftp()?;
             let remote = Path::new(&remote_path);
@@ -505,8 +573,15 @@ pub async fn sftp_download(
             let mut remote_file = sftp.open(remote)?;
             let mut local_file = std::fs::File::create(Path::new(&local_path))?;
 
-            let mut buffer = [0u8; 8192];
+            let mut buffer = [0u8; 65536];
             let mut transferred: u64 = 0;
+            let mut last_progress: i64 = -1;
+
+            let start_time = Instant::now();
+
+            // 👇 新增：滑动窗口，保存最近 3 秒内每次读取的 (时间点, 字节数)
+            let mut speed_window: VecDeque<(Instant, u64)> = VecDeque::new();
+            let window_duration = Duration::from_secs(3);
 
             loop {
                 let bytes_read = remote_file.read(&mut buffer)?;
@@ -516,21 +591,78 @@ pub async fn sftp_download(
                 local_file.write_all(&buffer[..bytes_read])?;
                 transferred += bytes_read as u64;
 
+                // 👇 新增：把本次读取加入窗口
+                let now = Instant::now();
+                speed_window.push_back((now, bytes_read as u64));
+
+                // 清理窗口：扔掉 3 秒以前的数据点
+                while let Some(&(t, _)) = speed_window.front() {
+                    if now - t > window_duration {
+                        speed_window.pop_front();
+                    } else {
+                        break;
+                    }
+                }
+
                 let progress = if file_size > 0 {
                     (transferred as f64 / file_size as f64 * 100.0) as u32
                 } else {
                     0
                 };
 
-                ctx.emit("transfer-progress", serde_json::json!({
+                if (progress as i64) != last_progress {
+                    last_progress = progress as i64;
+
+                    // 👇 计算瞬时速度：窗口内总字节 ÷ 窗口时间跨度
+                    let speed_bps = if speed_window.len() >= 2 {
+                        let window_bytes: u64 = speed_window.iter().map(|(_, b)| *b).sum();
+                        let first_time = speed_window.front().unwrap().0;
+                        let last_time = speed_window.back().unwrap().0;
+                        let span = (last_time - first_time).as_secs_f64();
+                        if span > 0.0 {
+                            window_bytes as f64 / span
+                        } else {
+                            0.0
+                        }
+                    } else {
+                        // 窗口数据太少，退化成平均速度
+                        let elapsed = start_time.elapsed().as_secs_f64();
+                        if elapsed > 0.0 {
+                            transferred as f64 / elapsed
+                        } else {
+                            0.0
+                        }
+                    };
+
+                    ctx.emit(
+                        "transfer-progress",
+                        serde_json::json!({
+                            "tabId": "",
+                            "taskId": task_id,
+                            "progress": progress,
+                            "transferredSize": transferred,
+                            "speed": format_speed(speed_bps)
+                        }),
+                    );
+                }
+            }
+            // 收尾 100%（用整体平均速度更准）
+            let elapsed = start_time.elapsed().as_secs_f64();
+            let final_speed = if elapsed > 0.0 {
+                transferred as f64 / elapsed
+            } else {
+                0.0
+            };
+            ctx.emit(
+                "transfer-progress",
+                serde_json::json!({
                     "tabId": "",
                     "taskId": task_id,
-                    "progress": progress,
+                    "progress": 100,
                     "transferredSize": transferred,
-                    "speed": ""
-                }));
-            }
-
+                    "speed": format_speed(final_speed)
+                }),
+            );
             Ok(true)
         })
         .await;
@@ -603,11 +735,7 @@ pub async fn local_list_dir(path: String) -> Response<Vec<RemoteFileItem>> {
 }
 
 /// SFTP 重命名文件/目录
-pub async fn sftp_rename(
-    session_id: String,
-    old_path: String,
-    new_path: String,
-) -> Response<bool> {
+pub async fn sftp_rename(session_id: String, old_path: String, new_path: String) -> Response<bool> {
     let sess = {
         let sessions = SFTP_SESSIONS.lock().unwrap();
         sessions.get(&session_id).cloned()
@@ -634,4 +762,21 @@ pub async fn sftp_rename(
 pub async fn get_app_dir() -> Response<String> {
     let app_dir = &crate::app::app_store::APP.lock().app_dir;
     Response::new(200, app_dir.to_string_lossy().to_string(), "成功")
+}
+
+/// 把字节/秒格式化成 "12.5 KB/s" / "3.2 MB/s" / "856 B/s"
+fn format_speed(bps: f64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = 1024.0 * 1024.0;
+    const GB: f64 = 1024.0 * 1024.0 * 1024.0;
+
+    if bps >= GB {
+        format!("{:.2} GB/s", bps / GB)
+    } else if bps >= MB {
+        format!("{:.2} MB/s", bps / MB)
+    } else if bps >= KB {
+        format!("{:.1} KB/s", bps / KB)
+    } else {
+        format!("{:.0} B/s", bps)
+    }
 }

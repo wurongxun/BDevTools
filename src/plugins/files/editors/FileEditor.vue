@@ -60,10 +60,19 @@ const currentEditorComponent = computed(() => {
   }
 })
 
+/**
+ * 收子编辑器的视图状态（光标 / 滚动位置）。
+ *
+ * path 以**上报者**为准，不能用 activeDocumentPath 收口：切 tab 时旧编辑器会先
+ * deactivate，此刻 activeDocumentPath 已经指向新文档 —— 用它收口会把旧文档的
+ * 滚动位置写到新文档上（两个标签互相污染位置）。子编辑器上报时会带上自己的 path。
+ */
 function handleStateUpdate(state: any) {
-  if (activeDocument.value&&docStore.activeDocumentPath) {
-      docStore.updateViewState(docStore.activeDocumentPath, state)
-  }
+  if (!state) return
+  const path = typeof state.path === 'string' && state.path ? state.path : docStore.activeDocumentPath
+  if (!path) return
+  const { path: _ignored, ...viewState } = state
+  docStore.updateViewState(path, viewState)
 }
 </script>
 

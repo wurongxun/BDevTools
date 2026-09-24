@@ -38,10 +38,10 @@
 
     <!-- 命中导航 -->
     <div class="tb-nav">
-      <app-button size="small" :disabled="!total" title="上一个匹配" @click="emit('goto', store.gotoPrev())">
+      <app-button size="small" :disabled="!navTotal" title="上一个匹配" @click="emit('goto', store.gotoPrev())">
         <el-icon><ArrowUp /></el-icon>
       </app-button>
-      <app-button size="small" :disabled="!total" title="下一个匹配" @click="emit('goto', store.gotoNext())">
+      <app-button size="small" :disabled="!navTotal" title="下一个匹配" @click="emit('goto', store.gotoNext())">
         <el-icon><ArrowDown /></el-icon>
       </app-button>
       <span class="tb-count">
@@ -49,12 +49,22 @@
           v-model="jumpText"
           size="small"
           class="tb-jump"
-          :disabled="!hitLines"
+          :disabled="!navTotal"
           @keyup.enter="onJump"
         />
         <span class="tb-sep">/</span>
-        <span class="tb-total">{{ hitLines }}</span>
-        <span v-if="total !== hitLines" class="tb-total-sub">（{{ total }} 处）</span>
+        <span class="tb-total">{{ navTotal }}</span>
+        <!-- 全文件结果可用时以"命中行"为口径，不再叠加本地的"处"计数（两者口径不同，混着显示会误导） -->
+        <span v-if="!store.viewActive && total !== hitLines" class="tb-total-sub">（{{ total }} 处）</span>
+      </span>
+      <!-- 查询中 / 降级说明 -->
+      <span v-if="store.viewScanning" class="tb-scan">查询中…</span>
+      <!-- 跳转打不通时的原因（原先静默失败，用户只看到"点了没反应"） -->
+      <span v-else-if="store.jumpHint" class="tb-scan tb-jump-hint" :title="store.jumpHint">
+        {{ store.jumpHint }}
+      </span>
+      <span v-else-if="store.viewNote" class="tb-scan" :title="store.viewNote">
+        {{ store.viewNote }}
       </span>
     </div>
 
@@ -112,6 +122,8 @@ const search = computed(() => store.search)
 const searchError = computed(() => store.searchError)
 const total = computed(() => store.result.total)
 const hitLines = computed(() => store.result.hits.length)
+/** 导航总数：全文件命中行数（不可用时回退为已加载命中行数） */
+const navTotal = computed(() => store.navTotal)
 const loadedCount = computed(() => store.loadedCount)
 const activeSource = computed(() => store.activeSource)
 
@@ -263,6 +275,19 @@ watch(
 
 .tb-total-sub {
   color: var(--el-text-color-placeholder);
+}
+
+/* 全文件扫描中 / 降级说明：与"处"计数同一视觉层级，避免抢主计数的注意力 */
+.tb-scan {
+  font-size: var(--font-size-xs);
+  color: var(--el-text-color-placeholder);
+  white-space: nowrap;
+  cursor: help;
+}
+
+/* 跳转失败是"操作没生效"，用告警色以区别于普通的降级说明 */
+.tb-jump-hint {
+  color: var(--el-color-warning);
 }
 
 .tb-spacer {

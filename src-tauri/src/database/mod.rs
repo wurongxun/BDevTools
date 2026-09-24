@@ -7,3 +7,4 @@ pub mod pool;
 pub mod dialect;
 pub mod mssql;
 pub mod odbc;
+pub mod catalog;

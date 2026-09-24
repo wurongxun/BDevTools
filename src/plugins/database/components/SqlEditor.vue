@@ -53,7 +53,7 @@ const selectedConfigId = ref<string>(props.configId || '')
 const selectedDb = ref('')
 const databases = ref<DatabaseInfo[]>([])
 const lastResult = ref<SqlResult | null>(null)
-// 分页统一在 SqlResultPanel 中按子结果独立管理，编辑器执行时仅取第一页（每页 200）
+// 分页统一在 QueryResultView 中按当前 SQL 独立管理，编辑器执行时仅取第一页（每页 200）
 const PAGE_SIZE = 200
 const executing = ref(false)
 let editor: monaco.editor.IStandaloneCodeEditor | null = null

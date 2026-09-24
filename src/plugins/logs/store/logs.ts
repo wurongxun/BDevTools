@@ -15,12 +15,14 @@ import { subscribe, type Unsubscribe } from '@/core/runtime'
 import { getCurrentWorkspaceId } from '@/composables/usePluginDir'
 import { parseLines } from '../core/parser'
 import {
-  clampHitIndex,
   compileMatcher,
-  findHitAfter,
-  findHitBefore,
+  firstIndexAfter,
+  indexOfHitLine,
+  indexOfSorted,
+  lastIndexBefore,
   scanAll,
   scanRange,
+  segmentIndexOfLine,
   toSearchResult,
 } from '../core/search'
 import {
@@ -40,6 +42,7 @@ import {
   type LineSegment,
   type LogExportResult,
   type LogIndexMeta,
+  type LogQueryResult,
 } from '../core/indexApi'
 import type {
   HighlightRule,
@@ -65,6 +68,22 @@ interface FileLinesResult {
 
 /** 单次读取行数（分块懒加载，避免一次性读入超大文件） */
 const CHUNK_SIZE = 2000
+/** 跳转补载时的单次读取行数：跳到文件尾部时不至于发几十次请求 */
+const JUMP_CHUNK_SIZE = 20000
+/**
+ * 滚动补载的窗口大小。
+ *
+ * 刻意远小于 `WINDOW_MAX_LINES`：视口只有几十行，一次读 2 万行要 parse 2 万个 JS 对象，
+ * 划一下滚动条就卡一下。5000 行 ≈ 80 屏，配上 1/4 的迟滞余量足够撑住一次长距离滚动。
+ */
+const SCROLL_WINDOW_LINES = 5000
+/**
+ * 单源保留的行窗口上限（§3.1）。
+ *
+ * `ParsedLine` 是 JS 对象（含原文字符串），每行数百字节——后端索引已压到 ~1B/行，
+ * 但**前端行集才是内存大头**，不淘汰就会随滚动无限增长。2 万行约 6–12MB/源。
+ */
+const WINDOW_MAX_LINES = 20_000
 
 /** 多源色标取色池 */
 const SOURCE_COLORS = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#16A085']
@@ -75,6 +94,13 @@ export const useLogStore = defineStore('logs', () => {
   const activeSourceId = ref('')
   /** 已加载的解析后日志行（大数组用 shallowRef，避免深层响应式开销） */
   const lines = shallowRef<ParsedLine[]>([])
+  /**
+   * `lines[0]` 对应的**原始行号**（1-based）。
+   *
+   * 窗口淘汰后 `lines` 不再从第 1 行开始，行号 → 下标必须走 `lineNo - baseLineNo`；
+   * 继续用 `lineNo - 1` 会整体错位（这正是"跳转跳错行"的典型成因）。
+   */
+  const baseLineNo = ref(1)
   const loading = ref(false)
   const loadingMore = ref(false)
   const errorMsg = ref('')
@@ -88,6 +114,36 @@ export const useLogStore = defineStore('logs', () => {
   const currentHitIndex = ref(-1)
   const currentRangeIndex = ref(0)
   const currentLine = ref(0)
+
+  // ---------------- 合并查询视图（筛选 + 搜索一次请求） ----------------
+  /**
+   * 最近一次 `log_query_lines` 的结果（§2.5 / §3.2）。
+   *
+   * 它是"渲染段"与"导航行号"的**共同事实源**：二者出自同一次查询，
+   * 因此核心不变量 `lines ⊆ ∪segments` 天然成立——旧实现里筛选与搜索是两次独立请求，
+   * 搜索给出的行号可能根本不在筛选结果里，跳转必然断裂。
+   */
+  const view = ref<LogQueryResult | null>(null)
+  /** 结果是否可用（不可用 = 无筛选且无关键词 / 实时流源 / 查询失败） */
+  const viewActive = ref(false)
+  /** 查询进行中 */
+  const viewScanning = ref(false)
+  /** 降级原因（查询失败 / 命中截断 / 索引截断） */
+  const viewNote = ref('')
+  /** 因超出索引上限而未参与本次查询的行数（>0 时 UI 必须提示） */
+  const unindexedLines = ref(0)
+  /** 竞态守卫：只有最后一次请求的结果允许落地 */
+  let viewToken = 0
+  /** 防抖定时器：避免每敲一个字符就查一遍 */
+  let viewTimer: number | null = null
+
+  /**
+   * 跳转失败的说明（成功时为空）。
+   *
+   * 跳转打不通时**必须**给出可见原因：原先只是静默 `return`，
+   * 用户看到的就是"点了没反应"，无法区分"没有命中"和"这个功能坏了"。
+   */
+  const jumpHint = ref('')
 
   // ---------------- 筛选（基础筛选） ----------------
   const filter = ref<FilterState>({ ...DEFAULT_FILTER })
@@ -143,6 +199,8 @@ export const useLogStore = defineStore('logs', () => {
   /** 已打开「文件类」源（本地 / SSH）的内容缓冲：按源 ID 缓存已加载的行与索引元数据，切换 tab 时直接复用、不重读磁盘 */
   interface FileBuffer {
     lines: ParsedLine[]
+    /** 缓存内容首行的原始行号（窗口化后不再是 1） */
+    baseLineNo: number
     loadedLines: number
     totalLines: number
     /** 后端索引元数据（时间轴 buckets / 级别计数 / 时间范围）。缓存下来供切回 tab 时同步恢复——否则 clearView 会把 indexMeta 抹空，Timeline 会变空态。 */
@@ -150,7 +208,7 @@ export const useLogStore = defineStore('logs', () => {
   }
   const buffers = new Map<string, FileBuffer>()
 
-  /** 每个源记忆的滚动位置（像素），切换回该 tab 时恢复，使 tab 像独立页面一样保留阅读进度 */
+  /** 每个源记忆的滚动位置（**逻辑下标**，非像素），切换回该 tab 时恢复，使 tab 像独立页面一样保留阅读进度 */
   const scrollMap = new Map<string, number>()
 
   /**
@@ -174,27 +232,55 @@ export const useLogStore = defineStore('logs', () => {
     return loadingSourceIds.value.has(id)
   }
 
+  /**
+   * 非活跃源的内容缓冲上限（§7.9）。
+   *
+   * 多 tab 打开时 `buffers` 是前端内存的主要增长源：每份都持有整份已加载 `ParsedLine[]`。
+   * 超出上限淘汰**最久未用**者（Map 的插入顺序即访问顺序，set 前先 delete 即"提到最新"）；
+   * 被淘汰的源切回时走重读磁盘路径——L2 已把按行取内容改成 O(1) 定位，代价可接受。
+   */
+  const MAX_BUFFERS = 2
+
   /** 把当前活跃源的文件视图内容快照进 buffers，供切回该 tab 时即时复用 */
   function snapshotBuffer(id: string) {
     if (!id) return
     const s = sources.value.find(x => x.id === id)
+    buffers.delete(id)
     buffers.set(id, {
       lines: lines.value,
+      baseLineNo: baseLineNo.value,
       loadedLines: s?.loadedLines ?? lines.value.length,
       totalLines: s?.totalLines ?? lines.value.length,
     })
+    // 淘汰最久未用的**其它**源（当前源与活跃源不参与）
+    while (buffers.size > MAX_BUFFERS) {
+      let victim: string | null = null
+      for (const k of buffers.keys()) {
+        if (k !== id && k !== activeSourceId.value) {
+          victim = k
+          break
+        }
+      }
+      if (!victim) break
+      buffers.delete(victim)
+    }
   }
 
-  /** 记录某源的滚动位置 */
-  function setScroll(id: string, top: number) {
-    if (!id) return
-    scrollMap.set(id, top)
-  }
+/**
+ * 记录某源滚动到的**逻辑下标**。
+ *
+ * 记下标而非像素：行高会随 `logicalTotal` 压缩（见 `LogView` 的 rowHeight），
+ * 同一个像素值在两次打开时对应的行号可能完全不同，记像素会错位。
+ */
+function setScroll(id: string, idx: number) {
+  if (!id) return
+  scrollMap.set(id, Math.max(0, idx))
+}
 
-  /** 读取某源记忆的滚动位置（无则 0） */
-  function getScroll(id: string): number {
-    return scrollMap.get(id) ?? 0
-  }
+/** 读取某源记忆的逻辑下标（无则 0） */
+function getScroll(id: string): number {
+  return scrollMap.get(id) ?? 0
+}
 
   /** 激活源变化即持久化（切换日志源 / 关闭源重选后恢复用） */
   watch(activeSourceId, () => {
@@ -237,17 +323,50 @@ export const useLogStore = defineStore('logs', () => {
   const displayLines = computed<ParsedLine[]>(() =>
     filterActive.value ? filteredLines.value : lines.value,
   )
-  const hasMore = computed(() => {
-    if (filterActive.value) return segIndex.value < segments.value.length
-    const s = activeSource.value
-    return !!s && lines.value.length < s.totalLines
-  })
   const loadedCount = computed(() => displayLines.value.length)
-  /** 当前聚焦命中所在的区间（用于当前项高亮） */
+
+  /**
+   * 逻辑总行数——**滚动条高度的唯一依据**（§3.1 比例滚动）。
+   *
+   * 它必须回答"这个文件一共有多少行 / 筛选结果一共有多少条"，
+   * 而**不是**"当前加载了多少行"。用它算高度，滚动条才代表数据位置而非加载进度：
+   * 高度恒定 ⇒ 拖到哪就是哪一行 ⇒ 不再出现"滚到底还在加载、底部一直往前跑"。
+   *
+   * - 筛选态：`view.lines` 的长度（= **可导航**命中数，上限 `MAX_MATCH_LINES`）。
+   *   刻意不用 `view.matched`：超出截断的部分没有行号，无法定位，
+   *   把它算进高度等于又造一个"到底了还在加载"。截断事实由 `viewNote` 提示。
+   * - 全量态：`source.totalLines`（后端 `count_file_lines` 给出，可靠）。
+   * - 实时流：没有"总行数"概念，只能按已收到的行数（流在增长，滚动条随之变长是合理的）。
+   */
+  const logicalTotal = computed(() => {
+    if (filterActive.value) {
+      if (viewActive.value && view.value && view.value.lines.length) return view.value.lines.length
+      return filteredLines.value.length
+    }
+    const s = activeSource.value
+    if (!s) return lines.value.length
+    return s.totalLines || lines.value.length
+  })
+
+  /**
+   * 导航用的命中行号序列：优先用全文件扫描结果，否则回退到已加载行的本地命中。
+   * 这是"搜索能覆盖整个文件"的关键——原先导航只走 result.hits（已加载部分）。
+   */
+  const navLines = computed<number[]>(() => {
+    if (viewActive.value && view.value && view.value.lines.length) return view.value.lines
+    return result.value.hits.map(h => h.lineIndex)
+  })
+  /** 导航总数：合并查询给出的命中真值；不可用时回退为本地命中行数 */
+  const navTotal = computed(() =>
+    viewActive.value && view.value ? view.value.matched : result.value.hits.length,
+  )
+
+  /** 当前聚焦命中所在行（按行号在本地命中里查；未加载的行没有命中区间，返回 null） */
   const currentHit = computed<LineHits | null>(() => {
-    const i = currentHitIndex.value
-    if (i < 0 || i >= result.value.hits.length) return null
-    return result.value.hits[i]
+    const lineNo = currentLine.value
+    if (!lineNo) return null
+    const i = indexOfHitLine(result.value.hits, lineNo)
+    return i >= 0 ? result.value.hits[i] : null
   })
 
   // ==================== 后端读取 ====================
@@ -275,14 +394,137 @@ export const useLogStore = defineStore('logs', () => {
       for (let i = 0; i < parsed.length; i++) linePosMap.set(parsed[i].index, base + i)
       filteredLines.value = filteredLines.value.concat(parsed)
     } else {
-      lines.value = lines.value.concat(parsed)
+      // 窗口淘汰：向下滚动时丢最旧的（用户视线在尾部）
+      let arr = lines.value.concat(parsed)
+      if (arr.length > WINDOW_MAX_LINES) {
+        const drop = arr.length - WINDOW_MAX_LINES
+        arr = arr.slice(drop)
+        baseLineNo.value += drop
+      } else if (!lines.value.length) {
+        baseLineNo.value = arr[0].index
+      }
+      lines.value = arr
     }
   }
 
-  /** 行号 → 数组下标（导航用）；不在当前行集中返回 -1 */
+  /**
+   * 把整个窗口搬到以 `startLine` 开头的位置（跳转目标远在窗口之外时用）。
+   *
+   * 逐块续读会为了一个目标行把整段都加载进来，反而破坏窗口；直接搬窗口只发一次请求。
+   */
+  async function loadWindowAt(startLine: number, count: number) {
+    const s = activeSource.value
+    if (!s || startLine < 1) return
+    const data = await readChunk(s.path, startLine, count)
+    if (!data || !data.content) return
+    const parsed = parseLines(data.content, data.first_line_number)
+    if (!parsed.length) return
+    lines.value = parsed
+    baseLineNo.value = parsed[0].index
+    s.loadedLines = baseLineNo.value + parsed.length - 1
+    if (data.total_lines) s.totalLines = data.total_lines
+    scanLocalHighlight()
+  }
+
+  /**
+   * 行号 → 数组下标（导航用）；不在当前行集中返回 -1。
+   *
+   * 全量态也要走这里：窗口淘汰后下标是 `lineNo - baseLineNo`，不是 `lineNo - 1`。
+   */
   function positionOfLine(lineNo: number): number {
-    if (!filterActive.value) return lineNo - 1
+    if (!filterActive.value) {
+      const i = lineNo - baseLineNo.value
+      return i >= 0 && i < lines.value.length ? i : -1
+    }
     return linePosMap.get(lineNo) ?? -1
+  }
+
+  /**
+   * 逻辑下标 → 原始行号（-1 = 越界）。
+   *
+   * 比例滚动的核心映射：滚动条上的第 `idx` 个槽对应哪一行。
+   * - 全量态：行号连续，`idx + 1`。
+   * - 筛选态（有合并查询结果）：行号不连续，查 `view.lines[idx]`。
+   * - 筛选态但查询不可用：退化成按已加载顺序，`filteredLines[idx].index`。
+   */
+  function lineNoAt(idx: number): number {
+    if (idx < 0) return -1
+    if (filterActive.value) {
+      if (viewActive.value && view.value) {
+        const nav = view.value.lines
+        return idx < nav.length ? nav[idx] : -1
+      }
+      return idx < filteredLines.value.length ? filteredLines.value[idx].index : -1
+    }
+    return idx + 1
+  }
+
+  /** 原始行号 → 逻辑下标（-1 = 不在当前视图里）。`lineNoAt` 的逆运算，跳转反算 scrollTop 用 */
+  function indexOfLineNo(lineNo: number): number {
+    if (!filterActive.value) return lineNo >= 1 ? lineNo - 1 : -1
+    if (viewActive.value && view.value) return indexOfSorted(view.value.lines, lineNo)
+    const arr = filteredLines.value
+    for (let i = 0; i < arr.length; i++) if (arr[i].index === lineNo) return i
+    return -1
+  }
+
+  /**
+   * 逻辑下标区间 → 行内容；**尚未加载的位置返回 null**（渲染成等高空槽）。
+   *
+   * 这是比例滚动的必然结果：滚动条覆盖整个文件，但内存里只有 2 万行的窗口，
+   * 视口落在窗口外时拿不到内容。返回 null 让渲染层画占位行而不是留白或报错。
+   */
+  function linesForRange(startIdx: number, endIdx: number): (ParsedLine | null)[] {
+    const out: (ParsedLine | null)[] = []
+    const filtered = filterActive.value
+    for (let i = startIdx; i < endIdx; i++) {
+      const lineNo = lineNoAt(i)
+      if (lineNo < 0) {
+        out.push(null)
+        continue
+      }
+      const p = positionOfLine(lineNo)
+      out.push(p >= 0 ? (filtered ? filteredLines.value[p] : lines.value[p]) : null)
+    }
+    return out
+  }
+
+  /**
+   * 比例滚动的按需补载：确保以 `[startIdx, endIdx]` 中心为基准的一个窗口已加载。
+   *
+   * 与 `ensureLineLoaded`（跳转用）的差别在**居中**：跳转关心"目标行在不在"，
+   * 滚动关心"视口这一屏有没有内容"，所以按视口中心搬窗口，且带迟滞
+   * （中心离窗口两端还有 1/4 余量就不搬），否则滚到窗口边缘就会反复重搬、抖动。
+   */
+  async function ensureRangeLoaded(startIdx: number, endIdx: number): Promise<void> {
+    const centerIdx = Math.floor((startIdx + endIdx) / 2)
+    const lineNo = lineNoAt(centerIdx)
+    if (lineNo <= 0) return
+
+    if (filterActive.value) {
+      if (positionOfLine(lineNo) >= 0) return
+      // 筛选态只能按段向前推进（段一旦越过无法回头），沿用跳转那套补载
+      await ensureFilteredLineLoaded(lineNo)
+      return
+    }
+
+    const base = baseLineNo.value
+    const end = base + lines.value.length - 1
+    if (lines.value.length && lineNo >= base && lineNo <= end) {
+      const margin = Math.max(1, Math.floor(lines.value.length / 4))
+      if (lineNo >= base + margin && lineNo <= end - margin) return
+    }
+    if (loadingMore.value) return
+    // 居中搬窗口：视口落在哪就在哪读一屏，而不是从文件头数过来
+    const win = Math.min(WINDOW_MAX_LINES, SCROLL_WINDOW_LINES)
+    const start = Math.max(1, lineNo - Math.floor(win / 2))
+    loadingMore.value = true
+    try {
+      await loadWindowAt(start, win)
+      snapshotBuffer(activeSourceId.value)
+    } finally {
+      loadingMore.value = false
+    }
   }
 
   /** 增量补扫新增部分，保持命中数组按行号有序 */
@@ -342,6 +584,7 @@ export const useLogStore = defineStore('logs', () => {
   /** 清空当前视图（切换源/工作区时调用） */
   function clearView() {
     lines.value = []
+    baseLineNo.value = 1
     result.value = { hits: [], total: 0, hitLines: new Set<number>() }
     currentHitIndex.value = -1
     currentRangeIndex.value = 0
@@ -350,6 +593,7 @@ export const useLogStore = defineStore('logs', () => {
     searchError.value = ''
     indexMeta.value = null
     filterError.value = ''
+    resetView()
     resetFiltered()
   }
 
@@ -368,6 +612,7 @@ export const useLogStore = defineStore('logs', () => {
         return null
       }
       lines.value = parseLines(data.content, data.first_line_number)
+      baseLineNo.value = 1
 
       const fileName = name || path.split(/[\\/]/).pop() || path
       const existing = sources.value.find(s => s.id === sourceId)
@@ -466,33 +711,6 @@ export const useLogStore = defineStore('logs', () => {
     }
   }
 
-  /** 继续加载下一块（滚动触底时调用） */
-  async function loadMore() {
-    if (filterActive.value) {
-      await loadMoreFiltered()
-      return
-    }
-    const s = activeSource.value
-    if (!s || loadingMore.value || !hasMore.value) return
-    loadingMore.value = true
-    try {
-      const startLine = lines.value.length + 1
-      const data = await readChunk(s.path, startLine)
-      if (!data || !data.content) return
-      const parsed = parseLines(data.content, data.first_line_number)
-      const before = lines.value.length
-      appendLines(parsed)
-      s.loadedLines = lines.value.length
-      if (data.total_lines) s.totalLines = data.total_lines
-      scanIncremental(before)
-      snapshotBuffer(activeSourceId.value)
-    } catch (e) {
-      console.error('[logs] 加载更多失败:', e)
-    } finally {
-      loadingMore.value = false
-    }
-  }
-
   function setActiveSource(id: string) {
     const target = sources.value.find(s => s.id === id)
     if (!target) return
@@ -510,6 +728,7 @@ export const useLogStore = defineStore('logs', () => {
       clearView()
       activeSourceId.value = id
       lines.value = buf.lines
+      baseLineNo.value = buf.baseLineNo || 1
       target.loadedLines = buf.loadedLines
       target.totalLines = buf.totalLines
       // 同步编码选择器，使其反映该 tab 自身的编码
@@ -882,8 +1101,16 @@ export const useLogStore = defineStore('logs', () => {
     segPos.value = 0
   }
 
-  /** 按段加载筛选结果，直到新增 CHUNK_SIZE 行或读完所有段 */
-  async function loadMoreFiltered(minLines = CHUNK_SIZE, force = false) {
+  /**
+   * 按段加载筛选结果，直到新增 minLines 行**且 untilLine 已加载**（若指定）或读完所有段。
+   *
+   * `untilLine` 是跳转补载的停止条件：只看"新增行数"是不够的——目标行可能远远落在
+   * 后面的段里，按行数加载会停在半路，跳转依旧打不通。
+   *
+   * 调用方**必须**先用 `segmentIndexOfLine` 确认目标行确实落在某个段内，
+   * 否则这里会把上千个段全部读一遍才罢休。
+   */
+  async function loadMoreFiltered(minLines = CHUNK_SIZE, force = false, untilLine?: number) {
     const s = activeSource.value
     // applyFilter 自身已置 filterLoading=true 以阻断并发滚动加载，内部调用需 force 绕开
     if (!s || (filterLoading.value && !force)) return
@@ -891,7 +1118,8 @@ export const useLogStore = defineStore('logs', () => {
     filterLoading.value = true
     try {
       let added = 0
-      while (added < minLines && segIndex.value < segments.value.length) {
+      while (segIndex.value < segments.value.length) {
+        if (added >= minLines && (untilLine == null || positionOfLine(untilLine) >= 0)) break
         const seg = segments.value[segIndex.value]
         const from = segPos.value || seg.start
         if (from > seg.end) {
@@ -946,15 +1174,8 @@ export const useLogStore = defineStore('logs', () => {
     filterLoading.value = true
     filterError.value = ''
     try {
-      resetFiltered()
-      const qr = await apiQueryLines(s.path, s.encoding, filter.value)
-      segments.value = qr.segments
-      filterMatched.value = qr.matched
-      filterTruncated.value = qr.truncated
-      segIndex.value = 0
-      segPos.value = 0
-      await loadMoreFiltered(CHUNK_SIZE, true)
-      await runSearch()
+      // 筛选条件变了 → 必须重新按段取内容
+      await rebuildView({ reloadContent: true })
     } catch (e) {
       filterError.value = (e as Error).message || '筛选失败'
     } finally {
@@ -966,7 +1187,10 @@ export const useLogStore = defineStore('logs', () => {
   function clearFilter() {
     filter.value = { ...DEFAULT_FILTER }
     resetFiltered()
-    void runSearch()
+    scanLocalHighlight()
+    // 全量态若仍有关键词，仍需一次查询补全"命中全集"
+    if (search.value.keyword) scheduleRebuild()
+    else resetView()
   }
 
   // ==================== 导出 ====================
@@ -998,8 +1222,21 @@ export const useLogStore = defineStore('logs', () => {
     }
   }
 
-  // ==================== 搜索 ====================
-  async function runSearch() {
+  // ==================== 搜索与筛选的统一驱动（P4） ====================
+  /** 段数上限（与后端 DEFAULT_MAX_SEGMENTS 对齐） */
+  const MAX_SEGMENTS = 2000
+  /** 单文件最多取回多少条命中行号（与后端 DEFAULT_MAX_MATCHES 对齐） */
+  const MAX_MATCH_LINES = 50000
+  /** 防抖：输入过程中每敲一个字符都查一遍代价太高 */
+  const VIEW_DELAY = 250
+
+  /**
+   * 本地扫描：只负责**当前行的高亮区间**，不再参与导航（§3.3）。
+   *
+   * 导航一律走 `view.lines`（服务端全量口径）；本地命中仅用于把已渲染行里的
+   * 关键词标出来，因此它可以是"部分"的——这正是它能保持实时的原因。
+   */
+  function scanLocalHighlight() {
     const opts = search.value
     if (!opts.keyword) {
       result.value = { hits: [], total: 0, hitLines: new Set<number>() }
@@ -1021,48 +1258,291 @@ export const useLogStore = defineStore('logs', () => {
     currentRangeIndex.value = 0
   }
 
+  /** 清空合并查询结果（切换源 / 清空条件时调用） */
+  function resetView() {
+    if (viewTimer) {
+      window.clearTimeout(viewTimer)
+      viewTimer = null
+    }
+    viewToken++
+    view.value = null
+    viewActive.value = false
+    viewNote.value = ''
+    viewScanning.value = false
+    unindexedLines.value = 0
+  }
+
+  /** 防抖触发一次合并查询 */
+  function scheduleRebuild() {
+    if (viewTimer) window.clearTimeout(viewTimer)
+    viewTimer = window.setTimeout(() => {
+      viewTimer = null
+      void rebuildView({ reloadContent: false })
+    }, VIEW_DELAY)
+  }
+
+  /**
+   * 单一驱动入口：**filter 或 search 任一变化都走这里，一次请求同时落地
+   * 渲染段与导航行号**（§3.3）。
+   *
+   * 这是本次改造的核心：旧实现里 `applyFilter` 与 `runFullSearch` 各发一次请求、
+   * 各维护一份状态，两条链路互不知情——筛选态下搜索甚至直接被禁用，
+   * 于是"下一个匹配"永远到不了未加载段里的命中。
+   *
+   * `reloadContent`：只有**筛选条件**变化时才需要重新按段取内容；
+   * 仅关键词变化时段不变、已加载行也不变，重新加载只会造成无谓的跳动与 IO。
+   */
+  async function rebuildView(opts: { reloadContent?: boolean } = {}) {
+    const token = ++viewToken
+    const s = activeSource.value
+    if (!s || s.kind === 'stream') {
+      // 实时流无文件、无索引，全程走本地路径
+      resetView()
+      scanLocalHighlight()
+      return
+    }
+    const kw = search.value.keyword
+    const hasFilter = isFilterActive(filter.value)
+    if (!hasFilter && !kw) {
+      resetView()
+      scanLocalHighlight()
+      return
+    }
+    viewScanning.value = true
+    viewNote.value = ''
+    try {
+      const res = await apiQueryLines({
+        path: s.path,
+        encoding: s.encoding || encoding.value,
+        filter: hasFilter ? filter.value : null,
+        search: kw
+          ? { keyword: kw, mode: search.value.mode, ignoreCase: search.value.ignoreCase }
+          : null,
+        maxSegments: MAX_SEGMENTS,
+        maxMatches: MAX_MATCH_LINES,
+        taskId: `logs-${token}`,
+      })
+      if (token !== viewToken) return // 已有更新的请求，丢弃本次结果
+      view.value = res
+      viewActive.value = true
+      unindexedLines.value = res.unindexed_lines
+      if (res.matches_truncated) {
+        viewNote.value = `命中过多，仅保留前 ${res.lines.length} 条导航`
+      } else if (res.unindexed_lines > 0) {
+        viewNote.value = `文件过大，末尾 ${res.unindexed_lines} 行未参与筛选`
+      }
+      if (hasFilter) {
+        segments.value = res.segments
+        filterMatched.value = res.filter_matched
+        filterTruncated.value = res.truncated
+        if (opts.reloadContent !== false) {
+          segIndex.value = 0
+          segPos.value = 0
+          resetFiltered()
+          await loadMoreFiltered(CHUNK_SIZE, true)
+        }
+      } else {
+        resetFiltered()
+      }
+      // 内容变了要重扫高亮；仅关键词变化时也要扫（displayLines 未变但 result 需刷新）
+      scanLocalHighlight()
+    } catch (e) {
+      if (token !== viewToken) return
+      // 典型：正则语法连备用引擎都不支持 → 降级为"仅已加载"，并给出可见原因
+      view.value = null
+      viewActive.value = false
+      const msg = (e as Error)?.message
+      viewNote.value = msg ? `查询失败：${msg}` : '查询失败，仅搜索已加载部分'
+      console.warn('[logs] 合并查询失败，降级为本地扫描:', e)
+    } finally {
+      if (token === viewToken) viewScanning.value = false
+    }
+  }
+
+  /** 关键词变化：先本地扫描保证高亮即时生效，再防抖补全"命中全集" */
+  function runSearch() {
+    scanLocalHighlight()
+    if (!search.value.keyword) {
+      resetView()
+      return
+    }
+    scheduleRebuild()
+  }
+
+  /** 等待正在进行的筛选加载结束（导航撞上滚动补载时，直接放弃就是"点了没反应"） */
+  async function waitFilterIdle(timeoutMs = 3000) {
+    const t0 = Date.now()
+    while (filterLoading.value && Date.now() - t0 < timeoutMs) {
+      await new Promise(r => setTimeout(r, 20))
+    }
+  }
+
+  /** 跳转结果：`ok` = 已就位，其余都是**必须提示给用户**的失败原因 */
+  type EnsureResult = 'ok' | 'not-in-filter' | 'truncated' | 'passed' | 'failed'
+
+  const ENSURE_HINT: Record<EnsureResult, string> = {
+    ok: '',
+    'not-in-filter': '该行不在当前筛选结果中',
+    truncated: '筛选结果过多已被截断，无法定位到该行',
+    passed: '该行所在区段已跳过，请重新应用筛选',
+    failed: '定位该行失败，请稍后重试',
+  }
+
+  /**
+   * 筛选态：把筛选结果加载到**包含 lineNo** 为止。
+   *
+   * 与全量态的根本差别是行号不连续——不能按行号续读，只能按段推进；
+   * 且段一旦越过就无法回头（`filteredLines` 只向前增长），所以必须先做段级定位。
+   */
+  async function ensureFilteredLineLoaded(lineNo: number): Promise<EnsureResult> {
+    if (positionOfLine(lineNo) >= 0) return 'ok'
+    const seg = segmentIndexOfLine(segments.value, lineNo)
+    if (seg < 0) {
+      // 段被 maxSegments 截断时，靠后的命中可能根本不在段列表里——这**不等于**没命中
+      return filterTruncated.value ? 'truncated' : 'not-in-filter'
+    }
+    if (seg < segIndex.value) {
+      // 该段已经读过却不含这一行，属状态不一致；不猜，直接暴露出来
+      return 'passed'
+    }
+    await waitFilterIdle()
+    await loadMoreFiltered(CHUNK_SIZE, false, lineNo)
+    return positionOfLine(lineNo) >= 0 ? 'ok' : 'failed'
+  }
+
+  /**
+   * 确保目标行已加载，返回"是否可用于跳转"。
+   *
+   * - 全量态：从当前末尾续读（lines 始终从第 1 行连续，行号 → 下标仍是 lineNo - 1），
+   *   补载用更大的块，避免跳到文件尾部时发几十次请求。
+   * - 筛选态：按段推进到目标行所在的段（见 `ensureFilteredLineLoaded`）。
+   *
+   * 失败时写入 `jumpHint`：原先只是静默 `return`，用户看到的就是"点了没反应"，
+   * 无法区分"没有命中"与"功能坏了"。
+   */
+  async function ensureLineLoaded(lineNo: number): Promise<boolean> {
+    jumpHint.value = ''
+    const s = activeSource.value
+    if (!s || lineNo <= 0) return false
+
+    if (filterActive.value) {
+      const r = await ensureFilteredLineLoaded(lineNo)
+      if (r !== 'ok') jumpHint.value = ENSURE_HINT[r]
+      return r === 'ok'
+    }
+
+    const base = baseLineNo.value
+    const endLine = base + lines.value.length - 1
+    if (lineNo >= base && lineNo <= endLine) return true
+    if (loadingMore.value) {
+      jumpHint.value = '正在加载，请稍后重试'
+      return false
+    }
+    loadingMore.value = true
+    try {
+      // 目标在窗口之前，或远在窗口之后（距离超过窗口容量）→ 直接搬窗口。
+      // 逐块续读会为了一个目标行把整段都加载进来，反而破坏窗口。
+      if (lineNo < base || lineNo - endLine > WINDOW_MAX_LINES) {
+        const start = Math.max(1, lineNo - Math.floor(CHUNK_SIZE / 2))
+        await loadWindowAt(start, Math.min(WINDOW_MAX_LINES, JUMP_CHUNK_SIZE))
+      } else {
+        while (baseLineNo.value + lines.value.length - 1 < lineNo) {
+          const startLine = baseLineNo.value + lines.value.length
+          const want = Math.min(JUMP_CHUNK_SIZE, lineNo - startLine + 1)
+          const data = await readChunk(s.path, startLine, want)
+          if (!data || !data.content) break
+          const parsed = parseLines(data.content, data.first_line_number)
+          if (!parsed.length) break
+          const before = lines.value.length
+          appendLines(parsed)
+          s.loadedLines = baseLineNo.value + lines.value.length - 1
+          if (data.total_lines) s.totalLines = data.total_lines
+          scanIncremental(before)
+        }
+      }
+      snapshotBuffer(activeSourceId.value)
+    } catch (e) {
+      console.error('[logs] 补载目标行失败:', e)
+      jumpHint.value = '加载目标行失败'
+    } finally {
+      loadingMore.value = false
+    }
+    return positionOfLine(lineNo) >= 0
+  }
+
+  /**
+   * 反向定位：在**完整日志**中定位该行（退出筛选态后跳到同一原始行号）。
+   *
+   * 行号恒为原始文件行号，所以反向定位不需要任何"反查映射"——
+   * 退出筛选后按同一个行号走全量态补载即可。这是 §1 不变量带来的直接好处。
+   */
+  async function revealInFullLog(lineNo: number): Promise<boolean> {
+    if (lineNo <= 0) return false
+    if (filterActive.value) {
+      // 退出筛选：displayLines 随即切回全量 lines，行号恢复连续
+      clearFilter()
+    }
+    const ok = await ensureLineLoaded(lineNo)
+    if (ok) currentLine.value = lineNo
+    return ok
+  }
+
   function setSearch(patch: Partial<SearchOptions>) {
     search.value = { ...search.value, ...patch }
     void runSearch()
   }
 
-  /** 跳转到下一个/上一个命中，返回目标行号（无命中返回 null） */
-  function gotoNext(): number | null {
-    const hits = result.value.hits
-    if (!hits.length) return null
-    let i = currentHitIndex.value
-    if (i < 0) i = findHitAfter(hits, currentLine.value - 1)
-    else i = i + 1
-    if (i < 0 || i >= hits.length) i = 0 // 循环回到首个
-    currentHitIndex.value = i
-    currentRangeIndex.value = 0
-    currentLine.value = hits[i].lineIndex
-    return hits[i].lineIndex
+  /**
+   * 校准"当前命中下标"。
+   *
+   * 补载新行后 `navLines` 会增长（新命中可能插在当前位置之前），上次记住的下标就会
+   * 指向另一条命中，直接 ±1 会跳错。因此每次导航前先按**行号**把下标校准回去
+   * ——行号是不变量，下标不是。
+   */
+  function calibratedHitIndex(nav: number[]): number {
+    const i = currentHitIndex.value
+    if (i >= 0 && i < nav.length && nav[i] === currentLine.value) return i
+    if (currentLine.value > 0) return indexOfSorted(nav, currentLine.value)
+    return -1
   }
 
-  function gotoPrev(): number | null {
-    const hits = result.value.hits
-    if (!hits.length) return null
-    let i = currentHitIndex.value
-    if (i < 0) i = findHitBefore(hits, currentLine.value + 1)
-    else i = i - 1
-    if (i < 0) i = hits.length - 1 // 循环到末尾
+  /** 跳转到下一个/上一个命中，返回目标行号（无命中返回 null） */
+  function gotoNext(): number | null {
+    const nav = navLines.value
+    if (!nav.length) return null
+    let i = calibratedHitIndex(nav)
+    if (i < 0) i = firstIndexAfter(nav, currentLine.value)
+    else i = i + 1
+    if (i < 0 || i >= nav.length) i = 0 // 循环回到首个
     currentHitIndex.value = i
     currentRangeIndex.value = 0
-    currentLine.value = hits[i].lineIndex
-    return hits[i].lineIndex
+    currentLine.value = nav[i]
+    return nav[i]
+  }
+
+  /** 跳转到上一个命中，返回目标行号（无命中返回 null） */
+  function gotoPrev(): number | null {
+    const nav = navLines.value
+    if (!nav.length) return null
+    let i = calibratedHitIndex(nav)
+    if (i < 0) i = lastIndexBefore(nav, currentLine.value)
+    else i = i - 1
+    if (i < 0) i = nav.length - 1 // 循环到末尾
+    currentHitIndex.value = i
+    currentRangeIndex.value = 0
+    currentLine.value = nav[i]
+    return nav[i]
   }
 
   /** 跳转到第 n 个命中（n 为 1-based，来自输入框） */
   function gotoMatch(n: number): number | null {
-    const hits = result.value.hits
-    if (!hits.length) return null
-    const idx = clampHitIndex(hits, Math.max(0, Math.round(n) - 1))
-    if (idx < 0) return null
+    const nav = navLines.value
+    if (!nav.length) return null
+    const idx = Math.min(Math.max(Math.round(n) - 1, 0), nav.length - 1)
     currentHitIndex.value = idx
     currentRangeIndex.value = 0
-    currentLine.value = hits[idx].lineIndex
-    return hits[idx].lineIndex
+    currentLine.value = nav[idx]
+    return nav[idx]
   }
 
   /** 当前命中序号（1-based，用于导航显示） */
@@ -1217,6 +1697,7 @@ export const useLogStore = defineStore('logs', () => {
     sources,
     activeSourceId,
     lines,
+    baseLineNo,
     loading,
     loadingMore,
     errorMsg,
@@ -1228,6 +1709,11 @@ export const useLogStore = defineStore('logs', () => {
     currentHitIndex,
     currentRangeIndex,
     currentLine,
+    viewScanning,
+    viewActive,
+    viewNote,
+    unindexedLines,
+    jumpHint,
     filter,
     indexMeta,
     indexLoading,
@@ -1244,14 +1730,17 @@ export const useLogStore = defineStore('logs', () => {
     isSourceLoading,
     // computed
     activeSource,
-    hasMore,
     loadedCount,
+    logicalTotal,
     currentHit,
     currentMatchNo,
     filterActive,
     displayLines,
+    navLines,
+    navTotal,
     // actions
     init,
+    rebuildView,
     openLocalFile,
     openLocalFileOrFocus,
     openRemoteFile,
@@ -1259,7 +1748,6 @@ export const useLogStore = defineStore('logs', () => {
     setScroll,
     getScroll,
     openStreamSource,
-    loadMore,
     setActiveSource,
     closeSource,
     closeOthers,
@@ -1276,11 +1764,17 @@ export const useLogStore = defineStore('logs', () => {
     loadMoreFiltered,
     exportLogs,
     positionOfLine,
+    lineNoAt,
+    indexOfLineNo,
+    linesForRange,
+    ensureRangeLoaded,
     runSearch,
     setSearch,
     gotoNext,
     gotoPrev,
     gotoMatch,
+    ensureLineLoaded,
+    revealInFullLog,
     addRule,
     updateRule,
     removeRule,

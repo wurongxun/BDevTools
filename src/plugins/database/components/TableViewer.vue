@@ -1,9 +1,9 @@
 <template>
   <div class="table-viewer">
     <el-tabs v-model="activeTab" class="viewer-tabs">
-      <!-- 数据 Tab（默认） -->
+      <!-- 数据 Tab（默认）：传表名，由 QueryResultView 自行构造 SELECT（表数据浏览） -->
       <el-tab-pane name="data" label="数据">
-        <TableDataView :config-id="configId" :database="database" :table="table" />
+        <QueryResultView :config-id="configId" :database="database" :table="table" />
       </el-tab-pane>
 
       <!-- 属性 Tab：表元数据 + 字段 + DDL -->
@@ -79,14 +79,14 @@
 import { ref, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MoreFilled } from '@element-plus/icons-vue'
-import TableDataView from './TableDataView.vue'
+import QueryResultView from './QueryResultView.vue'
 import { useConnectionStore } from '../store'
 import { dbTableColumns, dbTableSchema, dbListTables } from '../api/metadata'
 import type { ColumnInfo, TableInfo } from '../types'
 
 /**
  * 表查看器：双击表名时打开的综合视图
- * - 数据 Tab（默认）：表格 + 底部查询/分页（TableDataView）
+ * - 数据 Tab（默认）：用 SELECT 语句驱动 QueryResultView（表数据浏览）
  * - 属性 Tab：表元数据 + 字段 + DDL
  * - 预留 Tab：扩展位（图表/ER 图等）
  */

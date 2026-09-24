@@ -6,6 +6,8 @@ import { ref, computed } from 'vue'
 import type { EditorTab, SqlResult } from '../types'
 
 let tabCounter = 0
+/** 「新建查询」强制新建的递增序号，用于标题后缀（新查询 1 / 新查询 2 …） */
+let newQuerySeq = 0
 
 /** 脚本 tab 单条执行结果项（含执行语句 + 结果） */
 export interface ScriptResultEntry {
@@ -38,12 +40,19 @@ export const useEditorStore = defineStore('dbEditor', () => {
     return arr[idx] ?? arr[0]
   })
 
-  /** 打开新 Tab */
-  function openTab(tab: Partial<EditorTab>) {
+  /** 打开新 Tab
+   * @param tab.forceNew 为 true 时跳过去重，始终新建（用于「新建查询」每次点击都开新 tab）
+   */
+  function openTab(tab: Partial<EditorTab> & { forceNew?: boolean }) {
     const id = tab.id || `tab_${++tabCounter}`
+    // 强制新建的「新查询」tab：追加递增后缀，避免多个同名 tab 分不清
+    const baseTitle = tab.title || '新查询'
+    const finalTitle = tab.forceNew && baseTitle === '新查询'
+      ? `${baseTitle} ${++newQuerySeq}`
+      : baseTitle
     const newTab: EditorTab = {
       id,
-      title: tab.title || '新查询',
+      title: finalTitle,
       type: tab.type || 'sql',
       configId: tab.configId,
       database: tab.database,
@@ -51,9 +60,13 @@ export const useEditorStore = defineStore('dbEditor', () => {
       content: tab.content || '',
       dirty: false,
       filePath: tab.filePath,
+      // 对象列表 / 系统信息 tab 的细分类型（object-list 按 objectType 区分视图/索引/…，
+      // system-info 按 subType 区分会话状态/全局变量…）
+      objectType: tab.objectType,
+      subType: tab.subType,
     }
-    // 检查是否已存在相同的 Tab：sql 文件按路径去重，其余按类型+连接+库+表去重
-    const existing = tabs.value.find(t => {
+    // 检查是否已存在相同的 Tab：sql 文件按路径去重，其余按类型+连接+库+表+细分类型去重
+    const existing = tab.forceNew ? undefined : tabs.value.find(t => {
       if (t.type === 'sql' && t.filePath) {
         return newTab.type === 'sql' && t.filePath === newTab.filePath
       }
@@ -61,7 +74,9 @@ export const useEditorStore = defineStore('dbEditor', () => {
         t.type === newTab.type &&
         t.configId === newTab.configId &&
         t.database === newTab.database &&
-        t.table === newTab.table
+        t.table === newTab.table &&
+        t.objectType === newTab.objectType &&
+        t.subType === newTab.subType
       )
     })
     if (existing) {

@@ -197,13 +197,36 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     return null
   }
 
+  /**
+   * 把用户为**本窗口**选定的工作区记到本窗口所属的窗口预设上。
+   *
+   * 这是「预设未绑定工作区 → 打开时弹窗选择」那条路的收尾：不写回的话，用户的选择只存在于
+   * 当前窗口的内存里，关掉再开同一个预设又要重选一次（见 `rememberCurrentWindowWorkspace`）。
+   *
+   * 动态 import：预设 store 依赖 pinia（`useStore`），静态 import 会形成
+   * store ↔ 预设 store 的模块循环依赖（与本文件里 session / documents 的写法同理）。
+   * 最坏结果是「下次还得选一次」，所以整段失败只告警，绝不影响切换本身。
+   */
+  async function rememberWindowWorkspaceBinding(workspaceId: string) {
+    if (!workspaceId) return
+    // 临时工作区关窗即删：写进预设会留下悬空绑定（设置页卡片会显示「(工作区已删除)」）
+    if (isTemporary(currentWorkspace.value)) return
+    try {
+      const { rememberCurrentWindowWorkspace } = await import('@/views/app/setting/useWindowPresetsStore')
+      await rememberCurrentWindowWorkspace(workspaceId)
+    } catch (e) {
+      console.warn('[workspace] 记住窗口预设的工作区绑定失败:', e)
+    }
+  }
+
   /** 切换工作区（带锁保护 + 文档迁移 + 会话恢复）
    * 流程：锁定目标 → 保存并关闭当前工作区打开的文件 → 切到新工作区并加载其文件树
    *       → 恢复新工作区上次打开的文件
    * @returns { success: boolean, error?: string }  */
   async function switchWorkspace(id: string): Promise<{ success: boolean; error?: string }> {
-    // 如果已经是当前工作区，无需切换
+    // 如果已经是当前工作区，无需切换（但「选择」这个动作本身仍要记住绑定）
     if (currentWorkspace.value?.id === id) {
+      await rememberWindowWorkspaceBinding(id)
       return { success: true }
     }
 
@@ -260,6 +283,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       // 清除该工作区的恢复幂等标记（同一窗口内可能切换回来，需要允许再次恢复）
       sessionStore.resetRestored(id)
       await sessionStore.tryRestoreSession(id)
+
+      // 记住到本窗口所属的窗口预设：同一预设下次打开直接进这个工作区，不再弹选择框
+      await rememberWindowWorkspaceBinding(id)
     }
 
     return { success: true }

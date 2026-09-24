@@ -109,7 +109,9 @@ import { Search, ArrowUp, ArrowDown, Close, ArrowLeft, ArrowRight, DArrowLeft, D
 import NotificationUtil from '@/utils/NotificationUtil'
 import { load, Store } from '@/core/runtime'
 import useStore from '@/store'
+import { useDocumentManagerStore } from '../../store/documents'
 const {appConfig } = useStore();
+const docStore = useDocumentManagerStore()
 /**
  * 虚拟滚动与分块加载核心配置
  * - CHUNK_SIZE:    每次从后端加载的行数，控制单次 IO 与内存占用
@@ -129,6 +131,11 @@ const VIRTUAL_BUFFER = 15
 
 const props = defineProps<{
   path: string
+}>()
+
+const emit = defineEmits<{
+  /** 视图状态上报（滚动位置）：由 FileEditor 收口写进 docStore.viewState —— 切 tab / 切插件 / 重启都能恢复 */
+  'update-state': [state: Record<string, unknown>]
 }>()
 
 let store: Store | undefined = undefined
@@ -158,6 +165,8 @@ const searchInputRef = ref()
 
 /** 加载与生命周期标志：KeepAlive 停用标记、首次加载标记、块加载互斥锁 */
 let isDeactivated = false
+/** 是否经历过 deactivate：用于区分「首次挂载后的 onActivated」与「切回来的 onActivated」 */
+let hasDeactivated = false
 let isLoaded = false
 let chunkLoading = false
 const isLoadingChunk = ref(false)
@@ -206,6 +215,8 @@ let scrollTimer: ReturnType<typeof setTimeout> | null = null
 const scrollTopValue = ref(0)
 const containerHeight = ref(0)
 let scrollGuard = false
+/** 观察滚动容器尺寸：虚拟窗口的可见行数依赖它 */
+let ro: ResizeObserver | null = null
 
 /** 加载动画遮罩状态 */
 const showOverlay = ref(false)
@@ -332,7 +343,6 @@ interface FileState {
   totalLines: number
   keyword: string
   searchId: string
-  scrollTop: number
   startLine: number
   endLine: number
 }
@@ -354,7 +364,6 @@ function saveCurrentState() {
     totalLines: totalLines.value,
     keyword: keyword.value,
     searchId: searchId.value,
-    scrollTop: viewerRef.value?.scrollTop || 0,
     startLine: currentStartLine.value,
     endLine: currentEndLine.value
   }
@@ -383,11 +392,8 @@ function restoreState(filePath: string): boolean {
   currentStartLine.value = state.startLine
   currentEndLine.value = state.endLine
   isLoaded = true
-  nextTick(() => {
-    if (viewerRef.value) {
-      viewerRef.value.scrollTop = state.scrollTop
-    }
-  })
+  // 滚动位置不在这里恢复：统一走 applyScrollTop —— 它还要同步虚拟窗口基准值，
+  // 只设 DOM 会出现「渲染窗口在下方、视口在顶部」的空白（见 restoreView 注释）
   return true
 }
 
@@ -452,7 +458,7 @@ async function loadChunk(filePath: string, startLine: number) {
   return false
 }
 
-async function loadFirstChunk(filePath: string) {
+async function loadFirstChunk(filePath: string): Promise<boolean> {
   showOverlay.value = true
   overlayText.value = '加载中...'
   const ok = await loadChunk(filePath, 1)
@@ -464,9 +470,115 @@ async function loadFirstChunk(filePath: string) {
     totalMatches.value = 0
     prefetchAdjacent(filePath, 1)
   }
+  return !!ok
 }
 
 
+
+// ==================== 滚动位置的真源与恢复 ====================
+//
+// 为什么不能在 onDeactivated 里读 DOM 的 scrollTop（原实现就是这么写的）：
+// 本组件被两层 KeepAlive 包裹（插件级 AppEditorMain、文档级 FileEditor）。切走时 Vue 把
+// 组件根元素 move 到**脱离文档**的 storageContainer，实测此刻 el.scrollTop 立刻变 0
+// （clientHeight / scrollHeight 也一起变 0），移回文档后**不会**自动恢复。
+// 于是「切走再切回」读 DOM 只能拿到 0 —— 表现就是「默认回到顶部」。
+// 对照：display:none（v-show）是可逆的，恢复显示后 scrollTop 会回到原值；detach 不可逆。
+//
+// 结论：位置必须在**用户滚动过程中**就记进 JS（scrollTopValue，onVirtualScroll 里维护），
+// detach 之后只用这个值，并统一写进 docStore.viewState.scrollTop —— 与 CodeEditor 同一套管道，
+// 切 tab / 切插件 / 重启应用三种场景一次解决（会话快照里的 scroll_top 就是它）。
+
+/** 恢复位置期间置位：此刻 DOM 的值可能是被截断的 0，不能让它回写 scrollTopValue */
+let restoringScroll = false
+
+/** 读文档在 store 里记录的滚动位置（会话快照恢复的也是它） */
+function storedScrollTop(filePath: string): number {
+  const v = docStore.documents.get(filePath)?.viewState.scrollTop
+  return typeof v === 'number' && v > 0 ? v : 0
+}
+
+/** 上报滚动位置（去抖）：写进 docStore.viewState，供切 tab / 切插件 / 重启恢复 */
+let reportTimer: ReturnType<typeof setTimeout> | null = null
+function reportScrollTop() {
+  if (!props.path) return
+  // 必须带上自己的 path：FileEditor 若用 activeDocumentPath 收口，切 tab 时会把位置写到新文档上（串号）
+  emit('update-state', { path: props.path, scrollTop: scrollTopValue.value })
+}
+function scheduleScrollReport() {
+  if (reportTimer) clearTimeout(reportTimer)
+  reportTimer = setTimeout(() => {
+    reportTimer = null
+    reportScrollTop()
+  }, 250)
+}
+
+/**
+ * 把滚动位置应用到真实滚动条，并保持与虚拟窗口基准值同步。
+ *
+ * 顺序很重要：**先同步 scrollTopValue（它决定渲染哪一段行），再落 DOM**。
+ * 只落 DOM、不同步 ref 正是「切回空白」的成因 —— ref 还停在切走前的位置，
+ * 渲染窗口在下方、视口在顶部，顶部一片空白，滚一下才重新算对。
+ */
+function applyScrollTop(target: number) {
+  if (target <= 0) return
+  scrollTopValue.value = target
+  restoringScroll = true
+  const put = (attempt: number) => {
+    const el = viewerRef.value
+    if (!el) {
+      restoringScroll = false
+      return
+    }
+    el.scrollTop = target
+    // 元素刚插回文档时 scrollHeight 可能还没算出来，赋值会被截断 → 下一帧补一次
+    if (Math.abs(el.scrollTop - target) <= 1 || attempt >= 2) {
+      scrollTopValue.value = el.scrollTop
+      restoringScroll = false
+      return
+    }
+    requestAnimationFrame(() => put(attempt + 1))
+  }
+  void nextTick(() => put(0))
+}
+
+/**
+ * 恢复该文档的内容与滚动位置（onMounted / onActivated / path 变化统一走这里）。
+ *
+ * 内容来源三档：
+ * 1. 组件内 savedState 命中（KeepAlive 保住了实例）→ 内容与当前块都在内存里，直接落滚动条；
+ * 2. 未命中但有 store 记录的位置 → **按位置反算目标块**再加载。不能只加载第 1 块了事：
+ *    第 1 块只含前 CHUNK_SIZE 行，深位置会被浏览器截断到内容高度内，等于没恢复；
+ * 3. 都没有 → 正常加载第 1 块。
+ */
+async function restoreView(filePath: string) {
+  const target = storedScrollTop(filePath)
+  if (restoreState(filePath) || isLoaded) {
+    applyScrollTop(target)
+    return
+  }
+
+  const chunk = Math.max(1, Number(CHUNK_SIZE.value) || 1)
+  if (target > 0) {
+    // 位置对应的文件行号 → 它所在的块首行
+    const targetLine = Math.floor(target / LINE_HEIGHT) + 1
+    const startLine = Math.floor((targetLine - 1) / chunk) * chunk + 1
+    const ok = startLine === 1
+      ? await loadFirstChunk(filePath)
+      : await loadChunk(filePath, startLine)
+    if (ok) {
+      // 抑制「触底加载下一块」：位置恰在块底部时会被误判成用户滚到底，加载新块后
+      // scrollTop 会被重置到 0（分块设计如此），位置就又丢了
+      scrollGuard = true
+      applyScrollTop(startLine === 1 ? target : target - (startLine - 1) * LINE_HEIGHT)
+      setTimeout(() => {
+        scrollGuard = false
+      }, 400)
+    }
+    return
+  }
+
+  await loadFirstChunk(filePath)
+}
 
 async function loadNextChunk() {
   if (!props.path || chunkLoading) return
@@ -621,8 +733,10 @@ function onVirtualScroll() {
   if (!viewerRef.value) return
 
   const el = viewerRef.value
-  scrollTopValue.value = el.scrollTop
+  // 恢复位置期间不回写：此刻 DOM 的值可能是被截断的 0，回写会让虚拟窗口跳回顶部又变空白
+  if (!restoringScroll) scrollTopValue.value = el.scrollTop
   containerHeight.value = el.clientHeight
+  scheduleScrollReport()
 
   if (chunkLoading || isSearching.value || scrollGuard) return
 
@@ -667,15 +781,21 @@ async function doSearch() {
   showOverlay.value = true
   overlayText.value = '搜索中...'
   try {
-    const res: any = await invoke('search_log_index', {
+    // 迁移到统一的 log_query_lines（§2.7）：无筛选 + 关键词，恒忽略大小写（与旧口径一致）
+    const res: any = await invoke('logs_query_lines', {
       filePath: props.path,
+      encoding: currentEncoding.value,
       keyword: keyword.value,
-      encoding: currentEncoding.value
+      mode: 'text',
+      ignoreCase: true,
+      maxMatches: 200000
     })
     if (res && res.code === 200) {
-      searchId.value = res.data.search_id
-      totalMatches.value = res.data.total_matches
-      matchLineNumbers.value = res.data.match_line_numbers || []
+      totalMatches.value = res.data.matched
+      matchLineNumbers.value = res.data.lines || []
+      if (res.data.matches_truncated) {
+        NotificationUtil.warn(`匹配过多，仅保留前 ${matchLineNumbers.value.length} 条可跳转`)
+      }
       if (totalMatches.value > 0) {
         currentMatch.value = 1
         await loadPreview(1)
@@ -722,35 +842,46 @@ function navigateInBlock(targetLine: number, matchIndex: number) {
 }
 
 async function loadPreview(index: number) {
-  if (matchLineNumbers.value.length > 0 && index >= 1 && index <= matchLineNumbers.value.length) {
-    const targetLine = matchLineNumbers.value[index - 1]
-    if (targetLine >= currentStartLine.value && targetLine <= currentEndLine.value) {
-      navigateInBlock(targetLine, index)
-      return
-    }
+  if (matchLineNumbers.value.length === 0 || index < 1 || index > matchLineNumbers.value.length) return
+  const targetLine = matchLineNumbers.value[index - 1]
+  if (targetLine >= currentStartLine.value && targetLine <= currentEndLine.value) {
+    navigateInBlock(targetLine, index)
+    return
   }
   showOverlay.value = true
   overlayText.value = '搜索中...'
-  console.log('[loadPreview]', index, searchId.value)
-  console.log('[loadPreview]', searchId.value)
   try {
-    const res: any = await invoke('search_log_preview', {
-      searchId: searchId.value,
-      targetIndex: Number(index),
-      contextLines: Number(CHUNK_SIZE.value),
+    // 迁移后不再有 search_log_preview：按行号直接读一段（L2 已把取段改成 O(1) 定位），
+    // 高亮改由前端本地计算（与 navigateInBlock 同一口径：小写包含匹配）
+    const startLine = Math.max(1, targetLine - CHUNK_SIZE.value)
+    const res: any = await invoke('read_file_lines', {
+      filePath: props.path,
+      startLine,
+      lineCount: Number(CHUNK_SIZE.value) * 2 + 1,
       encoding: currentEncoding.value
     })
     if (res && res.code === 200) {
       const data = res.data
-      lines.value = data.content.split('\n')
+      const newLines: string[] = data.content.split('\n')
+      lines.value = newLines
       firstLineNumber.value = data.first_line_number
-      highlightSet.value = new Set(data.highlight_lines)
-      targetLineNumber.value = data.target_line_number
-      currentMatch.value = data.current_match_index
-      jumpTo.value = data.current_match_index
-      currentStartLine.value = data.first_line_number
-      currentEndLine.value = data.first_line_number + lines.value.length - 1
-      jumpBlockInput.value = String(Math.ceil(data.first_line_number / CHUNK_SIZE.value))
+      if (data.total_lines > 0) {
+        totalLines.value = data.total_lines
+      }
+      currentStartLine.value = startLine
+      currentEndLine.value = startLine + newLines.length - 1
+      const kw = keyword.value.toLowerCase()
+      const newHighlight = new Set<number>()
+      for (let i = 0; i < newLines.length; i++) {
+        if (newLines[i].toLowerCase().includes(kw)) {
+          newHighlight.add(startLine + i)
+        }
+      }
+      highlightSet.value = newHighlight
+      targetLineNumber.value = targetLine
+      currentMatch.value = index
+      jumpTo.value = index
+      jumpBlockInput.value = String(Math.ceil(startLine / CHUNK_SIZE.value))
 
       await nextTick()
       scrollToLineNumber(targetLineNumber.value)
@@ -800,9 +931,8 @@ watch(
     if (!newPath) return
     clearChunkCache()
     currentEncoding.value = 'UTF-8'
-    if (!restoreState(newPath)) {
-      await loadFirstChunk(newPath)
-    }
+    isLoaded = false
+    await restoreView(newPath)
     countTotalLinesAsync(newPath)
     detectFileEncoding(newPath)
   }
@@ -854,12 +984,19 @@ onMounted(async () => {
     defaults: {}
   })
   if (props.path) {
-    await loadFirstChunk(props.path)
+    await restoreView(props.path)
     countTotalLinesAsync(props.path)
     detectFileEncoding(props.path)
   }
-  if (viewerRef.value) {
-    containerHeight.value = viewerRef.value.clientHeight
+  const el = viewerRef.value
+  if (el) {
+    containerHeight.value = el.clientHeight
+    // 面板尺寸变化（侧栏拖拽 / 沉浸式切换 / 窗口缩放）后必须重算可见行数，
+    // 否则虚拟窗口仍按旧高度渲染，可视区底部会出现未渲染的空白带
+    ro = new ResizeObserver(entries => {
+      for (const entry of entries) containerHeight.value = entry.contentRect.height
+    })
+    ro.observe(el)
   }
   addKeydownListener()
   window.addEventListener('encoding-change', onGlobalEncodingChange);
@@ -868,10 +1005,10 @@ onMounted(async () => {
 
 onActivated(() => {
   isDeactivated = false
-  if (props.path && !restoreState(props.path)) {
-    if (!isLoaded) {
-      loadFirstChunk(props.path)
-    }
+  // 只有「真正被切走过」才恢复：首次挂载后 Vue 也会调一次 onActivated，那次归 onMounted 管
+  if (hasDeactivated && props.path) {
+    // 切回时 DOM 已被移回文档（clientHeight/scrollHeight 恢复），但 scrollTop 是 0 —— 必须主动落回去
+    void restoreView(props.path)
   }
   if (viewerRef.value) {
     containerHeight.value = viewerRef.value.clientHeight
@@ -881,6 +1018,7 @@ onActivated(() => {
 
 onDeactivated(() => {
   isDeactivated = true
+  hasDeactivated = true
   if (scrollTimer) {
     clearTimeout(scrollTimer)
     scrollTimer = null
@@ -888,11 +1026,27 @@ onDeactivated(() => {
   showSearchBar.value = false
   isSearching.value = false
   saveCurrentState()
+  // 位置必须用组件内记录值：此刻 DOM 已被 KeepAlive 移出文档，读 el.scrollTop 只会得到 0
+  if (reportTimer) {
+    clearTimeout(reportTimer)
+    reportTimer = null
+  }
+  reportScrollTop()
   removeKeydownListener()
 })
 
 onBeforeUnmount(() => {
   removeKeydownListener()
+  // KeepAlive 淘汰（:max=8）走的是 unmount 而非 deactivate，这里再兜底上报一次
+  if (reportTimer) {
+    clearTimeout(reportTimer)
+    reportTimer = null
+  }
+  reportScrollTop()
+  if (ro) {
+    ro.disconnect()
+    ro = null
+  }
   savedState.clear()
   clearChunkCache()
   window.removeEventListener('encoding-change', onGlobalEncodingChange)

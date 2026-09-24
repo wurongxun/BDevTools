@@ -140,7 +140,9 @@ import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
 import { useDocumentManagerStore } from '@/plugins/files/store/documents'
 import { open, subscribe } from '@/core/runtime'
+import { WINDOW_PRESETS_CHANGED_EVENT } from '@/core/windowPresets'
 import { openAppWindow, createEditorWindow, createPresetWindow } from '@/utils/WindowUtils'
+import { pluginManager } from '@/core/pluginManager'
 import type { WindowPresetConfig } from '@/utils/WindowUtils'
 import type { WindowMeta } from '@/Types/workspace'
 import type { WorkspaceConfig } from '@/Types/workspace'
@@ -252,13 +254,6 @@ const menus = computed<Menu[]>(() => {
     {
       label: '窗口(W)',
       items: windowItems
-    },
-    {
-      label: '帮助(H)',
-      items: [
-        { label: '帮助', command: 'help' },
-        { label: '关于', command: 'about' }
-      ]
     }
   ]
 })
@@ -409,7 +404,8 @@ const handleMenuCommand = async (item: MenuItem) => {
       break
     }
     case 'settings': {
-      openAppWindow('/App/setting')
+      // 设置已剥离为内置插件：切到设置插件（入口固定在活动栏底部），不再新开独立窗口
+      pluginManager.switchTool('settings')
       break
     }
     case 'encodingUtf8':
@@ -474,26 +470,47 @@ async function handleWindowPresetClick(presetId: string) {
   const preset = allWindowPresets.value.find(p => p.id === presetId)
   if (!preset) return
 
+  // 先查一次已打开的窗口（命中就聚焦，省掉一次创建往返）。
+  //
+  // 查不到结果时**必须中止**，不能往下落到创建分支：那两个窗口就会共用同一个预设，而它们的
+  // 插件清单各改各的、还会互相顶掉（后端也有同一判据，见 create_editor_window 的 409 —— 这里
+  // 只是省往返，不是唯一防线）。
+  let windows: WindowMeta[]
   try {
-    // 查询当前已打开的窗口列表
     const res = await invoke<ResponseData<WindowMeta[]>>('get_window_list')
-    if (res.code === 200 && res.data) {
-      // 优先按 preset_id 匹配，后备按窗口标题（即预设名称）匹配
-      const matched = res.data.find(w => w.preset_id === presetId)
-        || res.data.find(w => w.title === preset.name)
-      if (matched) {
-        await invoke('focus_window', { label: matched.label })
-        return
-      }
+    if (res.code !== 200 || !Array.isArray(res.data)) {
+      console.warn('查询窗口列表返回异常:', res.code, res.msg)
+      NotificationUtil.error('读取窗口列表失败，暂时无法打开该预设的窗口')
+      return
     }
+    windows = res.data
   } catch (e) {
     console.warn('查询窗口列表失败:', e)
+    NotificationUtil.error('读取窗口列表失败，暂时无法打开该预设的窗口')
+    return
+  }
+
+  // 优先按 preset_id 匹配，后备按窗口标题（即预设名称）匹配
+  const matched = windows.find(w => w.preset_id === presetId)
+    || windows.find(w => w.title === preset.name)
+  if (matched) {
+    await invoke('focus_window', { label: matched.label })
+    return
   }
 
   // 窗口未打开，根据预设创建新窗口
-  const meta = await createPresetWindow(preset)
-  if (!meta) {
-    NotificationUtil.error('创建窗口失败，请查看控制台日志')
+  const result = await createPresetWindow(preset)
+  if (result.ok) return
+  switch (result.reason) {
+    case 'duplicate':
+      // 后端说这个预设的窗口已经开着（前端这份列表略旧）：已聚焦过去，说明一下而不是静默
+      NotificationUtil.info('该预设的窗口已打开，已切换到该窗口')
+      break
+    case 'workspace-locked':
+      NotificationUtil.warn('该预设绑定的工作区已在其他窗口中打开')
+      break
+    default:
+      NotificationUtil.error('创建窗口失败，请查看控制台日志')
   }
 }
 
@@ -682,8 +699,8 @@ onMounted(async () => {
   if (!workspaceStore.pendingWorkspaceSelection) {
     await workspaceStore.loadCurrentWorkspace(null)
   }
-  // 监听窗口预设变更（设置窗口新增/修改/删除预设后广播），实时刷新窗口菜单
-  unlistenPresetsChanged = await subscribe('window-presets-changed', () => {
+  // 监听窗口预设变更（设置页新增/修改/删除预设后广播），实时刷新窗口菜单
+  unlistenPresetsChanged = await subscribe(WINDOW_PRESETS_CHANGED_EVENT, () => {
     loadWindowPresets()
   })
 })

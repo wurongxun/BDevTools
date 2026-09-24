@@ -100,7 +100,10 @@ const showWorkspaceSelect = ref(false)
 // 必须在 setup 阶段同步置位：父组件 onMounted 晚于子组件，
 // 否则 MenuBar/AppStatusBar 的 onMounted 会先自动分配兜底工作区
 try {
-  if (getCurrentWebviewWindow().label.startsWith('editor-')) {
+  const label = getCurrentWebviewWindow().label
+  // 编辑器窗口与**主窗口**都支持「未绑定工作区 → 打开时选择」：必须在子组件挂载前
+  // 置位 pending，否则 MenuBar / AppStatusBar 的 onMounted 会抢先自动分配兜底工作区。
+  if (label.startsWith('editor-') || label === 'main') {
     useWorkspaceStore.pendingWorkspaceSelection = true
   }
 } catch { /* 非 Tauri 环境忽略 */ }
@@ -159,8 +162,7 @@ const appPageTitle = ref('')
 const pageComponentMap: Record<string, { title: string; loader: () => Promise<any> }> = {
   'App-setting': { title: '设置', loader: () => import('@/views/app/AppSetting.vue') },
   'App-about': { title: '关于', loader: () => import('@/views/app/AppAbout.vue') },
-  'App-help': { title: '帮助', loader: () => import('@/views/app/AppHelp.vue') },
-  'App-terminal': { title: '终端', loader: () => import('@/views/app/AppTerminal.vue') }
+  'App-help': { title: '帮助', loader: () => import('@/views/app/AppHelp.vue') }
 }
 
 /**
@@ -366,7 +368,20 @@ function setupCloseHandler() {
         console.warn('关闭前保存失败:', e)
       }
 
-      // 保存完成，真正关闭窗口
+      // 保存完成，真正关闭窗口。
+      //
+      // 主窗口例外：它的「关闭」＝**隐藏到托盘**（close-to-tray），之后靠托盘图标 / 菜单
+      // 「显示窗口」唤回（Rust 侧同样拦截它的 CloseRequested，见
+      // `window_manager::main_window::should_hide_instead_of_close`）。
+      // 这里必须走 hide() 而不是 destroy()：destroy() **绕过** CloseRequested，会真把主窗口
+      // 销毁掉，只剩「托盘重建」这条兜底路径可走。
+      if (windowRole.value === 'main') {
+        await win.hide()
+        // 复位拦截标志：下次再点关闭仍要走「保存会话 → 隐藏」这一整套
+        isClosing.value = false
+        return
+      }
+
       await win.destroy()
     })
   } catch (_) { /* 忽略 */ }
@@ -401,8 +416,33 @@ async function initApp() {
   // 不参与启动恢复（详见 docStore.restoreOpenFiles / addRecentFile 的注释）。
   await docStore.restoreOpenFiles()
 
-  // 主窗口加载默认工作区（Layout 挂载前就绪）
-  await useWorkspaceStore.loadCurrentWorkspace(null)
+  // 主窗口：读取主窗口预设绑定的工作区（主窗口现在也可绑定；未绑定则「打开时选择」）
+  let mainBoundWorkspaceId = ''
+  try {
+    const wsSettings = await load('settings.json', { autoSave: false, defaults: {} })
+    const mainVal = await wsSettings.get<{ workspaceId?: string }>('main_window_preset')
+    if (mainVal?.workspaceId) mainBoundWorkspaceId = mainVal.workspaceId
+  } catch (e) {
+    console.warn('读取主窗口预设失败:', e)
+  }
+
+  let mainWorkspaceResolved = false
+  if (mainBoundWorkspaceId) {
+    const holder = await workspaceService.lockStatus(mainBoundWorkspaceId).catch(() => null)
+    if (!holder) {
+      await useWorkspaceStore.loadCurrentWorkspace(mainBoundWorkspaceId)
+      if (useWorkspaceStore.currentWorkspace) mainWorkspaceResolved = true
+    } else {
+      NotificationUtil.warn(`绑定的工作区已在窗口 [${holder}] 中打开，请重新选择`)
+    }
+  }
+  // 已绑定且成功加载 / 未绑定 / 被占用 ⇒ 打开时选择工作区
+  if (!mainWorkspaceResolved) {
+    useWorkspaceStore.pendingWorkspaceSelection = true
+    showWorkspaceSelect.value = true
+  } else {
+    useWorkspaceStore.pendingWorkspaceSelection = false
+  }
 
   // 主窗口：恢复上次会话（含草稿指纹校验）
   await restoreSessionIfAny()
@@ -426,19 +466,7 @@ async function initApp() {
     console.warn('加载主窗口布局配置失败:', e)
   }
 }
-document.onkeydown = function (event: KeyboardEvent) {
-  // 使用 event.code 替代 keyCode
-  if (event.code === 'F12') {
-    event.preventDefault()
-    return false
-  }
-  // 对于 Enter 键，使用 event.key 或 event.code
-  if (event.key === 'Enter' || event.code === 'Enter') {
-    // 注意：这里修改keyCode在现代浏览器中可能无效
-    // 如果需要阻止默认行为，应直接使用 event.preventDefault()
-    // 或者根据具体需求处理
-  }
-}
+
 onMounted(async () => {
   await initWindow()
   await initApp()

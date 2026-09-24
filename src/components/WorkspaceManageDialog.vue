@@ -293,7 +293,7 @@ async function confirmDelete() {
   border-radius: var(--radius-md);
 
   @include theme.useTheme {
-    // 控件边界使用 borderStrong（实测亮色 3.36:1 / 暗色 3.30:1，满足 WCAG 1.4.11 ≥3:1）
+    // 控件边界使用 borderStrong（实测浅色 on #fff/#f1f1f1/#f0f0f0 = 3.95/3.50/3.47:1、暗色 3.30:1，满足 WCAG 1.4.11 ≥3:1）
     border: 1px solid theme.getVar('borderStrong');
     background: theme.getVar('bgColor');
     color: theme.getVar('textColor');

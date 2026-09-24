@@ -44,6 +44,13 @@ export interface LogIndexMeta {
   buckets: TimeBucket[]
   elapsed_ms: number
   cached: boolean
+  /**
+   * L1 块级聚合是否已就绪。
+   *
+   * `false` 表示阶段二尚未完成：此时只能定位与滚动（L2 已就绪），**不能**做级别/时间筛选。
+   * 当前 `logs_index_build` 会等完整索引，故恒为 `true`；该字段为后续"边建边用"预留。
+   */
+  blocks_ready: boolean
 }
 
 /** 命中行段（1-based 闭区间） */
@@ -52,10 +59,33 @@ export interface LineSegment {
   end: number
 }
 
+/**
+ * 合并查询结果（§2.5）：**筛选 + 关键词一次查询产出的两个视图**。
+ *
+ * - `segments`：渲染用（前端按段取内容）；
+ * - `lines`：导航用（命中行号全集）。
+ *
+ * 二者同出一源，因此天然满足核心不变量 `lines ⊆ ∪segments`（§1.1）——
+ * 旧实现里筛选与搜索是两次独立请求，行号可能落在筛选结果之外，跳转必然断裂。
+ */
 export interface LogQueryResult {
   segments: LineSegment[]
+  /** 命中行号（1-based，升序）。无关键词时为空（此时导航走段） */
+  lines: number[]
+  /** 最终命中行数真值（不受任何截断影响） */
   matched: number
+  /** 仅筛选条件的命中行数（不含关键词） */
+  filter_matched: number
+  /** 段数是否因超过 maxSegments 被截断 */
   truncated: boolean
+  /** lines 是否因超过 maxMatches 被截断（matched 仍是真值） */
+  matches_truncated: boolean
+  /** 实际回读原文的行数（剪枝收益越小说明筛选命中率越高） */
+  scanned_lines: number
+  /** 被块级剪枝整块跳过的块数 */
+  pruned_blocks: number
+  /** 因超出索引上限而未参与本次查询的行数（>0 时 UI 必须提示） */
+  unindexed_lines: number
   elapsed_ms: number
 }
 
@@ -89,25 +119,49 @@ export async function buildIndex(path: string, encoding: string): Promise<LogInd
   throw new Error(res?.msg || '建立日志索引失败')
 }
 
-/** 按条件筛选，返回命中行段 */
-export async function queryLines(
-  path: string,
-  encoding: string,
-  filter: FilterState,
-  maxSegments = 2000,
-): Promise<LogQueryResult> {
-  const res = await call<ApiResp<LogQueryResult>>('logs_index_query', {
-    filePath: path,
-    encoding,
-    levels: filter.levels,
-    tsFrom: filter.tsFrom,
-    tsTo: filter.tsTo,
-    invert: filter.invert,
+/**
+ * 合并查询：**筛选 + 关键词一次请求**（§2.5）。
+ *
+ * 传 `taskId` 后可用 `cancelQuery` 中止——大文件查询是长任务，
+ * 输入关键词的过程中旧结果已经没意义了。
+ */
+export async function queryLines(opts: {
+  path: string
+  encoding: string
+  filter?: FilterState | null
+  search?: { keyword: string; mode: 'text' | 'regex'; ignoreCase: boolean } | null
+  maxSegments?: number
+  maxMatches?: number
+  taskId?: string
+}): Promise<LogQueryResult> {
+  const f = opts.filter
+  const s = opts.search
+  const res = await call<ApiResp<LogQueryResult>>('logs_query_lines', {
+    filePath: opts.path,
+    encoding: opts.encoding,
+    levels: f?.levels ?? [],
+    tsFrom: f?.tsFrom ?? null,
+    tsTo: f?.tsTo ?? null,
+    invert: f?.invert ?? false,
     mergeGap: 0,
-    maxSegments,
+    maxSegments: opts.maxSegments ?? 2000,
+    keyword: s?.keyword ?? '',
+    mode: s?.mode ?? 'text',
+    ignoreCase: s?.ignoreCase ?? false,
+    maxMatches: opts.maxMatches ?? 50000,
+    taskId: opts.taskId ?? null,
   })
   if (res && res.code === 200) return res.data
-  throw new Error(res?.msg || '筛选失败')
+  throw new Error(res?.msg || '查询失败')
+}
+
+/** 取消正在进行的查询（前端静默丢弃旧结果即可） */
+export async function cancelQuery(taskId: string): Promise<void> {
+  try {
+    await call<ApiResp<boolean>>('logs_cancel', { taskId })
+  } catch (e) {
+    console.warn('[logs] 取消查询失败:', e)
+  }
 }
 
 /** 筛选条件导出到文件（流式写入，后端一次扫描完成） */

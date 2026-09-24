@@ -7,6 +7,7 @@ import MainPanel from './MainPanel.vue'
 export default {
   id: 'database',
   label: '数据库',
+  description: '多数据库连接管理：SQL 执行、表数据浏览与导入导出',
   icon: markRaw(Coin),
   sidebarPanel: markRaw(SidebarPanel),
   mainPanel: markRaw(MainPanel),

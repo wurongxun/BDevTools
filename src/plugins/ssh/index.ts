@@ -8,6 +8,7 @@ import ConnectionTabBar from './components/RemoteConnection/ConnectionTabBar.vue
 export default {
   id: 'ssh',
   label: 'SSH 连接',
+  description: 'SSH 终端与 SFTP 文件传输，支持远程日志拉取',
   icon: markRaw(Connection),
   sidebarPanel: markRaw(SidebarPanel),
   mainPanel: markRaw(MainPanel),

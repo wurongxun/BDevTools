@@ -1,11 +1,11 @@
 {
-  "version": "1.5.0",
-  "notes": "1.5.0 - 2026-09-15 修复已知BUG\n2、增加示例\n3、优化界面\n4、增强插件功能",
-  "pub_date": "2026-09-16T22:50:00.046Z",
+  "version": "1.6.0",
+  "notes": "1.6.0 - 2026-09-23 1、修复BUG 2、优化页面布局 3、增加新插件 4、优化日志插件逻辑 5、优化窗口逻辑",
+  "pub_date": "2026-09-23T08:00:00+08:00",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUOFVHSVdiU3RaUTVOaEIxV1RsKzFTNkxsS09zeVhraEhkYW03UkkzYjVvdDl3aWpIRkRKVkJBNDdWeTA4YjU3ZkpOb0FuYldibVBTRE5BQjlYUUdtTEx2dzNTYi93N3drPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NTY3NDE2CWZpbGU6QkRldlRvb2xzXzEuNS4wX3g2NC1zZXR1cC5leGUKQ3VrSml0a09iUkkxUGl4azAvd0RmVEdGbVhzcnNxM1J4dGVBT1lOVFNvTzJuK0lVNVdNdzBvbkljeDZnL2J6bGFwbHVSK2h3aDFMWkNid3I1bXRXRGc9PQo=",
-      "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.5.0/BDevTools_1.5.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUOFVHSVdiU3RaUTVIUVV3Tjg4aUorQjZoVkpGSUNLd1l6aFRxRXNvaWN0cUhrd3dVanZoSk5PL0Q0YVF2SzJhWmdXbGxxd3VlOVV6ZTdEL0MyZ0JPZ1BqK0tQWEZUQXdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkwMTU2OTY5CWZpbGU6QkRldlRvb2xzXzEuNi4wX3g2NC1zZXR1cC5leGUKaFZTSDVTbkJYUFZxYUNjKzNZRUVXMkltN1RsaHpLYU85cTZoN2JPUDM3ZVhVR01sWWQrRmgvcERGMzJ4YnZ1SW9VQllBemFQYWVFWHJsRW9GTGRKQ1E9PQo=",
+      "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.6.0/BDevTools_1.6.0_x64-setup.exe"
     }
   }
 }

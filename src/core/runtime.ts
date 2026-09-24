@@ -107,6 +107,9 @@ export async function load(
 // ==================== 系统对话框 ====================
 export { open, save } from '@tauri-apps/plugin-dialog'
 
+// ==================== 外部打开（URL / 路径 / 资源管理器定位） ====================
+export { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
+
 // ==================== 操作系统信息 ====================
 // plugin-os 的 `type`/`version` 与浏览器全局命名冲突，统一以 os* 前缀暴露
 import * as os from '@tauri-apps/plugin-os'
@@ -123,7 +126,10 @@ export { check as checkUpdate } from '@tauri-apps/plugin-updater'
 export type { Update, DownloadEvent } from '@tauri-apps/plugin-updater'
 
 // ==================== 进程控制 ====================
-export { relaunch } from '@tauri-apps/plugin-process'
+// 这里曾经 re-export `relaunch`（@tauri-apps/plugin-process），但后端从未注册该插件
+// （Cargo.toml / lib.rs 里都没有），调用它只会拿到 IPC 报错——是个「导出即陷阱」的死代码。
+// 更新流程也不需要它：Windows 上 tauri-plugin-updater 起完安装器就 std::process::exit(0)，
+// 由安装器自己重启应用（NSIS 收到 /R）。将来真要用，先把 tauri-plugin-process 注册上再加回来。
 
 // ==================== 文件系统 ====================
 export { writeTextFile } from '@tauri-apps/plugin-fs'

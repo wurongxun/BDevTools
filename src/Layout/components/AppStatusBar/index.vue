@@ -64,11 +64,9 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   height: 22px;
-  padding: 0 8px;
   font-size: var(--font-size-sm);
   user-select: none;
   flex-shrink: 0;
-
   @include theme.useTheme {
     background-color: theme.getVar('activityBarBg');
     color: theme.getVar('textSecondary');

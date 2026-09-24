@@ -29,12 +29,13 @@
       :language="language"
       :readonly="isReadonly"
       @update:model-value="onContentChange"
+      @ready="onEditorReady"
     />
   </div>
 </template>
 
 <script setup lang="ts" name="CodeEditor">
-import { ref, computed, watch, onMounted, onActivated, onDeactivated, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onActivated, onDeactivated, onBeforeUnmount } from 'vue'
 import * as monaco from 'monaco-editor'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import NotificationUtil from '@/utils/NotificationUtil'
@@ -101,34 +102,58 @@ function emitState() {
   const pos = editor.getPosition()
   const scroll = editor.getScrollTop()
   emit('update-state', {
+    // 带上自身 path：父级若用 activeDocumentPath 收口，切 tab 时会把位置写到新文档上（串号）
+    path: props.path,
     cursor: pos ? { line: pos.lineNumber, column: pos.column } : undefined,
     scrollTop: scroll
   })
 }
 
-/** 编辑器内 Ctrl+S 保存 */
-function onEditorReady() {
+/**
+ * 把 docStore 里记录的光标 / 滚动位置应用到编辑器。
+ *
+ * 位置真源是 docStore.viewState（会话快照里 exportOpenFiles 的 cursor_* / scroll_top 就是它），
+ * 因此「切 tab / 切插件 / 重启」三条路径共用同一份数据，组件内不再另存一套。
+ * 注意 scrollTop 与 cursor 是二选一还原：revealLineInCenter 会把视口重新居中，
+ * 两个都恢复的话滚动位置会被光标位置覆盖。
+ */
+function applyViewState() {
   const editor = monacoRef.value?.getEditor()
-  if (editor) {
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-      handleSave()
-    })
-    // 恢复上次视图状态（如果存在）
-    const vs = doc.value?.viewState || {}
-    if (typeof vs.scrollTop === 'number' && vs.scrollTop > 0) {
-      editor.setScrollTop(vs.scrollTop)
-    }
-    const line = (vs.cursor as { line?: number } | undefined)?.line
-    if (line) {
-      editor.setPosition({ lineNumber: line, column: ((vs.cursor as { column?: number })?.column) || 1 })
-      editor.revealLineInCenter(line)
-    }
+  if (!editor) return
+  const vs = doc.value?.viewState || {}
+  const cursor = vs.cursor as { line?: number; column?: number } | undefined
+  if (typeof vs.scrollTop === 'number' && vs.scrollTop > 0) {
+    if (cursor?.line) editor.setPosition({ lineNumber: cursor.line, column: cursor.column || 1 })
+    editor.setScrollTop(vs.scrollTop)
+  } else if (cursor?.line) {
+    editor.setPosition({ lineNumber: cursor.line, column: cursor.column || 1 })
+    editor.revealLineInCenter(cursor.line)
   }
 }
 
+/**
+ * 编辑器就绪：注册 Ctrl+S + 还原上次视图状态。
+ *
+ * 历史坑：MonacoEditor 一直会 emit('ready')，但本组件模板里没有 @ready 绑定，
+ * 于是这个函数从未被执行 —— 「Ctrl+S 保存」与「位置恢复」都只是看起来写了。
+ * 父组件不监听子组件事件 = 死代码，改动子组件 API 时务必回头核对调用点。
+ */
+function onEditorReady() {
+  const editor = monacoRef.value?.getEditor()
+  if (!editor) return
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+    handleSave()
+  })
+  applyViewState()
+}
+
 // 文档路径切换（KeepAlive 复用实例时，props.path 会变化）
-watch(() => props.path, () => {
+watch(() => props.path, async () => {
   syncContentFromDoc()
+  // 内容回写会走子组件的 modelValue watch → editor.setValue，这一步会把滚动位置清零，
+  // 所以必须等这次更新跑完再落位置，否则刚恢复就被覆盖回顶部
+  await nextTick()
+  applyViewState()
 })
 
 // 文档从外部被 reload 后，内容已由 store 更新 → 回写编辑器
@@ -150,6 +175,9 @@ onMounted(() => {
 
 onActivated(() => {
   syncContentFromDoc()
+  // 切回时 DOM 已重新插回文档，重新落一次位置：KeepAlive detach 期间视图尺寸为 0，
+  // monaco 的 automaticLayout 按 0 高度重排过，滚动位置不保证保留
+  nextTick(() => applyViewState())
 })
 
 onDeactivated(() => {

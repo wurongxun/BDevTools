@@ -9,11 +9,18 @@ $themes: (
     textSecondary: #666,
     // 禁用态文字：替代 opacity 方案，保证 4.5:1（实测 #767676 on #fff = 4.54:1）
     textDisabled: #767676,
+    // 错误「文字」色（不是填充色）：EP 的 --el-color-danger #f56c6c 白底仅 2.90:1、
+    // #f1f1f1 上 2.57:1，达不到 WCAG AA 4.5:1。此值实测 on #ffffff 5.44:1 / on #f1f1f1 4.81:1。
+    dangerText: #c0392b,
     shadowColor: #eee,
     // borderColor = 柔和分隔线；borderStrong = 控件边界（输入框/下拉/复选框）
-    // 二者分工见 WCAG 1.4.11：控件边界需 ≥3:1，实测 #8c8c8c on #fff = 3.36:1   borderStrong: #8c8c8c,
+    // 二者分工见 WCAG 1.4.11：控件边界需 ≥3:1。注意不能只看白底——控件也会坐在
+    // appMainBgColor(#f1f1f1) / sidebarBg(#f0f0f0) 上，那两块底更暗、比值更低：
+    //   #cac9c9 → 1.65 / 1.46 / 1.45  （原值，最差 1.45:1，不达标）
+    //   #8c8c8c → 3.36 / 2.98 / 2.95  （仅白底达标，边缘底色仍不达标）
+    //   #808080 → 3.95 / 3.50 / 3.47  （采用；顺序为 on #fff / #f1f1f1 / #f0f0f0）
     borderColor: #e6e6e6,
-    borderStrong: #cac9c9,
+    borderStrong: #808080,
     hoverColor: #ecf5ff,
     sidebarBg: #f0f0f0,
     activityBarBg: #e8e8e8,
@@ -40,6 +47,9 @@ $themes: (
     textSecondary: #adadad,
     // 禁用态文字：实测 #949494 on #3c3f41 = 3.50:1（禁用文本为 AA 建议项，非强制）
     textDisabled: #949494,
+    // 错误「文字」色（暗色）：EP 的 #f56c6c 在 #3c3f41 上仅 3.66:1，不达标。
+    // 此值实测 on #3c3f41 5.01:1 / on #2d3137 6.17:1。
+    dangerText: #ff9494,
     shadowColor: #1a1a1a,    // 阴影色
     borderColor: #373a3c,    // 柔和分隔线 IDEA_BORDER_COLOR（仅用于面板分割）
     // 控件边界：实测 #8c9094 on bgColor 3.30:1 / on sidebarBg 3.84:1（WCAG 1.4.11 需 3:1）

@@ -17,7 +17,7 @@
     <TabBarItem
       v-for="doc in documentList"
       :key="doc.id"
-      :ref="el => setTabRef(doc.id, el)"
+      :data-doc-id="doc.id"
       :active="doc.id === activeDocumentId"
       :draggable="true"
       :dragging="dragState.draggedTab === doc.id"
@@ -152,7 +152,6 @@ const showCloseAllConfirm = ref(false)
 
 // TabBar 容器引用
 const tabBarContainer = ref<InstanceType<typeof TabBarContainer> | null>(null)
-const tabRefs = ref<Map<string, HTMLElement>>(new Map())
 const canScrollLeft = ref(false)
 const canScrollRight = ref(false)
 const showDropdown = ref(false)
@@ -169,13 +168,23 @@ let tooltipTimer: number | null = null
 const documentList = computed(() => docStore.documentList)
 const activeDocumentId = computed(() => docStore.activeDocumentPath)
 
-// 设置 tab 引用
-function setTabRef(id: string, el: any) {
-  if (el) {
-    tabRefs.value.set(id, el)
-  } else {
-    tabRefs.value.delete(id)
-  }
+/**
+ * 按文档 id 取标签页的真实 DOM 节点。
+ *
+ * 必须走 DOM 查询、不能存模板 ref：`<script setup>` 组件的模板 ref 拿到的是
+ * **组件实例**（脚本内绑定默认不对外暴露），对它调 `getBoundingClientRect()`
+ * 会抛 `TypeError: tab.getBoundingClientRect is not a function`。因为调用点在
+ * `nextTick` 回调里，控制台表现为「Uncaught (in promise)」。
+ * 标签页没有虚拟滚动、全部常驻 DOM，查询开销可忽略。
+ */
+function getTabEl(docId: string): HTMLElement | null {
+  const container = getTabListEl()
+  if (!container) return null
+  return (
+    Array.from(container.querySelectorAll<HTMLElement>('[data-doc-id]')).find(
+      (el) => el.dataset.docId === docId
+    ) ?? null
+  )
 }
 
 // 显示 tooltip
@@ -228,9 +237,9 @@ function getTabListEl(): HTMLElement | null {
 // 滚动到指定标签页
 function scrollToTab(docId: string) {
   nextTick(() => {
-    const tab = tabRefs.value.get(docId)
     const container = getTabListEl()
-    if (!tab || !container) return
+    const tab = getTabEl(docId)
+    if (!container || !tab) return
 
     const tabRect = tab.getBoundingClientRect()
     const containerRect = container.getBoundingClientRect()

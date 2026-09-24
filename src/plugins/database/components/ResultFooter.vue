@@ -30,6 +30,24 @@
             :loading="loading"
           ></app-button>
         </el-tooltip>
+        <el-tooltip content="删除行" placement="top">
+          <app-button
+            v-if="Deleteline"
+            bare
+            :icon="Deleteline"
+            size="small"
+            @click="showExportDialog = true"
+          ></app-button>
+        </el-tooltip>
+        <el-tooltip content="新增行" placement="top">
+          <app-button
+            v-if="Addline"
+            bare
+            :icon="Addline"
+            size="small"
+            @click="showExportDialog = true"
+          ></app-button>
+        </el-tooltip>
         <el-tooltip content="导出" placement="top">
           <app-button
             v-if="exportSql"
@@ -118,6 +136,9 @@ import GlobalDialog from '@/components/GlobalDialog.vue'
 import { save } from '@/core/runtime'
 import { dbExportSqlCsv, dbExportSqlExcel } from '../api/importExport'
 import Export from '@/components/Icon/Export.vue'
+import Addline from '@/components/Icon/Addline.vue'
+import Deleteline from '@/components/Icon/Deleteline.vue'
+
 import { Refresh } from '@element-plus/icons-vue'
 import Total from '@/components/Icon/Total.vue'
 

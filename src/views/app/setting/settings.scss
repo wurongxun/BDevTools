@@ -1,0 +1,347 @@
+// ============================================================
+// settings.scss —— 设置页「共享基元」样式
+//
+// 为什么是**非 scoped**：设置页已拆成多个子组件（左侧导航 / 三个分区面板），
+// 而 `<style scoped>` 的属性选择器只作用于**本组件模板里的节点**，不穿透子组件。
+// 分组容器、设置行、标签/值这些基元被三个面板共同使用，放任何一个子组件的
+// scoped 块里都会漏掉另外两个。
+//
+// 约定：
+//   - 本文件只放跨分区共用的基元（settings-* / setting-* / 分组与行）；
+//   - 分区专属样式（update-* / window-* / plugin-* …）留在各自组件的 scoped 块里，
+//     避免这份全局样式表继续膨胀；
+//   - 类名一律带 `settings-` / `setting-` 前缀。已全仓核对：这些类名没有第二处使用。
+//
+// 由 AppSetting.vue 引入一次（其余子组件不再重复引入）。
+// ============================================================
+@use '@/styles/theme.scss' as theme;
+@use '@/styles/mixin.scss' as mixin;
+
+.settings-layout {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  overflow: hidden;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('appMainBgColor');
+  }
+}
+
+// ---- 左侧分类导航（固定：不随右侧内容滚动） ----
+.settings-nav {
+  flex: none;
+  width: 168px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('sidebarBg');
+    border-right: 1px solid theme.getVar('borderColor');
+  }
+}
+
+// 与右侧 .settings-head 同高（40px）：两栏顶部基准线对齐，像桌面应用的设置对话框
+.settings-nav-head {
+  flex: none;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  box-sizing: border-box;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+    border-bottom: 1px solid theme.getVar('borderColor');
+  }
+}
+
+.settings-nav-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--space-2) var(--space-2) var(--space-3);
+  box-sizing: border-box;
+  @include mixin.scrollbar();
+}
+
+.settings-nav-item {
+  // 桌面密度：行高 28px（此前 8px 上下内边距 ≈ 34px）
+  height: 28px;
+  padding: 0 var(--space-2);
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  user-select: none;
+  text-align: left;
+  transition: background-color 0.12s;
+  // 语义化 <button> 需要抹平浏览器默认外观
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+
+  &:hover {
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
+      color: theme.getVar('textColor');
+    }
+  }
+
+  &[aria-selected='true'] {
+    font-weight: 500;
+
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarHover');
+      color: theme.getVar('textColor');
+    }
+  }
+}
+
+// ---- 右侧内容区：固定头部 + 可滚动正文 ----
+.settings-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/**
+ * 顶部固定条：分区标题 / 分区页签都放这里，正文滚动时**不跟着走**。
+ * 显式 height（而不是 min-height）——插件页签靠 `height: 100%` 撑满并让激活指示条
+ * 压在底边上，min-height 下百分比高度不可靠。
+ */
+.settings-head {
+  flex: none;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-5);
+  box-sizing: border-box;
+
+  @include theme.useTheme {
+    border-bottom: 1px solid theme.getVar('borderColor');
+  }
+}
+
+.settings-head-title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
+}
+
+// 唯一滚动容器：各分区共用（v-show 切换），切页签不叠加滚动条
+.settings-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  // 保留细滚动条：彻底隐藏会让用户失去"内容还有更多"的视觉线索
+  @include mixin.scrollbar();
+
+  // 填充型页签（插件开发 / 帮助）：页面自己有内部滚动条与吸顶条，
+  // 外层不能再滚（否则双滚动条 + 顶部固定条会被滚走）
+  &.is-fill {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+}
+
+.settings-pane {
+  padding: var(--space-4) var(--space-5) var(--space-6);
+  box-sizing: border-box;
+}
+
+// 填充型页签：交给内部自己滚动，外层不留内边距
+.settings-body.is-fill .settings-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+/**
+ * 插件分区的内部页签（插件管理 / 插件开发）。
+ * 住在 .settings-head 里 → **常驻顶部**，正文（插件列表）滚动时页签不动。
+ * 早先它跟在滚动容器内部，插件一多就会把页签一起滚走。
+ */
+.plugin-subtabs {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-6);
+  height: 100%;
+}
+
+.plugin-subtab {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  line-height: 1;
+  cursor: pointer;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+
+  &:hover {
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+    }
+  }
+
+  &.is-active {
+    font-weight: 600;
+
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+    }
+
+    // 底部 2px 指示条，压在 .settings-head 的下边框上
+    &::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 2px;
+
+      @include theme.useTheme {
+        background: theme.getVar('focusRing');
+      }
+    }
+  }
+}
+
+/**
+ * ---- 分组（桌面风格）----
+ * 组标题在容器外（像 IDEA 的设置分组），容器只做「细边框 + 行分隔线」，不做卡片阴影；
+ * 行高按桌面密度收紧。
+ */
+.settings-group {
+  margin-bottom: var(--space-5);
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.settings-group-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
+}
+
+.settings-group-desc {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+}
+
+.settings-group-body {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+
+  @include theme.useTheme {
+    background-color: theme.getVar('bgColor');
+    border: 1px solid theme.getVar('borderColor');
+  }
+}
+
+// ---- 设置项（一行：左说明 + 右控件） ----
+.settings-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+
+  @include theme.useTheme {
+    border-bottom: 1px solid theme.getVar('borderColor');
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.setting-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-label {
+  display: block;
+  font-size: var(--font-size-md);
+
+  @include theme.useTheme {
+    color: theme.getVar('textColor');
+  }
+}
+
+.setting-description {
+  display: block;
+  font-size: var(--font-size-base);
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+}
+
+.setting-control {
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+/* 更新那一行左侧内容会变高（进度条 / 说明），顶部对齐比居中稳 */
+.settings-item--update {
+  align-items: flex-start;
+
+  .setting-control {
+    padding-top: 2px;
+  }
+}
+
+// ---- 按钮：桌面风格，无浮动效果 ----
+// 挂在 .settings-layout 下（而不是裸 .el-button）：本文件不 scoped，
+// 裸选择器会污染全站所有 Element 按钮的悬停表现。
+.settings-layout .el-button {
+  transition: background-color 0.15s;
+
+  &:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}

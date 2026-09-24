@@ -27,6 +27,10 @@ export interface ViewState {
   scrollLeft?: number
   selections?: Array<{ start: number; end: number }>
 
+  // PDF 阅读器状态（PdfEditor：页码 / 缩放；滚动位置复用 scrollTop）
+  page?: number
+  pageScale?: number
+
   // 图片编辑器状态
   zoom?: number
   panX?: number

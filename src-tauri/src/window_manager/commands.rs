@@ -44,6 +44,22 @@ pub async fn create_editor_window(
         }
     }
 
+    // 预设窗口唯一性：同一预设同时只允许存在一个窗口。
+    //
+    // 命中时**不创建**，把已开窗口的 meta 带回去（code 409）让前端聚焦。前端窗口菜单点击时
+    // 也会先查一次 `get_window_list`，但那条路走 IPC、失败时会直接落到创建分支上，于是能绕过
+    // 「一预设一窗口」——出现两个窗口共用同一预设，而它们的插件清单各改各的、还会互相顶掉。
+    // 这里在进程内查注册表，是唯一可靠的判据；前端那次查询只是省一次创建往返。
+    if let Some(ref pid) = preset_id {
+        if let Some(existing) = registry::find_window_by_preset(pid) {
+            println!(
+                "[create_editor_window] 预设 {} 已有窗口 {}，不重复创建",
+                pid, existing.label
+            );
+            return Response::new(409, existing, "该预设的窗口已打开，已切换到该窗口");
+        }
+    }
+
     let uuid = Uuid::new_v4().to_string();
     // 截取 uuid 前 8 位作为简短标识（仅用于窗口 label，用户不可见）
     let short_id = &uuid[..8];
@@ -199,6 +215,16 @@ pub fn create_preset_window_from_preset(
             );
             return None;
         }
+    }
+
+    // 同一不变量（判据见 registry::find_window_by_preset）：settings.json 可被手工编辑，
+    // 若两个预设共用同一个 id，这里会开出两个「同一个预设」的窗口。
+    if let Some(existing) = registry::find_window_by_preset(preset_id) {
+        println!(
+            "[Rust] 预设 {} 已有窗口 {}，跳过创建",
+            preset_id, existing.label
+        );
+        return None;
     }
 
     let uuid = Uuid::new_v4().to_string();

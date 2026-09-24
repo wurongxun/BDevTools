@@ -82,3 +82,78 @@ pub fn create_window_meta(
         created_at: Utc::now().timestamp_millis(),
     }
 }
+
+/// 在**给定的窗口列表里**找 `preset_id` 对应的已打开窗口。
+///
+/// `preset_id` 为空串或 `"main"` 一律视为「不是预设窗口」：主窗口的 `preset_id` 也是
+/// `"main"`，但它由 `tauri.conf.json` 声明、永远只有一个，不参与预设唯一性判定；工具菜单里
+/// 「新建窗口」建的窗口 `preset_id` 是 `None`，同样不属于任何预设。
+///
+/// 抽成纯函数是为了能在不碰全局注册表的前提下测试 —— `WINDOW_REGISTRY` 是进程级
+/// `lazy_static`，用例共用同一份状态，直接测会互相干扰。
+pub fn pick_window_by_preset(windows: &[WindowMeta], preset_id: &str) -> Option<WindowMeta> {
+    if preset_id.is_empty() || preset_id == "main" {
+        return None;
+    }
+    windows
+        .iter()
+        .find(|w| w.preset_id.as_deref() == Some(preset_id))
+        .cloned()
+}
+
+/// 按 `preset_id` 查已打开的窗口。
+///
+/// 这是「一个预设同时只开一个窗口」这条不变量的判据，被 `create_editor_window` 与启动阶段的
+/// `create_preset_window_from_preset` 共用（见两处的唯一性检查）。
+pub fn find_window_by_preset(preset_id: &str) -> Option<WindowMeta> {
+    pick_window_by_preset(&get_all_windows(), preset_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn win(label: &str, preset: Option<&str>) -> WindowMeta {
+        create_window_meta(
+            label.to_string(),
+            WindowRole::Editor,
+            None,
+            label.to_string(),
+            preset.map(|s| s.to_string()),
+            0.0,
+            0.0,
+            800.0,
+            600.0,
+        )
+    }
+
+    #[test]
+    fn pick_window_by_preset_matches_by_preset_id() {
+        let list = vec![win("editor-a", Some("p1")), win("editor-b", Some("p2"))];
+        assert_eq!(
+            pick_window_by_preset(&list, "p1").map(|w| w.label),
+            Some("editor-a".to_string())
+        );
+        assert_eq!(
+            pick_window_by_preset(&list, "p2").map(|w| w.label),
+            Some("editor-b".to_string())
+        );
+    }
+
+    #[test]
+    fn pick_window_by_preset_returns_none_for_unopened() {
+        let list = vec![win("editor-a", Some("p1"))];
+        assert!(pick_window_by_preset(&list, "p9").is_none());
+    }
+
+    /// 主窗口 / 无预设窗口不能被当成「该预设已打开」：否则点主窗口的菜单项会去聚焦一个
+    /// 不相干的窗口，而且那个预设的窗口永远打不开。
+    #[test]
+    fn pick_window_by_preset_ignores_main_empty_and_unbound() {
+        let list = vec![win("main", Some("main")), win("editor-x", None)];
+        assert!(pick_window_by_preset(&list, "main").is_none());
+        assert!(pick_window_by_preset(&list, "").is_none());
+        assert!(pick_window_by_preset(&list, "editor-x").is_none());
+        assert!(!list.is_empty(), "列表本身不该为空");
+    }
+}

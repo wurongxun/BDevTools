@@ -11,3 +11,6 @@ pub(crate) mod mat_graph;
 pub mod mat_leak;
 pub mod mat_refs;
 pub mod mat_cfg;
+pub mod plugin_host;
+pub mod plugin_wasm;
+pub mod terminal;
