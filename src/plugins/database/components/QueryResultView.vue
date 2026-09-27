@@ -1,48 +1,28 @@
 <template>
   <div class="query-result-view" :aria-label="`查询结果${table ? ' · ' + table : ''}`">
-    <!-- ============ 头部：可编辑 SQL  增加查询条件/过滤/运行 / 新增 / 导入 ============ -->
-<!--    <div class="qr-header">-->
-<!--      <el-input-->
-<!--        v-model="sqlText"-->
-<!--        type="textarea"-->
-<!--        :rows="2"-->
-<!--        class="sql-input"-->
-<!--        placeholder="输入 SQL 语句，点击「运行」或按 Ctrl/Cmd + Enter 执行"-->
-<!--        @keydown.ctrl.enter.prevent="runQuery"-->
-<!--        @keydown.meta.enter.prevent="runQuery"-->
-<!--      />-->
-<!--      <div class="header-actions">-->
-<!--        <app-button size="small" type="primary" :loading="loading" @click="runQuery">运行</app-button>-->
-<!--        &lt;!&ndash; 单表查询才允许新增 / 导入；多表（JOIN、子查询等）仅可导出 &ndash;&gt;-->
-<!--        <template v-if="canEdit">-->
-<!--          <app-button size="small" @click="openAddDialog">新增行</app-button>-->
-<!--          <app-button size="small" @click="handleImport">导入</app-button>-->
-<!--        </template>-->
-<!--      </div>-->
-<!--    </div>-->
-
-<!--    <SqlEditorHeader-->
-<!--      ref="headerRef"-->
-<!--      v-model="sqlText"-->
-<!--      :loading="loading"-->
-<!--      table-name="formtable_main_23_dt1"-->
-<!--      :rows="5"-->
-<!--      :is-single-table="isSingleTable"-->
-<!--      :can-undo="historyCursor > 0"-->
-<!--      :can-redo="historyCursor < history.length - 1"-->
-<!--      @run="runQuery"-->
-<!--      @run-command="onRunCommand"-->
-<!--      @filter="onFilter"-->
-<!--      @save="onSave"-->
-<!--      @undo="onUndo"-->
-<!--      @redo="onRedo"-->
-<!--      @format="onFormat"-->
-<!--      @complete="onComplete"-->
-<!--      @template="onTemplate"-->
-<!--      @export="onExport"-->
-<!--      @cancel="onCancel"-->
-<!--      @expand-change="onExpandChange"-->
-<!--    />-->
+    <!-- ============ 头部：可编辑 SQL（编辑 / 追加条件 / 运行） ============
+         语句来源：SQL 查询模式取 props.sql，表浏览模式由表名构造（见 resolvedSql）。
+         导出 / 分页 / 总行数统计都在底部 ResultFooter，这里刻意不重复入口。 -->
+    <SqlEditorHeader
+      ref="headerRef"
+      :model-value="sqlText"
+      :loading="loading"
+      :table-name="headerTableName"
+      :rows="5"
+      :is-single-table="!!editableTable"
+      :can-undo="historyCursor > 0"
+      :can-redo="historyCursor < history.length - 1"
+      @update:model-value="onSqlInput"
+      @run="() => runQuery()"
+      @run-command="onRunCommand"
+      @filter="onFilter"
+      @undo="onUndo"
+      @redo="onRedo"
+      @format="onFormat"
+      @template="onTemplate"
+      @cancel="onCancel"
+      @expand-change="onExpandChange"
+    />
 
     <!-- ============ 模式提示 ============ -->
     <div v-if="result && result.is_query" class="qr-meta">
@@ -52,6 +32,12 @@
       <span v-else class="meta-readonly">多表或复杂查询：仅支持导出</span>
       <span v-if="selectedRows.length > 0" class="meta-selected">
         已选 {{ selectedRows.length }} 行（导出时默认只导出选中项）
+      </span>
+      <!-- 单表编辑入口：新增 / 导入属于「结果操作」，与 SQL 编辑区分开，
+           故不放头部编辑器；导出与分页在底部 ResultFooter -->
+      <span v-if="canEdit" class="meta-actions">
+        <app-button size="small" @click="openAddDialog">新增行</app-button>
+        <app-button size="small" @click="handleImport">导入</app-button>
       </span>
     </div>
 
@@ -218,6 +204,215 @@ const resolvedSql = computed(() => {
 })
 
 const sqlText = ref(resolvedSql.value)
+
+// ===================================================================
+// 头部编辑器：SQL 编辑历史（撤销 / 重做）
+// ===================================================================
+const headerRef = ref<InstanceType<typeof SqlEditorHeader> | null>(null)
+const headerExpanded = ref(false)
+
+/** 头部标签栏展示的表名：优先表浏览模式的表，其次解析出的可编辑表 */
+const headerTableName = computed(() => props.table || editableTable.value || 'SQL')
+
+const MAX_HISTORY = 50
+const history = ref<string[]>([resolvedSql.value])
+const historyCursor = ref(0)
+
+/**
+ * 写入一条历史。**撤销 / 重做自身不入栈**（直接改 sqlText），否则会自我污染：
+ * 撤销后 redo 分支必须丢弃（截断到游标），与常见编辑器的语义一致。
+ */
+function pushHistory(sql: string) {
+  if (history.value[historyCursor.value] === sql) return
+  history.value = history.value.slice(0, historyCursor.value + 1)
+  history.value.push(sql)
+  if (history.value.length > MAX_HISTORY) history.value.shift()
+  historyCursor.value = history.value.length - 1
+}
+
+/** 用户手动编辑（唯一入栈入口） */
+function onSqlInput(v: string) {
+  sqlText.value = v
+  pushHistory(v)
+}
+
+function onUndo() {
+  if (historyCursor.value <= 0) return
+  historyCursor.value -= 1
+  sqlText.value = history.value[historyCursor.value]
+}
+
+function onRedo() {
+  if (historyCursor.value >= history.value.length - 1) return
+  historyCursor.value += 1
+  sqlText.value = history.value[historyCursor.value]
+}
+
+// ===================================================================
+// 头部编辑器：运行 / 模板 / 格式化 / 过滤 / 取消
+// ===================================================================
+/** 运行下拉的四个动作；explain / count 会**改写编辑器内容**（便于再编辑与复查），入栈后可撤销 */
+async function onRunCommand(cmd: string) {
+  const sql = sqlText.value.trim()
+  if (!sql) return
+  switch (cmd) {
+    case 'run':
+      await runQuery()
+      break
+    case 'run-all':
+      await runAllStatements(sql)
+      break
+    case 'explain':
+      applyAndRun(`EXPLAIN ${sql}`)
+      break
+    case 'count':
+      applyAndRun(`SELECT COUNT(*) AS total FROM (${sql.replace(/;\s*$/, '')}) AS _count`)
+      break
+  }
+}
+
+/** 改写编辑器内容并执行（入栈，可撤销回原语句） */
+function applyAndRun(sql: string) {
+  sqlText.value = sql
+  pushHistory(sql)
+  void runQuery()
+}
+
+/**
+ * 执行所有语句：按 `;` 分割逐条提交（不解析字符串字面量内的分号，够用即可）。
+ * 非查询语句累加影响行数，最后一条查询语句的结果用于展示。
+ */
+async function runAllStatements(sql: string) {
+  if (!props.configId || loading.value) return
+  const stmts = sql
+    .split(';')
+    .map(s => s.trim())
+    .filter(Boolean)
+  if (stmts.length <= 1) {
+    await runQuery()
+    return
+  }
+  if (!(await ensureConnection())) return
+  loading.value = true
+  try {
+    let affected = 0
+    let lastQuery: SqlResult | null = null
+    for (const st of stmts) {
+      const res = await dbExecuteSql(props.configId, st, props.database, pageSize.value, 0)
+      if (res.code !== 200) {
+        ElMessage.error(`执行失败: ${res.msg}`)
+        return
+      }
+      if (res.data.is_query) lastQuery = res.data
+      else affected += res.data.affected_rows ?? 0
+    }
+    if (lastQuery) {
+      result.value = lastQuery
+      page.value = 1
+      await resolveEditable()
+    }
+    ElMessage.success(
+      lastQuery
+        ? `已执行 ${stmts.length} 条语句`
+        : `已执行 ${stmts.length} 条语句，影响 ${affected} 行`
+    )
+  } catch (e: any) {
+    ElMessage.error('执行失败: ' + (e.message || e))
+  } finally {
+    loading.value = false
+  }
+}
+
+/** SQL 模板片段：追加到编辑器末尾（已识别到单表时自动带上表名） */
+const SQL_TEMPLATES: Record<string, (table: string) => string> = {
+  select: t => `SELECT * FROM ${quoteIdent(t)}`,
+  insert: t => `INSERT INTO ${quoteIdent(t)} (col1, col2) VALUES ('v1', 'v2')`,
+  update: t => `UPDATE ${quoteIdent(t)} SET col1 = 'v1' WHERE id = 1`,
+  delete: t => `DELETE FROM ${quoteIdent(t)} WHERE id = 1`,
+  'count-rows': t => `SELECT COUNT(*) FROM ${quoteIdent(t)}`,
+}
+
+function quoteIdent(t: string): string {
+  return t ? `\`${t.replace(/`/g, '``')}\`` : '表名'
+}
+
+function onTemplate(cmd: string) {
+  const gen = SQL_TEMPLATES[cmd]
+  if (!gen) return
+  const snippet = gen(editableTable.value || props.table || '')
+  const next = sqlText.value.trim()
+    ? `${sqlText.value.replace(/\s+$/, '')}\n${snippet}`
+    : snippet
+  sqlText.value = next
+  pushHistory(next)
+  headerRef.value?.expand()
+}
+
+/**
+ * 极简 SQL 格式化：主要子句前换行 + 关键字大写。
+ * 只做「看得清」级别的排版，不追求方言完整正确 —— 复杂语句可能不如专用格式化器，
+ * 因此会入栈，不满意可 Ctrl+Z 撤销。字符串 / 标识符内部一律跳过。
+ */
+function formatSql(sql: string): string {
+  const re =
+    /\b(select|from|where|and|or|group\s+by|order\s+by|having|limit|offset|insert\s+into|values|update|set|delete\s+from|left\s+join|right\s+join|inner\s+join|join|on|union\s+all|union)\b/gi
+  // 标记引号内的下标：这些位置的关键字不参与换行
+  const quoted = new Array<boolean>(sql.length).fill(false)
+  let quote: string | null = null
+  for (let i = 0; i < sql.length; i++) {
+    const c = sql[i]
+    if (quote) {
+      quoted[i] = true
+      if (c === quote) quote = null
+      continue
+    }
+    if (c === "'" || c === '"' || c === '`') {
+      quote = c
+      quoted[i] = true
+    }
+  }
+  let out = ''
+  let last = 0
+  let m: RegExpExecArray | null
+  re.lastIndex = 0
+  while ((m = re.exec(sql))) {
+    if (quoted[m.index]) continue
+    out += sql.slice(last, m.index).replace(/\s+$/, '')
+    if (out && !out.endsWith('\n')) out += '\n'
+    out += m[0].toUpperCase() + ' '
+    last = m.index + m[0].length
+  }
+  out += sql.slice(last)
+  return out.replace(/[ \t]+\n/g, '\n').replace(/\n{2,}/g, '\n').trim()
+}
+
+function onFormat() {
+  const next = formatSql(sqlText.value)
+  if (next === sqlText.value) return
+  sqlText.value = next
+  pushHistory(next)
+}
+
+/** 过滤：只作用于当前页已加载的行（客户端过滤），不改写 SQL、不重新查询 */
+const filterKeyword = ref('')
+
+function onFilter(keyword: string) {
+  filterKeyword.value = (keyword ?? '').trim()
+}
+
+/** 取消：放弃编辑，回到 tab 传来的语句（或表浏览模式构造的语句）并收起编辑器 */
+function onCancel() {
+  const s = resolvedSql.value
+  if (s !== sqlText.value) {
+    sqlText.value = s
+    pushHistory(s)
+  }
+  headerRef.value?.collapse()
+}
+
+function onExpandChange(expanded: boolean) {
+  headerExpanded.value = expanded
+}
 
 const page = ref(1)
 const pageSize = ref(DEFAULT_PAGE_SIZE)
@@ -451,12 +646,20 @@ const displayRows = computed<Record<string, any>[]>(() => {
     })
     return obj
   })
+  // 头部过滤框：只过滤当前页已加载的行（客户端过滤，不改写 SQL）
+  const kw = filterKeyword.value.toLowerCase()
+  let list = rows
+  if (kw) {
+    list = rows.filter(o =>
+      r.columns.some((_c, i) => String(o[String(i)] ?? '').toLowerCase().includes(kw))
+    )
+  }
   const { prop, order } = sortState.value
   if (prop && order) {
     const dir = order === 'ascending' ? 1 : -1
-    rows.sort((x, y) => dir * compareCell(x[prop], y[prop]))
+    list.sort((x, y) => dir * compareCell(x[prop], y[prop]))
   }
-  return rows
+  return list
 })
 
 // ===================================================================
@@ -612,11 +815,16 @@ function handleImport() {
   showImportExport.value = true
 }
 
-// 语句变化（切换子结果 / 切换表 / 表浏览模式）时同步头部文本并重新执行
+// 语句变化（切换子结果 / 切换表 / 表浏览模式）时同步编辑器并重新执行
 watch(
   resolvedSql,
   (s) => {
+    // 换语句 = 换上下文：旧的撤销栈与过滤词对新语句没有意义，一并重置
     sqlText.value = s
+    filterKeyword.value = ''
+    headerRef.value?.setFilter('')
+    history.value = [s]
+    historyCursor.value = 0
     runQuery()
   },
   { immediate: true }
@@ -630,25 +838,8 @@ watch(
   height: 100%;
   overflow: hidden;
 }
-/* 头部：可编辑 SQL + 操作按钮 */
-.qr-header {
-  display: flex;
-  align-items: stretch;
-  flex-shrink: 0;
-}
-.sql-input {
-  flex: 1;
-  min-width: 0;
-}
-.sql-input :deep(textarea) {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-sm);
-  resize: vertical;
-}
-.header-actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+/* 头部编辑器：高度由内容决定，不参与压缩（展开态不能被结果区挤扁） */
+.sql-header {
   flex-shrink: 0;
 }
 
@@ -665,9 +856,15 @@ watch(
   color: var(--el-color-primary);
 }
 .meta-selected {
-  margin-left: auto;
   color: var(--el-color-primary);
   font-weight: 600;
+}
+.meta-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
 }
 .mono {
   font-family: var(--font-family-mono);

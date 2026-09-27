@@ -57,8 +57,6 @@ const lastResult = ref<SqlResult | null>(null)
 const PAGE_SIZE = 200
 const executing = ref(false)
 let editor: monaco.editor.IStandaloneCodeEditor | null = null
-/** 最近一次实际执行的 SQL（供状态展示等使用） */
-let lastExecutedSql = ''
 
 // 从 store 获取连接列表
 const connections = connectionStore.connections
@@ -185,7 +183,6 @@ async function runSelectedOrAll() {
         const res = await dbExecuteSql(selectedConfigId.value, stmt, db, PAGE_SIZE, 0)
         if (res.code === 200) {
           lastResult.value = res.data
-          lastExecutedSql = stmt
           // 透传执行的 SQL 原文，便于 SqlTab 存为子结果标签/展示
           emit('executed', { sql: stmt, result: res.data })
         } else {

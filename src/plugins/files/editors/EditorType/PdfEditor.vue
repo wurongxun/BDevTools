@@ -14,11 +14,9 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min?url'
 import { ElMessage } from 'element-plus'
 import { convertFileSrc } from '@/core/runtime'
 import { isDark } from '@/composables/useDark'
-import useStore from '@/store'
 import BookmarkTree from './Pdf/BookmarkTree.vue'
-import { DocumentState } from '../../store/documents'
 import { useDocumentManagerStore } from '../../store/documents'
-import { ArrowRight, ArrowDown, FolderOpened, Document } from '@element-plus/icons-vue'
+import { ArrowRight, ArrowDown, FolderOpened } from '@element-plus/icons-vue'
 
 defineOptions({
   name: 'PdfPreview'
@@ -30,7 +28,6 @@ const MIN_SCALE = 0.2
 const MAX_SCALE = 5
 const CONTAINER_PADDING = 40
 const MAX_FIT_SCALE = 1.5
-const { appConfig, system } = useStore()
 const docStore = useDocumentManagerStore()
 
 const props = defineProps<{
@@ -63,7 +60,6 @@ const controlsPosition = ref<{ top: number; left: number }>({ top: 0, left: 0 })
 // 书签栏相关
 const showBookmarkPanel = ref<boolean>(false)
 const bookmarks = ref<any[]>([])
-const expandedBookmarks = ref<Set<string>>(new Set())
 
 // 使用 shallowRef 存储大型对象，避免不必要的响应式开销
 let pdfDoc: any = null
@@ -580,14 +576,6 @@ function onNextPage() {
   pageNum++
   queueRenderPage(pageNum)
   scrollToTop()
-}
-
-const goToPage = (page: number) => {
-  if (page >= 1 && page <= page_count.value && pdfDoc) {
-    pageNum = page
-    queueRenderPage(pageNum)
-    scrollToTop()
-  }
 }
 
 // 切换书签面板显示

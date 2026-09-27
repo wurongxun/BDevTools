@@ -154,6 +154,7 @@ export const pluginListItems = computed<PluginListItem[]>(() => {
       permissions: [],
       settings: [],
       pageCapabilities: [],
+      deniedPageCapabilities: [],
       standaloneWindow: false,
       pinned: p.pinnedBottom === true,
       enabled: !disabledIds.value.has(p.id),
@@ -173,6 +174,8 @@ export const pluginListItems = computed<PluginListItem[]>(() => {
       permissions: p.permissions,
       settings: p.settings ?? [],
       pageCapabilities: p.page_capabilities ?? [],
+      // 只可能 ⊆ pageCapabilities：后端按白名单校验过，脏值在读的时候就被过滤掉了
+      deniedPageCapabilities: p.denied_page_capabilities ?? [],
       standaloneWindow: p.standalone_window === true,
       pinned: false,
       // 与内置同一口径：以禁用集合为准，不看后端那条已经重复表达同一事实的 enabled
@@ -390,6 +393,20 @@ export async function setPluginEnabled(id: string, enabled: boolean): Promise<vo
   }
   // 让其它窗口也把这个插件停掉（含关掉它的独立窗口）
   publishPluginState({ id, kind: 'toggle' })
+}
+
+/**
+ * 收紧某插件的页面能力（`denied` 传空数组 = 恢复插件自己的声明）。
+ *
+ * **只能减不能加**：用户不能替插件声明它没要过的 `pageCapabilities`。
+ *
+ * 刻意**不**广播跨窗口状态变更：那条广播会顺手关掉该插件的独立窗口
+ * （见 `applyPluginStateChange`），而改一项能力显然不该把用户开着的窗口关掉。
+ * CSP 是按响应算的，已打开的插件页重新打开才会拿到新策略 —— 设置页里会明确提示这一点。
+ */
+export async function setPluginPageCapsDenied(id: string, denied: string[]): Promise<void> {
+  await pluginApi.setPluginPageCaps(id, denied)
+  await refreshThirdPartyPlugins()
 }
 
 /**

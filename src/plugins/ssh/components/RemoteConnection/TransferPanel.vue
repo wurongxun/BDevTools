@@ -56,7 +56,7 @@
 import { ref, computed, watch } from 'vue'
 import { ArrowDown, ArrowUp } from '@element-plus/icons-vue'
 import { useFtpStore } from '../../store'
-import type { TransferTask, TransferStatus } from '../../types'
+import type { TransferStatus } from '../../types'
 
 const props = defineProps<{
   tabId: string

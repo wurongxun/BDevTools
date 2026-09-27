@@ -66,7 +66,7 @@ import AppStatusBar from './components/AppStatusBar/index.vue'
 import useStore from '@/store/index'
 import { pluginManager } from '@/core/pluginManager'
 import { storeToRefs } from 'pinia'
-import { watch, nextTick, onMounted, onUnmounted, ref, reactive, computed } from 'vue'
+import { watch, nextTick, onMounted, onUnmounted, ref, computed } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 
 const { system, useWorkspaceStore, useLayoutStore } = useStore()
@@ -80,13 +80,6 @@ const isFocusMode = computed(() => useLayoutStore.focusMode)
  * 与 focusMode 的区别见 `store/modules/layout.ts` 的 `immersiveMode` 注释
  */
 const isImmersive = computed(() => useLayoutStore.immersiveMode)
-
-// const isEditorRoute = computed(() => {
-//   return !route.path.startsWith('/App')
-// })
-
-
-
 
 
 const sideBoxRef = ref<HTMLElement | null>(null)

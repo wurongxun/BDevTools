@@ -12,7 +12,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { call } from '@/api/rpc'
-import { open, subscribe, type Unsubscribe } from '@/core/runtime'
+import { open, subscribe } from '@/core/runtime'
 import { getCurrentWorkspaceId } from '@/composables/usePluginDir'
 import { useWorkspaceStore } from '@/store/modules/workspace'
 import {
@@ -183,9 +183,8 @@ export const useLogExplorerStore = defineStore('logExplorer', () => {
   }
 
   // 工作区切换事件监听（store 单例只装一次）
-  let unsub: Unsubscribe | null = null
   void (async () => {
-    unsub = await subscribe<void>('workspace-changed', () => {
+    await subscribe<void>('workspace-changed', () => {
       void onWorkspaceChanged()
     })
   })()

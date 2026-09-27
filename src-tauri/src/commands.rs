@@ -19,32 +19,34 @@ use tauri_plugin_notification::{NotificationExt, PermissionState};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::core::ctx::AppContext;
-use crate::command::app_window;
-use crate::command::file_association;
-use crate::command::file_command::{self, ScriptFileEntry};
-use crate::command::file_utils;
-use crate::command::log_index::{
+use crate::window_manager::app_window;
+use crate::plugins::files::file_association;
+use crate::plugins::files::file_command::{self, ScriptFileEntry};
+use crate::plugins::files::file_utils;
+use crate::plugins::logs::log_index::{
     self, LogExportResult, LogIndexMeta, LogQueryResult,
 };
-use crate::command::log_stream;
-use crate::command::mat_hprof::{self, MatHeaderInfo, MatHistogramResult};
-use crate::command::mat_leak::{self, MatLeakSuspectsResult};
-use crate::command::mat_cfg::{self, MatLimitInfo};
-use crate::command::plugin_host;
-use crate::command::plugin_wasm;
-use crate::command::mat_refs::{
+use crate::plugins::logs::log_stream;
+use crate::plugins::mat::mat_hprof::{self, MatHeaderInfo, MatHistogramResult};
+use crate::plugins::mat::mat_leak::{self, MatLeakSuspectsResult};
+use crate::plugins::mat::mat_cfg::{self, MatLimitInfo};
+// 目录已改名为 plugin_host/{host,wasm}.rs，但函数体一律用裸名 `plugin_host::` / `plugin_wasm::`
+// 书写（与插件 id 语义对齐），故 import 时用别名把名字拉回原样，避免改动几百处调用点。
+use crate::plugin_host::host as plugin_host;
+use crate::plugin_host::wasm as plugin_wasm;
+use crate::plugins::mat::mat_refs::{
     self, RefBuildInfo, RefInstances, RefObjectDetail, RefSearchResult,
 };
-use crate::command::remote_conn::{self, RemoteFileItem};
-use crate::command::terminal;
-use crate::command::search_log_parallel::{self, FileLinesResult};
-use crate::database::connection::DbConnectionConfig;
-use crate::database::import_export::{ExportResult, ImportResult};
-use crate::database::metadata::{
+use crate::plugins::ssh::remote_conn::{self, RemoteFileItem};
+use crate::plugins::terminal::terminal;
+use crate::plugins::logs::search_log_parallel::{self, FileLinesResult};
+use crate::plugins::database::connection::DbConnectionConfig;
+use crate::plugins::database::import_export::{ExportResult, ImportResult};
+use crate::plugins::database::metadata::{
     CatalogCapabilities, DatabaseIndexInfo, DatabaseObjectInfo, DatabaseInfo, DbAdminInfo, DbUserInfo,
     IndexInfo, KeyValueRow, TableInfo,
 };
-use crate::database::operations::{ColumnInfo, SqlResult, TableDataResult};
+use crate::plugins::database::operations::{ColumnInfo, SqlResult, TableDataResult};
 use crate::entity::session::{SessionSnapshot, SessionSummary};
 use crate::entity::window::WindowMeta;
 use crate::entity::workspace::{WorkspaceConfig, WorkspaceSummary};
@@ -147,6 +149,13 @@ pub async fn read_note_file(path: String) -> Result<ResData<String>, String> {
 #[tauri::command]
 pub async fn get_file_size(path: String) -> Result<ResData<u64>, String> {
     file_command::get_file_size(path).await
+}
+
+/// 读取文件原始字节，前端直接拿到 ArrayBuffer（图片查看用）。
+/// 走裸字节通道而非 ResData，见 `file_command::read_file_bytes` 的说明。
+#[tauri::command]
+pub async fn read_file_bytes(path: String) -> Result<tauri::ipc::Response, String> {
+    file_command::read_file_bytes(path).await
 }
 
 /// 创建本地文件夹
@@ -1009,43 +1018,43 @@ pub fn draft_delete(workspace_id: String, file_path: String) -> Response<bool> {
 /// 创建数据库连接配置
 #[tauri::command]
 pub async fn db_connection_create(config: DbConnectionConfig) -> Response<Option<String>> {
-    crate::database::connection::db_connection_create(config).await
+    crate::plugins::database::connection::db_connection_create(config).await
 }
 
 /// 删除数据库连接配置
 #[tauri::command]
 pub async fn db_connection_delete(id: String) -> Response<bool> {
-    crate::database::connection::db_connection_delete(id).await
+    crate::plugins::database::connection::db_connection_delete(id).await
 }
 
 /// 更新数据库连接配置
 #[tauri::command]
 pub async fn db_connection_update(config: DbConnectionConfig) -> Response<bool> {
-    crate::database::connection::db_connection_update(config).await
+    crate::plugins::database::connection::db_connection_update(config).await
 }
 
 /// 获取所有连接配置列表
 #[tauri::command]
 pub async fn db_connection_list() -> Response<Vec<DbConnectionConfig>> {
-    crate::database::connection::db_connection_list().await
+    crate::plugins::database::connection::db_connection_list().await
 }
 
 /// 测试数据库连接连通性
 #[tauri::command]
 pub async fn db_connection_test(config: DbConnectionConfig) -> Response<bool> {
-    crate::database::connection::db_connection_test(config).await
+    crate::plugins::database::connection::db_connection_test(config).await
 }
 
 /// 建立数据库连接（创建连接池）
 #[tauri::command]
 pub async fn db_connect(config_id: String) -> Response<bool> {
-    crate::database::connection::db_connect(config_id).await
+    crate::plugins::database::connection::db_connect(config_id).await
 }
 
 /// 断开数据库连接
 #[tauri::command]
 pub async fn db_disconnect(config_id: String) -> Response<bool> {
-    crate::database::connection::db_disconnect(config_id).await
+    crate::plugins::database::connection::db_disconnect(config_id).await
 }
 
 // ==================== 数据库操作 ====================
@@ -1059,7 +1068,7 @@ pub async fn db_execute_sql(
     page_size: Option<u64>,
     offset: Option<u64>,
 ) -> Response<SqlResult> {
-    crate::database::operations::db_execute_sql(config_id, sql, database, page_size, offset).await
+    crate::plugins::database::operations::db_execute_sql(config_id, sql, database, page_size, offset).await
 }
 
 /// 分页查询表数据
@@ -1073,7 +1082,7 @@ pub async fn db_query_table_data(
     where_clause: Option<String>,
     order_by: Option<String>,
 ) -> Response<TableDataResult> {
-    crate::database::operations::db_query_table_data(
+    crate::plugins::database::operations::db_query_table_data(
         config_id, database, table, page, page_size, where_clause, order_by,
     )
     .await
@@ -1087,7 +1096,7 @@ pub async fn db_insert_row(
     table: String,
     data: serde_json::Value,
 ) -> Response<bool> {
-    crate::database::operations::db_insert_row(config_id, database, table, data).await
+    crate::plugins::database::operations::db_insert_row(config_id, database, table, data).await
 }
 
 /// 更新单行数据
@@ -1100,7 +1109,7 @@ pub async fn db_update_row(
     primary_value: serde_json::Value,
     data: serde_json::Value,
 ) -> Response<bool> {
-    crate::database::operations::db_update_row(
+    crate::plugins::database::operations::db_update_row(
         config_id, database, table, primary_key, primary_value, data,
     )
     .await
@@ -1115,7 +1124,7 @@ pub async fn db_delete_row(
     primary_key: String,
     primary_value: serde_json::Value,
 ) -> Response<bool> {
-    crate::database::operations::db_delete_row(config_id, database, table, primary_key, primary_value)
+    crate::plugins::database::operations::db_delete_row(config_id, database, table, primary_key, primary_value)
         .await
 }
 
@@ -1124,13 +1133,13 @@ pub async fn db_delete_row(
 /// 获取所有数据库列表
 #[tauri::command]
 pub async fn db_list_databases(config_id: String) -> Response<Vec<DatabaseInfo>> {
-    crate::database::metadata::db_list_databases(config_id).await
+    crate::plugins::database::metadata::db_list_databases(config_id).await
 }
 
 /// 获取指定数据库的所有表
 #[tauri::command]
 pub async fn db_list_tables(config_id: String, database: String) -> Response<Vec<TableInfo>> {
-    crate::database::metadata::db_list_tables(config_id, database).await
+    crate::plugins::database::metadata::db_list_tables(config_id, database).await
 }
 
 /// 获取表的字段信息
@@ -1140,7 +1149,7 @@ pub async fn db_table_columns(
     database: String,
     table: String,
 ) -> Response<Vec<ColumnInfo>> {
-    crate::database::metadata::db_table_columns(config_id, database, table).await
+    crate::plugins::database::metadata::db_table_columns(config_id, database, table).await
 }
 
 /// 获取表的索引信息
@@ -1150,7 +1159,7 @@ pub async fn db_table_indexes(
     database: String,
     table: String,
 ) -> Response<Vec<IndexInfo>> {
-    crate::database::metadata::db_table_indexes(config_id, database, table).await
+    crate::plugins::database::metadata::db_table_indexes(config_id, database, table).await
 }
 
 /// 获取建表 DDL
@@ -1160,7 +1169,7 @@ pub async fn db_table_schema(
     database: String,
     table: String,
 ) -> Response<String> {
-    crate::database::metadata::db_table_schema(config_id, database, table).await
+    crate::plugins::database::metadata::db_table_schema(config_id, database, table).await
 }
 
 // ---- 目录能力声明与新增对象（走 catalog 抽象，各库按自身能力实现）----
@@ -1168,7 +1177,7 @@ pub async fn db_table_schema(
 /// 查询当前连接支持哪些目录能力（前端据此决定渲染哪些树节点）
 #[tauri::command]
 pub async fn db_catalog_capabilities(config_id: String) -> Response<CatalogCapabilities> {
-    crate::database::metadata::db_catalog_capabilities(config_id).await
+    crate::plugins::database::metadata::db_catalog_capabilities(config_id).await
 }
 
 /// 获取指定库的视图列表
@@ -1177,7 +1186,7 @@ pub async fn db_list_views(
     config_id: String,
     database: String,
 ) -> Response<Vec<DatabaseObjectInfo>> {
-    crate::database::metadata::db_list_views(config_id, database).await
+    crate::plugins::database::metadata::db_list_views(config_id, database).await
 }
 
 /// 获取指定库的存储过程列表
@@ -1186,7 +1195,7 @@ pub async fn db_list_procedures(
     config_id: String,
     database: String,
 ) -> Response<Vec<DatabaseObjectInfo>> {
-    crate::database::metadata::db_list_procedures(config_id, database).await
+    crate::plugins::database::metadata::db_list_procedures(config_id, database).await
 }
 
 /// 获取指定库的触发器列表
@@ -1195,7 +1204,7 @@ pub async fn db_list_triggers(
     config_id: String,
     database: String,
 ) -> Response<Vec<DatabaseObjectInfo>> {
-    crate::database::metadata::db_list_triggers(config_id, database).await
+    crate::plugins::database::metadata::db_list_triggers(config_id, database).await
 }
 
 /// 获取指定库的事件列表（仅 MySQL 支持）
@@ -1204,7 +1213,7 @@ pub async fn db_list_events(
     config_id: String,
     database: String,
 ) -> Response<Vec<DatabaseObjectInfo>> {
-    crate::database::metadata::db_list_events(config_id, database).await
+    crate::plugins::database::metadata::db_list_events(config_id, database).await
 }
 
 /// 获取指定库的索引聚合
@@ -1213,31 +1222,31 @@ pub async fn db_list_database_indexes(
     config_id: String,
     database: String,
 ) -> Response<Vec<DatabaseIndexInfo>> {
-    crate::database::metadata::db_list_database_indexes(config_id, database).await
+    crate::plugins::database::metadata::db_list_database_indexes(config_id, database).await
 }
 
 /// 获取实例用户列表
 #[tauri::command]
 pub async fn db_list_users(config_id: String) -> Response<Vec<DbUserInfo>> {
-    crate::database::metadata::db_list_users(config_id).await
+    crate::plugins::database::metadata::db_list_users(config_id).await
 }
 
 /// 获取管理员列表（各库用自身原生语义判定）
 #[tauri::command]
 pub async fn db_list_admins(config_id: String) -> Response<Vec<DbAdminInfo>> {
-    crate::database::metadata::db_list_admins(config_id).await
+    crate::plugins::database::metadata::db_list_admins(config_id).await
 }
 
 /// 获取运行状态（scope: session | global）
 #[tauri::command]
 pub async fn db_show_status(config_id: String, scope: String) -> Response<Vec<KeyValueRow>> {
-    crate::database::metadata::db_show_status(config_id, scope).await
+    crate::plugins::database::metadata::db_show_status(config_id, scope).await
 }
 
 /// 获取系统变量（scope: session | global）
 #[tauri::command]
 pub async fn db_show_variables(config_id: String, scope: String) -> Response<Vec<KeyValueRow>> {
-    crate::database::metadata::db_show_variables(config_id, scope).await
+    crate::plugins::database::metadata::db_show_variables(config_id, scope).await
 }
 
 // ==================== 数据库导入导出 ====================
@@ -1250,7 +1259,7 @@ pub async fn db_export_csv(
     table: String,
     file_path: String,
 ) -> Response<ExportResult> {
-    crate::database::import_export::db_export_csv(config_id, database, table, file_path).await
+    crate::plugins::database::import_export::db_export_csv(config_id, database, table, file_path).await
 }
 
 /// 导出表数据为 Excel
@@ -1261,7 +1270,7 @@ pub async fn db_export_excel(
     table: String,
     file_path: String,
 ) -> Response<ExportResult> {
-    crate::database::import_export::db_export_excel(config_id, database, table, file_path).await
+    crate::plugins::database::import_export::db_export_excel(config_id, database, table, file_path).await
 }
 
 /// 按任意 SQL 语句导出结果为 CSV
@@ -1271,7 +1280,7 @@ pub async fn db_export_sql_csv(
     sql: String,
     file_path: String,
 ) -> Response<ExportResult> {
-    crate::database::import_export::db_export_sql_csv(config_id, sql, file_path).await
+    crate::plugins::database::import_export::db_export_sql_csv(config_id, sql, file_path).await
 }
 
 /// 按任意 SQL 语句导出结果为 Excel
@@ -1281,7 +1290,7 @@ pub async fn db_export_sql_excel(
     sql: String,
     file_path: String,
 ) -> Response<ExportResult> {
-    crate::database::import_export::db_export_sql_excel(config_id, sql, file_path).await
+    crate::plugins::database::import_export::db_export_sql_excel(config_id, sql, file_path).await
 }
 
 /// 从 CSV 导入数据到表
@@ -1293,7 +1302,7 @@ pub async fn db_import_csv(
     file_path: String,
     has_header: bool,
 ) -> Response<ImportResult> {
-    crate::database::import_export::db_import_csv(config_id, database, table, file_path, has_header)
+    crate::plugins::database::import_export::db_import_csv(config_id, database, table, file_path, has_header)
         .await
 }
 
@@ -1305,7 +1314,7 @@ pub async fn db_import_excel(
     table: String,
     file_path: String,
 ) -> Response<ImportResult> {
-    crate::database::import_export::db_import_excel(config_id, database, table, file_path).await
+    crate::plugins::database::import_export::db_import_excel(config_id, database, table, file_path).await
 }
 
 // ==================== 实时流日志 ====================
@@ -1396,6 +1405,18 @@ pub fn plugin_get_order() -> Response<Vec<String>> {
 #[tauri::command]
 pub fn plugin_set_order(order: Vec<String>) -> Response<bool> {
     plugin_host::plugin_set_order(order)
+}
+
+/// 收紧某插件的页面能力（**只能减，不能加**；传空数组 = 恢复插件自己的声明）
+///
+/// 生效口径 = 清单 `pageCapabilities` − `denied`，下一次加载插件页时生效
+/// （CSP 是按响应算的，已打开的页面要重新打开才拿得到新策略）。
+#[tauri::command]
+pub fn plugin_set_page_caps(id: String, denied: Vec<String>) -> Response<bool> {
+    match plugin_host::set_denied_page_caps(&id, &denied) {
+        Ok(()) => Response::new(200, true, "ok"),
+        Err(e) => Response::new(500, false, &e),
+    }
 }
 
 /// 调用插件后端逻辑（进 Extism WASM 沙箱）。

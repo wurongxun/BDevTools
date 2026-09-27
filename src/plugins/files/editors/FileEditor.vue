@@ -25,7 +25,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Document } from '@element-plus/icons-vue'
-import useStore from '@/store'
 import { useDocumentManagerStore } from '../store/documents'
 import CodeEditor from './EditorType/CodeEditor.vue'
 import ImageEditor from './EditorType/ImageEditor.vue'
@@ -33,7 +32,6 @@ import PdfEditor from './EditorType/PdfEditor.vue'
 import MdEditor from './EditorType/MdEditor.vue'
 import TextView from './EditorType/TextView.vue'
 
-const { fileTreeStore } = useStore()
 const docStore = useDocumentManagerStore()
 
 const activeDocument = computed(() => docStore.activeDocument)

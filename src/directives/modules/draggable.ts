@@ -83,7 +83,7 @@ const instance: Directive = {
       }
     })
   },
-  unmounted(el: HTMLElement) {}
+  unmounted() {}
 }
 
 export default { name: 'draggable', instance }

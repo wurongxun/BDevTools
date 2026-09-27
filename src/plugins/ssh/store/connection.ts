@@ -8,7 +8,6 @@ import type {
   ConnectionStatus,
   TabContentType
 } from '../types'
-import { ConnectionType } from '../types'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { useWorkspaceConnections, WORKSPACE_CONNECTION_KEYS } from '@/composables/useWorkspaceConnections'
 import { useFtpStore } from './ftp'

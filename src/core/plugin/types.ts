@@ -187,6 +187,11 @@ export interface InstalledPlugin {
   settings: SettingDef[]
   /** 插件页能力声明（空 = 最严 CSP）；用于「3D 与游戏」容器与设置页展示 */
   page_capabilities: string[]
+  /**
+   * 用户在设置里**收紧掉**的页面能力（settings.json `plugin_caps_denied`）。
+   * 生效口径 = `page_capabilities` − 本集合：只能减，不能加。
+   */
+  denied_page_capabilities?: string[]
   /** 主界面是否在独立窗口里（清单 `standaloneWindow`） */
   standalone_window: boolean
   enabled: boolean
@@ -218,6 +223,11 @@ export interface PluginListItem {
   settings: SettingDef[]
   /** 插件页能力声明（空 = 最严 CSP；内置插件恒为空） */
   pageCapabilities: string[]
+  /**
+   * 用户收紧掉的页面能力（内置插件恒为空：内置不是第三方包，没有 CSP 可收紧）。
+   * 始终只可能 ⊆ `pageCapabilities`。
+   */
+  deniedPageCapabilities: string[]
   /** 主界面是否在独立窗口里（内置插件恒为 false） */
   standaloneWindow: boolean
   /**

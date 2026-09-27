@@ -138,7 +138,6 @@
 </template>
 
 <script setup lang="ts">
-import useStore from '@/store'
 import { useDocumentManagerStore } from '../store/documents'
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { TabBarContainer, TabBarItem, TabCloseButton } from '@/components/TabBar'
@@ -275,11 +274,6 @@ function scrollRight() {
     left: 200,
     behavior: 'smooth'
   })
-}
-
-// 处理鼠标滚轮（TabBarContainer 已处理滚动转换，此处仅更新按钮状态）
-function handleWheel() {
-  updateScrollButtons()
 }
 
 // 更新滚动按钮状态

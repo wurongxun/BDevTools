@@ -238,7 +238,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@/api/rpc'
 import { desktopDir, dirname, open } from '@/core/runtime'
-import { Upload, Download, FolderAdd, Delete, Refresh, EditPen, ArrowUp, ArrowDown, Star, Close } from '@element-plus/icons-vue'
+import { Star, Close } from '@element-plus/icons-vue'
 // 保留 Element Plus 图标导入（其他位置可能使用）
 import { ElInput } from 'element-plus'
 import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
@@ -257,7 +257,6 @@ const props = defineProps<{
 
 const connectionStore = useConnectionStore()
 const ftpStore = useFtpStore()
-const docStore = useDocumentManagerStore()
 
 const isConnecting = ref(false)
 

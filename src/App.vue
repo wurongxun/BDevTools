@@ -67,7 +67,7 @@ import elZhTw from 'element-plus/es/locale/lang/zh-tw'
 import elEn from 'element-plus/es/locale/lang/en'
 import useStore from '@/store'
 import Layout from '@/Layout/index.vue'
-import Common from '@/views/Common/Common.vue'
+import Common from '@/components/Common/Common.vue'
 import GlobalDialog from '@/components/GlobalDialog.vue'
 import WorkspaceSelectDialog from '@/components/WorkspaceSelectDialog.vue'
 import type { WindowRole } from '@/Types/workspace'
@@ -160,9 +160,9 @@ const appPageTitle = ref('')
 
 // 页面组件映射（懒加载）
 const pageComponentMap: Record<string, { title: string; loader: () => Promise<any> }> = {
-  'App-setting': { title: '设置', loader: () => import('@/views/app/AppSetting.vue') },
-  'App-about': { title: '关于', loader: () => import('@/views/app/AppAbout.vue') },
-  'App-help': { title: '帮助', loader: () => import('@/views/app/AppHelp.vue') }
+  'App-setting': { title: '设置', loader: () => import('@/plugins/settings/app/AppSetting.vue') },
+  'App-about': { title: '关于', loader: () => import('@/plugins/settings/app/AppAbout.vue') },
+  'App-help': { title: '帮助', loader: () => import('@/plugins/settings/app/AppHelp.vue') }
 }
 
 /**

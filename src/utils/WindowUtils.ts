@@ -1,4 +1,4 @@
-import { WebviewWindow, getCurrentWebviewWindow, load } from '@/core/runtime'
+import { WebviewWindow, load } from '@/core/runtime'
 import type { Window } from '@/core/runtime'
 import { invoke } from '@/api/rpc'
 import type { WindowMeta } from '@/Types/workspace'

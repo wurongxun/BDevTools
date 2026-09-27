@@ -139,13 +139,12 @@ import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
 import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
 import { useDocumentManagerStore } from '@/plugins/files/store/documents'
-import { open, subscribe } from '@/core/runtime'
+import { subscribe } from '@/core/runtime'
 import { WINDOW_PRESETS_CHANGED_EVENT } from '@/core/windowPresets'
 import { openAppWindow, createEditorWindow, createPresetWindow } from '@/utils/WindowUtils'
 import { pluginManager } from '@/core/pluginManager'
 import type { WindowPresetConfig } from '@/utils/WindowUtils'
 import type { WindowMeta } from '@/Types/workspace'
-import type { WorkspaceConfig } from '@/Types/workspace'
 const {fileTreeStore,useLayoutStore } = useStore()
 const workspaceStore = useWorkspaceStore()
 const docStore = useDocumentManagerStore()

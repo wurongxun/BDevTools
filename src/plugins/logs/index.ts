@@ -1,5 +1,4 @@
 import { markRaw } from 'vue'
-import { DataLine } from '@element-plus/icons-vue'
 import type { ToolPlugin } from '@/core/pluginManager'
 import SidebarPanel from './sidebar/SidebarPanel.vue'
 import LogWorkspace from './components/LogWorkspace.vue'

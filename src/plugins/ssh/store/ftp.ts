@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { invoke } from '@/api/rpc'
-import type { FtpFileItem, TransferTask, FtpPanelState } from '../types'
+import type { TransferTask, FtpPanelState } from '../types'
 import NotificationUtil from '@/utils/NotificationUtil'
 
 let taskIdCounter = 0

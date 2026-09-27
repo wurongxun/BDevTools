@@ -32,7 +32,7 @@
 
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from 'vue'
-import { ArrowDown, ArrowUp, Close, WarningFilled } from '@element-plus/icons-vue'
+import { Close, WarningFilled } from '@element-plus/icons-vue'
 import { useLogStore } from '../store/logs'
 import LogToolbar from './LogToolbar.vue'
 import FilterBar from './FilterBar.vue'

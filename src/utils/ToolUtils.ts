@@ -106,7 +106,7 @@ export default class ToolUtils {
   static notEmptyObject(obj: any) {
     if (typeof obj !== 'object') return false
     let result: number = 0
-    for (const key in obj) {
+    for (const _key in obj) {
       result++
     }
 

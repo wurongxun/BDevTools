@@ -12,11 +12,9 @@ class NotebookInfo {
   public children: Array<NotebookInfo> = []
 }
 import NotificationUtil from '@/utils/NotificationUtil'
-import request from '@/utils/request/index'
 import { tauri_request } from '@/utils/tauri_request'
-import { defineAsyncComponent, ref } from 'vue'
+import { ref } from 'vue'
 import {
-  note_comm_router,
   note_comm_router_notebookMd,
   note_comm_router_notebookPdf
 } from '@/setting'

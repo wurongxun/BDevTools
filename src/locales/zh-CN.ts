@@ -1,8 +1,3 @@
-//import Calendar from "@/views/element/Icon/Calendar.vue";
-
-import { Notebook } from '@element-plus/icons-vue'
-import { labelInner } from 'echarts/types/src/label/labelStyle.js'
-
 export default {
   appName: 'BackendDevTools',
   settings: {

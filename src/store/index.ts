@@ -4,7 +4,6 @@ import userStore from './modules/user'
 import permissionStore from './modules/permission'
 import errorInfoStore from './modules/errorInfo'
 import { appConfigInfo } from './modules/appConfigInfo'
-// import { useNoteStore } from './modules/noteTem'
 import { fileTreeStore } from './modules/fileTree'
 import { useWorkspaceStore } from './modules/workspace'
 import { useSessionStore } from './modules/session'
@@ -26,4 +25,3 @@ export default function useStore() {
     useLayoutStore: useLayoutStore(pinia)
   }
 }
-//noteTem: useNoteStore(pinia),

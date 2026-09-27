@@ -109,7 +109,7 @@ import {
   View, Sort, SetUp, MagicStick, Timer,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import type { ElTree, TreeInstance } from 'element-plus'
+import type { TreeInstance } from 'element-plus'
 import { useConnectionStore, useEditorStore, useDbSidebarStore } from '../store'
 import {
   dbListDatabases, dbListTables, dbTableColumns,

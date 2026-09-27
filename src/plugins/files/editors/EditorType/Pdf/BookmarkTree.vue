@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { ArrowRight, ArrowDown, Document } from '@element-plus/icons-vue'
 
 interface BookmarkItem {

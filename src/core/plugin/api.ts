@@ -2,7 +2,8 @@
  * 第三方插件后端命令封装（唯一入口：`@/api/rpc`）。
  *
  * 对应命令：plugin_list / plugin_install / plugin_uninstall /
- * plugin_set_enabled / plugin_get_order / plugin_set_order / plugin_call
+ * plugin_set_enabled / plugin_get_order / plugin_set_order / plugin_call /
+ * plugin_set_page_caps
  */
 import { call } from '@/api/rpc'
 import type { ApiResp, CallStats, InstalledPlugin, PluginRuntimeInfo } from './types'
@@ -74,6 +75,17 @@ export async function callPlugin(
   } catch (e) {
     return { code: 500, data: '', msg: e instanceof Error ? e.message : String(e) }
   }
+}
+
+/**
+ * 收紧某插件的页面能力（`denied` 传空数组 = 恢复插件自己的声明）。
+ *
+ * **只能减不能加**：用户不能替插件声明它没要过的 `pageCapabilities`。
+ * 下一次加载插件页生效（CSP 是按响应算的，已打开的页面要重新打开才拿得到新策略）。
+ */
+export async function setPluginPageCaps(id: string, denied: string[]): Promise<void> {
+  const res = await call<ApiResp<boolean>>('plugin_set_page_caps', { id, denied })
+  if (res?.code !== 200) throw new Error(res?.msg || '保存页面能力失败')
 }
 
 /** WASM 运行时信息（是否启用 + 资源限制 + 支持的权限声明形态） */

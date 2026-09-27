@@ -212,7 +212,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     // 临时工作区关窗即删：写进预设会留下悬空绑定（设置页卡片会显示「(工作区已删除)」）
     if (isTemporary(currentWorkspace.value)) return
     try {
-      const { rememberCurrentWindowWorkspace } = await import('@/views/app/setting/useWindowPresetsStore')
+      const { rememberCurrentWindowWorkspace } = await import('@/plugins/settings/components/useWindowPresetsStore')
       await rememberCurrentWindowWorkspace(workspaceId)
     } catch (e) {
       console.warn('[workspace] 记住窗口预设的工作区绑定失败:', e)

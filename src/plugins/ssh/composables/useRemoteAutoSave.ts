@@ -1,6 +1,5 @@
 import { watch, onUnmounted } from 'vue'
 import { useDocumentManagerStore } from '@/plugins/files/store/documents'
-import NotificationUtil from '@/utils/NotificationUtil'
 
 /**
  * 远程文件自动保存 composable

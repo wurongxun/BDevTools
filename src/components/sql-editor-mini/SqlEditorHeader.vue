@@ -1,6 +1,6 @@
 <template>
   <div class="sql-header" :class="{ 'is-expanded': expanded }">
-    <!-- ========== 折叠态单行头部 ========== -->
+    <!-- ========== 折叠态：单行头部 ========== -->
     <div v-if="!expanded" class="qr-header-collapsed" @click="toggleExpand">
       <!-- 左侧：SQL 语句预览（截断显示） + 展开按钮 -->
       <div class="sql-preview" :title="modelValue">
@@ -16,15 +16,14 @@
 
       <!-- 展开/折叠图标 -->
       <el-tooltip content="展开编辑器" placement="bottom">
-        <button class="icon-btn expand-btn" @click.stop="toggleExpand">
+        <button class="icon-btn expand-btn" aria-label="展开编辑器" @click.stop="toggleExpand">
           <el-icon><Expand /></el-icon>
         </button>
       </el-tooltip>
 
-      <!-- 分隔符 -->
       <div class="divider-v"></div>
 
-      <!-- 中间：快速过滤框（单行） -->
+      <!-- 中间：快速过滤框（单行）：仅过滤当前页结果，不改 SQL -->
       <div class="quick-filter" @click.stop>
         <el-input
           v-model="filterText"
@@ -38,15 +37,23 @@
 
       <div class="divider-v"></div>
 
-      <!-- 右侧：工具栏按钮组（仿 DBeaver 风格，图标按钮 + 下拉箭头） -->
+      <!-- 右侧：工具栏（运行 / 模板 / 撤销 · 重做）
+           导入、导出、保存一律不放这里：导出在结果区底部 ResultFooter，保存由编辑器 Tab 负责 -->
       <div class="toolbar" @click.stop>
-        <!-- 运行按钮（主按钮，带下拉） -->
+        <!-- 运行按钮（主按钮，带下拉）
+             用原生 button 而非 el-button：el-dropdown 需要拿到真实 DOM 作为触发锚点，
+             app-button 不透传 DOM 引用；这里与 ToolDropdown 保持同一写法 -->
         <el-dropdown trigger="click" @command="handleRunCommand">
-          <el-button size="small" type="primary" class="run-btn" :loading="loading">
+          <button
+            class="run-btn"
+            type="button"
+            :disabled="loading"
+            :aria-label="`${runLabel} (Ctrl+Enter)`"
+          >
             <el-icon class="play-icon"><VideoPlay /></el-icon>
             <span class="run-label">{{ runLabel }}</span>
             <el-icon class="arrow-down"><ArrowDown /></el-icon>
-          </el-button>
+          </button>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="run">执行 (Ctrl+Enter)</el-dropdown-item>
@@ -59,21 +66,8 @@
 
         <div class="divider-v thin"></div>
 
-        <!-- 保存 / 导出 -->
-        <ToolBtn icon="Document" :title="'保存SQL (Ctrl+S)'" @click="emit('save')" />
-        <ToolDropdown icon="Download" title="导出结果">
-          <el-dropdown-menu>
-            <el-dropdown-item command="csv">导出为 CSV</el-dropdown-item>
-            <el-dropdown-item command="excel">导出为 Excel</el-dropdown-item>
-            <el-dropdown-item command="json">导出为 JSON</el-dropdown-item>
-            <el-dropdown-item command="insert">导出为 INSERT 语句</el-dropdown-item>
-          </el-dropdown-menu>
-        </ToolDropdown>
-
-        <div class="divider-v thin"></div>
-
-        <!-- SQL 模板 / 代码片段 -->
-        <ToolDropdown icon="EditPen" title="SQL 模板">
+        <!-- SQL 模板 / 代码片段：追加到编辑器末尾 -->
+        <ToolDropdown icon="EditPen" title="SQL 模板" @command="cmd => emit('template', cmd)">
           <el-dropdown-menu>
             <el-dropdown-item command="select">SELECT * FROM</el-dropdown-item>
             <el-dropdown-item command="insert">INSERT INTO</el-dropdown-item>
@@ -86,24 +80,13 @@
         <!-- 历史：撤销 / 重做 -->
         <ToolBtn icon="Back" title="撤销 (Ctrl+Z)" :disabled="!canUndo" @click="emit('undo')" />
         <ToolBtn icon="Right" title="重做 (Ctrl+Y)" :disabled="!canRedo" @click="emit('redo')" />
-
-        <div class="divider-v thin"></div>
-
-        <!-- 结果集切换 -->
-        <ToolDropdown icon="Tickets" title="结果集展示">
-          <el-dropdown-menu>
-            <el-dropdown-item command="grid">网格视图</el-dropdown-item>
-            <el-dropdown-item command="text">文本视图</el-dropdown-item>
-            <el-dropdown-item command="json-view">JSON 视图</el-dropdown-item>
-          </el-dropdown-menu>
-        </ToolDropdown>
       </div>
     </div>
 
     <!-- ========== 展开态：多行 SQL 编辑器 ========== -->
     <div v-else class="qr-header-expanded">
       <div class="sql-editor-wrap">
-        <!-- 编辑器顶部：SQL 标签/语言标识 -->
+        <!-- 编辑器顶部：SQL 标签/表名标识 -->
         <div class="editor-topbar">
           <span class="lang-tag">
             <el-icon><Document /></el-icon>
@@ -112,12 +95,12 @@
           <span class="charset-tag">{{ tableName || 'untitled' }}</span>
           <div class="editor-actions">
             <el-tooltip content="格式化 SQL" placement="bottom">
-              <button class="icon-btn small" @click="handleFormat">
+              <button class="icon-btn small" aria-label="格式化 SQL" @click="handleFormat">
                 <el-icon><MagicStick /></el-icon>
               </button>
             </el-tooltip>
             <el-tooltip content="折叠 (Esc)" placement="bottom">
-              <button class="icon-btn small" @click="toggleExpand">
+              <button class="icon-btn small" aria-label="折叠编辑器" @click="toggleExpand">
                 <el-icon><Fold /></el-icon>
               </button>
             </el-tooltip>
@@ -138,7 +121,6 @@
           @keydown.ctrl.enter.prevent="handleRun"
           @keydown.meta.enter.prevent="handleRun"
           @keydown.esc.prevent="toggleExpand"
-          @keydown.ctrl.s.prevent="emit('save')"
           @keydown.ctrl.z.prevent="emit('undo')"
           @keydown.ctrl.y.prevent="emit('redo')"
         />
@@ -156,16 +138,15 @@
               v-model="filterText"
               size="small"
               class="filter-input-expanded"
-              placeholder="输入表达式过滤结果 (Ctrl+Space 补全)"
+              :placeholder="filterPlaceholder"
               clearable
               @keydown.enter="handleFilter"
-              @keydown.ctrl.space.prevent="emit('complete')"
             />
-            <el-button size="small" @click="emit('cancel')">取消</el-button>
-            <el-button size="small" type="primary" :loading="loading" @click="handleRun">
+            <app-button size="small" @click="emit('cancel')">取消</app-button>
+            <app-button size="small" type="primary" :loading="loading" @click="handleRun">
               <el-icon><VideoPlay /></el-icon>
               <span style="margin-left:4px">运行 (Ctrl+Enter)</span>
-            </el-button>
+            </app-button>
           </div>
         </div>
       </div>
@@ -176,17 +157,28 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import {
-  Expand, Fold, VideoPlay, ArrowDown, Document, Download,
-  EditPen, Back, Right, Tickets, MagicStick,
+  Expand, Fold, VideoPlay, ArrowDown, Document,
+  MagicStick,
 } from '@element-plus/icons-vue'
 import ToolBtn from './ToolBtn.vue'
 import ToolDropdown from './ToolDropdown.vue'
 
+/**
+ * SQL 结果区的头部编辑器（DBeaver 风格）
+ *
+ * 职责边界：**只负责「编辑 + 执行动作」，不负责数据落盘与结果导出**。
+ * 保存由编辑器 Tab 负责，导出/分页/统计在结果区底部 ResultFooter，
+ * 因此这里刻意不提供保存、导出、导入按钮（重复入口会造成行为分歧）。
+ *
+ * 折叠态单行预览 + 展开态多行编辑；两种形态都保留过滤框。
+ */
 interface Props {
   modelValue: string
   loading?: boolean
+  /** 展示用的表名/标识（顶部标签栏） */
   tableName?: string
   rows?: number
+  /** 单表查询 → 展示「可增删改」徽标 */
   isSingleTable?: boolean
   canUndo?: boolean
   canRedo?: boolean
@@ -202,7 +194,7 @@ const props = withDefaults(defineProps<Props>(), {
   canUndo: false,
   canRedo: false,
   runLabel: '运行',
-  filterPlaceholder: '输入一个SQL表达式来过滤结果 (使用 Ctrl+Space)',
+  filterPlaceholder: '输入关键字过滤当前页结果',
 })
 
 const emit = defineEmits<{
@@ -210,14 +202,11 @@ const emit = defineEmits<{
   (e: 'run', sql: string): void
   (e: 'run-command', cmd: string): void
   (e: 'filter', keyword: string): void
-  (e: 'save'): void
   (e: 'undo'): void
   (e: 'redo'): void
   (e: 'format'): void
-  (e: 'complete'): void
   (e: 'cancel'): void
   (e: 'template', cmd: string): void
-  (e: 'export', fmt: string): void
   (e: 'expand-change', expanded: boolean): void
 }>()
 
@@ -248,14 +237,14 @@ const handleFilter = () => emit('filter', filterText.value)
 const handleFormat = () => emit('format')
 const handleRunCommand = (cmd: string) => emit('run-command', cmd)
 
-// 外部可调用：关闭折叠
+// 外部可调用：折叠 / 展开 / 写入过滤词
 defineExpose({
   collapse: () => (expanded.value = false),
   expand: () => { expanded.value = true; nextTick(() => sqlInputRef.value?.textarea?.focus()) },
   setFilter: (v: string) => (filterText.value = v),
 })
 
-// 默认允许父组件用 esc 关闭
+// 展开态允许用 Esc 收起（编辑区内 Esc 已在模板里 prevent 掉，这里兜住点击别处的场景）
 watch(expanded, (v) => {
   if (v) {
     const onKey = (e: KeyboardEvent) => {
@@ -271,11 +260,17 @@ watch(expanded, (v) => {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/theme.scss' as theme;
+
+/* 全部取主题令牌 / EP 语义变量：禁止硬编码底色，暗色主题下才不会白得刺眼 */
 .sql-header {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
-  border: 1px solid #d0d7de;
-  border-radius: 4px;
-  background: #fafbfc;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--radius-sm, 4px);
+  @include theme.useTheme {
+    background: theme.getVar('bgColor');
+  }
   overflow: hidden;
   user-select: none;
 }
@@ -288,9 +283,9 @@ watch(expanded, (v) => {
   padding: 0 4px;
   gap: 0;
   cursor: pointer;
-  background: linear-gradient(to bottom, #ffffff, #f6f8fa);
+  background: var(--el-fill-color-lighter);
   transition: background .15s;
-  &:hover { background: linear-gradient(to bottom, #f0f6ff, #e8f0fe); }
+  &:hover { background: var(--el-fill-color-light); }
 }
 
 .sql-preview {
@@ -298,27 +293,27 @@ watch(expanded, (v) => {
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
-  min-width: 260px;
+  min-width: 200px;
   max-width: 520px;
   padding: 0 8px;
-  font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
-  font-size: 13px;
-  color: #24292f;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--el-text-color-primary);
   overflow: hidden;
   .sql-icon {
     display: inline-flex;
     align-items: center;
-    color: #f59e0b;
+    color: var(--el-color-warning);
     flex-shrink: 0;
   }
   .sql-text {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: #0550ae; // SQL 关键字蓝
+    color: var(--el-color-primary); // SQL 关键字蓝
     letter-spacing: 0;
   }
-  .sql-ellipsis { color: #8c959f; }
+  .sql-ellipsis { color: var(--el-text-color-placeholder); }
 }
 
 .expand-btn {
@@ -329,23 +324,24 @@ watch(expanded, (v) => {
 .divider-v {
   width: 1px;
   height: 22px;
-  background: #d0d7de;
+  background: var(--el-border-color);
   margin: 0 4px;
-  &.thin { background: #e5e9ef; margin: 0 2px; height: 18px; }
+  flex-shrink: 0;
+  &.thin { background: var(--el-border-color-lighter); margin: 0 2px; height: 18px; }
 }
 
 .quick-filter {
   flex: 1 1 auto;
-  min-width: 180px;
+  min-width: 140px;
   padding: 0 4px;
   .filter-input :deep(.el-input__wrapper) {
     background: transparent;
     box-shadow: none;
-    font-size: 12px;
-    &:hover, &.is-focus { box-shadow: 0 0 0 1px #0969da inset; background: #fff; }
+    font-size: var(--font-size-sm);
+    &:hover, &.is-focus { box-shadow: 0 0 0 1px var(--el-color-primary) inset; background: var(--el-bg-color); }
   }
-  .filter-input :deep(.el-input__inner) { color: #57606a; }
-  .filter-input :deep(input::placeholder) { color: #8c959f; font-style: italic; }
+  .filter-input :deep(.el-input__inner) { color: var(--el-text-color-regular); }
+  .filter-input :deep(input::placeholder) { color: var(--el-text-color-placeholder); font-style: italic; }
 }
 
 /* ========== 工具栏 ========== */
@@ -361,8 +357,16 @@ watch(expanded, (v) => {
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
+  border: none;
+  border-radius: 3px;
+  background: var(--el-color-primary);
+  color: #fff;
+  cursor: pointer;
+  transition: background .15s;
+  &:hover:not(:disabled) { background: var(--el-color-primary-light-3); }
+  &:disabled { background: var(--el-color-primary-light-5); cursor: not-allowed; }
   .play-icon { font-size: 12px; }
-  .run-label { font-size: 12px; font-weight: 500; }
+  .run-label { font-size: var(--font-size-sm); font-weight: 500; }
   .arrow-down { font-size: 10px; margin-left: 2px; }
 }
 
@@ -374,17 +378,17 @@ watch(expanded, (v) => {
   justify-content: center;
   border: none;
   background: transparent;
-  color: #57606a;
+  color: var(--el-text-color-secondary);
   border-radius: 3px;
   cursor: pointer;
   transition: all .15s;
-  &:hover { background: #eaeef2; color: #0969da; }
-  &:disabled { opacity: .4; cursor: not-allowed; &:hover { background: transparent; color: #57606a; } }
+  &:hover { background: var(--el-fill-color); color: var(--el-color-primary); }
+  &:disabled { opacity: .4; cursor: not-allowed; &:hover { background: transparent; color: var(--el-text-color-secondary); } }
   &.small { width: 24px; height: 24px; font-size: 13px; }
 }
 
 /* ========== 展开态 ========== */
-.qr-header-expanded { padding: 0; background: #fff; }
+.qr-header-expanded { padding: 0; background: var(--el-bg-color); }
 
 .sql-editor-wrap { display: flex; flex-direction: column; }
 
@@ -393,23 +397,23 @@ watch(expanded, (v) => {
   align-items: center;
   height: 28px;
   padding: 0 8px;
-  background: #f6f8fa;
-  border-bottom: 1px solid #e5e9ef;
+  background: var(--el-fill-color-lighter);
+  border-bottom: 1px solid var(--el-border-color-lighter);
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   .lang-tag {
     display: inline-flex;
     align-items: center;
     gap: 4px;
     padding: 2px 8px;
-    background: #ddf4ff;
-    color: #0969da;
+    background: var(--el-color-info-light-9);
+    color: var(--el-color-info);
     border-radius: 3px;
     font-weight: 600;
   }
   .charset-tag {
-    color: #8c959f;
-    font-family: monospace;
+    color: var(--el-text-color-placeholder);
+    font-family: var(--font-family-mono);
   }
   .editor-actions {
     margin-left: auto;
@@ -420,14 +424,14 @@ watch(expanded, (v) => {
 
 .sql-textarea {
   :deep(.el-textarea__inner) {
-    font-family: 'JetBrains Mono', 'Consolas', 'Monaco', 'Fira Code', monospace;
-    font-size: 13px;
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-base);
     line-height: 1.6;
     padding: 8px 12px;
     border: none;
     border-radius: 0;
-    background: #fff;
-    color: #24292f;
+    background: var(--el-bg-color);
+    color: var(--el-text-color-primary);
     resize: none;
     box-shadow: none;
     &:focus { box-shadow: none; }
@@ -438,39 +442,40 @@ watch(expanded, (v) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 34px;
+  min-height: 34px;
   padding: 0 8px;
-  background: #f6f8fa;
-  border-top: 1px solid #e5e9ef;
+  background: var(--el-fill-color-lighter);
+  border-top: 1px solid var(--el-border-color-lighter);
   gap: 12px;
+  flex-wrap: wrap;
 
   .status-info {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     .badge {
       padding: 2px 8px;
       border-radius: 3px;
       font-weight: 500;
-      &.single { background: #dafbe1; color: #1a7f37; }
-      &.multi { background: #fff8c5; color: #9a6700; }
+      &.single { background: var(--el-color-success-light-9); color: var(--el-color-success); }
+      &.multi { background: var(--el-color-warning-light-9); color: var(--el-color-warning); }
     }
-    .line-info { color: #8c959f; font-family: monospace; }
+    .line-info { color: var(--el-text-color-placeholder); font-family: var(--font-family-mono); }
   }
   .bottom-actions {
     display: flex;
     align-items: center;
     gap: 8px;
     .filter-input-expanded {
-      width: 320px;
-      :deep(.el-input__wrapper) { font-size: 12px; }
+      width: 260px;
+      :deep(.el-input__wrapper) { font-size: var(--font-size-sm); }
     }
   }
 }
 
 /* 下拉菜单项样式统一 */
 :deep(.el-dropdown-menu__item) {
-  font-size: 13px;
+  font-size: var(--font-size-base);
 }
 </style>

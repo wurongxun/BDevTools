@@ -5,7 +5,6 @@ import { invoke } from '@/api/rpc'
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/entity/entitys'
 import { md5 } from '@/utils/Md5Utils'
-import { pdf_store_conten_key_prefix, pdf_store_tem_key_prefix } from '@/setting'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { load, type Store } from '@/core/runtime'
 import type { OpenFileInfo } from '@/Types/workspace'
@@ -75,8 +74,6 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
 
   // 当前激活的文档路径
   const activeDocumentPath = ref<string | null>(null)
-  // 当前激活的文档key
-  const activeDocumentKey = ref<string | null>(null)
   // 文档打开顺序（用于标签页排序）
   const documentOrder = ref<string[]>([])
 
@@ -307,6 +304,13 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
         }
         doc.isLoading = false
         doc.lastModified = Date.now()
+      } else if (type === FileType.IMAGE) {
+        // 图片：整份读成 ArrayBuffer，由 ImageEditor 转 Blob URL（图片通常不大，且需要完整的二进制才能解码）
+        const content = await loadFileContent(filePath, type)
+        doc.content = content
+        doc.originalContent = content
+        doc.isLoading = false
+        doc.lastModified = Date.now()
       }
     } catch (error) {
       console.error(`Failed to load file: ${filePath}`, error)
@@ -424,31 +428,7 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     }
     // NotificationUtil.success(`已打开文件：${filePath}`)
     activeDocumentPath.value = filePath
-
-    // 更新文档顺序（将激活的文档移到最前面）
-    // if (filePath) {
-    //   const index = documentOrder.value.indexOf(filePath)
-    //   if (index > -1) {
-    //     documentOrder.value.splice(index, 1)
-    //     documentOrder.value.unshift(filePath)
-    //   }
-    // }
   }
-  /**
-   * 设置激活文档Key
-   */
-  function setActiveDocumentKey(key: string | null) {
-    // 保存当前文档的视图状态
-    if (activeDocumentKey.value) {
-      // 这里可以触发保存视图状态的逻辑
-    }
-    // NotificationUtil.success(`已打开文件：${filePath}`)
-    activeDocumentKey.value = key
-
-
-  }
-
-
   /**
    * 更新文档内容
    */
@@ -670,7 +650,6 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     documentOrder.value.splice(Math.min(index, documentOrder.value.length), 0, doc.id)
     // 激活该文档
     setActiveDocument(doc.id)
-    //setActiveDocumentKey(doc.key)
   }
 
   /**
@@ -773,7 +752,6 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     documents.value.set(id, doc)
     documentOrder.value.unshift(id)
     setActiveDocument(id)
-    //setActiveDocumentKey(hash)
     return id
   }
 
@@ -903,12 +881,16 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
 
   /**
    * 从磁盘加载文件内容
+   *
+   * 图片返回 `ArrayBuffer`（由 ImageEditor 转 Blob URL 显示）；
+   * PDF / 二进制返回 `null` —— PDF 由 PdfEditor 走 asset 协议（`convertFileSrc`）按需加载，
+   * 二进制没有查看器，把整份字节拉进内存纯属浪费。
    */
-  async function loadFileContent(filePath: string, fileType: FileType): Promise<string | ArrayBuffer> {
-    // 对于图片和二进制文件，返回 ArrayBuffer
-    if (fileType === FileType.IMAGE || fileType === FileType.BINARY|| fileType === FileType.PDF) {
-      return await invoke('read_file_bytes', { path: filePath })
+  async function loadFileContent(filePath: string, fileType: FileType): Promise<string | ArrayBuffer | null> {
+    if (fileType === FileType.IMAGE) {
+      return await invoke<ArrayBuffer>('read_file_bytes', { path: filePath })
     }
+    if (fileType === FileType.PDF || fileType === FileType.BINARY) return null
     var res = await tauri_request<ResponseData<string>>("read_note_file", {
       path: filePath
     });

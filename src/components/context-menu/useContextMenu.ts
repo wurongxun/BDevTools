@@ -52,7 +52,7 @@ export function showContextMenu(options: ContextMenuOptions) {
     }
   })
 
-  const instance = app.mount(container)
+  app.mount(container)
 
   contextMenuInstance = {
     app,

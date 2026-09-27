@@ -107,7 +107,6 @@
 import { invoke } from '@/api/rpc'
 import { Search, ArrowUp, ArrowDown, Close, ArrowLeft, ArrowRight, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import NotificationUtil from '@/utils/NotificationUtil'
-import { load, Store } from '@/core/runtime'
 import useStore from '@/store'
 import { useDocumentManagerStore } from '../../store/documents'
 const {appConfig } = useStore();
@@ -120,8 +119,6 @@ const docStore = useDocumentManagerStore()
  * - VIRTUAL_BUFFER: 可视区域上下额外渲染的行数，避免快速滚动时出现空白
  */
 let CHUNK_SIZE = computed(() => appConfig.read_lines)
-// 计算属性
-const read_lines = computed(() => appConfig.read_lines)
 
 const OVERLAP = 50
 
@@ -138,7 +135,6 @@ const emit = defineEmits<{
   'update-state': [state: Record<string, unknown>]
 }>()
 
-let store: Store | undefined = undefined
 
 /** 搜索功能状态：关键词、搜索会话ID、匹配序号与总数、跳转目标、搜索栏显隐 */
 const keyword = ref('')
@@ -151,8 +147,6 @@ const showSearchBar = ref(false)
 const matchLineNumbers = ref<number[]>([])
 /** 搜索功能状态：是否正在搜索 */
 const isSearching = ref(false)
-/** IME 输入法组合状态 */
-let isComposing = ref(false)
 /** IME 输入法组合状态 */
 let compositionEndTime = 0
 /** 内容渲染与虚拟滚动状态：行数据、起始行号、高亮行集合、目标行、DOM 引用 */
@@ -979,10 +973,6 @@ function addKeydownListener() {
 }
 onMounted(async () => {
   //初始化行数
-  store = await load('settings.json', {
-    autoSave: false,
-    defaults: {}
-  })
   if (props.path) {
     await restoreView(props.path)
     countTotalLinesAsync(props.path)

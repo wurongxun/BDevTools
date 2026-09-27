@@ -1,10 +1,9 @@
-import type { ComponentPublicInstance } from 'vue'
 import useStore from './store'
 import type { IErrorItem } from '@/Types/ErrorInfo'
 import ToolUtils from './utils/ToolUtils'
 
 const { errorStore } = useStore()
-const errorHandler = (err: unknown, vm: ComponentPublicInstance | null, info: string) => {
+const errorHandler = (err: unknown) => {
   if (err instanceof Error) {
     const title = err.message
     // 获取堆栈跟踪信息

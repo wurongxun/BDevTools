@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia'
-import { computed } from 'vue'
 import { pluginManager, type ToolPlugin } from '@/core/pluginManager'
 import { getCurrentWindow, publish } from '@/core/runtime'
 import { IMMERSIVE_STATE_EVENT } from '@/composables/useImmersiveShortcut'

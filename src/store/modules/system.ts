@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia'
-import { useDark, useToggle } from '@vueuse/core'
 
 const systemStore = defineStore('systemStore', {
   state: () => {

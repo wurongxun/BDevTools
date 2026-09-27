@@ -18,7 +18,6 @@ import FunctionalArea from './components/FunctionalArea/index.vue'
 import MenuBar from './components/MenuBar/index.vue'
 import QuickActions from './components/QuickActions/index.vue'
 import useStore from '@/store'
-import logoSrc from '@/assets/logo/128x128@2x.png'
 
 const store = useStore()
 

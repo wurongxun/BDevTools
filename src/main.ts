@@ -8,7 +8,6 @@ import '../mock'
 import 'element-plus/dist/index.css'
 import 'normalize.css/normalize.css'
 import '@/styles/index.scss'
-import IndexUtils from '@/utils/index'
 import SvgIcon from '@/components/SvgIcon.vue'
 import AppButton from '@/components/AppButton.vue'
 import registerDirectives from '@/directives/index'
@@ -53,8 +52,8 @@ async function initializeApp() {
   }
   registerDirectives(app)
 
-  app.config.errorHandler = (err, vm, info) => {
-    errorHandler(err, vm, info)
+  app.config.errorHandler = (err) => {
+    errorHandler(err)
   }
 
   // 挂载前恢复持久化设置（语言/主题等），避免首帧语言回退到默认值

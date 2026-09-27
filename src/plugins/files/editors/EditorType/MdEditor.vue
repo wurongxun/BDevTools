@@ -32,38 +32,26 @@
 <script setup lang="ts" name="MdEditor">
 import {
   computed,
-  h,
-  defineComponent,
   onMounted,
   reactive,
   ref,
-  toRefs,
-  createVNode,
-  toRaw,
   onActivated,
   onDeactivated,
   watch,
   onUnmounted,
   nextTick,
 } from "vue";
-import { ElMessage } from "element-plus";
 import NotificationUtil from "@/utils/NotificationUtil";
-import { invoke } from "@/api/rpc";
 import { getCurrentWindow } from "@/core/runtime";
 import { MdEditor } from "md-editor-v3";
 import type { ExposeParam } from 'md-editor-v3';
 import "md-editor-v3/lib/style.css";
 import { ResponseData } from "@/entity/entitys";
-import { load, Store } from "@/core/runtime";
 import { tauri_request } from "@/utils/tauri_request";
 import { Document } from '@element-plus/icons-vue';
 import { subscribe, Unsubscribe } from "@/core/runtime";
 import { isDark } from '@/composables/useDark';
-import useStore from '@/store'
 import { useDocumentManagerStore } from '../../store/documents'
-import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
-// --- 状态与 Store 初始化 ---
-let store: Store | undefined = undefined;
 const docStore = useDocumentManagerStore()
 
 // 接收父组件传入的文档路径（每个实例绑定自己的文档）
@@ -117,14 +105,7 @@ const handleWindowResize = async () => {
   }, 250);
 };
 
-// 当前激活的文档路径
-const activeDocId = computed(() => docStore.activeDocumentPath)
-
-// 当前组件绑定的文档路径（来自 prop，非全局状态）
-const docPath = computed(() => props.path)
-
-// KeepAlive 缓存标志：组件被停用时为 true，防止 watch 在恢复时重复加载
-let isDeactivated = false
+// KeepAlive 缓存标志：组件被停用时防止 watch 在恢复时重复加载
 let isLoaded = false
 
 // 根据文档ID加载文件
@@ -204,7 +185,6 @@ onUnmounted(() => {
 // 组件被激活时（从缓存中恢复）- 检查是否需要加载
 onActivated(() => {
   console.log('[MdEditor] Activated - 从缓存恢复')
-  isDeactivated = false
   if (!isLoaded && props.path) {
     loadFile(props.path)
   }
@@ -215,7 +195,6 @@ onActivated(() => {
 // 组件被停用时（保存到缓存）
 onDeactivated(() => {
   console.log('[MdEditor] Deactivated - 保存到缓存')
-  isDeactivated = true
   const currentPath = data.currentChooseNoteAllPath_md
   if (currentPath && data.editedMdtext_md !== data.notEditedMdtext_md) {
     docStore.updateDocumentContent(currentPath, data.editedMdtext_md)
@@ -244,59 +223,12 @@ const onContentChange = async (value: string) => {
   saveTimeoutId = window.setTimeout(async () => {
     try {
       docStore.updateDocumentContent(currentPath, value)
-      if (store) {
-        await store.set(pdf_store_tem_key_prefix + currentPath, { value: value });
-        await store.save();
-        console.log("内容已防抖保存至临时存储");
-      }
     } catch (error) {
       console.error("保存临时内容失败:", error);
       NotificationUtil.error("缓存数据保存失败！");
     }
   }, 500);
 };
-
-// 初始化 Store
-const initStore = async () => {
-  if (store == null || store == undefined) {
-    try {
-      store = await load(pdf_store_tem_key, {
-        autoSave: false,
-        defaults: {}
-      });
-    } catch (error) {
-      console.error("初始化 Store 失败:", error);
-      NotificationUtil.error("本地存储初始化失败");
-    }
-  }
-};
-
-// 读取文件内容
-const read_note_file_bypath = async function (path: string) {
-  if (!path) {
-    NotificationUtil.error("文件路径为空");
-    return;
-  }
-
-  try {
-    const res = await tauri_request<ResponseData<string>>("read_note_file", {
-      path: path
-    });
-
-    if (res && res.code === 200 && res.data !== undefined) {
-      const content = res.data;
-      data.editedMdtext_md = content;
-      data.notEditedMdtext_md = content;
-      data.showMdEditor = true;
-    } else {
-      NotificationUtil.error("读取失败：" + (res?.msg || "未知错误"));
-    }
-  } catch (error) {
-    console.error("读取文件异常:", error);
-    NotificationUtil.error("读取文件发生异常");
-  }
-};
-
 
 // 监听关闭事件
 const listenClose = async () => {
@@ -344,14 +276,7 @@ const saveMd = async (mdText: string, path: string) => {
     if (res && res.code === 200) {
       data.notEditedMdtext_md = mdText;
       NotificationUtil.success("笔记保存成功");
-      // 保存成功后，更新永久缓存
-      if (store) {
-        await store.set(pdf_store_conten_key_prefix + path, { value: mdText });
-        // 临时缓存也更新，保持一致
-        await store.set(pdf_store_tem_key_prefix + path, { value: mdText });
-        await store.save();
-      }
-      // 更新 store 中的文档状态
+      // 更新文档状态
       docStore.updateDocumentContent(path, mdText)
       return true;
     } else {
@@ -380,12 +305,6 @@ const saveMdText = async () => {
   }
 
  await saveMd(data.editedMdtext_md, data.currentChooseNoteAllPath_md);
-};
-
-// 占位符按钮点击事件（原代码未实现，补充空函数避免报错）
-const handleCreateNote = () => {
-  console.log("创建新笔记功能待实现");
-  // TODO: 实现创建笔记逻辑
 };
 
 </script>

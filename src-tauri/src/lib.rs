@@ -4,7 +4,8 @@ use tauri::Manager;
 use tauri::{App, Emitter, Listener};
 
 mod app;
-mod command;
+mod plugin_host;
+mod plugins;
 mod core;
 mod entity;
 mod response;
@@ -13,7 +14,6 @@ mod sqlite;
 mod window_manager;
 mod workspace;
 mod session;
-mod database;
 mod immersive_shortcut;
 pub mod commands;
 
@@ -34,7 +34,7 @@ use crate::commands::{
     draft_save, ensure_dir, file_manager_open_path, focus_window, get_app_dir,
     get_document_notebooks, get_file_size, get_note_list, get_path_childrenFoldersAndFiles,
     get_window_count, get_window_list, kv_delete, kv_entries, kv_get, kv_set,
-    list_script_files,     local_list_dir, logs_index_build, logs_index_drop,
+    list_script_files, local_list_dir, logs_index_build, logs_index_drop,
     logs_index_export, logs_cancel, logs_query_lines,
     loding_window_close, note_book_window, mat_hprof_header, mat_hprof_histogram,
     mat_leak_suspects,
@@ -46,9 +46,10 @@ use crate::commands::{
     plugin_install, plugin_last_stats, plugin_set_settings,
     plugin_list,
     plugin_runtime_info, plugin_set_enabled, plugin_set_memdump, plugin_set_order, plugin_uninstall,
+    plugin_set_page_caps,
     terminal_alive, terminal_close, terminal_defaults, terminal_list_shells, terminal_open,
     terminal_resize, terminal_write,
-    read_note_file, register_file_association, remove_file, remove_folder,
+    read_note_file, read_file_bytes, register_file_association, remove_file, remove_folder,
     rename_script_file, save_note, session_clear, session_delete,
     session_delete_workspace, session_list, session_load, session_load_all,
     session_load_workspace, session_save, sftp_check, sftp_connect, sftp_disconnect,
@@ -125,6 +126,7 @@ pub fn run() {
             get_note_list,
             get_file_size,
             read_note_file,
+            read_file_bytes,
             create_folder,
             ensure_dir,
             create_note_file,
@@ -278,6 +280,7 @@ pub fn run() {
             plugin_get_disabled,
             plugin_get_order,
             plugin_set_order,
+            plugin_set_page_caps,
             plugin_call,
             plugin_runtime_info,
             plugin_last_stats,
@@ -299,7 +302,7 @@ pub fn run() {
         // 插件 ID 走路径首段才能跨平台一致（见 plugin_host::split_plugin_uri）。
         .register_uri_scheme_protocol("plugin", |_ctx, request| {
             let uri = request.uri();
-            let (plugin_id, rel) = crate::command::plugin_host::split_plugin_uri(
+            let (plugin_id, rel) = crate::plugin_host::host::split_plugin_uri(
                 uri.host().unwrap_or_default(),
                 uri.path(),
             );
@@ -311,7 +314,7 @@ pub fn run() {
                 .and_then(|v| v.to_str().ok())
                 .map(str::to_string);
             let (status, mime, body, content_range) =
-                match crate::command::plugin_host::read_plugin_asset_response(
+                match crate::plugin_host::host::read_plugin_asset_response(
                     &plugin_id,
                     &rel,
                     range.as_deref(),
@@ -351,7 +354,7 @@ pub fn run() {
             // 没必要为每个资源都去读一次清单。策略由该插件清单的 pageCapabilities 决定，
             // 未声明任何能力 = 与历史逐字一致的最严 CSP（见 plugin_host::page_policy）。
             if mime.starts_with("text/html") {
-                let policy = crate::command::plugin_host::page_policy(&plugin_id);
+                let policy = crate::plugin_host::host::page_policy(&plugin_id);
                 builder = builder.header("Content-Security-Policy", policy.csp);
                 if policy.isolate {
                     // 跨源隔离：只有**顶层窗口**能靠这两个头生效（iframe 里加了也没用，
@@ -377,9 +380,9 @@ pub fn run() {
             // 会顺带把旧的 `<home>/app` 迁到卸载够不着的规范位置
             APP.lock().update_dirs(&home_dir, &config_dir);
             // 第三方插件存储一次性迁移：config_dir 会被卸载脚本删，必须落到 app_dir
-            crate::command::plugin_host::migrate_third_party_storage();
+            crate::plugin_host::host::migrate_third_party_storage();
             // 内置插件默认状态（首次运行只开 files，其余默认关闭；幂等，写 settings.json）
-            crate::command::plugin_host::ensure_plugin_defaults();
+            crate::plugin_host::host::ensure_plugin_defaults();
             // 初始化工作区和会话目录
             crate::workspace::config::ensure_workspaces_dir();
             crate::session::snapshot::ensure_sessions_dir();
