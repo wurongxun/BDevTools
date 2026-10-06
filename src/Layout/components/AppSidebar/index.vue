@@ -6,38 +6,38 @@
       <!-- 插件图标列表（roving tabindex 的 tablist；固定在底部的宿主入口不在此列） -->
       <div class="activity-list" role="tablist" aria-label="插件面板" aria-orientation="vertical">
         <button
-          v-for="(plugin, index) in listPlugins"
-          :key="plugin.id"
+          v-for="(item, index) in listItems"
+          :key="item.id"
           :ref="(el) => setItemRef(el, index)"
           class="activity-item"
           type="button"
           role="tab"
-          :class="{ 'activity-item-active': isPluginActive(plugin.id) }"
-          :aria-selected="isPluginActive(plugin.id)"
-          :tabindex="isPluginActive(plugin.id) ? 0 : -1"
-          :title="activityTitle(plugin)"
-          :aria-label="activityTitle(plugin)"
-          @click="onActivityClick(plugin.id)"
+          :class="{ 'activity-item-active': isPluginActive(item.pluginId) }"
+          :aria-selected="isPluginActive(item.pluginId)"
+          :tabindex="isPluginActive(item.pluginId) ? 0 : -1"
+          :title="activityTitle(item)"
+          :aria-label="activityTitle(item)"
+          @click="onActivityClick(item.pluginId)"
           @keydown="onActivityKeydown($event, index)"
         >
-          <component :is="plugin.icon" class="activity-icon" aria-hidden="true" />
+          <component :is="item.payload.icon" class="activity-icon" aria-hidden="true" />
         </button>
       </div>
 
       <!-- 底部常驻入口（pinnedBottom，如「设置」）：对齐 VS Code 活动栏底部的齿轮位 -->
-      <div v-if="bottomPlugins.length" class="activity-bottom">
+      <div v-if="bottomItems.length" class="activity-bottom">
         <button
-          v-for="plugin in bottomPlugins"
-          :key="plugin.id"
+          v-for="item in bottomItems"
+          :key="item.id"
           class="activity-item"
           type="button"
-          :class="{ 'activity-item-active': pluginManager.activeToolId.value === plugin.id }"
-          :aria-pressed="pluginManager.activeToolId.value === plugin.id"
-          :title="plugin.label"
-          :aria-label="plugin.label"
-          @click="onActivityClick(plugin.id)"
+          :class="{ 'activity-item-active': pluginManager.activeToolId.value === item.pluginId }"
+          :aria-pressed="pluginManager.activeToolId.value === item.pluginId"
+          :title="item.payload.label"
+          :aria-label="item.payload.label"
+          @click="onActivityClick(item.pluginId)"
         >
-          <component :is="plugin.icon" class="activity-icon" aria-hidden="true" />
+          <component :is="item.payload.icon" class="activity-icon" aria-hidden="true" />
         </button>
       </div>
     </div>
@@ -46,10 +46,16 @@
          收起（sidebarPanelCollapsed）时隐藏；专注模式（hideActivityBar）下始终显示；
          插件未提供 sidebarPanel 时整个面板区不渲染（由 Layout 把侧栏收缩到活动栏宽度，主面板占满） -->
     <div v-show="showPanelArea" class="panel-area">
-      <template v-for="plugin in displayPlugins" :key="plugin.id">
-        <KeepAlive>
-          <component :is="plugin.sidebarPanel" v-if="plugin.sidebarPanel && isPanelVisible(plugin.id)" />
-        </KeepAlive>
+      <template v-for="item in sidebarItems" :key="item.id">
+        <ErrorBoundary v-slot="{ retryKey }" :scope="`${panelLabel(item.pluginId)} · 侧栏`">
+          <KeepAlive>
+            <component
+              :is="item.payload.component"
+              v-if="isPanelVisible(item.pluginId)"
+              :key="`${item.pluginId}-${retryKey}`"
+            />
+          </KeepAlive>
+        </ErrorBoundary>
       </template>
     </div>
   </div>
@@ -58,6 +64,9 @@
 <script setup lang="ts" name="AppSidebar">
 import { computed, ref, nextTick } from 'vue'
 import { pluginManager } from '@/core/pluginManager'
+import { contributionRegistry } from '@/core/registry'
+import type { ActivityBarItem, ViewPayload } from '@/core/registry'
+import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import { launchStandalonePlugin } from '@/core/plugin/launch'
 import { isPluginWindowOpen } from '@/core/plugin/window'
 import useStore from '@/store/index'
@@ -77,38 +86,66 @@ const props = withDefaults(defineProps<{
   immersive: false
 })
 
-/** 当前窗口显示的插件列表（根据 layout store 的 enabledPlugins 过滤） */
-const displayPlugins = computed(() => useLayoutStore.filteredPlugins)
+/**
+ * 本窗口可见的插件 ID。
+ *
+ * 可见性是**窗口策略**（窗口预设的显示清单），不属于注册表 —— 注册表只回答「系统里有什么」，
+ * 这里再按本窗口的清单过滤一次。
+ */
+const visibleIds = computed(() => new Set(useLayoutStore.filteredPlugins.map(p => p.id)))
+
+/** 活动栏条目（已按插件顺序排好；再按本窗口清单过滤） */
+const activityItems = computed<ActivityBarItem[]>(() =>
+  contributionRegistry.activityItems().filter(e => visibleIds.value.has(e.pluginId)),
+)
 
 /** 活动栏图标列表（不含固定在底部的宿主入口，如「设置」） */
-const listPlugins = computed(() => displayPlugins.value.filter(p => !p.pinnedBottom))
+const listItems = computed(() => activityItems.value.filter(e => !e.payload.pinnedBottom))
 
 /** 固定在活动栏底部的常驻入口（pinnedBottom，如「设置」） */
-const bottomPlugins = computed(() => displayPlugins.value.filter(p => p.pinnedBottom))
+const bottomItems = computed(() => activityItems.value.filter(e => e.payload.pinnedBottom))
+
+/** 侧栏面板条目（已按插件顺序排好 + 本窗口清单过滤） */
+const sidebarItems = computed(() =>
+  contributionRegistry.views<ViewPayload>('sidebar').filter(e => visibleIds.value.has(e.pluginId)),
+)
+
+/** 取某插件的活动栏条目（点击/激活判定都要先拿到它） */
+function itemOf(pluginId: string): ActivityBarItem | undefined {
+  return activityItems.value.find(e => e.pluginId === pluginId)
+}
+
+/** 该插件是否提供侧栏面板（决定是否自动展开面板区） */
+function hasSidebar(pluginId: string): boolean {
+  return sidebarItems.value.some(e => e.pluginId === pluginId)
+}
 
 /** 插件面板是否收起（仅隐藏面板区，保留活动栏） */
 const sidebarPanelCollapsed = computed(() => useLayoutStore.sidebarPanelCollapsed)
 
 /**
- * 面板区当前实际渲染的插件
- * 专注模式固定显示第一个启用插件（与下面的 isPanelVisible 判定保持一致）
+ * 面板区当前实际渲染的条目。
+ *
+ * 专注模式固定显示第一个启用插件（与下面的 isPanelVisible 判定保持一致）；该插件没有侧栏
+ * 面板时这里就是 undefined，面板区随之整体隐藏。
  */
-const visiblePanelPlugin = computed(() => {
-  if (props.hideActivityBar) return displayPlugins.value[0]
-  const active = pluginManager.getPlugin(pluginManager.activeToolId.value)
-  // 当前激活插件不在本窗口的显示清单里（本窗口把它「移出」了，或窗口预设的清单没勾选它）
+const visiblePanelItem = computed(() => {
+  if (props.hideActivityBar) {
+    const firstId = useLayoutStore.filteredPlugins[0]?.id
+    return sidebarItems.value.find(e => e.pluginId === firstId)
+  }
+  // 激活插件不在本窗口的显示清单里（本窗口把它「移出」了，或窗口预设的清单没勾选它）
   // → 不能按「有面板」处理：那会渲染出一块没有图标可回去的孤儿面板
-  if (active && !displayPlugins.value.some(p => p.id === active.id)) return undefined
-  return active
+  return sidebarItems.value.find(e => e.pluginId === pluginManager.activeToolId.value)
 })
 
 /**
  * 面板区是否需要渲染
- * 当前插件未提供 sidebarPanel 时整体不显示，避免留下一片空白条
+ * 当前插件未提供侧栏面板时整体不显示，避免留下一片空白条
  * （宽度收敛由 Layout 负责：收缩到活动栏宽度，主面板占满）
  */
 const showPanelArea = computed(() =>
-  Boolean(visiblePanelPlugin.value?.sidebarPanel)
+  Boolean(visiblePanelItem.value)
   && (props.hideActivityBar || !sidebarPanelCollapsed.value)
 )
 
@@ -125,24 +162,24 @@ const showPanelArea = computed(() =>
  *   也不该顺手把终端面板开开关关。
  */
 function onActivityClick(pluginId: string, activate = true) {
-  const plugin = pluginManager.getPlugin(pluginId)
-  if (plugin?.dockPanel) {
-    if (activate) useLayoutStore.toggleDockPanel(plugin.dockPanel.position)
+  const item = itemOf(pluginId)
+  if (item?.payload.dockPosition) {
+    if (activate) useLayoutStore.toggleDockPanel(item.payload.dockPosition)
     return
   }
   pluginManager.switchTool(pluginId)
-  if (plugin?.standaloneWindow && activate) {
+  if (item?.payload.standaloneWindow && activate) {
     void launchStandalonePlugin(pluginId)
   }
-  if (useLayoutStore.sidebarPanelCollapsed && plugin?.sidebarPanel) {
+  if (useLayoutStore.sidebarPanelCollapsed && hasSidebar(pluginId)) {
     useLayoutStore.setSidebarPanelCollapsed(false)
   }
 }
 
 /** 活动栏图标的激活态：停靠面板插件看面板显隐，独立窗口插件看窗口是否开着，其余看是否被激活 */
 function isPluginActive(pluginId: string): boolean {
-  const plugin = pluginManager.getPlugin(pluginId)
-  if (plugin?.dockPanel) return !!useLayoutStore.dockPanelVisible[plugin.dockPanel.position]
+  const pos = itemOf(pluginId)?.payload.dockPosition
+  if (pos) return !!useLayoutStore.dockPanelVisible[pos]
   return pluginManager.activeToolId.value === pluginId
 }
 
@@ -151,18 +188,19 @@ function isPluginActive(pluginId: string): boolean {
  * - 停靠面板插件补一句当前动作，避免「点了没反应」的困惑
  * - 独立窗口插件同理：它的窗口开着时点击是「前置」，关着时是「打开」
  */
-function activityTitle(plugin: { label: string; dockPanel?: { position: string }; standaloneWindow?: boolean; id: string }): string {
-  if (plugin.dockPanel) {
-    return useLayoutStore.dockPanelVisible[plugin.dockPanel.position]
-      ? `${plugin.label}（点击隐藏）`
-      : `${plugin.label}（点击显示）`
+function activityTitle(item: ActivityBarItem): string {
+  const label = item.payload.label
+  if (item.payload.dockPosition) {
+    return useLayoutStore.dockPanelVisible[item.payload.dockPosition]
+      ? `${label}（点击隐藏）`
+      : `${label}（点击显示）`
   }
-  if (plugin.standaloneWindow) {
-    return isPluginWindowOpen(plugin.id)
-      ? `${plugin.label}（独立窗口已打开，点击前置）`
-      : `${plugin.label}（点击在独立窗口打开）`
+  if (item.payload.standaloneWindow) {
+    return isPluginWindowOpen(item.pluginId)
+      ? `${label}（独立窗口已打开，点击前置）`
+      : `${label}（点击在独立窗口打开）`
   }
-  return plugin.label
+  return label
 }
 
 /**
@@ -170,7 +208,7 @@ function activityTitle(plugin: { label: string; dockPanel?: { position: string }
  * 切换后立即把焦点移到新项上，保持 roving tabindex 的焦点跟随
  */
 function onActivityKeydown(e: KeyboardEvent, index: number) {
-  const count = listPlugins.value.length
+  const count = listItems.value.length
   if (count === 0) return
 
   let next = -1
@@ -192,7 +230,7 @@ function onActivityKeydown(e: KeyboardEvent, index: number) {
   }
 
   e.preventDefault()
-  onActivityClick(listPlugins.value[next].id, false)
+  onActivityClick(listItems.value[next].pluginId, false)
   nextTick(() => activityItemRefs.value[next]?.focus())
 }
 
@@ -202,6 +240,11 @@ function setItemRef(el: unknown, index: number) {
   if (el) activityItemRefs.value[index] = el as HTMLElement
 }
 
+/** 面板出错时的可读名字（告诉用户崩掉的是哪个插件的哪一块） */
+function panelLabel(pluginId: string): string {
+  return pluginManager.getPlugin(pluginId)?.label ?? pluginId
+}
+
 /**
  * 判断插件面板是否可见
  * - 活动栏隐藏时（专注模式）：显示第一个插件的面板
@@ -209,8 +252,8 @@ function setItemRef(el: unknown, index: number) {
  */
 function isPanelVisible(pluginId: string): boolean {
   if (props.hideActivityBar) {
-    // 专注模式：自动显示第一个插件的面板
-    return displayPlugins.value.length > 0 && displayPlugins.value[0].id === pluginId
+    // 专注模式：自动显示第一个插件的面板（与 visiblePanelItem 同一口径）
+    return useLayoutStore.filteredPlugins[0]?.id === pluginId
   }
   return pluginManager.activeToolId.value === pluginId
 }

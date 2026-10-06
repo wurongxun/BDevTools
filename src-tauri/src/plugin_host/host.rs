@@ -214,6 +214,16 @@ pub struct PluginManifest {
     /// 声明后：活动栏图标 = 「打开（或前置）它的独立窗口」，主面板换成启动卡片（不再是 iframe）。
     #[serde(default)]
     pub standalone_window: bool,
+    /// 本插件**依赖哪些插件**（插件 ID，可指向内置或第三方）。
+    ///
+    /// 语义是「声明关系」，不是「打包关系」：宿主据此阻止「把别人还依赖着的插件停用」
+    /// 并在依赖缺失时给出明确提示。**不自动安装、不自动启用** —— 那会把一次点击变成
+    /// 一串隐式副作用（VS Code 的自动启用依赖是另一个选择，我们选可预测的一边）。
+    ///
+    /// 存在性由宿主侧校验（内置插件集是编译期决定的，后端不知道这次打包了哪些）；
+    /// 后端只保证声明本身合法：ID 合法、不指向自己、不重复。
+    #[serde(default)]
+    pub dependencies: Vec<String>,
     /// 贡献点（设置项 / 命令…）：宿主据此在设置页与命令面板里呈现插件能力。
     ///
     /// 与 `permissions` 是两套东西：这里**不授予任何能力**，只是告诉宿主「把我放在哪、
@@ -228,7 +238,7 @@ pub struct PluginManifest {
 /// 又几乎都带 `#[serde(default)]`，所以 `pagecapabilities` / `PageCapabilities` / `permission`
 /// 这类错法**不会报错，只会表现为「我明明声明了却没生效」**。
 /// **新增清单字段时必须同步这里**，否则新字段的正确写法会被误报为「未识别」。
-const MANIFEST_KEYS: [&str; 13] = [
+const MANIFEST_KEYS: [&str; 14] = [
     "id",
     "name",
     "version",
@@ -241,6 +251,7 @@ const MANIFEST_KEYS: [&str; 13] = [
     "pageCapabilities",
     "page_capabilities",
     "standaloneWindow",
+    "dependencies",
     "contributes",
 ];
 
@@ -315,6 +326,8 @@ pub struct InstalledPlugin {
     pub denied_page_capabilities: Vec<String>,
     /// 主界面是否在独立窗口里（清单 `standaloneWindow`；前端据此改活动栏图标的入口语义）
     pub standalone_window: bool,
+    /// 依赖哪些插件（清单 `dependencies` 原样透出，宿主做存在性与停用保护）
+    pub dependencies: Vec<String>,
     /// 是否启用（false 时不注册到前端插件列表）
     pub enabled: bool,
     /// 安装时间（RFC3339，缺失时为空串）
@@ -353,9 +366,15 @@ fn is_safe_rel_path(p: &str) -> bool {
 /// `log` / `kv` / `fs:read[:作用域]` / `fs:write[:作用域]` / `net:<host>`
 ///
 /// `fs:read` / `fs:write` 不带作用域 = 只限插件私有数据目录；
-/// 带作用域时必须是绝对路径或 `$HOME` 前缀（`..`、`*`、空字节一律拒绝）。
+/// 带作用域时必须是绝对路径或 `$HOME` 前缀（`..`、空字节一律拒绝）。
+///
+/// 唯一的例外是**整条** `fs:read:*` / `fs:write:*`（任意路径，与 `net:*` 同构）；
+/// `*` 写在路径里（`fs:read:/tmp/*`）仍然非法 —— 通配只在「作用域」这一个位置上成立。
 fn is_permission_allowed(p: &str) -> bool {
     if matches!(p, "log" | "kv" | "fs:read" | "fs:write") {
+        return true;
+    }
+    if matches!(p, "fs:read:*" | "fs:write:*") {
         return true;
     }
     if let Some(scope) = p
@@ -613,6 +632,23 @@ fn validate_manifest(m: &PluginManifest) -> Result<(), String> {
             ));
         }
     }
+    // 依赖只校验「声明本身」是否合法：目标存不存在由宿主侧判定（内置插件集是编译期决定的，
+    // 后端不知道这次打包了哪些）。这里拒绝的是「写了也永远不可能成立」的声明。
+    let mut seen_dep = std::collections::HashSet::new();
+    for d in &m.dependencies {
+        if !is_valid_id(d) {
+            return Err(format!(
+                "dependencies 含非法插件 id（仅允许小写字母/数字/./_/-，不以 . 开头）: {}",
+                d
+            ));
+        }
+        if d == &m.id {
+            return Err("dependencies 不能指向自己".to_string());
+        }
+        if !seen_dep.insert(d.as_str()) {
+            return Err(format!("dependencies 重复声明: {}", d));
+        }
+    }
     // 设置项同样「未知 / 不合法一律拒装」：装的时候报错，比装完发现设置页渲染不出来便宜
     if let Some(c) = &m.contributes {
         validate_configuration(&c.configuration)?;
@@ -756,7 +792,10 @@ fn validate_configuration(defs: &[SettingDef]) -> Result<(), String> {
 /// **必须落在 `app_dir` 而不是 `config_dir`**：NSIS 卸载脚本在用户勾选「删除应用数据」时会
 /// `RmDir /r "$APPDATA\${BUNDLEID}"`，而 `config_dir` 正是 `$APPDATA\com.backend-development-tools.app`
 /// —— 插件放在那里，卸载/重装一次就全没了。第三方插件是用户资产，不随应用卸载消失。
-fn install_root() -> PathBuf {
+///
+/// `pub(crate)` 同样是为了跨插件隔离：`fs:write:*` 若覆盖到这里，插件就能改写**别的**插件的
+/// `plugin.wasm`（等于把一次越权变成持久感染），所以整个安装目录都是排除区。
+pub(crate) fn install_root() -> PathBuf {
     install_root_in(&APP.lock().app_dir)
 }
 
@@ -808,7 +847,10 @@ pub(crate) fn plugin_dir(id: &str) -> Result<PathBuf, String> {
 }
 
 /// 插件私有数据根目录（`{app_dir}/plugin_data`，与内置插件同一套约定）
-fn plugin_data_root() -> PathBuf {
+///
+/// `pub(crate)` 是为了让 WASM 侧的跨插件隔离能把它列为「排除区」——内置插件的数据
+/// 同样不属于任何第三方插件（`fs:read:*` 也不能碰，见 wasm.rs 的 `foreign_roots`）。
+pub(crate) fn plugin_data_root() -> PathBuf {
     APP.lock().app_dir.join("plugin_data")
 }
 
@@ -990,6 +1032,7 @@ fn load_installed(dir: &Path) -> Result<InstalledPlugin, String> {
         page_capabilities: m.page_capabilities,
         denied_page_capabilities,
         standalone_window: m.standalone_window,
+        dependencies: m.dependencies,
         installed_at: meta.installed_at,
         size_bytes: dir_size(dir),
         builtin: false,
@@ -1813,6 +1856,7 @@ impl InstalledPlugin {
             page_capabilities: Vec::new(),
             denied_page_capabilities: Vec::new(),
             standalone_window: false,
+            dependencies: Vec::new(),
             enabled: false,
             installed_at: String::new(),
             size_bytes: 0,
@@ -1975,6 +2019,7 @@ mod tests {
                 permissions: Vec::new(),
                 page_capabilities: Vec::new(),
                 standalone_window: false,
+                dependencies: Vec::new(),
             };
             assert!(validate_manifest(&m).is_err(), "{} 应被拒绝", id);
         }
@@ -2098,6 +2143,43 @@ mod tests {
         }
     }
 
+    /// `dependencies` 只做「声明本身」的校验：宿主才有能力判断目标存不存在
+    #[test]
+    fn dependencies_must_be_sane() {
+        let base = PluginManifest {
+            contributes: None,
+            id: "demo".to_string(),
+            name: "demo".to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            icon: None,
+            entry: "page.html".to_string(),
+            wasm: None,
+            init: None,
+            permissions: Vec::new(),
+            page_capabilities: Vec::new(),
+            standalone_window: false,
+            dependencies: Vec::new(),
+        };
+        assert!(validate_manifest(&base).is_ok());
+        // 依赖内置插件是合法用法（如第三方工具依赖 files 的文件读写）
+        let mut ok = base.clone();
+        ok.dependencies = vec!["files".to_string()];
+        assert!(validate_manifest(&ok).is_ok());
+        // 自依赖
+        let mut bad = base.clone();
+        bad.dependencies = vec!["demo".to_string()];
+        assert!(validate_manifest(&bad).is_err());
+        // 非法 id（大写 / 路径穿越）
+        let mut bad2 = base.clone();
+        bad2.dependencies = vec!["Files".to_string()];
+        assert!(validate_manifest(&bad2).is_err());
+        // 重复声明
+        let mut bad3 = base.clone();
+        bad3.dependencies = vec!["files".to_string(), "files".to_string()];
+        assert!(validate_manifest(&bad3).is_err());
+    }
+
     #[test]
     fn entry_must_be_html() {
         let base = PluginManifest {
@@ -2113,6 +2195,7 @@ mod tests {
             permissions: Vec::new(),
             page_capabilities: Vec::new(),
             standalone_window: false,
+            dependencies: Vec::new(),
         };
         assert!(validate_manifest(&base).is_ok());
         let mut bad = base.clone();
@@ -2131,7 +2214,8 @@ mod tests {
         assert!(is_permission_allowed("net:api.example.com"));
         assert!(!is_permission_allowed("net"));
         assert!(!is_permission_allowed("exec"));
-        assert!(!is_permission_allowed("fs:read:*"));
+        // `fs:read:*` 是**合法**的通配作用域（任意路径），不属于这里要拒的写法；
+        // 它合法与否由 `fs_scope_rules` 单独盯着
     }
 
     #[test]
@@ -2141,7 +2225,11 @@ mod tests {
         assert!(is_permission_allowed("fs:write:~/out"));
         assert!(is_permission_allowed("fs:read:/tmp/demo"));
         assert!(is_permission_allowed("fs:write:C:/tmp/demo"));
-        // 穿越 / 通配 / 空白 / 相对路径一律拒绝
+        // 整条 `*` 是**合法的通配**（任意路径）；`*` 写在路径里仍然非法
+        assert!(is_permission_allowed("fs:read:*"));
+        assert!(is_permission_allowed("fs:write:*"));
+        assert!(!is_permission_allowed("fs:read:/*"));
+        // 穿越 / 路径内通配 / 空白 / 相对路径一律拒绝
         assert!(!is_permission_allowed("fs:read:$HOME/../secret"));
         assert!(!is_permission_allowed("fs:read:/tmp/*"));
         assert!(!is_permission_allowed("fs:read:"));
@@ -2214,6 +2302,7 @@ mod tests {
             permissions: Vec::new(),
             page_capabilities: Vec::new(),
             standalone_window: false,
+            dependencies: Vec::new(),
         };
         assert!(validate_manifest(&base).is_ok());
         let mut ok = base.clone();
@@ -2468,6 +2557,7 @@ mod tests {
             permissions: vec!["log".to_string()],
             page_capabilities: vec!["wasm".to_string()],
             standalone_window: true,
+            dependencies: Vec::new(),
         };
         let v = serde_json::to_value(&m).expect("可序列化");
         for k in v.as_object().expect("对象").keys() {
@@ -2512,6 +2602,7 @@ mod tests {
             permissions: Vec::new(),
             page_capabilities: Vec::new(),
             standalone_window: false,
+            dependencies: Vec::new(),
         };
         assert!(validate_manifest(&m).is_err());
     }

@@ -138,11 +138,12 @@ import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
 
 import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
-import { useDocumentManagerStore } from '@/plugins/files/store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 import { subscribe } from '@/core/runtime'
 import { WINDOW_PRESETS_CHANGED_EVENT } from '@/core/windowPresets'
 import { openAppWindow, createEditorWindow, createPresetWindow } from '@/utils/WindowUtils'
 import { pluginManager } from '@/core/pluginManager'
+import { openCommandPalette } from '@/composables/useCommandPalette'
 import type { WindowPresetConfig } from '@/utils/WindowUtils'
 import type { WindowMeta } from '@/Types/workspace'
 const {fileTreeStore,useLayoutStore } = useStore()
@@ -235,6 +236,8 @@ const menus = computed<Menu[]>(() => {
   fileItems.push({ label: '打开工作区', command: 'openWorkspace' })
   fileItems.push({ label: '更换工作文件夹', shortcut: 'Ctrl+Shift+O', command: 'openWorkingDirectory' })
 
+  // 命令面板：统一唤起插件贡献的命令（插件间不互相 import，只通过命令表交互）
+  fileItems.push({ label: '命令面板', shortcut: 'Ctrl+Shift+P', command: 'commandPalette' })
   fileItems.push({ label: '设置', command: 'settings' })
 
   // 窗口菜单项：列出所有配置的窗口预设
@@ -405,6 +408,10 @@ const handleMenuCommand = async (item: MenuItem) => {
     case 'settings': {
       // 设置已剥离为内置插件：切到设置插件（入口固定在活动栏底部），不再新开独立窗口
       pluginManager.switchTool('settings')
+      break
+    }
+    case 'commandPalette': {
+      openCommandPalette()
       break
     }
     case 'encodingUtf8':

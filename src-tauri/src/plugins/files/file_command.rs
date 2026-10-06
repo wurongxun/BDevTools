@@ -2,14 +2,6 @@ use crate::response::resp_data::ResData;
 use std::path::{Path, PathBuf};
 use chardetng::EncodingDetector;
 
-/// 确保目录存在（递归创建）
-pub async fn ensure_dir(path: String) -> Result<ResData<String>, String> {
-    match tokio::fs::create_dir_all(&path).await {
-        Ok(_) => Ok(ResData { code: 200, msg: "ok".to_string(), data: String::new() }),
-        Err(e) => Ok(ResData { code: 500, msg: format!("创建目录失败: {}", e), data: String::new() }),
-    }
-}
-
 // 获取目录下笔记
 pub async fn get_note_list(path: String) -> Result<ResData<Vec<String>>, String> {
     let paths = tokio::fs::read_dir(PathBuf::from(path)).await;
@@ -67,47 +59,6 @@ pub async fn read_note_file(path: String) -> Result<ResData<String>, String> {
 }
 
 // ... existing code ...
-
-// 创建本地文件夹
-pub async fn create_folder(
-    father_path: String,
-    new_folder_name: String,
-) -> Result<ResData<String>, String> {
-    if father_path.is_empty() {
-        return Ok(ResData {
-            code: 500,
-            msg: "父路径为空！".to_string(),
-            data: String::new(),
-        });
-    }
-    //检查路径是否存在
-    if !Path::new(&father_path).exists() {
-        return Ok(ResData {
-            code: 500,
-            msg: "路径不存在！".to_string(),
-            data: String::new(),
-        });
-    }
-    let mut path_ = PathBuf::from(father_path);
-    path_.push(new_folder_name);
-    // 递归创建目录
-    match tokio::fs::create_dir_all(path_).await {
-        Ok(_) => {
-            return Ok(ResData {
-                code: 200,
-                msg: "创建成功".to_string(),
-                data: String::new(),
-            })
-        }
-        Err(err) => {
-            return Ok(ResData {
-                code: 500,
-                msg: format!("创建失败：{0}", err.to_string()),
-                data: String::new(),
-            })
-        }
-    }
-}
 
 /**
  * 获取文件大小（字节）。供前端打开文件前做"大文件分诊"（小文件走代码编辑器、大文件走分块只读查看器）。

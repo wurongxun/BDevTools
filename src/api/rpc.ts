@@ -10,6 +10,19 @@ import { invoke } from '@tauri-apps/api/core'
 export { invoke }
 
 /**
+ * 后端统一响应包裹（与 Rust 侧 `Response<T>` 同形）。
+ *
+ * 放在核心而不是各插件各定义一份：它是**通信契约**，不是某个插件的业务类型。
+ * 核心服务（如 `services/workspaceDirService.ts`）要用它，若只能从插件目录 import，
+ * 核心就被插件反向绑住了 —— 插件也就不再是「可被裁剪」的那一层。
+ */
+export interface RpcResponse<T> {
+  code: number
+  data: T
+  msg: string
+}
+
+/**
  * IPC 流式通道（Tauri v2 Channel）。
  * 用于「一次调用、多次回推」的场景（终端输出、流式日志），
  * 与全局事件（runtime.publish/subscribe）的区别：Channel 的生命周期绑定在单次 invoke 上，

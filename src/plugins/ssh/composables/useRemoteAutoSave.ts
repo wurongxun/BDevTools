@@ -1,5 +1,5 @@
 import { watch, onUnmounted } from 'vue'
-import { useDocumentManagerStore } from '@/plugins/files/store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 
 /**
  * 远程文件自动保存 composable

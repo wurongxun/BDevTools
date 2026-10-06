@@ -39,8 +39,8 @@ import { ref, computed, watch, nextTick, onMounted, onActivated, onDeactivated, 
 import * as monaco from 'monaco-editor'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import NotificationUtil from '@/utils/NotificationUtil'
-import { useDocumentManagerStore } from '../../store/documents'
-import type { DocumentState } from '../../store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
+import type { DocumentState } from '@/store/modules/documents'
 
 const props = defineProps<{
   path: string

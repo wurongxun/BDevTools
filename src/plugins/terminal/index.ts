@@ -1,6 +1,6 @@
 import { markRaw } from 'vue'
-import type { ToolPlugin } from '@/core/pluginManager'
-import TerminalPanel from './components/TerminalPanel.vue'
+import type { BuiltinPluginImpl } from '@/core/pluginManager'
+import { lazyView } from '@/core/plugin/lazy'
 import Terminal from "@/components/Icon/Terminal.vue"
 
 /**
@@ -18,16 +18,13 @@ import Terminal from "@/components/Icon/Terminal.vue"
  * 同时看，做成主面板就只能二选一。
  */
 export default {
-  id: 'terminal',
-  label: '终端',
-  description: '本地交互式终端：多标签 / 分屏 / 可拖拽停靠，支持 shell 集成（cwd、退出码）',
   icon: markRaw(Terminal),
   // 只有停靠面板，不注册 mainPanel（活动栏点击 = 显示/隐藏底部面板）
   dockPanel: {
     position: 'bottom',
-    component: markRaw(TerminalPanel),
+    component: lazyView('terminal', 'dock', () => import('./components/TerminalPanel.vue')),
     defaultHeight: 280,
     minHeight: 80,
   },
   order: 7,
-} satisfies ToolPlugin
+} satisfies BuiltinPluginImpl

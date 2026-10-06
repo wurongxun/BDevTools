@@ -9,7 +9,7 @@ import type { Window } from '@/core/runtime'
 import type { SessionSnapshot, WindowState, OpenFileInfo, LayoutState } from '@/Types/workspace'
 import { sessionService } from '@/services/sessionService'
 import useStore from '@/store'
-import { useDocumentManagerStore, FileType } from '@/plugins/files/store/documents'
+import { useDocumentManagerStore, FileType } from '@/store/modules/documents'
 
 /** 草稿冲突项：目标文件在关闭后被外部修改，需用户决策 */
 export interface DraftConflict {

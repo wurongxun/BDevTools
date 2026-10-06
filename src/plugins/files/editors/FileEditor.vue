@@ -25,7 +25,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Document } from '@element-plus/icons-vue'
-import { useDocumentManagerStore } from '../store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 import CodeEditor from './EditorType/CodeEditor.vue'
 import ImageEditor from './EditorType/ImageEditor.vue'
 import PdfEditor from './EditorType/PdfEditor.vue'

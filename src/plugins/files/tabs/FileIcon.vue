@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { FileType } from '../store/documents'
+import { FileType } from '@/store/modules/documents'
 
 defineProps<{
   type: FileType | string

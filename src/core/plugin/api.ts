@@ -116,6 +116,12 @@ export interface PluginFsRoots {
   read: string[]
   /** `fs:write[:作用域]` 的根目录 */
   write: string[]
+  /** 声明了 `fs:read:*`：任意路径可读（此时 `read` 可能是空数组，判定以本字段为准） */
+  readAny: boolean
+  /** 声明了 `fs:write:*`：任意路径可写 */
+  writeAny: boolean
+  /** 即使在通配模式下也**禁止**选择的路径（其它插件数据目录 / 内置插件数据 / 插件安装根） */
+  deny: string[]
 }
 
 /**
@@ -131,7 +137,8 @@ export async function fetchPluginFsRoots(id: string): Promise<PluginFsRoots> {
   } catch (e) {
     console.warn('[PluginApi] 读取插件 fs 作用域失败', e)
   }
-  return { read: [], write: [] }
+  // 失败必须收敛成「全拒绝」：三个标志都取最严值，deny 空数组 + any=false = 一条路径都选不了
+  return { read: [], write: [], readAny: false, writeAny: false, deny: [] }
 }
 
 /** 插件设置的当前值：已存的优先，没有的键回落到清单 default */

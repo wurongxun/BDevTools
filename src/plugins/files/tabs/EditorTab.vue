@@ -138,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { useDocumentManagerStore } from '../store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { TabBarContainer, TabBarItem, TabCloseButton } from '@/components/TabBar'
 import FileIcon from './FileIcon.vue'

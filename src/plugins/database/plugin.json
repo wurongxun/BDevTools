@@ -1,0 +1,6 @@
+{
+  "id": "database",
+  "name": "数据库",
+  "description": "多数据库连接管理：SQL 执行、表数据浏览与导入导出",
+  "dependencies": ["files"]
+}

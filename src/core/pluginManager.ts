@@ -1,4 +1,7 @@
 import { ref, type Component } from 'vue'
+import { contributionRegistry } from '@/core/registry'
+import { registerCommands } from '@/core/commands'
+import { contributePlugin, withdrawPlugin } from '@/core/plugin/contributions'
 
 /**
  * 工具插件接口
@@ -57,6 +60,14 @@ export interface ToolPlugin {
    * 用于「设置」这类宿主级常驻入口。
    */
   pinnedBottom?: boolean
+  /**
+   * 本插件依赖哪些插件（ID）。
+   *
+   * 来源：内置插件来自 `plugin.json` 的 `dependencies`（由生成脚本写入），第三方来自安装记录。
+   * 宿主据此做两件事：① 阻止停用「别人还依赖着」的插件；② 依赖缺失时给出明确提示。
+   * **不会**自动启用/安装依赖 —— 一次点击产生一串隐式副作用更难排查。
+   */
+  dependencies?: string[]
   /** 插件需要的工作目录子路径（相对于插件工作目录根） */
   workspaceDirs?: string[]
   /** 插件激活回调 */
@@ -79,6 +90,18 @@ export interface ToolPlugin {
   /** 侧边栏默认宽度（px，首次切换该插件且未手动拖拽过时使用） */
   sidebarDefaultWidth?: number
 }
+
+/**
+ * 内置插件**实现体**的类型：`ToolPlugin` 去掉由清单提供的那部分元数据。
+ *
+ * 内置插件的 `id` / `label` / `description` 来自目录下的 `plugin.json`（与第三方插件同一份
+ * schema，由 `scripts/gen-builtin-plugins.mjs` 合并进 `BUILTIN_PLUGINS`）。用 `Omit` 把这三个键
+ * 从实现体里剔掉，插件代码就**不可能**再写第二份元数据 —— 类型层面保证元数据只有一个真源。
+ *
+ * 宿主编排字段（`order` / `pinnedBottom` / 侧栏宽度）仍留在代码里：它们表达的是「宿主怎么摆放
+ * 这个插件」，不是插件自述，因此不进清单。
+ */
+export type BuiltinPluginImpl = Omit<ToolPlugin, 'id' | 'label' | 'description' | 'dependencies'>
 
 /** 未纳入统一排序的插件权重基准（保证它们排在已排序插件之后） */
 const DEFAULT_ORDER_BASE = 1000
@@ -122,19 +145,14 @@ class PluginManager {
   }
 
   /**
-   * 停靠在指定位置的插件（Layout 渲染 dockPanel 用）
-   * 同一位置只取排序最靠前的一个。
-   */
-  dockPluginAt(position: 'bottom'): ToolPlugin | undefined {
-    return this.plugins.find(p => p.dockPanel?.position === position)
-  }
-
-  /**
    * 当前激活插件是否提供侧栏面板
    * 供布局层判断侧栏宽度收敛、拖拽手柄与面板切换按钮是否可用
+   *
+   * 查注册表而不是读插件字段：**有没有侧栏面板是一个贡献事实**，宿主各处判定必须同源。
    */
   get activeHasSidebar(): boolean {
-    return Boolean(this.getPlugin(this.activeToolId.value)?.sidebarPanel)
+    const id = this.activeToolId.value
+    return contributionRegistry.views('sidebar').some(e => e.pluginId === id)
   }
 
   /** 注册插件 */
@@ -145,6 +163,21 @@ class PluginManager {
       return
     }
     this._plugins.value.push(plugin)
+    // 同步贡献点：UI 只认注册表，不直接读插件对象上的组件字段
+    contributePlugin(plugin)
+    // 「切换到 X」：切主面板是宿主的能力，但命令由插件自己贡献（停靠面板类插件除外 ——
+    // 它们的图标是显隐开关，切主面板没有意义）。随插件注销自动消失。
+    // 查注册表而不是读插件字段：判定必须与布局里「图标是不是显隐开关」同源。
+    if (!contributionRegistry.views('dock').some(e => e.pluginId === plugin.id)) {
+      registerCommands(plugin.id, [
+        {
+          command: `${plugin.id}.focus`,
+          title: `切换到 ${plugin.label}`,
+          category: '视图',
+          run: () => this.switchTool(plugin.id),
+        },
+      ])
+    }
     // 如果是第一个插件，自动激活
     if (this._plugins.value.length === 1) {
       this.activeToolId.value = plugin.id
@@ -160,6 +193,8 @@ class PluginManager {
     const plugin = this._plugins.value[idx]
     plugin.onDeactivate?.()
     this._plugins.value.splice(idx, 1)
+    // 条目必须整组撤销：漏一条就会留下点不动的孤儿图标
+    withdrawPlugin(id)
     // 如果卸载的是当前激活的插件，切换到排序后的第一个
     if (this.activeToolId.value === id) {
       this.activeToolId.value = this.plugins[0]?.id || ''
@@ -189,6 +224,8 @@ class PluginManager {
       next[id] = i
     })
     this._orderIndex.value = next
+    // 注册表用同一套顺序排条目，否则活动栏图标顺序会跟排序设置不一致
+    contributionRegistry.setPluginOrder(ids)
   }
 }
 

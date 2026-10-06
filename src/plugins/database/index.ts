@@ -1,19 +1,15 @@
 import { markRaw } from 'vue'
 import { Coin } from '@element-plus/icons-vue'
-import type { ToolPlugin } from '@/core/pluginManager'
-import SidebarPanel from './SidebarPanel.vue'
-import MainPanel from './MainPanel.vue'
+import type { BuiltinPluginImpl } from '@/core/pluginManager'
+import { lazyView } from '@/core/plugin/lazy'
 
 export default {
-  id: 'database',
-  label: '数据库',
-  description: '多数据库连接管理：SQL 执行、表数据浏览与导入导出',
   icon: markRaw(Coin),
-  sidebarPanel: markRaw(SidebarPanel),
-  mainPanel: markRaw(MainPanel),
+  sidebarPanel: lazyView('database', 'sidebar', () => import('./SidebarPanel.vue')),
+  mainPanel: lazyView('database', 'main', () => import('./MainPanel.vue')),
   workspaceDirs: ['scripts', 'exports'],
   order: 4,
   // 数据库侧边栏内容多（连接树 + 脚本树 + 插件设置），声明更宽的默认/最小宽度
   sidebarDefaultWidth: 260,
   sidebarMinWidth: 180
-} satisfies ToolPlugin
+} satisfies BuiltinPluginImpl

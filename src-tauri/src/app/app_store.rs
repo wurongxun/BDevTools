@@ -142,6 +142,14 @@ pub fn resolve_user_data_root(home_dir: &Path) -> PathBuf {
     os_data_base(home_dir).join(USER_DATA_FOLDER)
 }
 
+/// 旧版业务数据目录 `<home>/app`
+///
+/// 除了目录搬迁本身，工作区配置里持久化过的「默认工作区文件夹」也可能还是这个旧值，
+/// 需要一并清理（见 `workspace::config::migrate_default_workspace_folder`）。
+pub fn legacy_app_dir(home_dir: &Path) -> PathBuf {
+    home_dir.join(LEGACY_APP_FOLDER)
+}
+
 /// 目录搬迁的结果
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MigrateOutcome {
@@ -215,7 +223,7 @@ impl App {
     /// 顺带做一次目录迁移：旧的 `<home>/app` → [`resolve_user_data_root`]。
     /// **迁移失败时回退到旧目录**：宁可继续污染 HOME，也不能让用户数据看起来消失了。
     pub fn update_dirs(&mut self, home_dir: &Path, config_dir: &Path) {
-        let legacy = home_dir.join(LEGACY_APP_FOLDER);
+        let legacy = legacy_app_dir(home_dir);
         let target = resolve_user_data_root(home_dir);
         if home_dir.as_os_str().is_empty() {
             // 拿不到真实 home 时不要拿相对路径开玩笑，直接用目标目录

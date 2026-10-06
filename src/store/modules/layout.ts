@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { pluginManager, type ToolPlugin } from '@/core/pluginManager'
+import { contributionRegistry } from '@/core/registry'
 import { getCurrentWindow, publish } from '@/core/runtime'
 import { IMMERSIVE_STATE_EVENT } from '@/composables/useImmersiveShortcut'
 
@@ -98,11 +99,12 @@ const useLayoutStore = defineStore('layout', {
           else pluginManager.activeToolId.value = ''
         }
       }
-      for (const p of pluginManager.plugins) {
-        if (p.pinnedBottom || !p.dockPanel || ids.includes(p.id)) continue
-        if (this.dockPanelVisible[p.dockPanel.position]) {
-          this.setDockPanelVisible(p.dockPanel.position, false)
-        }
+      // 查注册表而不是读插件的 `dockPanel` 字段：「有没有停靠面板、停在哪」是贡献事实，
+      // 与 Layout 渲染时用的是同一张表 —— 两处判定不一致就会出现「面板还在、开关没了」
+      for (const e of contributionRegistry.views('dock')) {
+        if (ids.includes(e.pluginId)) continue
+        const pos = e.payload.position
+        if (pos && this.dockPanelVisible[pos]) this.setDockPanelVisible(pos, false)
       }
     },
 

@@ -1,18 +1,17 @@
 import { markRaw } from 'vue'
 import { Folder } from '@element-plus/icons-vue'
-import type { ToolPlugin } from '@/core/pluginManager'
-import SidebarPanel from './sidebar/SidebarPanel.vue'
-import FileEditor from './editors/FileEditor.vue'
-import EditorTab from './tabs/EditorTab.vue'
+import type { BuiltinPluginImpl } from '@/core/pluginManager'
+import { lazyView } from '@/core/plugin/lazy'
 
+/**
+ * 面板一律 `lazyView`：图标同步（活动栏要立刻画出来），面板按需（用到才拉 chunk）。
+ * `lazyView` 的第一个参数是本插件 id，必须与 `plugin.json` 一致（守卫脚本会查）。
+ */
 export default {
-  id: 'files',
-  label: '文件',
-  description: '文件管理：目录浏览、打开与编辑、最近打开与会话恢复',
   icon: markRaw(Folder),
-  sidebarPanel: markRaw(SidebarPanel),
-  mainPanel: markRaw(FileEditor),
-  tabBar: markRaw(EditorTab),
+  sidebarPanel: lazyView('files', 'sidebar', () => import('./sidebar/SidebarPanel.vue')),
+  mainPanel: lazyView('files', 'main', () => import('./editors/FileEditor.vue')),
+  tabBar: lazyView('files', 'tabBar', () => import('./tabs/EditorTab.vue')),
   workspaceDirs: ['temp'],
   order: 1
-} satisfies ToolPlugin
+} satisfies BuiltinPluginImpl

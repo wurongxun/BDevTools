@@ -20,51 +20,62 @@ pub mod commands;
 use crate::app::app_store::{app_open_file, app_settings, APP};
 use crate::app::tray::create_tray;
 use crate::commands::{
-    about, close_window, connection_create, connection_delete, connection_edit,
-    connection_list, count_file_lines, create_editor_window, create_folder,
-    create_note_file, db_catalog_capabilities, db_connect, db_connection_create,
-    db_connection_delete, db_connection_list, db_connection_test, db_connection_update,
-    db_delete_row, db_disconnect, db_execute_sql, db_export_csv, db_export_excel,
-    db_export_sql_csv, db_export_sql_excel, db_import_csv, db_import_excel, db_insert_row,
-    db_list_admins, db_list_database_indexes, db_list_databases, db_list_events,
-    db_list_procedures, db_list_tables, db_list_triggers, db_list_users, db_list_views,
-    db_query_table_data, db_show_status, db_show_variables, db_table_columns, db_table_indexes,
-    db_table_schema,
-    db_update_row, detect_file_encoding, draft_check, draft_delete, draft_load,
-    draft_save, ensure_dir, file_manager_open_path, focus_window, get_app_dir,
-    get_document_notebooks, get_file_size, get_note_list, get_path_childrenFoldersAndFiles,
-    get_window_count, get_window_list, kv_delete, kv_entries, kv_get, kv_set,
-    list_script_files, local_list_dir, logs_index_build, logs_index_drop,
-    logs_index_export, logs_cancel, logs_query_lines,
-    loding_window_close, note_book_window, mat_hprof_header, mat_hprof_histogram,
-    mat_leak_suspects,
-    mat_analysis_limits,
+    about, close_window, create_editor_window, create_folder, draft_check, draft_delete,
+    file_manager_open_path,
+    count_file_lines, read_file_lines,
+    draft_load, draft_save, ensure_dir, focus_window, get_window_count, get_window_list,
+    kv_delete, kv_entries, kv_get, kv_set, loding_window_close, note_book_window, plugin_call,
+    plugin_fs_roots, plugin_get_disabled, plugin_get_order, plugin_get_settings,
+    plugin_install, plugin_last_stats, plugin_set_settings, plugin_list, plugin_runtime_info,
+    plugin_set_enabled, plugin_set_memdump, plugin_set_order, plugin_uninstall,
+    plugin_set_page_caps, session_clear, session_delete, session_delete_workspace,
+    session_list, session_load, session_load_all, session_load_workspace, session_save,
+    update_window_position_cmd, windows_close, windows_hide, windows_maximize,
+    windows_minimize, workspace_create, workspace_delete, workspace_get, workspace_get_default,
+    workspace_add_plugin_external_dir, workspace_get_plugin_dir, workspace_get_plugin_subdir,
+    workspace_list, workspace_list_plugin_external_dirs, workspace_lock, workspace_lock_status,
+    workspace_remove_plugin_external_dir, workspace_unlock, workspace_update,
+};
+#[cfg(feature = "plugin-database")]
+use crate::commands::{
+    db_catalog_capabilities, db_connect, db_connection_create, db_connection_delete,
+    db_connection_list, db_connection_test, db_connection_update, db_delete_row, db_disconnect,
+    db_execute_sql, db_export_csv, db_export_excel, db_export_sql_csv, db_export_sql_excel,
+    db_import_csv, db_import_excel, db_insert_row, db_list_admins, db_list_database_indexes,
+    db_list_databases, db_list_events, db_list_procedures, db_list_tables, db_list_triggers,
+    db_list_users, db_list_views, db_query_table_data, db_show_status, db_show_variables,
+    db_table_columns, db_table_indexes, db_table_schema, db_update_row,
+};
+#[cfg(feature = "plugin-files")]
+use crate::commands::{
+    create_note_file, detect_file_encoding, get_document_notebooks,
+    get_file_size, get_note_list, get_path_childrenFoldersAndFiles, list_script_files,
+    open_default_apps_settings,
+    read_note_file, read_file_bytes, register_file_association, remove_file, remove_folder,
+    rename_script_file, save_note, up_file_name, up_folder_name, write_script_file,
+};
+#[cfg(feature = "plugin-logs")]
+use crate::commands::{
+    logs_index_build, logs_index_drop, logs_index_export, logs_cancel, logs_query_lines,
+    logs_stream_start, logs_stream_stop,
+};
+#[cfg(feature = "plugin-mat")]
+use crate::commands::{
+    mat_hprof_header, mat_hprof_histogram, mat_leak_suspects, mat_analysis_limits,
     mat_refs_build, mat_refs_inspect, mat_refs_instances, mat_refs_release,
     mat_refs_search_classes,
-    open_default_apps_settings, read_file_lines,
-    plugin_call, plugin_fs_roots, plugin_get_disabled, plugin_get_order, plugin_get_settings,
-    plugin_install, plugin_last_stats, plugin_set_settings,
-    plugin_list,
-    plugin_runtime_info, plugin_set_enabled, plugin_set_memdump, plugin_set_order, plugin_uninstall,
-    plugin_set_page_caps,
+};
+#[cfg(feature = "plugin-ssh")]
+use crate::commands::{
+    connection_create, connection_delete, connection_edit, connection_list, get_app_dir,
+    local_list_dir, sftp_check, sftp_connect, sftp_disconnect, sftp_download, sftp_list_dir,
+    sftp_mkdir, sftp_remove, sftp_rename, sftp_upload, logs_pull_remote, ssh_check,
+    ssh_connect, ssh_disconnect, ssh_resize_pty, ssh_write,
+};
+#[cfg(feature = "plugin-terminal")]
+use crate::commands::{
     terminal_alive, terminal_close, terminal_defaults, terminal_list_shells, terminal_open,
     terminal_resize, terminal_write,
-    read_note_file, read_file_bytes, register_file_association, remove_file, remove_folder,
-    rename_script_file, save_note, session_clear, session_delete,
-    session_delete_workspace, session_list, session_load, session_load_all,
-    session_load_workspace, session_save, sftp_check, sftp_connect, sftp_disconnect,
-    sftp_download, sftp_list_dir, sftp_mkdir, sftp_remove, sftp_rename, sftp_upload,
-    logs_pull_remote,
-    logs_stream_start, logs_stream_stop,
-    ssh_check, ssh_connect, ssh_disconnect, ssh_resize_pty, ssh_write, up_file_name,
-    up_folder_name, update_window_position_cmd, windows_close, windows_hide,
-    windows_maximize, windows_minimize, workspace_create, workspace_delete,
-    workspace_get, workspace_get_default,
-    workspace_add_plugin_external_dir, workspace_get_plugin_dir,
-    workspace_get_plugin_subdir, workspace_list, workspace_list_plugin_external_dirs,
-    workspace_lock, workspace_lock_status, workspace_remove_plugin_external_dir,
-    workspace_unlock, workspace_update,
-    write_script_file,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -121,65 +132,158 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            get_document_notebooks,
-            file_manager_open_path,
-            get_note_list,
-            get_file_size,
-            read_note_file,
-            read_file_bytes,
+            
+    #[cfg(feature = "plugin-files")]
+    get_document_notebooks,
+            
+            
+    #[cfg(feature = "plugin-files")]
+    get_note_list,
+            
+    #[cfg(feature = "plugin-files")]
+    get_file_size,
+            
+    #[cfg(feature = "plugin-files")]
+    read_note_file,
+            
+    #[cfg(feature = "plugin-files")]
+    read_file_bytes,
             create_folder,
             ensure_dir,
-            create_note_file,
-            get_path_childrenFoldersAndFiles,
-            list_script_files,
-            rename_script_file,
-            write_script_file,
-            save_note,
-            up_file_name,
-            up_folder_name,
-            remove_folder,
-            remove_file,
+            
+    #[cfg(feature = "plugin-files")]
+    create_note_file,
+    #[cfg(feature = "plugin-files")]
+    get_path_childrenFoldersAndFiles,
+    
+    #[cfg(feature = "plugin-files")]
+    list_script_files,
+            
+    #[cfg(feature = "plugin-files")]
+    rename_script_file,
+            
+    #[cfg(feature = "plugin-files")]
+    write_script_file,
+            
+    #[cfg(feature = "plugin-files")]
+    save_note,
+            
+    #[cfg(feature = "plugin-files")]
+    up_file_name,
+            
+    #[cfg(feature = "plugin-files")]
+    up_folder_name,
+            
+    #[cfg(feature = "plugin-files")]
+    remove_folder,
+            
+    #[cfg(feature = "plugin-files")]
+    remove_file,
             loding_window_close,
+            file_manager_open_path,
+            count_file_lines, read_file_lines,
             about,
             note_book_window,
             windows_hide,
             windows_minimize,
             windows_maximize,
             windows_close,
-            read_file_lines,
-            count_file_lines,
-            detect_file_encoding,
+            
+                
+                
+    #[cfg(feature = "plugin-files")]
+    detect_file_encoding,
             // 日志工作台：服务端索引与筛选（logs 插件）
-            logs_index_build,
-            logs_query_lines,
-            logs_cancel,
-            logs_index_export,
-            logs_index_drop,
-            register_file_association,
-            open_default_apps_settings,
-            ssh_connect,
-            ssh_write,
-            ssh_disconnect,
-            ssh_resize_pty,
-            ssh_check,
-            sftp_connect,
-            sftp_disconnect,
-            sftp_check,
-            sftp_list_dir,
-            sftp_mkdir,
-            sftp_remove,
-            sftp_upload,
-            sftp_download,
-            logs_pull_remote,
-            logs_stream_start,
-            logs_stream_stop,
-            local_list_dir,
-            sftp_rename,
-            get_app_dir,
-            connection_create,
-            connection_delete,
-            connection_edit,
-            connection_list,
+            
+    #[cfg(feature = "plugin-logs")]
+    logs_index_build,
+            
+    #[cfg(feature = "plugin-logs")]
+    logs_query_lines,
+            
+    #[cfg(feature = "plugin-logs")]
+    logs_cancel,
+            
+    #[cfg(feature = "plugin-logs")]
+    logs_index_export,
+            
+    #[cfg(feature = "plugin-logs")]
+    logs_index_drop,
+            
+    #[cfg(feature = "plugin-files")]
+    register_file_association,
+            
+    #[cfg(feature = "plugin-files")]
+    open_default_apps_settings,
+            
+    #[cfg(feature = "plugin-ssh")]
+    ssh_connect,
+            
+    #[cfg(feature = "plugin-ssh")]
+    ssh_write,
+            
+    #[cfg(feature = "plugin-ssh")]
+    ssh_disconnect,
+            
+    #[cfg(feature = "plugin-ssh")]
+    ssh_resize_pty,
+            
+    #[cfg(feature = "plugin-ssh")]
+    ssh_check,
+            
+    #[cfg(feature = "plugin-ssh")]
+    sftp_connect,
+            
+    #[cfg(feature = "plugin-ssh")]
+    sftp_disconnect,
+            
+    #[cfg(feature = "plugin-ssh")]
+    sftp_check,
+            
+    #[cfg(feature = "plugin-ssh")]
+    sftp_list_dir,
+            
+    #[cfg(feature = "plugin-ssh")]
+    sftp_mkdir,
+            
+    #[cfg(feature = "plugin-ssh")]
+    sftp_remove,
+            
+    #[cfg(feature = "plugin-ssh")]
+    sftp_upload,
+            
+    #[cfg(feature = "plugin-ssh")]
+    sftp_download,
+            
+    #[cfg(feature = "plugin-ssh")]
+    logs_pull_remote,
+            
+    #[cfg(feature = "plugin-logs")]
+    logs_stream_start,
+            
+    #[cfg(feature = "plugin-logs")]
+    logs_stream_stop,
+            
+    #[cfg(feature = "plugin-ssh")]
+    local_list_dir,
+            
+    #[cfg(feature = "plugin-ssh")]
+    sftp_rename,
+            
+    #[cfg(feature = "plugin-ssh")]
+    get_app_dir,
+            
+    #[cfg(feature = "plugin-ssh")]
+    connection_create,
+            
+    #[cfg(feature = "plugin-ssh")]
+    connection_delete,
+            
+    #[cfg(feature = "plugin-ssh")]
+    connection_edit,
+            
+    #[cfg(feature = "plugin-ssh")]
+    connection_list,
             // 窗口管理
             create_editor_window,
             get_window_list,
@@ -211,15 +315,33 @@ pub fn run() {
             kv_delete,
             kv_entries,
             // Java 堆转储分析（mat 插件）
-            mat_hprof_header,
-            mat_hprof_histogram,
-            mat_leak_suspects,
-            mat_analysis_limits,
-            mat_refs_build,
-            mat_refs_release,
-            mat_refs_search_classes,
-            mat_refs_instances,
-            mat_refs_inspect,
+            
+    #[cfg(feature = "plugin-mat")]
+    mat_hprof_header,
+            
+    #[cfg(feature = "plugin-mat")]
+    mat_hprof_histogram,
+            
+    #[cfg(feature = "plugin-mat")]
+    mat_leak_suspects,
+            
+    #[cfg(feature = "plugin-mat")]
+    mat_analysis_limits,
+            
+    #[cfg(feature = "plugin-mat")]
+    mat_refs_build,
+            
+    #[cfg(feature = "plugin-mat")]
+    mat_refs_release,
+            
+    #[cfg(feature = "plugin-mat")]
+    mat_refs_search_classes,
+            
+    #[cfg(feature = "plugin-mat")]
+    mat_refs_instances,
+            
+    #[cfg(feature = "plugin-mat")]
+    mat_refs_inspect,
             // 会话管理（主键：工作区 ID）
             session_save,
             session_load,
@@ -235,43 +357,109 @@ pub fn run() {
             draft_load,
             draft_delete,
             // 数据库连接管理
-            db_connection_create,
-            db_connection_delete,
-            db_connection_update,
-            db_connection_list,
-            db_connection_test,
-            db_connect,
-            db_disconnect,
+            
+    #[cfg(feature = "plugin-database")]
+    db_connection_create,
+            
+    #[cfg(feature = "plugin-database")]
+    db_connection_delete,
+            
+    #[cfg(feature = "plugin-database")]
+    db_connection_update,
+            
+    #[cfg(feature = "plugin-database")]
+    db_connection_list,
+            
+    #[cfg(feature = "plugin-database")]
+    db_connection_test,
+            
+    #[cfg(feature = "plugin-database")]
+    db_connect,
+            
+    #[cfg(feature = "plugin-database")]
+    db_disconnect,
             // 数据库操作
-            db_execute_sql,
-            db_query_table_data,
-            db_insert_row,
-            db_update_row,
-            db_delete_row,
+            
+    #[cfg(feature = "plugin-database")]
+    db_execute_sql,
+            
+    #[cfg(feature = "plugin-database")]
+    db_query_table_data,
+            
+    #[cfg(feature = "plugin-database")]
+    db_insert_row,
+            
+    #[cfg(feature = "plugin-database")]
+    db_update_row,
+            
+    #[cfg(feature = "plugin-database")]
+    db_delete_row,
             // 元数据查询
-            db_list_databases,
-            db_list_tables,
-            db_table_columns,
-            db_table_indexes,
-            db_table_schema,
+            
+    #[cfg(feature = "plugin-database")]
+    db_list_databases,
+            
+    #[cfg(feature = "plugin-database")]
+    db_list_tables,
+            
+    #[cfg(feature = "plugin-database")]
+    db_table_columns,
+            
+    #[cfg(feature = "plugin-database")]
+    db_table_indexes,
+            
+    #[cfg(feature = "plugin-database")]
+    db_table_schema,
             // 目录能力声明与对象浏览（走 catalog 抽象，各库按自身能力实现）
-            db_catalog_capabilities,
-            db_list_views,
-            db_list_procedures,
-            db_list_triggers,
-            db_list_events,
-            db_list_database_indexes,
-            db_list_users,
-            db_list_admins,
-            db_show_status,
-            db_show_variables,
+            
+    #[cfg(feature = "plugin-database")]
+    db_catalog_capabilities,
+            
+    #[cfg(feature = "plugin-database")]
+    db_list_views,
+            
+    #[cfg(feature = "plugin-database")]
+    db_list_procedures,
+            
+    #[cfg(feature = "plugin-database")]
+    db_list_triggers,
+            
+    #[cfg(feature = "plugin-database")]
+    db_list_events,
+            
+    #[cfg(feature = "plugin-database")]
+    db_list_database_indexes,
+            
+    #[cfg(feature = "plugin-database")]
+    db_list_users,
+            
+    #[cfg(feature = "plugin-database")]
+    db_list_admins,
+            
+    #[cfg(feature = "plugin-database")]
+    db_show_status,
+            
+    #[cfg(feature = "plugin-database")]
+    db_show_variables,
             // 导入导出
-            db_export_csv,
-            db_export_excel,
-            db_export_sql_csv,
-            db_export_sql_excel,
-            db_import_csv,
-            db_import_excel,
+            
+    #[cfg(feature = "plugin-database")]
+    db_export_csv,
+            
+    #[cfg(feature = "plugin-database")]
+    db_export_excel,
+            
+    #[cfg(feature = "plugin-database")]
+    db_export_sql_csv,
+            
+    #[cfg(feature = "plugin-database")]
+    db_export_sql_excel,
+            
+    #[cfg(feature = "plugin-database")]
+    db_import_csv,
+            
+    #[cfg(feature = "plugin-database")]
+    db_import_excel,
             // 第三方插件（安装 / 卸载 / 排序 / 调用）
             plugin_list,
             plugin_install,
@@ -289,13 +477,27 @@ pub fn run() {
             plugin_set_settings,
             plugin_set_memdump,
             // 本地交互式终端（terminal 插件）：PTY 会话 + Channel 流式输出
-            terminal_open,
-            terminal_write,
-            terminal_resize,
-            terminal_close,
-            terminal_alive,
-            terminal_list_shells,
-            terminal_defaults,
+            
+    #[cfg(feature = "plugin-terminal")]
+    terminal_open,
+            
+    #[cfg(feature = "plugin-terminal")]
+    terminal_write,
+            
+    #[cfg(feature = "plugin-terminal")]
+    terminal_resize,
+            
+    #[cfg(feature = "plugin-terminal")]
+    terminal_close,
+            
+    #[cfg(feature = "plugin-terminal")]
+    terminal_alive,
+            
+    #[cfg(feature = "plugin-terminal")]
+    terminal_list_shells,
+            
+    #[cfg(feature = "plugin-terminal")]
+    terminal_defaults,
         ])
         // 第三方插件页面协议：plugin://localhost/<plugin_id>/<包内相对路径>
         // host 必须固定为 localhost：Windows/Android 下 wry 会把它改写成 http://plugin.localhost/*，
@@ -385,6 +587,10 @@ pub fn run() {
             crate::plugin_host::host::ensure_plugin_defaults();
             // 初始化工作区和会话目录
             crate::workspace::config::ensure_workspaces_dir();
+            // 默认工作区文件夹一次性清理：早期版本把 app_dir（含旧版 <home>/app）本身当默认工作区，
+            // 既会把内部资产（app.db / sessions / plugin_data …）暴露进用户文件树，
+            // 也会在目录搬迁后留下指向旧位置的悬空路径。清掉后由用户在 files 侧边栏自选目录
+            crate::workspace::config::migrate_default_workspace_folder(&home_dir);
             crate::session::snapshot::ensure_sessions_dir();
             crate::workspace::plugin_dir::ensure_plugin_data_dir();
             #[cfg(all(desktop))]

@@ -98,6 +98,9 @@ export interface PluginManifest {
   /**
    * 权限声明（后端白名单）：
    * `log` / `kv` / `fs:read[:绝对路径|$HOME[/子路径]]` / `fs:write[:...]` / `net:<host>`
+   *
+   * 作用域位置写 `*` 是**通配**（`fs:read:*` = 任意路径），但其它插件的数据目录与插件安装
+   * 目录仍是禁区 —— 见 `docs/plugin-dev/capabilities.md` 的「任意路径与跨插件隔离」。
    */
   permissions?: string[]
   /**
@@ -169,6 +172,10 @@ export interface CallStats {
   memdump_path: string | null
   /** 出错快照文件大小（字节）＝出错那刻的线性内存字节数 */
   memdump_bytes: number | null
+  /** 连续「宿主级故障」次数（达到后端阈值就跳闸） */
+  consec_failures: number
+  /** 熔断剩余冷却毫秒（0 = 没在冷却）；冷却期内的调用会被直接拒掉 */
+  circuit_cooldown_ms: number
 }
 
 /** 已安装第三方插件（后端 `plugin_list` 返回） */
@@ -194,6 +201,8 @@ export interface InstalledPlugin {
   denied_page_capabilities?: string[]
   /** 主界面是否在独立窗口里（清单 `standaloneWindow`） */
   standalone_window: boolean
+  /** 依赖哪些插件（清单 `dependencies` 原样透出） */
+  dependencies: string[]
   enabled: boolean
   /** 安装时间（RFC3339，可能为空串） */
   installed_at: string
@@ -246,4 +255,18 @@ export interface PluginListItem {
    * 放在列表项里而不是让视图自己去查：列表本身就是响应式的，视图不必再持一份映射。
    */
   lastStats: CallStats | null
+  /** 本插件声明依赖哪些插件（空 = 不依赖任何插件） */
+  dependencies: string[]
+  /**
+   * 声明了依赖但当前不可用的那些（没打包 / 没安装 / 被停用）。
+   *
+   * 单独列出而不是让视图自己算：「依赖缺失」是运行期事实，宿主判定口径要统一
+   * （内置插件集由构建决定，第三方由安装状态决定）。
+   */
+  missingDependencies: string[]
+  /**
+   * 激活耗时（毫秒，各面板首次加载之和）；**未激活为 `null`**。
+   * 懒激活之后「装了很多插件」不等于「启动很慢」，这个数字说明慢是谁造成的。
+   */
+  activationMs: number | null
 }

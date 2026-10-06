@@ -212,6 +212,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     // 临时工作区关窗即删：写进预设会留下悬空绑定（设置页卡片会显示「(工作区已删除)」）
     if (isTemporary(currentWorkspace.value)) return
     try {
+      // plugin-boundary-allow: 窗口预设 store 仍在 settings 插件目录下（TODO: 下沉到 core/windowPresets）
       const { rememberCurrentWindowWorkspace } = await import('@/plugins/settings/components/useWindowPresetsStore')
       await rememberCurrentWindowWorkspace(workspaceId)
     } catch (e) {
@@ -248,7 +249,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     // ===== 切换前：保存并关闭当前工作区打开的文件（与窗口关闭流程同序） =====
     // 动态 import 避免与 session/documents store 的模块循环依赖
     const { useSessionStore } = await import('./session')
-    const { useDocumentManagerStore } = await import('@/plugins/files/store/documents')
+    const { useDocumentManagerStore } = await import('@/store/modules/documents')
     const sessionStore = useSessionStore()
     const docStore = useDocumentManagerStore()
     try {

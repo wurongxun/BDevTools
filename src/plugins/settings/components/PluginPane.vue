@@ -115,6 +115,31 @@
               <span>{{ formatPluginSize(item.sizeBytes) }}</span>
             </template>
           </div>
+          <!-- 依赖：声明了谁，以及当前哪些不可用（没打包 / 没安装 / 被停用）。
+               宿主不自动补依赖，所以「缺了什么」必须让用户一眼看到 -->
+          <div v-if="item.dependencies.length" class="plugin-perms">
+            <span class="plugin-perms-label">依赖</span>
+            <span
+              v-for="dep in item.dependencies"
+              :key="dep"
+              class="plugin-perm"
+              :class="{ 'is-missing': item.missingDependencies.includes(dep) }"
+              :title="item.missingDependencies.includes(dep) ? `缺少依赖：${dep} 当前不可用` : dep"
+            >
+              {{ dep }}
+            </span>
+            <span v-if="item.missingDependencies.length" class="plugin-deps-warn">
+              缺少 {{ item.missingDependencies.length }} 项依赖，功能可能不完整
+            </span>
+          </div>
+          <!-- 激活耗时：懒激活之后「装得多」不再等于「启动慢」，这个数字说明慢是谁造成的。
+               未激活显示「未激活」而不是 0 —— 0 会跟「快到测不出来」混淆 -->
+          <div class="plugin-perms">
+            <span class="plugin-perms-label">激活</span>
+            <span class="plugin-stat">
+              {{ item.activationMs === null ? '未激活' : `${item.activationMs} ms` }}
+            </span>
+          </div>
           <div v-if="item.permissions.length" class="plugin-perms">
             <span class="plugin-perms-label">权限声明</span>
             <span v-for="perm in item.permissions" :key="perm" class="plugin-perm">{{ perm }}</span>
@@ -153,6 +178,15 @@
             </span>
             <span v-if="item.lastStats.memdump_path" class="plugin-stat-path">
               {{ item.lastStats.memdump_path }}
+            </span>
+          </div>
+          <!-- 熔断：解释「为什么这个插件现在点不动」—— 冷却期内后端直接拒调用，
+               页面上什么都不说的话，用户只会以为界面坏了 -->
+          <div v-if="item.lastStats?.circuit_cooldown_ms" class="plugin-caps-warn">
+            <span class="plugin-caps-warn-text">
+              已熔断：连续 {{ item.lastStats.consec_failures }} 次资源性失败，
+              约 {{ Math.ceil(item.lastStats.circuit_cooldown_ms / 1000) }} 秒内不再调用。
+              修好后会自动恢复；想立刻重试就重装 / 重新启用该插件
             </span>
           </div>
         </div>
@@ -1008,6 +1042,21 @@ async function confirmUninstallPlugin() {
 .plugin-caps-warn-text {
   flex: 1;
   min-width: 0;
+}
+
+// 依赖里「当前不可用」的那一项
+.plugin-perm.is-missing {
+  @include theme.useTheme {
+    color: theme.getVar('dangerText');
+  }
+}
+
+.plugin-deps-warn {
+  font-size: var(--font-size-xs);
+
+  @include theme.useTheme {
+    color: theme.getVar('dangerText');
+  }
 }
 
 .plugin-ops {

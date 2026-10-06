@@ -62,5 +62,6 @@ export function toToolPlugin(plugin: InstalledPlugin, index: number): ToolPlugin
     order: THIRD_PARTY_ORDER_BASE + index,
     source: 'third-party',
     standaloneWindow: plugin.standalone_window === true,
+    dependencies: plugin.dependencies ?? [],
   }
 }

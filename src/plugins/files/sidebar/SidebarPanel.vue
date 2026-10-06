@@ -9,7 +9,7 @@ import GlobalDialog from '@/components/GlobalDialog.vue'
 import StringUtil from '@/utils/StringUtil'
 import { load, Store } from '@/core/runtime'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
-import { useDocumentManagerStore } from '../store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 
 // 常量定义
 const INVALID_CHARS_REGEX = /.*[/\\:*?|].*/

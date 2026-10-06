@@ -95,10 +95,19 @@
           </div>
         </template>
       </el-tree>
-      <!-- 空状态 -->
+      <!-- 空状态：工作区没有关联文件夹（竖向引导，对齐 VS Code 的「未打开文件夹」）。
+           刻意不预置目录 —— 目录由用户自己选，这里只给两个明确入口。 -->
       <div v-show="treeChildrenData.length === 0" class="empty-tree-actions">
-        <div class="empty-hint" @click="changeWorkspace()">请选择文件夹</div>
-      
+        <el-icon class="empty-guide-icon"><FolderOpened /></el-icon>
+        <p class="empty-guide-text">尚未打开文件夹</p>
+        <div class="empty-guide-actions">
+          <app-button size="small" type="primary" class="guide-btn" @click="handleOpenFolder">
+            打开文件夹
+          </app-button>
+          <app-button size="small" class="guide-btn" @click="handleOpenFile">
+            打开文件
+          </app-button>
+        </div>
       </div>
     </div>
 
@@ -223,7 +232,7 @@ import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/entity/entitys'
-import { useDocumentManagerStore } from '../store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 import useStore from '@/store/index'
 import { TreeNode } from '@/Types/entitys'
 import { changeWorkspace } from '@/utils/index'
@@ -538,6 +547,23 @@ function handleAddFolder(data: TreeNode) {
 
 function handleRefresh() {
   emit('refresh')
+}
+
+/**
+ * 空状态「打开文件」：只把文件开进编辑器，**不改工作目录**。
+ * 与 MenuBar 的「打开文件」行为一致 —— 用户还没选目录时，不该替他决定文件树根在哪。
+ */
+async function handleOpenFile() {
+  const { open } = await import('@/core/runtime')
+  const selected = await open({ multiple: false, filters: [{ name: '文件', extensions: ['*'] }] })
+  if (typeof selected === 'string' && selected) {
+    docStore.openDocument(selected)
+  }
+}
+
+/** 空状态「打开文件夹」：选目录作为工作目录（changeWorkspace 内部会刷新文件树并持久化） */
+function handleOpenFolder() {
+  void changeWorkspace()
 }
 
 // ===== 根目录操作 =====
@@ -1000,44 +1026,48 @@ onBeforeUnmount(() => {
   }
 }
 
-// ===== 空状态 =====
+// ===== 空状态（工作区未关联文件夹）：竖向引导，对齐 VS Code =====
 .empty-tree-actions {
-  display: grid;
-  justify-content: center;
-  gap: 12px;
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+}
 
-  .button-card {
-    padding: 12px 24px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
+// 装饰性大图标（文案已表达同样含义）：用次要层级，不抢主体
+.empty-guide-icon {
+  align-self: center;
+  font-size: var(--font-size-5xl);
 
-    @include theme.useTheme {
-      background-color: theme.getVar('bgColor');
-      border-color: theme.getVar('borderColor');
-    }
-
-    .svg-icon {
-      font-size: theme.getVar('fontSizeXl');
-      color: var(--el-color-primary);
-      transition: color 0.2s;
-
-      &:hover {
-        color: var(--el-color-primary-light-4);
-      }
-    }
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
   }
 }
 
-.empty-hint {
+.empty-guide-text {
+  margin: 0;
   text-align: center;
-  padding: 20px;
 
   @include theme.useTheme {
     color: theme.getVar('textSecondary');
     font-size: theme.getVar('fontSize');
+  }
+}
+
+// 竖向堆叠 + 按钮撑满侧边栏宽度（VS Code 观感）
+.empty-guide-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+
+  .guide-btn {
+    width: 100%;
+    // EP 的 `.el-button + .el-button { margin-left: 12px }` 对普通按钮依然生效 ——
+    // 项目只在 `.is-bare` 图标按钮上把它归零（见 element.scss）。全宽竖排按钮再叠加这 12px
+    // 会溢出容器，表现为「第二个按钮右移 12px、左右边缘不齐」。间距由容器 gap 给。
+    margin-left: 0;
+    justify-content: center;
   }
 }
 

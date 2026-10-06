@@ -15,7 +15,7 @@ import { ElMessage } from 'element-plus'
 import { convertFileSrc } from '@/core/runtime'
 import { isDark } from '@/composables/useDark'
 import BookmarkTree from './Pdf/BookmarkTree.vue'
-import { useDocumentManagerStore } from '../../store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 import { ArrowRight, ArrowDown, FolderOpened } from '@element-plus/icons-vue'
 
 defineOptions({

@@ -6,6 +6,9 @@
     <!-- 主窗口 / 编辑器窗口 → 使用 Layout -->
     <Layout v-else />
 
+    <!-- 命令面板：统一唤起插件贡献的命令（Ctrl+Shift+P / F1）。辅助窗口没有插件主区，不挂 -->
+    <CommandPalette v-if="windowRole !== 'auxiliary'" />
+
     <!-- 新建编辑器窗口：选择工作区或新建临时工作区 -->
     <WorkspaceSelectDialog
       v-model="showWorkspaceSelect"
@@ -69,9 +72,10 @@ import useStore from '@/store'
 import Layout from '@/Layout/index.vue'
 import Common from '@/components/Common/Common.vue'
 import GlobalDialog from '@/components/GlobalDialog.vue'
+import CommandPalette from '@/components/CommandPalette/index.vue'
 import WorkspaceSelectDialog from '@/components/WorkspaceSelectDialog.vue'
 import type { WindowRole } from '@/Types/workspace'
-import { useDocumentManagerStore } from '@/plugins/files/store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 import { windowService } from '@/services/windowService'
 import { workspaceService } from '@/services/workspaceService'
 import NotificationUtil from '@/utils/NotificationUtil'
@@ -160,8 +164,11 @@ const appPageTitle = ref('')
 
 // 页面组件映射（懒加载）
 const pageComponentMap: Record<string, { title: string; loader: () => Promise<any> }> = {
+  // plugin-boundary-allow: 辅助窗口的页面路由表尚未贡献点化（TODO: 由 settings 插件注册进注册表后查表）
   'App-setting': { title: '设置', loader: () => import('@/plugins/settings/app/AppSetting.vue') },
+  // plugin-boundary-allow: 同上
   'App-about': { title: '关于', loader: () => import('@/plugins/settings/app/AppAbout.vue') },
+  // plugin-boundary-allow: 同上
   'App-help': { title: '帮助', loader: () => import('@/plugins/settings/app/AppHelp.vue') }
 }
 

@@ -108,7 +108,7 @@ import { invoke } from '@/api/rpc'
 import { Search, ArrowUp, ArrowDown, Close, ArrowLeft, ArrowRight, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import NotificationUtil from '@/utils/NotificationUtil'
 import useStore from '@/store'
-import { useDocumentManagerStore } from '../../store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 const {appConfig } = useStore();
 const docStore = useDocumentManagerStore()
 /**

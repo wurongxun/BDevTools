@@ -49,8 +49,8 @@
           @click="switchTo(p.id)"
         >
           {{ p.label }}
-          <span class="ph-chip-flag" :class="p.sidebarPanel ? 'is-yes' : 'is-no'">
-            {{ p.sidebarPanel ? '有侧栏' : '无侧栏' }}
+          <span class="ph-chip-flag" :class="p.hasSidebar ? 'is-yes' : 'is-no'">
+            {{ p.hasSidebar ? '有侧栏' : '无侧栏' }}
           </span>
         </button>
       </div>
@@ -62,6 +62,7 @@
 <script setup lang="ts" name="PlaceholderMainPanel">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { pluginManager } from '@/core/pluginManager'
+import { contributionRegistry } from '@/core/registry'
 
 /**
  * 侧栏实宽从 Layout 派发的同窗口事件 layout-update 里读（detail.sidebarWidth）
@@ -90,7 +91,18 @@ const sidebarWidthText = computed(() =>
 )
 const activeId = computed(() => pluginManager.activeToolId.value)
 const activeHasSidebar = computed(() => pluginManager.activeHasSidebar)
-const plugins = computed(() => pluginManager.plugins)
+/**
+ * 查注册表而不是读插件对象：这里要展示的是「宿主看到了什么」，
+ * 与布局真正渲染用的必须是同一份数据 —— 否则诊断面板会给出与实际不一致的结论。
+ */
+const plugins = computed(() => {
+  const sides = new Set(contributionRegistry.views('sidebar').map(e => e.pluginId))
+  return contributionRegistry.activityItems().map(e => ({
+    id: e.pluginId,
+    label: e.payload.label,
+    hasSidebar: sides.has(e.pluginId),
+  }))
+})
 
 function switchTo(id: string) {
   pluginManager.switchTool(id)

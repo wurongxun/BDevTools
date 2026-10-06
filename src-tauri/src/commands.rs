@@ -8,6 +8,8 @@
 //! 命令名即暴露给前端的 invoke 名称，改名需同步前端。
 
 use std::collections::HashMap;
+// 仅 ssh 插件用（logs_pull_remote 取远端文件名）；裁掉 ssh 后必须一起裁，否则 unused import
+#[cfg(feature = "plugin-ssh")]
 use std::path::Path;
 
 use serde::Serialize;
@@ -20,32 +22,48 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::core::ctx::AppContext;
 use crate::window_manager::app_window;
+#[cfg(feature = "plugin-files")]
 use crate::plugins::files::file_association;
+#[cfg(feature = "plugin-files")]
 use crate::plugins::files::file_command::{self, ScriptFileEntry};
+#[cfg(feature = "plugin-files")]
 use crate::plugins::files::file_utils;
+#[cfg(feature = "plugin-logs")]
 use crate::plugins::logs::log_index::{
     self, LogExportResult, LogIndexMeta, LogQueryResult,
 };
+#[cfg(feature = "plugin-logs")]
 use crate::plugins::logs::log_stream;
+#[cfg(feature = "plugin-mat")]
 use crate::plugins::mat::mat_hprof::{self, MatHeaderInfo, MatHistogramResult};
+#[cfg(feature = "plugin-mat")]
 use crate::plugins::mat::mat_leak::{self, MatLeakSuspectsResult};
+#[cfg(feature = "plugin-mat")]
 use crate::plugins::mat::mat_cfg::{self, MatLimitInfo};
 // 目录已改名为 plugin_host/{host,wasm}.rs，但函数体一律用裸名 `plugin_host::` / `plugin_wasm::`
 // 书写（与插件 id 语义对齐），故 import 时用别名把名字拉回原样，避免改动几百处调用点。
 use crate::plugin_host::host as plugin_host;
 use crate::plugin_host::wasm as plugin_wasm;
+#[cfg(feature = "plugin-mat")]
 use crate::plugins::mat::mat_refs::{
     self, RefBuildInfo, RefInstances, RefObjectDetail, RefSearchResult,
 };
+#[cfg(feature = "plugin-ssh")]
 use crate::plugins::ssh::remote_conn::{self, RemoteFileItem};
+#[cfg(feature = "plugin-terminal")]
 use crate::plugins::terminal::terminal;
-use crate::plugins::logs::search_log_parallel::{self, FileLinesResult};
+// 行读取是**核心能力**（files 的 TextView 与 logs 都用），不随任何插件裁剪
+use crate::utils::line_reader::{self, FileLinesResult};
+#[cfg(feature = "plugin-database")]
 use crate::plugins::database::connection::DbConnectionConfig;
+#[cfg(feature = "plugin-database")]
 use crate::plugins::database::import_export::{ExportResult, ImportResult};
+#[cfg(feature = "plugin-database")]
 use crate::plugins::database::metadata::{
     CatalogCapabilities, DatabaseIndexInfo, DatabaseObjectInfo, DatabaseInfo, DbAdminInfo, DbUserInfo,
     IndexInfo, KeyValueRow, TableInfo,
 };
+#[cfg(feature = "plugin-database")]
 use crate::plugins::database::operations::{ColumnInfo, SqlResult, TableDataResult};
 use crate::entity::session::{SessionSnapshot, SessionSummary};
 use crate::entity::window::WindowMeta;
@@ -53,6 +71,8 @@ use crate::entity::workspace::{WorkspaceConfig, WorkspaceSummary};
 use crate::response::resp_data::ResData;
 use crate::response::response::Response;
 use crate::session::draft::{DraftCheckResult, DraftMeta};
+// SSH 连接配置（sqlite 表在核心，但只有 ssh 插件的命令用它）
+#[cfg(feature = "plugin-ssh")]
 use crate::sqlite::ssh_connection::SshSubMenu;
 
 /// tauri → 业务 的唯一适配点：把 `tauri::AppHandle` 转换为平台无关的 [`AppContext`]。
@@ -97,13 +117,15 @@ fn ctx_from_app(app: &tauri::AppHandle) -> AppContext {
 
 // ==================== 文件管理 ====================
 
-/// 打开目录（项目）
+/// 打开目录（项目）。**核心能力**（`utils::fs`）：任何插件都可能要「打开所在目录」，
+/// 不该被 files 插件的开关绑住。
 #[tauri::command]
 pub async fn file_manager_open_path(app_handle: tauri::AppHandle, path: String) -> ResData<String> {
-    file_utils::file_manager_open_path(&ctx_from_app(&app_handle), path).await
+    crate::utils::fs::open_path_in_file_manager(&ctx_from_app(&app_handle), path).await
 }
 
 /// 获取文档笔记本（目录树）
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn get_document_notebooks(
     app_handle: tauri::AppHandle,
@@ -113,6 +135,7 @@ pub async fn get_document_notebooks(
 }
 
 /// 更新文件夹名称
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn up_folder_name(
     path: String,
@@ -122,30 +145,35 @@ pub async fn up_folder_name(
 }
 
 /// 检测文件编码
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn detect_file_encoding(path: String) -> Result<ResData<String>, String> {
     file_utils::detect_file_encoding(path).await
 }
 
-/// 确保目录存在（递归创建）
+/// 确保目录存在（递归创建）。
+/// **核心能力**（`utils::fs`）：database 等插件也要建目录，不能挂在 `plugin-files` 开关上。
 #[tauri::command]
 pub async fn ensure_dir(path: String) -> Result<ResData<String>, String> {
-    file_command::ensure_dir(path).await
+    crate::utils::fs::ensure_dir(path).await
 }
 
 /// 获取目录下笔记
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn get_note_list(path: String) -> Result<ResData<Vec<String>>, String> {
     file_command::get_note_list(path).await
 }
 
 /// 读取本地笔记文件（自动检测编码）
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn read_note_file(path: String) -> Result<ResData<String>, String> {
     file_command::read_note_file(path).await
 }
 
 /// 获取文件大小（字节），供大文件分诊
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn get_file_size(path: String) -> Result<ResData<u64>, String> {
     file_command::get_file_size(path).await
@@ -153,21 +181,24 @@ pub async fn get_file_size(path: String) -> Result<ResData<u64>, String> {
 
 /// 读取文件原始字节，前端直接拿到 ArrayBuffer（图片查看用）。
 /// 走裸字节通道而非 ResData，见 `file_command::read_file_bytes` 的说明。
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn read_file_bytes(path: String) -> Result<tauri::ipc::Response, String> {
     file_command::read_file_bytes(path).await
 }
 
-/// 创建本地文件夹
+/// 创建本地文件夹。
+/// **核心能力**（`utils::fs`）：见 `ensure_dir` 的说明 —— 纯 fs 操作，不随 files 插件裁剪。
 #[tauri::command]
 pub async fn create_folder(
     father_path: String,
     new_folder_name: String,
 ) -> Result<ResData<String>, String> {
-    file_command::create_folder(father_path, new_folder_name).await
+    crate::utils::fs::create_folder(father_path, new_folder_name).await
 }
 
 /// 创建笔记文件
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn create_note_file(
     father_path: String,
@@ -177,12 +208,14 @@ pub async fn create_note_file(
 }
 
 /// 保存笔记
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn save_note(path: String, md_text: String) -> Result<ResData<String>, String> {
     file_command::save_note(path, md_text).await
 }
 
 /// 更新文件名
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn up_file_name(
     path: String,
@@ -192,18 +225,21 @@ pub async fn up_file_name(
 }
 
 /// 删除本地文件夹
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn remove_folder(path: String) -> Result<ResData<String>, String> {
     file_command::remove_folder(path).await
 }
 
 /// 删除本地文件
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn remove_file(path: String) -> Result<ResData<String>, String> {
     file_command::remove_file(path).await
 }
 
 /// 获取目录下所有文件及文件夹名称
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn get_path_childrenFoldersAndFiles(
     path: String,
@@ -212,12 +248,14 @@ pub async fn get_path_childrenFoldersAndFiles(
 }
 
 /// 写入脚本文件（不存在则创建，存在则覆盖）
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn write_script_file(path: String, content: String) -> Result<ResData<String>, String> {
     file_command::write_script_file(path, content).await
 }
 
 /// 重命名脚本文件（保留原扩展名）
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn rename_script_file(
     path: String,
@@ -227,6 +265,7 @@ pub async fn rename_script_file(
 }
 
 /// 递归列出目录下所有文件与文件夹
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn list_script_files(path: String) -> Result<ResData<Vec<ScriptFileEntry>>, String> {
     file_command::list_script_files(path).await
@@ -286,18 +325,19 @@ pub async fn read_file_lines(
     line_count: Option<u64>,
     encoding: Option<String>,
 ) -> Result<ResData<FileLinesResult>, String> {
-    search_log_parallel::read_file_lines(file_path, start_line, line_count, encoding).await
+    line_reader::read_file_lines(file_path, start_line, line_count, encoding).await
 }
 
 /// 快速统计文件总行数
 #[tauri::command]
 pub async fn count_file_lines(file_path: String) -> Result<ResData<u64>, String> {
-    search_log_parallel::count_file_lines(file_path).await
+    line_reader::count_file_lines(file_path).await
 }
 
 // ==================== 日志工作台：服务端索引与筛选（logs 插件） ====================
 
 /// 建立日志索引（级别计数 / 时间范围 / 时间桶）
+#[cfg(feature = "plugin-logs")]
 #[tauri::command]
 pub async fn logs_index_build(
     file_path: String,
@@ -307,6 +347,7 @@ pub async fn logs_index_build(
 }
 
 /// 合并查询：**筛选 + 关键词一次完成**，同时返回渲染段与导航行号（§2.5）
+#[cfg(feature = "plugin-logs")]
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn logs_query_lines(
@@ -343,6 +384,7 @@ pub async fn logs_query_lines(
 }
 
 /// 取消正在进行的查询任务（P6）；前端凭 `task_id` 静默丢弃结果
+#[cfg(feature = "plugin-logs")]
 #[tauri::command]
 pub fn logs_cancel(task_id: String) -> Result<ResData<bool>, String> {
     let hit = log_index::cancel_query(task_id);
@@ -358,6 +400,7 @@ pub fn logs_cancel(task_id: String) -> Result<ResData<bool>, String> {
 }
 
 /// 按筛选条件流式导出日志到目标文件
+#[cfg(feature = "plugin-logs")]
 #[tauri::command]
 pub async fn logs_index_export(
     file_path: String,
@@ -385,6 +428,7 @@ pub async fn logs_index_export(
 }
 
 /// 释放指定文件的索引缓存
+#[cfg(feature = "plugin-logs")]
 #[tauri::command]
 pub async fn logs_index_drop(file_path: String) -> Result<ResData<bool>, String> {
     log_index::log_index_drop(file_path).await
@@ -393,6 +437,7 @@ pub async fn logs_index_drop(file_path: String) -> Result<ResData<bool>, String>
 // ==================== Java 堆转储分析（mat 插件） ====================
 
 /// 读取堆转储文件头：格式识别（HPROF / PHD / 未知）+ 元信息
+#[cfg(feature = "plugin-mat")]
 #[tauri::command]
 pub async fn mat_hprof_header(path: String) -> Result<ResData<MatHeaderInfo>, String> {
     let p = path.clone();
@@ -402,6 +447,7 @@ pub async fn mat_hprof_header(path: String) -> Result<ResData<MatHeaderInfo>, St
 }
 
 /// 生成按类聚合的浅堆直方图（Shallow Heap）
+#[cfg(feature = "plugin-mat")]
 #[tauri::command]
 pub async fn mat_hprof_histogram(
     path: String,
@@ -414,6 +460,7 @@ pub async fn mat_hprof_histogram(
 }
 
 /// 分析预算 / 规模上限明细（前端「分析预算」设置弹窗，不依赖任何 dump）
+#[cfg(feature = "plugin-mat")]
 #[tauri::command]
 pub async fn mat_analysis_limits() -> Result<ResData<MatLimitInfo>, String> {
     tokio::task::spawn_blocking(mat_cfg::mat_analysis_limits)
@@ -422,6 +469,7 @@ pub async fn mat_analysis_limits() -> Result<ResData<MatLimitInfo>, String> {
 }
 
 /// Leak Suspects：支配树 + Retained Heap 的泄漏嫌疑分析（对象多时耗时数十秒级）
+#[cfg(feature = "plugin-mat")]
 #[tauri::command]
 pub async fn mat_leak_suspects(path: String) -> Result<ResData<MatLeakSuspectsResult>, String> {
     let p = path.clone();
@@ -431,6 +479,7 @@ pub async fn mat_leak_suspects(path: String) -> Result<ResData<MatLeakSuspectsRe
 }
 
 /// 引用追踪：构建（或复用）对象图会话，返回图规模与可达性汇总
+#[cfg(feature = "plugin-mat")]
 #[tauri::command]
 pub async fn mat_refs_build(path: String) -> Result<ResData<RefBuildInfo>, String> {
     let p = path.clone();
@@ -440,6 +489,7 @@ pub async fn mat_refs_build(path: String) -> Result<ResData<RefBuildInfo>, Strin
 }
 
 /// 引用追踪：释放某 dump 的会话缓存（关闭 dump 时调用）
+#[cfg(feature = "plugin-mat")]
 #[tauri::command]
 pub async fn mat_refs_release(path: String) -> Result<ResData<bool>, String> {
     let p = path.clone();
@@ -449,6 +499,7 @@ pub async fn mat_refs_release(path: String) -> Result<ResData<bool>, String> {
 }
 
 /// 引用追踪：类名搜索（大小写不敏感子串，按浅堆合计降序）
+#[cfg(feature = "plugin-mat")]
 #[tauri::command]
 pub async fn mat_refs_search_classes(
     path: String,
@@ -464,6 +515,7 @@ pub async fn mat_refs_search_classes(
 }
 
 /// 引用追踪：取某类实例样本（按浅堆降序 Top N）
+#[cfg(feature = "plugin-mat")]
 #[tauri::command]
 pub async fn mat_refs_instances(
     path: String,
@@ -479,6 +531,7 @@ pub async fn mat_refs_instances(
 }
 
 /// 引用追踪：单个对象详情（outgoing / incoming / Path to GC Roots）
+#[cfg(feature = "plugin-mat")]
 #[tauri::command]
 pub async fn mat_refs_inspect(
     path: String,
@@ -493,12 +546,14 @@ pub async fn mat_refs_inspect(
 // ==================== 文件关联（Windows） ====================
 
 /// 注册文件关联
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn register_file_association() -> ResData<String> {
     file_association::register_file_association().await
 }
 
 /// 打开系统默认应用设置
+#[cfg(feature = "plugin-files")]
 #[tauri::command]
 pub async fn open_default_apps_settings() -> ResData<String> {
     file_association::open_default_apps_settings().await
@@ -507,6 +562,7 @@ pub async fn open_default_apps_settings() -> ResData<String> {
 // ==================== SSH / SFTP 远程连接 ====================
 
 /// SSH 连接
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn ssh_connect(
     app_handle: tauri::AppHandle,
@@ -525,30 +581,35 @@ pub async fn ssh_connect(
 }
 
 /// SSH 写入（用户输入）
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn ssh_write(session_id: String, data: String) -> Response<bool> {
     remote_conn::ssh_write(session_id, data).await
 }
 
 /// SSH 断开连接
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn ssh_disconnect(session_id: String) -> Response<bool> {
     remote_conn::ssh_disconnect(session_id).await
 }
 
 /// SSH 连接状态检测
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn ssh_check(session_id: String) -> Response<bool> {
     remote_conn::ssh_check(session_id).await
 }
 
 /// SSH 调整 PTY 大小
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn ssh_resize_pty(session_id: String, cols: u32, rows: u32) -> Response<bool> {
     remote_conn::ssh_resize_pty(session_id, cols, rows).await
 }
 
 /// SFTP 连接
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn sftp_connect(
     tab_id: String,
@@ -564,36 +625,42 @@ pub async fn sftp_connect(
 }
 
 /// SFTP 断开连接
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn sftp_disconnect(session_id: String) -> Response<bool> {
     remote_conn::sftp_disconnect(session_id).await
 }
 
 /// SFTP 连接状态检测
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn sftp_check(session_id: String) -> Response<bool> {
     remote_conn::sftp_check(session_id).await
 }
 
 /// SFTP 列出目录
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn sftp_list_dir(session_id: String, path: String) -> Response<Vec<RemoteFileItem>> {
     remote_conn::sftp_list_dir(session_id, path).await
 }
 
 /// SFTP 创建目录
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn sftp_mkdir(session_id: String, path: String) -> Response<bool> {
     remote_conn::sftp_mkdir(session_id, path).await
 }
 
 /// SFTP 删除文件/目录
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn sftp_remove(session_id: String, path: String) -> Response<bool> {
     remote_conn::sftp_remove(session_id, path).await
 }
 
 /// SFTP 上传文件
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn sftp_upload(
     app_handle: tauri::AppHandle,
@@ -606,6 +673,7 @@ pub async fn sftp_upload(
 }
 
 /// SFTP 下载文件
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn sftp_download(
     app_handle: tauri::AppHandle,
@@ -629,6 +697,7 @@ pub struct LogsPullRemoteResp {
 ///
 /// 复用现有 SFTP 能力：建立 SFTP 会话 → 下载到 config_dir/plugin_data/logs_remote → 断开。
 /// 前端拿到本地缓存路径后，像打开本地文件一样走既有分块加载 / 索引 / 筛选 / 时间轴链路。
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn logs_pull_remote(
     app_handle: tauri::AppHandle,
@@ -696,18 +765,21 @@ pub async fn logs_pull_remote(
 }
 
 /// 本地目录列出
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn local_list_dir(path: String) -> Response<Vec<RemoteFileItem>> {
     remote_conn::local_list_dir(path).await
 }
 
 /// SFTP 重命名文件/目录
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn sftp_rename(session_id: String, old_path: String, new_path: String) -> Response<bool> {
     remote_conn::sftp_rename(session_id, old_path, new_path).await
 }
 
 /// 获取应用数据目录路径
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn get_app_dir() -> Response<String> {
     remote_conn::get_app_dir().await
@@ -716,24 +788,28 @@ pub async fn get_app_dir() -> Response<String> {
 // ==================== SSH 连接配置（SQLite） ====================
 
 /// 创建 SSH 连接配置
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn connection_create(map: SshSubMenu) -> Response<Option<bool>> {
     crate::sqlite::ssh_connection::connection_create(map).await
 }
 
 /// 删除 SSH 连接配置
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn connection_delete(id: String) -> Response<bool> {
     crate::sqlite::ssh_connection::connection_delete(id).await
 }
 
 /// 编辑 SSH 连接配置
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn connection_edit(map: SshSubMenu) -> Response<bool> {
     crate::sqlite::ssh_connection::connection_edit(map).await
 }
 
 /// 查询 SSH 连接配置列表
+#[cfg(feature = "plugin-ssh")]
 #[tauri::command]
 pub async fn connection_list() -> Response<Vec<SshSubMenu>> {
     crate::sqlite::ssh_connection::connection_list().await
@@ -1016,42 +1092,49 @@ pub fn draft_delete(workspace_id: String, file_path: String) -> Response<bool> {
 // ==================== 数据库连接配置 ====================
 
 /// 创建数据库连接配置
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_connection_create(config: DbConnectionConfig) -> Response<Option<String>> {
     crate::plugins::database::connection::db_connection_create(config).await
 }
 
 /// 删除数据库连接配置
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_connection_delete(id: String) -> Response<bool> {
     crate::plugins::database::connection::db_connection_delete(id).await
 }
 
 /// 更新数据库连接配置
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_connection_update(config: DbConnectionConfig) -> Response<bool> {
     crate::plugins::database::connection::db_connection_update(config).await
 }
 
 /// 获取所有连接配置列表
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_connection_list() -> Response<Vec<DbConnectionConfig>> {
     crate::plugins::database::connection::db_connection_list().await
 }
 
 /// 测试数据库连接连通性
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_connection_test(config: DbConnectionConfig) -> Response<bool> {
     crate::plugins::database::connection::db_connection_test(config).await
 }
 
 /// 建立数据库连接（创建连接池）
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_connect(config_id: String) -> Response<bool> {
     crate::plugins::database::connection::db_connect(config_id).await
 }
 
 /// 断开数据库连接
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_disconnect(config_id: String) -> Response<bool> {
     crate::plugins::database::connection::db_disconnect(config_id).await
@@ -1060,6 +1143,7 @@ pub async fn db_disconnect(config_id: String) -> Response<bool> {
 // ==================== 数据库操作 ====================
 
 /// 执行 SQL 语句（分页）
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_execute_sql(
     config_id: String,
@@ -1072,6 +1156,7 @@ pub async fn db_execute_sql(
 }
 
 /// 分页查询表数据
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_query_table_data(
     config_id: String,
@@ -1089,6 +1174,7 @@ pub async fn db_query_table_data(
 }
 
 /// 插入单行数据
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_insert_row(
     config_id: String,
@@ -1100,6 +1186,7 @@ pub async fn db_insert_row(
 }
 
 /// 更新单行数据
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_update_row(
     config_id: String,
@@ -1116,6 +1203,7 @@ pub async fn db_update_row(
 }
 
 /// 删除单行数据
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_delete_row(
     config_id: String,
@@ -1131,18 +1219,21 @@ pub async fn db_delete_row(
 // ==================== 数据库元数据 ====================
 
 /// 获取所有数据库列表
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_list_databases(config_id: String) -> Response<Vec<DatabaseInfo>> {
     crate::plugins::database::metadata::db_list_databases(config_id).await
 }
 
 /// 获取指定数据库的所有表
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_list_tables(config_id: String, database: String) -> Response<Vec<TableInfo>> {
     crate::plugins::database::metadata::db_list_tables(config_id, database).await
 }
 
 /// 获取表的字段信息
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_table_columns(
     config_id: String,
@@ -1153,6 +1244,7 @@ pub async fn db_table_columns(
 }
 
 /// 获取表的索引信息
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_table_indexes(
     config_id: String,
@@ -1163,6 +1255,7 @@ pub async fn db_table_indexes(
 }
 
 /// 获取建表 DDL
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_table_schema(
     config_id: String,
@@ -1175,12 +1268,14 @@ pub async fn db_table_schema(
 // ---- 目录能力声明与新增对象（走 catalog 抽象，各库按自身能力实现）----
 
 /// 查询当前连接支持哪些目录能力（前端据此决定渲染哪些树节点）
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_catalog_capabilities(config_id: String) -> Response<CatalogCapabilities> {
     crate::plugins::database::metadata::db_catalog_capabilities(config_id).await
 }
 
 /// 获取指定库的视图列表
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_list_views(
     config_id: String,
@@ -1190,6 +1285,7 @@ pub async fn db_list_views(
 }
 
 /// 获取指定库的存储过程列表
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_list_procedures(
     config_id: String,
@@ -1199,6 +1295,7 @@ pub async fn db_list_procedures(
 }
 
 /// 获取指定库的触发器列表
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_list_triggers(
     config_id: String,
@@ -1208,6 +1305,7 @@ pub async fn db_list_triggers(
 }
 
 /// 获取指定库的事件列表（仅 MySQL 支持）
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_list_events(
     config_id: String,
@@ -1217,6 +1315,7 @@ pub async fn db_list_events(
 }
 
 /// 获取指定库的索引聚合
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_list_database_indexes(
     config_id: String,
@@ -1226,24 +1325,28 @@ pub async fn db_list_database_indexes(
 }
 
 /// 获取实例用户列表
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_list_users(config_id: String) -> Response<Vec<DbUserInfo>> {
     crate::plugins::database::metadata::db_list_users(config_id).await
 }
 
 /// 获取管理员列表（各库用自身原生语义判定）
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_list_admins(config_id: String) -> Response<Vec<DbAdminInfo>> {
     crate::plugins::database::metadata::db_list_admins(config_id).await
 }
 
 /// 获取运行状态（scope: session | global）
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_show_status(config_id: String, scope: String) -> Response<Vec<KeyValueRow>> {
     crate::plugins::database::metadata::db_show_status(config_id, scope).await
 }
 
 /// 获取系统变量（scope: session | global）
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_show_variables(config_id: String, scope: String) -> Response<Vec<KeyValueRow>> {
     crate::plugins::database::metadata::db_show_variables(config_id, scope).await
@@ -1252,6 +1355,7 @@ pub async fn db_show_variables(config_id: String, scope: String) -> Response<Vec
 // ==================== 数据库导入导出 ====================
 
 /// 导出表数据为 CSV
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_export_csv(
     config_id: String,
@@ -1263,6 +1367,7 @@ pub async fn db_export_csv(
 }
 
 /// 导出表数据为 Excel
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_export_excel(
     config_id: String,
@@ -1274,6 +1379,7 @@ pub async fn db_export_excel(
 }
 
 /// 按任意 SQL 语句导出结果为 CSV
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_export_sql_csv(
     config_id: String,
@@ -1284,6 +1390,7 @@ pub async fn db_export_sql_csv(
 }
 
 /// 按任意 SQL 语句导出结果为 Excel
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_export_sql_excel(
     config_id: String,
@@ -1294,6 +1401,7 @@ pub async fn db_export_sql_excel(
 }
 
 /// 从 CSV 导入数据到表
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_import_csv(
     config_id: String,
@@ -1307,6 +1415,7 @@ pub async fn db_import_csv(
 }
 
 /// 从 Excel 导入数据到表
+#[cfg(feature = "plugin-database")]
 #[tauri::command]
 pub async fn db_import_excel(
     config_id: String,
@@ -1322,6 +1431,7 @@ pub async fn db_import_excel(
 /// 启动实时日志流。
 /// - WebSocket：由前端原生 `WebSocket` 直连，后端不参与（此处返回提示）。
 /// - TCP：后端建立监听，按行推送 `logs-stream-line` 事件。
+#[cfg(feature = "plugin-logs")]
 #[tauri::command]
 pub async fn logs_stream_start(
     app_handle: tauri::AppHandle,
@@ -1348,6 +1458,7 @@ pub async fn logs_stream_start(
 }
 
 /// 停止指定实时流（TCP 后端任务 / WebSocket 前端已自行关闭）
+#[cfg(feature = "plugin-logs")]
 #[tauri::command]
 pub async fn logs_stream_stop(stream_id: String) -> Response<bool> {
     log_stream::log_stream_stop(stream_id).await
@@ -1495,6 +1606,7 @@ pub async fn plugin_set_memdump(enabled: bool) -> Response<bool> {
 // 这里把 `Channel` 适配成业务模块的中性 `TermSink` 闭包，业务模块不感知任何 tauri 类型。
 
 /// 打开一个本地 PTY 会话（跨平台 shell），输出经 `onEvent` 持续推送
+#[cfg(feature = "plugin-terminal")]
 #[tauri::command]
 pub async fn terminal_open(
     options: terminal::TermOpenOptions,
@@ -1517,6 +1629,7 @@ pub async fn terminal_open(
 /// 而「写 PTY」在 shell 不读 stdin 时（正在跑长命令 / 分页器）会阻塞住，
 /// 一旦阻塞主线程整个界面就无响应了（粘贴大段文本时最容易撞上）。
 /// 凡是有可能阻塞的命令一律 `async` + `spawn_blocking`（与 mat_* 一致）。
+#[cfg(feature = "plugin-terminal")]
 #[tauri::command]
 pub async fn terminal_write(session_id: String, data: String) -> Response<bool> {
     match tokio::task::spawn_blocking(move || terminal::terminal_write(session_id, data)).await {
@@ -1526,6 +1639,7 @@ pub async fn terminal_write(session_id: String, data: String) -> Response<bool> 
 }
 
 /// 调整终端尺寸（内核据此向 shell 发 SIGWINCH / ConPTY 同步窗口大小）
+#[cfg(feature = "plugin-terminal")]
 #[tauri::command]
 pub async fn terminal_resize(session_id: String, cols: u16, rows: u16) -> Response<bool> {
     match tokio::task::spawn_blocking(move || terminal::terminal_resize(session_id, cols, rows)).await {
@@ -1538,6 +1652,7 @@ pub async fn terminal_resize(session_id: String, cols: u16, rows: u16) -> Respon
 ///
 /// 释放 PTY 时 Windows 上会走 `ClosePseudoConsole`，它会等 conhost 退出；
 /// 该调用可能阻塞（见 `terminal::terminal_close` 的说明），绝不能落在主线程上。
+#[cfg(feature = "plugin-terminal")]
 #[tauri::command]
 pub async fn terminal_close(session_id: String) -> Response<bool> {
     match tokio::task::spawn_blocking(move || terminal::terminal_close(session_id)).await {
@@ -1547,6 +1662,7 @@ pub async fn terminal_close(session_id: String) -> Response<bool> {
 }
 
 /// 会话是否存活（前端自检 / 崩溃恢复用）
+#[cfg(feature = "plugin-terminal")]
 #[tauri::command]
 pub async fn terminal_alive(session_id: String) -> Response<bool> {
     match tokio::task::spawn_blocking(move || terminal::terminal_alive(session_id)).await {
@@ -1556,6 +1672,7 @@ pub async fn terminal_alive(session_id: String) -> Response<bool> {
 }
 
 /// 本机可用 shell 列表（「新建会话」下拉）
+#[cfg(feature = "plugin-terminal")]
 #[tauri::command]
 pub async fn terminal_list_shells() -> Response<Vec<terminal::ShellInfo>> {
     match tokio::task::spawn_blocking(terminal::terminal_list_shells).await {
@@ -1565,6 +1682,7 @@ pub async fn terminal_list_shells() -> Response<Vec<terminal::ShellInfo>> {
 }
 
 /// 终端默认启动信息（默认 shell / 默认 cwd / 平台）
+#[cfg(feature = "plugin-terminal")]
 #[tauri::command]
 pub async fn terminal_defaults() -> Response<terminal::TermDefaults> {
     match tokio::task::spawn_blocking(terminal::terminal_defaults).await {

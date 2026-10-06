@@ -1,9 +1,0 @@
-{
-  "id": "json-toolkit",
-  "name": "JSON 工具箱",
-  "version": "1.0.0",
-  "description": "纯前端沙箱示例：JSON 格式化 / 压缩 / 校验与结构统计",
-  "icon": "icon.svg",
-  "entry": "page.html",
-  "permissions": ["log"]
-}

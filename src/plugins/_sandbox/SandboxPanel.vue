@@ -70,9 +70,24 @@ function postToPlugin(payload: Record<string, unknown>) {
 /** 宿主保留方法：`func` 以 `__host_` 开头的一律不进 WASM，由本面板直接处理 */
 const HOST_FUNCS = new Set(['__host_dialog_open', '__host_dialog_save'])
 
-/** 路径归一化：统一分隔符、去尾斜杠、忽略大小写（Windows 下 `D:\\A` 与 `d:/a/` 同义） */
+/**
+ * 路径归一化：统一分隔符、折叠 `.` 与 `..`、去尾斜杠、忽略大小写。
+ *
+ * **必须折叠 `..`**：只做前缀比较的话 `{root}/a/../b` 会「看起来在范围内」；有了排除区
+ * （其它插件的数据目录）之后，这个洞会直接变成绕过隔离的入口。比较两侧都过这个函数，
+ * 所以折叠不会误伤正常路径（UNC 的前导空段在两侧同样被丢掉）。
+ */
 function normPath(p: string): string {
-  return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+  const out: string[] = []
+  for (const seg of p.replace(/\\/g, '/').split('/')) {
+    if (seg === '' || seg === '.') continue
+    if (seg === '..') {
+      out.pop()
+      continue
+    }
+    out.push(seg)
+  }
+  return out.join('/').toLowerCase()
 }
 
 /** 路径是否落在任一作用域内（作用域目录本身也算在内） */
@@ -94,6 +109,10 @@ function withinRoots(p: string, roots: string[]): boolean {
  * 作用域约束：返回路径必须落在清单声明的 `fs` 作用域内。对话框返回的是字符串、本身不授予
  * 访问权，但允许它指向任意位置会误导用户（选了却读不了），所以这里直接拒绝而不是透传。
  * 判定用的根目录由宿主给出（与 `host_fs_open` 同一份），前端只做前缀比较，不重解析清单。
+ *
+ * 声明了 `fs:read:*` / `fs:write:*` 的插件走**通配模式**：任意路径都能选，只剩「排除区」
+ * （`deny`：其它插件的数据目录 / 内置插件数据 / 插件安装根）这一道闸 —— 排除区与后端
+ * `host_fs_open` 用的是同一份列表，否则用户会选到「前端放行、后端拒绝」的路径。
  */
 async function runHostFunc(
   func: string,
@@ -102,15 +121,25 @@ async function runHostFunc(
   const kind = func === '__host_dialog_save' ? 'save' : 'open'
   const perm = kind === 'save' ? 'fs:write' : 'fs:read'
   const roots = await fetchPluginFsRoots(props.pluginId)
+  // 通配作用域（`fs:read:*` / `fs:write:*`）：任意路径，只剩排除区这一道闸
+  const any = kind === 'save' ? roots.writeAny : roots.readAny
   const allowed = kind === 'save' ? roots.write : roots.read
-  if (allowed.length === 0) {
+  const deny = Array.isArray(roots.deny) ? roots.deny : []
+  if (!any && allowed.length === 0) {
     return { ok: false, error: `插件未声明任何 ${perm} 作用域，不能使用宿主文件对话框` }
+  }
+  /** 该路径是否可被选中：排除区优先 → 通配放行 → 否则逐个前缀比较 */
+  const pickable = (p: string): boolean => {
+    if (withinRoots(p, deny)) return false
+    return any || withinRoots(p, allowed)
   }
   const opt = (input ?? {}) as Record<string, unknown>
   const filters = Array.isArray(opt.filters)
     ? (opt.filters as { name: string; extensions: string[] }[])
     : undefined
-  const defaultPath = typeof opt.defaultPath === 'string' ? opt.defaultPath : allowed[0]
+  // 插件给的起始目录也要过同一道闸：否则它能先把对话框指到排除区里
+  const wanted = typeof opt.defaultPath === 'string' ? opt.defaultPath : undefined
+  const defaultPath = wanted && pickable(wanted) ? wanted : allowed[0]
 
   const picked =
     kind === 'save'
@@ -120,9 +149,12 @@ async function runHostFunc(
   // 用户取消 → null（插件必须处理，这是最常见的空指针来源）
   if (picked === null || picked === undefined) return { ok: true, data: null }
   const paths = Array.isArray(picked) ? picked : [picked]
-  const rejected = paths.filter((x) => !withinRoots(x, allowed))
+  const rejected = paths.filter((x) => !pickable(x))
   if (rejected.length > 0) {
-    return { ok: false, error: `所选路径不在插件声明的 ${perm} 作用域内：${rejected.join('、')}` }
+    const why = paths.some((x) => withinRoots(x, deny))
+      ? '其它插件的数据目录与插件安装目录不可访问'
+      : `不在插件声明的 ${perm} 作用域内`
+    return { ok: false, error: `所选路径${why}：${rejected.join('、')}` }
   }
   return { ok: true, data: Array.isArray(picked) ? paths : paths[0] }
 }

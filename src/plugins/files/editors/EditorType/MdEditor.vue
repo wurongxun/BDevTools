@@ -51,7 +51,7 @@ import { tauri_request } from "@/utils/tauri_request";
 import { Document } from '@element-plus/icons-vue';
 import { subscribe, Unsubscribe } from "@/core/runtime";
 import { isDark } from '@/composables/useDark';
-import { useDocumentManagerStore } from '../../store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 const docStore = useDocumentManagerStore()
 
 // 接收父组件传入的文档路径（每个实例绑定自己的文档）

@@ -1,7 +1,7 @@
 <template>
   <div class="window-controls">
     <el-tooltip content="最小化" placement="bottom">
-      <button type="button" class="ctrl-btn" aria-label="最小化窗口" @click="handleMinimize">
+      <button type="button" class="ctrl-btn" aria-label="最小化窗口" @click="minimize">
         <el-icon><Minus /></el-icon>
       </button>
     </el-tooltip>
@@ -10,7 +10,7 @@
         type="button"
         class="ctrl-btn"
         :aria-label="isMaximized ? '还原窗口' : '最大化窗口'"
-        @click="handleToggleMaximize"
+        @click="toggleMaximize"
       >
         <el-icon>
           <WindowRestoreIcon v-if="isMaximized" />
@@ -19,7 +19,7 @@
       </button>
     </el-tooltip>
     <el-tooltip content="关闭" placement="bottom">
-      <button type="button" class="ctrl-btn ctrl-close" aria-label="关闭窗口" @click="handleClose">
+      <button type="button" class="ctrl-btn ctrl-close" aria-label="关闭窗口" @click="closeWindow">
         <el-icon><Close /></el-icon>
       </button>
     </el-tooltip>
@@ -27,38 +27,16 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue'
 import { Close, Minus } from '@element-plus/icons-vue'
-import { getCurrentWindow } from '@/core/runtime'
+import { useWindowCommands } from '@/composables/useWindowCommands'
 import WindowMaximizationIcon from '@/components/Icon/WindowMaximizationIcon.vue'
 import WindowRestoreIcon from '@/components/Icon/WindowRestoreIcon.vue'
 
-const isMaximized = ref(false)
-
-async function handleMinimize() {
-  try {
-    await getCurrentWindow().minimize()
-  } catch (e) {
-    console.error('最小化失败:', e)
-  }
-}
-
-async function handleToggleMaximize() {
-  try {
-    await getCurrentWindow().toggleMaximize()
-    isMaximized.value = !isMaximized.value
-  } catch (e) {
-    console.error('最大化切换失败:', e)
-  }
-}
-
-async function handleClose() {
-  try {
-    await getCurrentWindow().close()
-  } catch (e) {
-    console.error('关闭窗口失败:', e)
-  }
-}
+/**
+ * 图标态取自 `useWindowCommands` 的真实状态，**不再本地乐观翻转** ——
+ * 否则窗口被 window-state 插件恢复成最大化启动时，图标会显示成「最大化」（点一下才对上）。
+ */
+const { isMaximized, minimize, toggleMaximize, closeWindow } = useWindowCommands()
 </script>
 
 <style scoped lang="scss">

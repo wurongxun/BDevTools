@@ -1,8 +1,7 @@
 import { markRaw } from 'vue'
 import { DataAnalysis } from '@element-plus/icons-vue'
-import type { ToolPlugin } from '@/core/pluginManager'
-import SidebarPanel from './SidebarPanel.vue'
-import MainPanel from './MainPanel.vue'
+import type { BuiltinPluginImpl } from '@/core/pluginManager'
+import { lazyView } from '@/core/plugin/lazy'
 
 /**
  * MAT（Memory Analyzer Tool）插件 —— Java 堆转储内存分析
@@ -14,12 +13,9 @@ import MainPanel from './MainPanel.vue'
  * 支配树（Retained Heap）、Leak Suspects、GC Roots 引用追踪、OQL 为占位，后续迭代接入。
  */
 export default {
-  id: 'mat',
-  label: '内存分析',
-  description: 'Java 堆转储分析：直方图、泄漏检测、支配树与引用追踪',
   icon: markRaw(DataAnalysis),
-  sidebarPanel: markRaw(SidebarPanel),
-  mainPanel: markRaw(MainPanel),
+  sidebarPanel: lazyView('mat', 'sidebar', () => import('./SidebarPanel.vue')),
+  mainPanel: lazyView('mat', 'main', () => import('./MainPanel.vue')),
   order: 5,
   // 侧边栏内容较简，用默认宽度即可
-} satisfies ToolPlugin
+} satisfies BuiltinPluginImpl

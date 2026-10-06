@@ -1,5 +1,0 @@
-{
-  "ok": true,
-  "from": "package-asset",
-  "note": "这个文件是被插件页 fetch 出来的 —— 能读到就说明 pageCapabilities 里的 assets 生效了"
-}

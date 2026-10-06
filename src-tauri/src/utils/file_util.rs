@@ -172,10 +172,10 @@ pub fn get_dir_notebooks_data(root_path: &String) -> ResData<String> {
     let mut i: u32 = 0;
     //最大层级5 当前深度0
     let _ = get_dir_and_file_with_depth(&mut i, &mut dir_info, 5, 0);
-    println!(
-        "get_dir_notebooks_data {}",
-        serde_json::to_string(&dir_info).unwrap()
-    );
+    // println!(
+    //     "get_dir_notebooks_data {}",
+    //     serde_json::to_string(&dir_info).unwrap()
+    // );
     ResData {
         code: 200,
         msg: "OK".to_string(),

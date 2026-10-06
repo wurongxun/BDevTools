@@ -17,7 +17,7 @@
 //! - **时间戳继承**：无时间戳行（堆栈帧、续行）继承上一条有效时间戳，
 //!   否则时间范围筛选会把异常块从中间切断
 
-use crate::plugins::logs::search_log_parallel::{read_line_lossy, resolve_encoding};
+use crate::utils::line_reader::{read_line_lossy, resolve_encoding};
 use crate::response::resp_data::ResData;
 use chrono::{Local, NaiveDate, TimeZone};
 use encoding_rs::Encoding;

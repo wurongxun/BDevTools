@@ -1,6 +1,7 @@
 /**
  * 数据库插件类型定义
  */
+import type { RpcResponse } from '@/api/rpc'
 
 /** 数据库类型 */
 export type DbType = 'mysql' | 'postgresql' | 'sqlserver' | 'oracle'
@@ -256,9 +257,10 @@ export interface ScriptFileNode {
   sourceKind?: 'default' | 'external'
 }
 
-/** 统一响应 */
-export interface ApiResponse<T> {
-  code: number
-  data: T
-  msg: string
-}
+/**
+ * 统一响应：与核心 `@/api/rpc` 的 `RpcResponse` 是同一份契约。
+ *
+ * 用别名而不是再定义一次：响应包裹是通信契约，核心服务也要用，各写一份就会出现
+ * 「同一个东西两个名字」，改动时漏改一边。
+ */
+export type ApiResponse<T> = RpcResponse<T>

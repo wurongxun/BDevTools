@@ -1,0 +1,5 @@
+{
+  "id": "terminal",
+  "name": "终端",
+  "description": "本地交互式终端：多标签 / 分屏 / 可拖拽停靠，支持 shell 集成（cwd、退出码）"
+}
