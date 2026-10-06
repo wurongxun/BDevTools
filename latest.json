@@ -1,11 +1,11 @@
 {
-  "version": "1.6.0",
-  "notes": "1.6.0 - 2026-09-23 1、修复BUG 2、优化页面布局 3、增加新插件 4、优化日志插件逻辑 5、优化窗口逻辑",
-  "pub_date": "2026-09-24 18:03:14 星期四（CST，UTC+0800）",
+  "version": "1.6.1",
+  "notes": "1.6.1 - 2026-09-23 修复窗口BUG\n2、修复页面布局",
+  "pub_date": "2026-10-06T08:00:00+08:00",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUOFVHSVdiU3RaUTMwSHhQMDYxNFcvUVZtWFJvT3FrYUt3TGY3UFVPTlJmU0l3ajJUMTVKU3hBMHgxRm83aGo4dG5mUUlKdEx5UnZmVGV4WUNIWjBRRGhUODZpSStsRHdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkwMjk0NzEzCWZpbGU6QkRldlRvb2xzXzEuNi4wX3g2NC1zZXR1cC5leGUKUGVCZjZ0Nm5NOGs3ek5KRnU2RjJORlYvUHk0QmZyRC9FMFFzYS9pU0dUNUM1VjZzaHNMWDFxL2dRRmFmSXFaN1h1U1ovUEV4WUZ0eVhycXM4UVptREE9PQo=",
-      "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.6.0/BDevTools_1.6.0_x64-setup.exe"
+      "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.6.1/BDevTools_1.6.1_x64-setup.exe"
     }
   }
 }
