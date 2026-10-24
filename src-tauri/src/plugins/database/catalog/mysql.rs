@@ -40,6 +40,57 @@ impl MySqlCatalog {
             .fetch_all(&self.pool)
             .await?)
     }
+
+    /// MySQL 直到 8.0 都没有 `SHOW CREATE TRIGGER`，只能拿 `information_schema.TRIGGERS`
+    /// 的字段拼回去。
+    ///
+    /// 拼出来的语句**保证看得懂、能照着重建**，但不保证与服务端内部表示逐字节一致
+    /// （比如 sql_mode 这段服务端是会带上的，这里没写）。与其假装拿到了官方源码，
+    /// 不如把「这是拼的」写进注释 —— 反正触发器的可执行主体 `ACTION_STATEMENT` 是真的。
+    async fn trigger_source(&self, database: &str, name: &str) -> Result<String> {
+        let rows = self
+            .rows_two(
+                "SELECT TRIGGER_NAME AS name, ACTION_TIMING AS timing, \
+                 EVENT_MANIPULATION AS evt, EVENT_OBJECT_TABLE AS tbl, \
+                 ACTION_ORIENTATION AS scope, ACTION_STATEMENT AS body, \
+                 IFNULL(DEFINER,'') AS definer \
+                 FROM information_schema.TRIGGERS \
+                 WHERE TRIGGER_SCHEMA = ? AND TRIGGER_NAME = ?",
+                database,
+                name,
+            )
+            .await?;
+        let r = rows.first().ok_or_else(|| anyhow::anyhow!("未找到触发器 {}", name))?;
+
+        // DEFINER 形如 `'root'@'localhost'`，要按 SHOW CREATE 的写法拆成两段各自加反引号
+        let head = match s(r, "definer") {
+            Some(d) if !d.is_empty() => {
+                let (u, h) = d.split_once('@').unwrap_or((d.as_str(), "%"));
+                format!(
+                    "CREATE DEFINER={}@{} ",
+                    self.quote_ident(u),
+                    self.quote_ident(h)
+                )
+            }
+            _ => "CREATE ".to_string(),
+        };
+        let scope = if req(r, "scope").eq_ignore_ascii_case("STATEMENT") {
+            "STATEMENT"
+        } else {
+            "ROW"
+        };
+        Ok(format!(
+            "{}TRIGGER {} {} {} ON {}.{} FOR EACH {}\n{}",
+            head,
+            self.quote_ident(&req(r, "name")),
+            req(r, "timing"),
+            req(r, "evt"),
+            self.quote_ident(database),
+            self.quote_ident(&req(r, "tbl")),
+            scope,
+            req(r, "body")
+        ))
+    }
 }
 
 /// 取可空字符串：NULL / 空串都收敛为 None
@@ -71,6 +122,7 @@ impl CatalogProvider for MySqlCatalog {
         CatalogCapabilities {
             views: true,
             procedures: true,
+            functions: true,
             triggers: true,
             events: true,
             database_indexes: true,
@@ -80,6 +132,7 @@ impl CatalogProvider for MySqlCatalog {
             global_status: true,
             session_variables: true,
             global_variables: true,
+            object_source: true,
         }
     }
 
@@ -128,7 +181,10 @@ impl CatalogProvider for MySqlCatalog {
         let rows = self
             .rows_two(
                 "SELECT COLUMN_NAME AS name, DATA_TYPE AS data_type, IS_NULLABLE AS is_nullable, \
-                 COLUMN_KEY AS column_key, COLUMN_DEFAULT AS default_value, COLUMN_COMMENT AS comment \
+                 COLUMN_KEY AS column_key, COLUMN_DEFAULT AS default_value, COLUMN_COMMENT AS comment, \
+                 ORDINAL_POSITION AS ord, EXTRA AS extra, \
+                 NUMERIC_PRECISION AS num_prec, NUMERIC_SCALE AS num_scale, \
+                 CHARACTER_MAXIMUM_LENGTH AS char_len \
                  FROM information_schema.COLUMNS \
                  WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION",
                 database,
@@ -140,6 +196,9 @@ impl CatalogProvider for MySqlCatalog {
             .map(|r| {
                 let key = s(r, "column_key");
                 let nullable = s(r, "is_nullable");
+                // MySQL 的 EXTRA 同时承载自增与生成列两类标记（`auto_increment` /
+                // `VIRTUAL GENERATED` / `STORED GENERATED`），读它比再查 statistics 便宜
+                let extra = req(r, "extra").to_lowercase();
                 ColumnInfo {
                     name: req(r, "name"),
                     data_type: req(r, "data_type"),
@@ -147,6 +206,12 @@ impl CatalogProvider for MySqlCatalog {
                     is_primary_key: key.as_deref() == Some("PRI"),
                     default_value: s(r, "default_value"),
                     comment: s(r, "comment"),
+                    ordinal_position: r.try_get::<i64, _>("ord").unwrap_or(0) as i32,
+                    is_auto_increment: extra.contains("auto_increment"),
+                    is_generated: extra.contains("generated"),
+                    numeric_precision: r.try_get::<i64, _>("num_prec").ok().map(|v| v as i32),
+                    numeric_scale: r.try_get::<i64, _>("num_scale").ok().map(|v| v as i32),
+                    character_max_length: r.try_get::<i64, _>("char_len").ok(),
                 }
             })
             .collect())
@@ -217,6 +282,50 @@ impl CatalogProvider for MySqlCatalog {
             )
             .await?;
         Ok(rows.iter().map(|r| object_from_row(r)).collect())
+    }
+
+    async fn list_functions(&self, database: &str) -> Result<Vec<DatabaseObjectInfo>> {
+        let rows = self
+            .rows_one(
+                "SELECT ROUTINE_NAME AS name, ROUTINE_TYPE AS object_type, ROUTINE_SCHEMA AS database_name, \
+                 IFNULL(DEFINER,'') AS definer, IFNULL(CREATED,'') AS created, IFNULL(LAST_ALTERED,'') AS modified, \
+                 IFNULL(ROUTINE_COMMENT,'') AS comment_txt, '' AS status_txt, '' AS event_txt, '' AS table_name \
+                 FROM information_schema.ROUTINES \
+                 WHERE ROUTINE_SCHEMA = ? AND ROUTINE_TYPE = 'FUNCTION' ORDER BY ROUTINE_NAME",
+                database,
+            )
+            .await?;
+        Ok(rows.iter().map(|r| object_from_row(r)).collect())
+    }
+
+    /// 取对象的定义源码。
+    ///
+    /// **列位置按语句各不相同**，集中在这里核对一次，别照抄 `table_schema` 的下标：
+    /// - `SHOW CREATE VIEW`      → View      | Create View  | character_set_client | …
+    /// - `SHOW CREATE PROCEDURE` → Procedure | **sql_mode** | Create Procedure     | …
+    /// - `SHOW CREATE FUNCTION`  → Function  | **sql_mode** | Create Function      | …
+    ///
+    /// 例程那条比 view 多夹了一个 sql_mode，源码在**第 3 列（下标 2）**；
+    /// 用下标 1 会把 sql_mode 当成源码显示给用户。
+    async fn object_source(
+        &self,
+        kind: ObjectSourceKind,
+        database: &str,
+        name: &str,
+    ) -> Result<String> {
+        let full = format!("{}.{}", self.quote_ident(database), self.quote_ident(name));
+        let (sql, idx): (String, usize) = match kind {
+            ObjectSourceKind::View => (format!("SHOW CREATE VIEW {}", full), 1),
+            ObjectSourceKind::Procedure => (format!("SHOW CREATE PROCEDURE {}", full), 2),
+            ObjectSourceKind::Function => (format!("SHOW CREATE FUNCTION {}", full), 2),
+            ObjectSourceKind::Trigger => return self.trigger_source(database, name).await,
+        };
+        let row = sqlx::query(&sql).fetch_one(&self.pool).await?;
+        let src = row.try_get::<String, _>(idx).unwrap_or_default();
+        if src.trim().is_empty() {
+            return Err(anyhow::anyhow!("未取到 {}（对象不存在或没有权限）", kind.label()));
+        }
+        Ok(src)
     }
 
     async fn list_triggers(&self, database: &str) -> Result<Vec<DatabaseObjectInfo>> {

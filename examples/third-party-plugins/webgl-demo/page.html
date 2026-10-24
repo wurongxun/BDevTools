@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WebGL 自检示例</title>
+  <link rel="stylesheet" href="page.css" />
+</head>
+<body>
+  <header class="bar">
+    <div>
+      <h1>WebGL 自检示例</h1>
+      <p class="sub">零依赖旋转立方体 + 页面能力自检</p>
+    </div>
+    <span class="badge" id="gl-badge">WebGL 初始化中…</span>
+  </header>
+
+  <main class="wrap">
+    <section class="panel">
+      <canvas id="gl" width="720" height="405"></canvas>
+      <p class="tip" id="gl-note">
+        立方体转起来就说明 <strong>WebGL 在插件页里可用</strong>——这一项不需要任何 CSP 放开，
+        是最低门槛。真正的引擎（Unity WebGL / Godot Web / three.js loader）还要靠下面的能力。
+      </p>
+    </section>
+
+    <section class="panel">
+      <h2>页面能力自检</h2>
+      <ul class="probe" id="probe"></ul>
+      <p class="tip">
+        <code>plugin.json</code> 里 <strong>声明了的</strong>项应显示「通过」，未声明的应显示「被阻止」。
+        未声明的能力一律保持禁止（默认最严 CSP），每个能力对应一条明确指令。
+      </p>
+      <p class="tip">
+        注：<code>isolate</code>（跨源隔离 → <code>SharedArrayBuffer</code> → 多线程 WASM）只在
+        <strong>独立窗口</strong>里可能生效；在面板内的沙箱 iframe 里必然为「被阻止」，
+        因为跨源隔离要求整条文档链都带 COOP/COEP，而宿主主页面并不是隔离的。
+      </p>
+    </section>
+  </main>
+
+  <!-- 严格 CSP（script-src 'self'）：脚本必须外链，事件必须 addEventListener -->
+  <script src="page.js"></script>
+</body>
+</html>

@@ -10,6 +10,7 @@ bool_literal / is_select_query）当前由上层以各自方式实现，属于�
 */
 #![allow(dead_code)]
 use anyhow::{anyhow, Result};
+use super::pool::DbPool;
 
 /// 数据库方言
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,6 +19,17 @@ pub enum Dialect {
     PostgreSQL,
     SqlServer,
     Oracle,
+}
+
+/// 由连接池反推方言（CRUD / 编辑写回都需要按方言拼标识符与字面量）。
+/// 放在这里而不是各处 `match pool`，是为了让「这一句该怎么写」只有一个答案。
+pub fn dialect_of(pool: &DbPool) -> Dialect {
+    match pool {
+        DbPool::MySQL(_) => Dialect::MySQL,
+        DbPool::PostgreSQL(_) => Dialect::PostgreSQL,
+        DbPool::SqlServer(_) => Dialect::SqlServer,
+        DbPool::Oracle(_) => Dialect::Oracle,
+    }
 }
 
 impl Dialect {
@@ -138,6 +150,40 @@ impl Dialect {
                     "0"
                 }
             }
+        }
+    }
+
+    /// 字符串字面量里的转义（不含外层引号）。
+    /// MySQL 默认 `\` 是转义符，只把 `'` 翻倍的话，值里的 `\` 会把后面的引号吃掉；
+    /// 其余三种在字符串字面量里反斜杠就是普通字符（PG 的 standard_conforming_strings
+    /// 默认开启），翻倍反而会写错数据 —— 所以这里按方言区分，不是偷懒。
+    pub fn escape_string(&self, s: &str) -> String {
+        match self {
+            Dialect::MySQL => s.replace('\\', "\\\\").replace('\'', "''"),
+            _ => s.replace('\'', "''"),
+        }
+    }
+
+    /// 字符串 → 带引号的字面量
+    pub fn string_literal(&self, s: &str) -> String {
+        format!("'{}'", self.escape_string(s))
+    }
+
+    /// JSON 值 → SQL 字面量（编辑写回的唯一出口）。
+    /// - `null` → `NULL`
+    /// - bool → 方言布尔字面量
+    /// - number → 原样
+    /// - 其余（含嵌套对象）→ JSON 文本。
+    ///   注意：网格里的「标量契约」默认把 DECIMAL / 时间 / JSON 都序列化成了字符串，
+    ///   这里只要原样包引号即可，**不要**为了「看起来像数字」去尝试 parse —— 那会
+    ///   丢掉 `12.30` 的标度，也会把 `007` 变成 `7`。
+    pub fn literal(&self, v: &serde_json::Value) -> String {
+        match v {
+            serde_json::Value::Null => "NULL".to_string(),
+            serde_json::Value::Bool(b) => self.bool_literal(*b).to_string(),
+            serde_json::Value::Number(n) => n.to_string(),
+            serde_json::Value::String(s) => self.string_literal(s),
+            other => self.string_literal(&other.to_string()),
         }
     }
 }

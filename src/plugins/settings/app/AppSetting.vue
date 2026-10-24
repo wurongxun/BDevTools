@@ -21,7 +21,7 @@
             :class="{ 'is-active': pluginTab === 'manage' }"
             @click="pluginTab = 'manage'"
           >
-            插件管理
+            {{ $t('settingsPlugin.tabs.pluginManage') }}
           </button>
           <button
             type="button"
@@ -31,10 +31,10 @@
             :class="{ 'is-active': pluginTab === 'dev' }"
             @click="pluginTab = 'dev'"
           >
-            插件开发
+            {{ $t('settingsPlugin.tabs.pluginDev') }}
           </button>
         </div>
-        <h2 v-else class="settings-head-title">{{ headTitle }}</h2>
+        <h2 v-else class="settings-head-title">{{ $t('settingsPlugin.nav.' + activeSettingTab) }}</h2>
       </header>
 
       <!-- 唯一滚动容器：各分区共用（v-show 切换），切页签不叠加滚动条。
@@ -76,15 +76,7 @@ const activeSettingTab = ref<SettingTab>('app')
 /** 插件分区内部页签：管理（内置/第三方插件的安装与排序）/ 开发（第三方插件开发文档） */
 const pluginTab = ref<PluginTab>('manage')
 
-/** 顶部固定条上的分区标题（插件分区走页签，不用标题） */
-const HEAD_TITLES: Record<SettingTab, string> = {
-  app: '应用设置',
-  window: '窗口设置',
-  plugin: '插件',
-  help: '帮助',
-  about: '关于',
-}
-const headTitle = computed(() => HEAD_TITLES[activeSettingTab.value])
+/** 顶部固定条上的分区标题（插件分区走页签，不用标题）；标题由模板按当前分区取 i18n 文案 */
 
 /**
  * 是否让正文区「填满高度、由内部自己滚动」。

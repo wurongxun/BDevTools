@@ -13,8 +13,38 @@ export const PLUGIN_ICON_WHITELIST: string[] = [
   'HomeFilled', 'Box', 'Film', 'Printer', 'Promotion', 'Search',
 ]
 
-/** 沙箱桥协议版本：宿主与插件页面必须一致，否则消息一律丢弃 */
-export const PLUGIN_BRIDGE_VERSION = 1
+/**
+ * 沙箱桥协议版本：宿主与插件页面**通常**要一致，否则消息一律丢弃。
+ *
+ * 版本史：
+ * - **v1**：握手后推 `{ kind:'theme', dark, wasm }`，只包含主题与 WASM 可用性。
+ * - **v2（当前）**：把 `theme` 合并进 `{ kind:'context', dark, locale, wasm }` ——
+ *   一次性把「宿主才知道、插件页自己算不出来」的运行时上下文全给出去（语言是**应用设置**，
+ *   不是 `navigator.language`；主题是**宿主开关**，不是系统 prefers-color-scheme）。
+ *   见 `docs/design/plugin-host-integration.md` §3 与 `docs/plugin-dev/bridge.md`。
+ *
+ * 宿主**兼容 v1**：插件页用哪个版本发 `ready`，宿主就用哪个版本回（`SandboxPanel` 的
+ * `peerVersion`），所以升级不是破坏性的，只是 v1 插件拿不到 `locale`。刻意不做长期双轨。
+ */
+export const PLUGIN_BRIDGE_VERSION = 2
+
+/** v1 协议版本号（theme-only）：宿主仍然接受，避免老插件页面被静默丢弃 */
+export const PLUGIN_BRIDGE_V1 = 1
+
+/**
+ * 宿主运行时上下文（`kind: 'context'` 的载荷，`PLUGIN_BRIDGE_VERSION >= 2`）。
+ *
+ * 只放插件页自己算不出来的东西；字段新增要同步 `docs/plugin-dev/bridge.md`，
+ * 因为协议没有反射能力——多一个字段宿主不报错，插件却会静默拿到 `undefined`。
+ */
+export interface HostContext {
+  /** 是否暗色模式（切 `data-theme` 用） */
+  dark: boolean
+  /** 宿主当前语言（`zh_CN` / `zh_TW` / `en`；已归一化的 `AppLocale`） */
+  locale: string
+  /** WASM 运行时是否可用：据此禁用依赖后端的按钮，别等用户点了才发现跑不了 */
+  wasm: boolean
+}
 
 /** 内置插件 ID（第三方禁止占用；与后端 `BUILTIN_IDS` 保持一致） */
 /**

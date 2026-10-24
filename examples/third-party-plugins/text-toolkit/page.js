@@ -2,7 +2,7 @@
  * 插件页脚本（外链，因为插件页 CSP 是 `script-src 'self'`，内联脚本会被直接拒绝）。
  *
  * 这里没有任何业务逻辑，也拿不到任何宿主对象：整页只有三件事
- *   1. 发 `ready` 握手，让宿主把主题与 WASM 运行时状态推过来
+ *   1. 发 `ready` 握手，让宿主把上下文（主题 / 语言 / WASM 运行时）推过来
  *   2. 把按钮点击变成 `call` 消息 —— 宿主转发进 Extism WASM 沙箱
  *   3. 把 `{ reqId, ok, data }` 的回复渲染到结果区
  *
@@ -13,7 +13,7 @@
   'use strict'
 
   // 必须与宿主 `src/core/plugin/types.ts` 的 PLUGIN_BRIDGE_VERSION 一致，否则消息会被丢弃
-  var BRIDGE_VERSION = 1
+  var BRIDGE_VERSION = 2
   // WASM 后端唯一入口函数名，对应 guest 侧 `#[plugin_fn] pub fn handle`
   var ENTRY_FUNC = 'handle'
 
@@ -29,8 +29,10 @@
   /** 已发出的请求：reqId → 按钮元素（用于禁用 + 复位） */
   var pending = {}
   var seq = 0
-  /** 宿主推来的运行时状态；null = 还没收到 theme 消息 */
+  /** 宿主推来的运行时状态；null = 还没收到 context 消息 */
   var runtime = null
+  /** 宿主当前语言（context.locale）；页面自己做字典时可以按它切换 */
+  var locale = ''
 
   // ---------- 渲染 ----------
 
@@ -187,9 +189,13 @@
     var data = e.data
     if (!data || typeof data !== 'object' || data.v !== BRIDGE_VERSION) return
 
-    // 宿主主动推送：主题 + WASM 运行时可用性
-    if (data.kind === 'theme') {
+    // 宿主主动推送：上下文（主题 + 语言 + WASM 运行时可用性）
+    if (data.kind === 'context') {
       document.documentElement.setAttribute('data-theme', data.dark ? 'dark' : 'light')
+      if (data.locale) {
+        locale = data.locale
+        document.documentElement.setAttribute('data-locale', data.locale)
+      }
       runtime = data.wasm === true
       setBadge(runtime ? 'WASM 运行时：已就绪' : 'WASM 运行时：未启用', !runtime)
       return

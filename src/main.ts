@@ -18,8 +18,9 @@ import { appConfigInfo } from '@/store/modules/appConfigInfo'
 import { pinia } from '@/store/index'
 import { subscribe } from '@/core/runtime'
 import { initWindowPresetsSync } from '@/core/windowPresets'
-import { setHostThemeProvider } from '@/core/plugin/window'
+import { setHostLocaleProvider, setHostThemeProvider } from '@/core/plugin/window'
 import { initTheme, isDark } from '@/composables/useDark'
+import { installNativeContextMenuGuard } from '@/core/nativeContextMenu'
 
 import ContextMenu from './components/context-menu/ContextMenu.vue'
 import ContextMenuTrigger from './components/context-menu/ContextMenuTrigger.vue'
@@ -67,6 +68,11 @@ async function initializeApp() {
   // 切主题不会同步到已打开的独立窗口（见 core/plugin/window.ts 文件头的「主题」一节）。
   setHostThemeProvider(() => (isDark.value ? 'dark' : 'light'))
 
+  // 与上面同一思路，给独立窗口型插件注入宿主语言：那种窗口没有桥，语言只能拼进 URL 的
+  // `?lang=` 作为初值（切语言不会同步到已打开的独立窗口）。注入线漏接时 URL 不带该参数，
+  // 插件页应回落到自己的默认语言。
+  setHostLocaleProvider(() => appConfig.language)
+
   // 跨窗口语言同步：任一窗口修改语言后广播，所有窗口即时切换
   await subscribe<{ language: string }>('language-changed', (payload) => {
     if (payload?.language) {
@@ -77,6 +83,12 @@ async function initializeApp() {
   // 跨窗口窗口预设同步：预设改名后，由该预设打开的窗口同步自己的标题。
   // 删预设时「关哪些窗口」由发起方统一处理（见 core/windowPresets.ts），此处不关窗口。
   await initWindowPresetsSync()
+
+  // 去掉 WebView 的浏览器原生右键菜单（生产构建生效；dev 模式放行以保留 Inspect 入口）。
+  // 必须在 mount 之前安装：越早注册，越不会出现「首帧右键还能弹出原生菜单」的窗口期。
+  // 覆盖范围为宿主所有窗口（它们都是同一个 index.html + hash 路由）；第三方插件页是
+  // 跨源沙箱 iframe，宿主够不到，不在覆盖范围内（详见 core/nativeContextMenu.ts 文件头）。
+  installNativeContextMenuGuard()
 
   app.mount('#app')
 }

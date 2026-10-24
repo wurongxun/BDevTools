@@ -1,5 +1,8 @@
 <template>
-  <Teleport to="body">
+  <!-- 子菜单（level > 0）刻意不 Teleport：Teleport 出去就不是 li 的 DOM 后代了，
+       鼠标一移向子菜单就会触发 li 的 mouseleave 把它关掉，永远点不到。
+       就地渲染同样是 position: fixed（坐标相对视口），视觉位置不受影响。 -->
+  <Teleport to="body" :disabled="level > 0">
     <Transition name="context-menu">
       <ul
         v-if="visible"
@@ -16,10 +19,10 @@
           <li
             v-else-if="item.children && item.children.length"
             class="context-menu-item context-menu-submenu"
-            :class="{ 'is-disabled': item.disabled }"
+            :class="{ 'is-disabled': item.disabled, 'is-open': activeSubmenu === index }"
             @mouseenter="openSubmenu(index, $event)"
             @mouseleave="closeSubmenu(index)"
-            @click.stop
+            @click.stop="toggleSubmenu(index, $event)"
           >
             <span class="menu-item-icon">
               <template v-if="item.icon">
@@ -181,17 +184,34 @@ const closeAll = () => {
 }
 
 // 点击菜单项
+//
+// onClick 只在这里调一次 —— 命令式的 handleSelect 不再重复调（否则过滤条件会被加两遍）。
+// 顺序上先执行动作再关，且用 try/finally：动作里抛异常也必须把菜单关掉
+// （否则用户看到的就是「点了没反应、菜单还杵在那儿」）。
 const handleItemClick = (item: MenuItem) => {
   if (item.disabled) return
   if (item.divider) return
 
-  emit('select', item)
-
-  if (item.onClick) {
-    item.onClick()
+  try {
+    if (item.onClick) {
+      item.onClick()
+    }
+  } finally {
+    emit('select', item)
+    closeAll()
   }
+}
 
-  closeAll()
+// 点击子菜单父项：开 ⇄ 关（悬停已经能开，这里给「点开」一条路，
+// 否则点到父项像没反应、菜单一直不消失）
+const toggleSubmenu = (index: number, event: MouseEvent) => {
+  const item = props.menuItems[index]
+  if (item.disabled) return
+  if (activeSubmenu.value === index) {
+    closeSubmenu(index)
+    return
+  }
+  openSubmenu(index, event)
 }
 
 // 处理子菜单选择
@@ -200,11 +220,13 @@ const handleSelect = (item: MenuItem) => {
 }
 
 // 点击外部关闭菜单
+//
+// 不能用 menuRef.contains()：子菜单现在是 li 的后代（不 Teleport），但一级菜单之外的
+// 点击目标可能在别的 .context-menu 里；统一按「点在任何菜单内都算内部」判断。
 const handleClickOutside = (event: MouseEvent) => {
-  if (!menuRef.value) return
-  if (!menuRef.value.contains(event.target as Node)) {
-    closeAll()
-  }
+  const target = event.target as HTMLElement | null
+  if (target?.closest?.('.context-menu')) return
+  closeAll()
 }
 
 // 滚动时关闭菜单
@@ -224,6 +246,12 @@ const handleKeydown = (event: KeyboardEvent) => {
   }
 }
 
+// immediate 是必须的：命令式菜单（showContextMenu）一挂载 visible 就是 true，
+// 没有 false→true 的变化就不会触发本 watch ⇒ 四个全局监听永远不注册
+// ⇒ 点哪儿菜单都不关。声明式用法（visible 初值 false）顺带也受益。
+//
+// 只有一级菜单注册：子菜单若也注册，鼠标在父菜单上按下就算「外部点击」，
+// 会连带把整个菜单关掉。
 watch(
   () => props.visible,
   (val) => {
@@ -232,10 +260,12 @@ watch(
       nextTick(() => {
         adjustPosition()
       })
-      document.addEventListener('mousedown', handleClickOutside)
-      document.addEventListener('scroll', handleScroll, true)
-      window.addEventListener('resize', handleResize)
-      window.addEventListener('keydown', handleKeydown)
+      if (props.level === 0) {
+        document.addEventListener('mousedown', handleClickOutside)
+        document.addEventListener('scroll', handleScroll, true)
+        window.addEventListener('resize', handleResize)
+        window.addEventListener('keydown', handleKeydown)
+      }
     } else {
       activeSubmenu.value = null
       document.removeEventListener('mousedown', handleClickOutside)
@@ -243,7 +273,8 @@ watch(
       window.removeEventListener('resize', handleResize)
       window.removeEventListener('keydown', handleKeydown)
     }
-  }
+  },
+  { immediate: true }
 )
 
 watch(
@@ -348,8 +379,15 @@ onUnmounted(() => {
   margin-left: 8px;
 }
 
-.context-menu-submenu:hover > .menu-item-arrow {
+.context-menu-submenu:hover > .menu-item-arrow,
+.context-menu-submenu.is-open > .menu-item-arrow {
   color: currentColor;
+}
+
+/* 展开中的子菜单父项保持高亮，让「点开了」这件事看得见 */
+.context-menu-submenu.is-open:not(.is-disabled) {
+  background-color: var(--hoverColor);
+  color: var(--activityBarActive);
 }
 
 .context-menu-divider {

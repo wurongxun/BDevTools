@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>文本工具箱</title>
+  <link rel="stylesheet" href="page.css" />
+</head>
+<body>
+  <header class="bar">
+    <h1>文本工具箱</h1>
+    <span id="wasm-badge" class="badge">WASM 运行时：握手…</span>
+  </header>
+
+  <p class="tip">
+    页面本身不做任何计算，也不持有任何能力：所有按钮都只是把请求 postMessage 给宿主，
+    由宿主转发进 Extism WASM 沙箱，宿主能力（KV / 文件 / HTTP）在 Rust 侧按
+    <code>plugin.json</code> 的权限声明逐次校验。
+  </p>
+
+  <section class="card">
+    <label class="label" for="text">输入文本</label>
+    <textarea id="text" rows="5" spellcheck="false">Hello Extism
+第二行：统计与变换都在 WASM 里完成</textarea>
+    <div class="row">
+      <button data-action="stats">统计</button>
+      <button data-action="upper">转大写</button>
+      <button data-action="reverse">反转</button>
+      <button data-action="probe">查看已授权能力</button>
+      <button data-action="mem">本次占用内存</button>
+    </div>
+    <p class="tip">
+      最后两个按钮是**自查**：<code>probe</code> 把宿主授予的作用域列出来；
+      <code>mem</code> 让插件自报**自己的线性内存用量**（读 <code>wasm32::memory_size(0)</code>，
+      按 64KiB 页算），并拿 <code>host_info</code> 给的上限算占用比 ——
+      想精确知道一个插件吃了多少内存，这是唯一准确的口径。
+    </p>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <input id="key" value="note" placeholder="KV 键名" />
+      <button data-action="kv_save">存到 KV</button>
+      <button data-action="kv_load">读 KV</button>
+      <button data-action="kv_keys">列出键</button>
+    </div>
+    <div class="row">
+      <input id="path" value="notes/demo.txt" placeholder="数据目录内的相对路径" />
+      <button data-action="fs_save">写文件</button>
+      <button data-action="fs_load">读文件</button>
+      <button data-action="fs_stat">文件信息</button>
+      <button data-action="fs_list">列目录</button>
+    </div>
+    <div class="row">
+      <input id="url" value="https://api.github.com/zen" placeholder="仅 net: 白名单内的域名可用" />
+      <button data-action="fetch">发起 HTTP 请求</button>
+    </div>
+    <div class="row">
+      <input id="needle" value="NEEDLE" placeholder="分块扫描要找的子串" />
+      <input id="dest" value="notes/big-copy.txt" placeholder="分块复制的目标路径" />
+    </div>
+    <div class="row">
+      <button data-action="scan">分块扫大文件</button>
+      <button data-action="copy">分块复制</button>
+      <button data-action="patch">就地改 3 字节并截断</button>
+    </div>
+    <p class="tip">
+      最后一行三个按钮演示**大文件**：文件留在宿主侧，WASM 每次只拿一块（≤1MB）。
+      因为单次调用有 15s / 10 亿 fuel 的上限，页面会按游标**反复调用**直到插件说 done ——
+      上面的路径输入框就是被扫 / 被复制的源文件。
+    </p>
+  </section>
+
+  <section class="card">
+    <div class="row row-head">
+      <span class="label">结果</span>
+      <button id="clear" class="ghost">清空</button>
+    </div>
+    <pre id="out">点击上面的按钮，结果会显示在这里。</pre>
+  </section>
+
+  <!-- 严格 CSP（script-src 'self'）：脚本必须外链，事件必须 addEventListener -->
+  <script src="page.js"></script>
+</body>
+</html>

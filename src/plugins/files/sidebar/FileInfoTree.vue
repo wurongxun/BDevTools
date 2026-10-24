@@ -1061,11 +1061,12 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: var(--space-2);
 
-  .guide-btn {
+  // 选择器要写成 `.el-button.guide-btn`：EP 的 `.el-button + .el-button { margin-left: 12px }`
+  // 特异性是 (0,0,2)，单类的 `.guide-btn` (0,0,1) 压不住它 —— 实测第二个按钮仍被右推 12px。
+  // 提到 (0,0,3) 才能稳定归零，且不依赖 CSS 加载顺序。
+  // （项目只在 .is-bare 上归零过这条，见 element.scss —— 普通按钮的兄弟间距一直都在。）
+  .el-button.guide-btn {
     width: 100%;
-    // EP 的 `.el-button + .el-button { margin-left: 12px }` 对普通按钮依然生效 ——
-    // 项目只在 `.is-bare` 图标按钮上把它归零（见 element.scss）。全宽竖排按钮再叠加这 12px
-    // 会溢出容器，表现为「第二个按钮右移 12px、左右边缘不齐」。间距由容器 gap 给。
     margin-left: 0;
     justify-content: center;
   }

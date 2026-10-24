@@ -159,7 +159,16 @@ export async function rememberCurrentWindowWorkspace(workspaceId: string): Promi
   // 已绑定（含正好相同）→ 不动：运行期选择不覆盖设置页里的显式配置
   if (preset.workspaceId) return
   const idx = windowPresets.value.findIndex(p => p.id === preset.id)
-  if (idx === -1) return
+  if (idx === -1) {
+    // 主窗口预设**不在** `window_presets` 数组里（单独存在 `main_window_preset`），
+    // 漏了这一支就会出现「主窗口每次都要重选工作区」：下面是一个 -1 分支直接 return，
+    // 绑定从来没落过盘，刷新/重启后 `main_window_preset.workspaceId` 依旧为空。
+    if (preset.id === 'main') {
+      await persistMainWindowPreset({ ...preset, workspaceId })
+      await publishWindowPresetsChanged()
+    }
+    return
+  }
   windowPresets.value[idx] = { ...windowPresets.value[idx], workspaceId }
   await saveWindowPresets()
   // 其它窗口（窗口菜单 / 设置页）据此重读；本窗口靠共享状态，无需重读

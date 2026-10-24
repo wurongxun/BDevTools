@@ -1,0 +1,16 @@
+{
+  "id": "webgl-demo",
+  "name": "WebGL 自检示例",
+  "version": "1.0.0",
+  "description": "示例：零依赖 WebGL 旋转立方体 + 页面能力自检。演示 pageCapabilities 如何把插件页的 CSP 从「最严」放开到能跑 3D / 游戏引擎，以及 standaloneWindow 如何把入口改成独立窗口",
+  "icon": "Monitor",
+  "entry": "page.html",
+  "standaloneWindow": true,
+  "pageCapabilities": [
+    "wasm",
+    "assets",
+    "media",
+    "worker",
+    "isolate"
+  ]
+}

@@ -2,52 +2,52 @@
   <div class="about-container">
     <div class="about-content">
       <div class="info-section">
-        <h2>应用信息</h2>
+        <h2>{{ $t('settingsPlugin.about.appInfo') }}</h2>
         <div class="info-grid">
           <div class="info-item">
-            <span class="info-label">应用名称</span>
-            <span class="info-value">{{ data.appName || '获取中...' }}</span>
+            <span class="info-label">{{ $t('settingsPlugin.about.appName') }}</span>
+            <span class="info-value">{{ data.appName || $t('settingsPlugin.about.loading') }}</span>
           </div>
           <div class="info-item">
-            <span class="info-label">Tauri 版本</span>
-            <span class="info-value">{{ data.tauriVersion || '获取中...' }}</span>
+            <span class="info-label">{{ $t('settingsPlugin.about.tauriVersion') }}</span>
+            <span class="info-value">{{ data.tauriVersion || $t('settingsPlugin.about.loading') }}</span>
           </div>
           <div class="info-item">
-            <span class="info-label">应用版本</span>
-            <span class="info-value">{{ data.appVersion || '获取中...' }}</span>
+            <span class="info-label">{{ $t('settingsPlugin.about.appVersion') }}</span>
+            <span class="info-value">{{ data.appVersion || $t('settingsPlugin.about.loading') }}</span>
           </div>
           <div class="info-item">
-            <span class="info-label">系统架构</span>
-            <span class="info-value">{{ data.archName || '获取中...' }}</span>
+            <span class="info-label">{{ $t('settingsPlugin.about.arch') }}</span>
+            <span class="info-value">{{ data.archName || $t('settingsPlugin.about.loading') }}</span>
           </div>
           <div class="info-item">
-            <span class="info-label">平台</span>
-            <span class="info-value">{{ data.platformName || '获取中...' }}</span>
+            <span class="info-label">{{ $t('settingsPlugin.about.platform') }}</span>
+            <span class="info-value">{{ data.platformName || $t('settingsPlugin.about.loading') }}</span>
           </div>
           <div class="info-item">
-            <span class="info-label">系统类型</span>
-            <span class="info-value">{{ data.osType || '获取中...' }}</span>
+            <span class="info-label">{{ $t('settingsPlugin.about.osType') }}</span>
+            <span class="info-value">{{ data.osType || $t('settingsPlugin.about.loading') }}</span>
           </div>
           <div class="info-item">
-            <span class="info-label">系统版本</span>
-            <span class="info-value">{{ data.osVersion || '获取中...' }}</span>
+            <span class="info-label">{{ $t('settingsPlugin.about.osVersion') }}</span>
+            <span class="info-value">{{ data.osVersion || $t('settingsPlugin.about.loading') }}</span>
           </div>
         </div>
 
-        <h2>联系信息</h2>
+        <h2>{{ $t('settingsPlugin.about.contact') }}</h2>
         <div class="contact-info">
           <p>
-            <span class="contact-label">联系邮箱</span>
+            <span class="contact-label">{{ $t('settingsPlugin.about.email') }}</span>
             <a href="mailto:1475316789@qq.com">1475316789@qq.com</a>
           </p>
           <p>
-            <span class="contact-label">图标出处</span>
+            <span class="contact-label">{{ $t('settingsPlugin.about.iconSource') }}</span>
             <a href="https://www.flaticon.com/free-icon/substance_9814620" target="_blank" rel="noreferrer">
               flaticon.com/free-icon/substance_9814620
             </a>
           </p>
           <p>
-            <span class="contact-label">Gitee 地址</span>
+            <span class="contact-label">{{ $t('settingsPlugin.about.gitee') }}</span>
             <a href="https://gitee.com/wurongxun/BackendDevTools" target="_blank" rel="noreferrer">
               gitee.com/wurongxun/BDevTools
             </a>
@@ -56,10 +56,10 @@
       </div>
 
       <div class="coffee-section">
-        <h2>请我喝杯咖啡</h2>
+        <h2>{{ $t('settingsPlugin.about.coffee') }}</h2>
         <div class="coffee-content">
-          <el-image alt="请我喝杯咖啡" class="coffee-image" :src="coffeeImage" />
-          <p class="coffee-text">如果您觉得这个应用对您有帮助，欢迎请我喝杯咖啡！您的支持是我持续开发的动力。</p>
+          <el-image :alt="$t('settingsPlugin.about.coffeeAlt')" class="coffee-image" :src="coffeeImage" />
+          <p class="coffee-text">{{ $t('settingsPlugin.about.coffeeText') }}</p>
         </div>
       </div>
     </div>

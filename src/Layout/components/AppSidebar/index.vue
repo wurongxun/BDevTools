@@ -287,8 +287,12 @@ function isPanelVisible(pluginId: string): boolean {
 .activity-list {
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
-
+.activity-list::-webkit-scrollbar {
+  display: none;
+}
 // 底部常驻入口（如「设置」）：推到底部并与上方插件列表做视觉分隔
 .activity-bottom {
   margin-top: auto;

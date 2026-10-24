@@ -159,6 +159,54 @@ impl SqlServerPool {
         Ok(result.rows_affected().iter().sum())
     }
 
+    /// 在一个显式事务里顺序执行多条语句，逐条返回受影响行数。
+    ///
+    /// 必须**借用同一条连接**（TDS 的事务是连接级的），所以这里先 acquire 一次再跑完，
+    /// 而不是每条语句各借一条。任一条失败 ⇒ ROLLBACK，返回的结果里包含失败那条，
+    /// 后面被跳过的语句不出现在结果里（调用方按下标补齐「未执行」）。
+    pub async fn execute_batch_transaction(
+        &self,
+        stmts: &[anyhow::Result<String>],
+        expect_one: &[bool],
+    ) -> Result<Vec<Result<u64>>> {
+        let mut conn = self.acquire().await?;
+        conn.execute("BEGIN TRANSACTION", &[]).await?;
+        let mut out: Vec<Result<u64>> = Vec::with_capacity(stmts.len());
+        let mut rolled_back = false;
+        for (i, item) in stmts.iter().enumerate() {
+            match item {
+                Err(e) => {
+                    out.push(Err(anyhow!("{}", e)));
+                    rolled_back = true;
+                    break;
+                }
+                Ok(sql) => match conn.execute(sql.as_str(), &[]).await {
+                    Ok(res) => {
+                        let n: u64 = res.rows_affected().iter().sum();
+                        // 要求恰好命中一行却不是一行 ⇒ 与执行失败同等对待：整批回滚
+                        if expect_one.get(i) == Some(&true) && n != 1 {
+                            out.push(Err(anyhow!("{}", crate::plugins::database::editing::exact_one_violation(n))));
+                            rolled_back = true;
+                            break;
+                        }
+                        out.push(Ok(n));
+                    }
+                    Err(e) => {
+                        out.push(Err(anyhow!("{}", e)));
+                        rolled_back = true;
+                        break;
+                    }
+                },
+            }
+        }
+        if rolled_back {
+            conn.execute("ROLLBACK TRANSACTION", &[]).await?;
+        } else {
+            conn.execute("COMMIT TRANSACTION", &[]).await?;
+        }
+        Ok(out)
+    }
+
     /// 查询单个数值（用于 COUNT 统计）
     pub async fn query_count(&self, sql: &str) -> Result<u64> {
         let (_, rows) = self.query_rows(sql, 1).await?;

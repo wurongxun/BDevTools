@@ -12,7 +12,7 @@ Mock.mock('/mockJs/getMenu', {
   msg: 'success'
 })
 
-Mock.mock('/mockJs/getPermission', 'get', (options) => {
+Mock.mock('/mockJs/getPermission', 'get', () => {
   const data = [Cookies.get('token')]
   return {
     code: 200,

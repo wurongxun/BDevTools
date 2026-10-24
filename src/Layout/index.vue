@@ -524,10 +524,10 @@ onUnmounted(() => {
     .side-box {
       flex-shrink: 0;
       height: 100%;
-      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-        min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-        max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-        opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      //transition: width 0.1s cubic-bezier(0.4, 0, 0.2, 1),
+      //  min-width 0.1s cubic-bezier(0.4, 0, 0.2, 1),
+      //  max-width 0.1s cubic-bezier(0.4, 0, 0.2, 1),
+      //  opacity 0.1s cubic-bezier(0.4, 0, 0.2, 1);
       z-index: 1000;
       box-sizing: border-box;
       overflow: hidden;

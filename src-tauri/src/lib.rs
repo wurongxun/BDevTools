@@ -39,12 +39,13 @@ use crate::commands::{
 #[cfg(feature = "plugin-database")]
 use crate::commands::{
     db_catalog_capabilities, db_connect, db_connection_create, db_connection_delete,
-    db_connection_list, db_connection_test, db_connection_update, db_delete_row, db_disconnect,
-    db_execute_sql, db_export_csv, db_export_excel, db_export_sql_csv, db_export_sql_excel,
-    db_import_csv, db_import_excel, db_insert_row, db_list_admins, db_list_database_indexes,
-    db_list_databases, db_list_events, db_list_procedures, db_list_tables, db_list_triggers,
-    db_list_users, db_list_views, db_query_table_data, db_show_status, db_show_variables,
-    db_table_columns, db_table_indexes, db_table_schema, db_update_row,
+    db_connection_list, db_connection_test, db_connection_update, db_apply_edits,
+    db_disconnect, db_execute_sql, db_export_csv, db_export_excel, db_export_sql_csv,
+    db_export_sql_excel, db_import_csv, db_import_excel, db_list_admins, db_list_database_indexes,
+    db_list_databases, db_list_events, db_list_functions, db_list_procedures, db_list_tables,
+    db_list_triggers, db_list_users, db_list_views, db_object_source, db_query_table_data,
+    db_show_status, db_show_variables, db_table_columns, db_table_indexes, db_table_schema,
+    db_preview_edits,
 };
 #[cfg(feature = "plugin-files")]
 use crate::commands::{
@@ -386,14 +387,13 @@ pub fn run() {
     #[cfg(feature = "plugin-database")]
     db_query_table_data,
             
-    #[cfg(feature = "plugin-database")]
-    db_insert_row,
+            // 结果网格编辑：批量写 + 预览（同一份 SQL 生成逻辑）
             
     #[cfg(feature = "plugin-database")]
-    db_update_row,
+    db_apply_edits,
             
     #[cfg(feature = "plugin-database")]
-    db_delete_row,
+    db_preview_edits,
             // 元数据查询
             
     #[cfg(feature = "plugin-database")]
@@ -420,6 +420,12 @@ pub fn run() {
             
     #[cfg(feature = "plugin-database")]
     db_list_procedures,
+            
+    #[cfg(feature = "plugin-database")]
+    db_list_functions,
+            
+    #[cfg(feature = "plugin-database")]
+    db_object_source,
             
     #[cfg(feature = "plugin-database")]
     db_list_triggers,

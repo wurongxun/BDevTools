@@ -1,0 +1,161 @@
+/* WebGL 自检示例：页面样式（插件页没有宿主主题变量，自行配色） */
+:root {
+  color-scheme: dark;
+  --bg: #121212;
+  --panel: #1b1d21;
+  --line: #33363c;
+  --text: #e9eaec;
+  --muted: #9aa0a6;
+  --ok: #57c08a;
+  --bad: #e2706a;
+  --accent: #4d8fe0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.bar h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.badge {
+  flex: none;
+  padding: 2px 10px;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+}
+
+.wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 20px;
+}
+
+.panel {
+  flex: 1 1 340px;
+  min-width: 300px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #0b0c0e;
+  border-radius: 8px;
+}
+
+.tip {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tip + .tip {
+  margin-top: 8px;
+}
+
+code {
+  padding: 0 4px;
+  font-family: ui-monospace, Consolas, 'Cascadia Mono', monospace;
+  font-size: 12px;
+  background: #24272c;
+  border-radius: 4px;
+}
+
+.probe {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.probe-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.probe-row:last-child {
+  border-bottom: 0;
+}
+
+.probe-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.probe-row.is-ok .probe-dot {
+  background: var(--ok);
+}
+
+.probe-row.is-bad .probe-dot {
+  background: var(--bad);
+}
+
+.probe-cap {
+  flex: none;
+  width: 66px;
+  font-family: ui-monospace, Consolas, 'Cascadia Mono', monospace;
+  color: var(--accent);
+}
+
+.probe-note {
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.probe-row.is-ok .probe-note {
+  color: var(--text);
+}
+
+.is-pending {
+  color: var(--muted);
+}

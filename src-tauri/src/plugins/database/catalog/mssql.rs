@@ -73,6 +73,7 @@ impl CatalogProvider for SqlServerCatalog {
         CatalogCapabilities {
             views: true,
             procedures: true,
+            functions: true,
             triggers: true,
             events: false, // 定时作业是 SQL Agent，语义不同
             database_indexes: true,
@@ -82,6 +83,7 @@ impl CatalogProvider for SqlServerCatalog {
             global_status: true,
             session_variables: false, // 只有实例级配置，无会话级变量概念
             global_variables: true,
+            object_source: true,
         }
     }
 
@@ -127,7 +129,11 @@ impl CatalogProvider for SqlServerCatalog {
         let sql = format!(
             "SELECT c.name AS name, ty.name AS data_type, c.is_nullable AS is_nullable, \
              dc.definition AS default_value, \
-             CASE WHEN pk.column_id IS NOT NULL THEN 'PRI' ELSE '' END AS column_key, '' AS comment_txt \
+             CASE WHEN pk.column_id IS NOT NULL THEN 'PRI' ELSE '' END AS column_key, '' AS comment_txt, \
+             CAST(c.column_id AS BIGINT) AS ord, c.is_identity AS is_identity, \
+             c.is_computed AS is_computed, \
+             CAST(c.precision AS BIGINT) AS prec, CAST(c.scale AS BIGINT) AS scale, \
+             CAST(c.max_length AS BIGINT) AS max_len \
              FROM {}sys.columns c \
              JOIN {}sys.types ty ON c.user_type_id = ty.user_type_id \
              LEFT JOIN {}sys.default_constraints dc ON c.default_object_id = dc.object_id \
@@ -147,6 +153,13 @@ impl CatalogProvider for SqlServerCatalog {
                 is_primary_key: cell(r, 4) == "PRI",
                 default_value: opt_cell(r, 3),
                 comment: opt_cell(r, 5),
+                ordinal_position: r.get(6).and_then(num_of).unwrap_or(0) as i32,
+                is_auto_increment: r.get(7).and_then(bool_of).unwrap_or(false),
+                is_generated: r.get(8).and_then(bool_of).unwrap_or(false),
+                numeric_precision: r.get(9).and_then(num_of).map(|v| v as i32),
+                numeric_scale: r.get(10).and_then(num_of).map(|v| v as i32),
+                // max_length 是字节数（nvarchar 还要除以 2），这里只用作「长文本」的粗判据
+                character_max_length: r.get(11).and_then(num_of),
             })
             .collect())
     }
@@ -248,6 +261,70 @@ impl CatalogProvider for SqlServerCatalog {
         );
         let rows = self.q(&sql).await?;
         Ok(rows.iter().map(|r| object_from_row(r)).collect())
+    }
+
+    async fn list_functions(&self, database: &str) -> Result<Vec<DatabaseObjectInfo>> {
+        let p = self.p(database);
+        // FN 标量 / IF 内联表值 / TF 表值 / FS·FT CLR / AF 聚合
+        let sql = format!(
+            "SELECT o.name AS name, 'FUNCTION' AS object_type, DB_NAME() AS database_name, \
+             '' AS definer, '' AS created, \
+             ISNULL(CONVERT(NVARCHAR(30), o.modify_date, 120), '') AS modified, \
+             '' AS comment_txt, '' AS status_txt, '' AS event_txt, '' AS table_name \
+             FROM {}sys.objects o \
+             WHERE o.type IN ('FN', 'IF', 'TF', 'FS', 'FT', 'AF') AND o.is_ms_shipped = 0 \
+             ORDER BY o.name",
+            p
+        );
+        let rows = self.q(&sql).await?;
+        Ok(rows.iter().map(|r| object_from_row(r)).collect())
+    }
+
+    /// 取对象源码：`sys.sql_modules` 对**视图 / 例程 / 触发器一视同仁**，一句话通吃。
+    ///
+    /// 刻意不用 `OBJECT_DEFINITION(OBJECT_ID(N'db.name'))`：那种两段式名字会被解析成
+    /// **schema.object**（落在当前库），跨库打开时取到的很可能是别的对象。
+    /// 走 `sys.objects` 按名字 + 类型过滤则没有这个歧义。
+    async fn object_source(
+        &self,
+        kind: ObjectSourceKind,
+        database: &str,
+        name: &str,
+    ) -> Result<String> {
+        let p = self.p(database);
+        let lit = self.escape_literal(name);
+        let types = match kind {
+            ObjectSourceKind::View => "'V'",
+            ObjectSourceKind::Procedure => "'P', 'PC'",
+            ObjectSourceKind::Function => "'FN', 'IF', 'TF', 'FS', 'FT', 'AF'",
+            ObjectSourceKind::Trigger => "'TR', 'TA'",
+        };
+        let sql = format!(
+            "SELECT sm.definition AS src \
+             FROM {}sys.sql_modules sm \
+             JOIN {}sys.objects o ON o.object_id = sm.object_id \
+             WHERE o.name = N'{}' AND o.type IN ({})",
+            p, p, lit, types
+        );
+        let rows = self.q(&sql).await?;
+        let mut srcs: Vec<String> = rows
+            .iter()
+            .map(|r| cell(r, 0))
+            .filter(|v| !v.trim().is_empty())
+            .collect();
+        if srcs.is_empty() {
+            // 对象在但 definition 为空 ⇒ WITH ENCRYPTION；对象不在则查不到这一行。
+            // 两种情形对用户差别很大（一个没权限看，一个名字写错），但按这条 SQL 的形式
+            // 区分不出来，所以给一条覆盖两种可能、并且**说明白了**的提示。
+            return Err(anyhow::anyhow!(
+                "未取到 {}：对象不存在、没有权限，或被 WITH ENCRYPTION 加密",
+                kind.label()
+            ));
+        }
+        if srcs.len() > 1 {
+            srcs.sort();
+        }
+        Ok(srcs.join("\nGO\n"))
     }
 
     async fn list_triggers(&self, database: &str) -> Result<Vec<DatabaseObjectInfo>> {

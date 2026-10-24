@@ -1,6 +1,6 @@
 # BDevTools
 
-**_一切皆是插件_**,BDevTools一款跨平台桌面管理工具集合。以「**_插件化_**」为核心，集文件编辑、大日志分析、SSH/SFTP、数据库、Java 堆分析、本地终端与 3D/游戏窗口于一身，并开放**第三方插件框架**——任何人都可以在沙箱里装一个纯前端页面、或带 Rust/WASM 后端的工具。轻量高效，GB 级日志与堆转储分析无压力。
+******_一切皆是插件_**,BDevTools一款跨平台桌面管理工具集合。以「**_插件化_**」为核心，集文件编辑、大日志分析、SSH/SFTP、数据库、Java 堆分析、本地终端与 3D/游戏窗口于一身，并开放**第三方插件框架**——任何人都可以在沙箱里装一个纯前端页面、或带 Rust/WASM 后端的工具。轻量高效，GB 级日志与堆转储分析无压力。
 
 > 当前版本 **1.6.0**（`productName: BDevTools`，应用标识 `com.backend-development-tools.app`）。
 
@@ -10,17 +10,17 @@
 
 ### 内置插件
 
-| 插件 | ID | 定位 | 能力要点 |
-|------|----|------|----------|
-| 文件管理 | `files` | 资源管理器 + 编辑器 | 目录树 / 收藏 / 最近打开 / 搜索过滤；Markdown 编辑与实时预览；文件编码自动检测（UTF-8 / GBK / UTF-16）；会话恢复；系统双击 `.md` 关联打开 |
-| 远程连接 | `ssh` | SSH 终端 + SFTP | 多标签 SSH 终端（多终端主题）；SFTP 双栏管理（上传/下载/重命名/删除，含进度条与传输队列）；连接分组 / 书签；断线检测；远程日志拉取 |
-| 日志工作台 | `logs` | 大文件日志分析 | 分块懒加载（GB 级不卡）；关键词 / 正则搜索与命中导航；级别配色（Java/Logback/Python/系统日志归一化）；自定义高亮规则；堆栈识别与悬停元信息 |
-| 数据库 | `database` | 多数据库连接管理 | 支持 MySQL / PostgreSQL / SQL Server / Oracle；SQL 执行（语法高亮、计划查看）；表结构与数据网格浏览、分页；导入 / 导出 |
-| 内存分析 | `mat` | Java 堆转储分析 | HPROF / PHD 格式识别；浅堆直方图（真解析）；泄漏检测 / 支配树 / GC Roots 引用追踪 / OQL（子能力分批迭代接入） |
-| 本地终端 | `terminal` | 停靠面板（底部） | 多标签 / 分屏 / 可拖拽停靠；shell 集成（cwd、退出码）；活动栏图标即显隐开关，不占主区 |
-| 3D / 游戏 | `web3d` | 独立窗口托管 | 在新窗口里运行声明了页面能力 / 独立窗口的第三方 3D / 游戏插件（Unity WebGL、Godot、three.js 等）；列表占满主区 |
-| 设置 | `settings` | 宿主入口（固定底部） | 应用设置、窗口预设、插件管理；不可禁用 |
-| 占位 | `placeholder` | 布局验证示例 | 只有主面板、无侧栏 / 标签条，用于验证「无侧栏插件」的布局适配（验证完可删） |
+| 插件            | ID | 定位 | 能力要点 |
+|---------------|----|------|----------|
+| 文件管理/MarkDown | `files` | 资源管理器 + 编辑器 | 目录树 / 收藏 / 最近打开 / 搜索过滤；Markdown 编辑与实时预览；文件编码自动检测（UTF-8 / GBK / UTF-16）；会话恢复；系统双击 `.md` 关联打开 |
+| 远程连接          | `ssh` | SSH 终端 + SFTP | 多标签 SSH 终端（多终端主题）；SFTP 双栏管理（上传/下载/重命名/删除，含进度条与传输队列）；连接分组 / 书签；断线检测；远程日志拉取 |
+| 日志工作台         | `logs` | 大文件日志分析 | 分块懒加载（GB 级不卡）；关键词 / 正则搜索与命中导航；级别配色（Java/Logback/Python/系统日志归一化）；自定义高亮规则；堆栈识别与悬停元信息 |
+| 数据库           | `database` | 多数据库连接管理 | 支持 MySQL / PostgreSQL / SQL Server / Oracle；SQL 执行（语法高亮、计划查看）；表结构与数据网格浏览、分页；导入 / 导出 |
+| 内存分析          | `mat` | Java 堆转储分析 | HPROF / PHD 格式识别；浅堆直方图（真解析）；泄漏检测 / 支配树 / GC Roots 引用追踪 / OQL（子能力分批迭代接入） |
+| 本地终端          | `terminal` | 停靠面板（底部） | 多标签 / 分屏 / 可拖拽停靠；shell 集成（cwd、退出码）；活动栏图标即显隐开关，不占主区 |
+| 3D / 游戏       | `web3d` | 独立窗口托管 | 在新窗口里运行声明了页面能力 / 独立窗口的第三方 3D / 游戏插件（Unity WebGL、Godot、three.js 等）；列表占满主区 |
+| 设置            | `settings` | 宿主入口（固定底部） | 应用设置、窗口预设、插件管理；不可禁用 |
+| 占位            | `placeholder` | 布局验证示例 | 只有主面板、无侧栏 / 标签条，用于验证「无侧栏插件」的布局适配（验证完可删） |
 
 > 三种窗口形态：`mainPanel`（占主区）、`sidebarPanel`（活动栏图标 + 侧栏）、`dockPanel`（停靠面板，如终端）。插件可任意组合，窗口预设决定「这个窗口启用哪些插件、怎么排」。
 
@@ -30,8 +30,8 @@
 
 - **插件页永远在沙箱里**：以 `sandbox="allow-scripts"` 的 iframe 运行（无 `allow-same-origin`），固定 CSP（`default-src 'none'; script-src 'self'` 等），**拿不到任何 Tauri 接口**——所有能力都由宿主按权限放行。
 - **两种形态**（正交于渲染位置）：
-    - **纯前端插件**：逻辑全在页面 JS 里，无后端能力（`plugin_call` 返回 501）。
-    - **带 WASM 后端的插件**：逻辑跑在 **Extism WASM 沙箱**（Rust / C / AssemblyScript 皆可），按 `permissions` 申请宿主能力：`log` / `kv` / `fs:read` / `fs:write` / `net:<host>`（默认全拒，调用点逐次校验）。
+  - **纯前端插件**：逻辑全在页面 JS 里，无后端能力（`plugin_call` 返回 501）。
+  - **带 WASM 后端的插件**：逻辑跑在 **Extism WASM 沙箱**（Rust / C / AssemblyScript 皆可），按 `permissions` 申请宿主能力：`log` / `kv` / `fs:read` / `fs:write` / `net:<host>`（默认全拒，调用点逐次校验）。
 - **渲染位置可选**：声明 `pageCapabilities`（`wasm` / `assets` / `media` / `worker` / `isolate`）可把页面 CSP 从「最严」放宽到能跑 3D / 游戏引擎；声明 `standaloneWindow` 则入口改为**独立窗口**（跨源隔离 `crossOriginIsolated` 为真，可本地存档）。
 - **页面 ↔ 宿主 通信走桥协议**（postMessage + 版本号 `PLUGIN_BRIDGE_VERSION`）：页面发 `ready` / `call`，宿主回 `data` / `error` / `theme`，所有 host function 走 `plugin_call`。
 
@@ -155,6 +155,42 @@ pnpm release:build     # 只构建 + 签名 + 本地验签
 pnpm release:publish   # 只发布（需要令牌）
 pnpm release:verify    # 校验产物签名与配置里的公钥是否匹配
 ```
+
+发版需要这些（都不入库）：
+
+- **签名私钥**：`~/.tauri/backend_dev_tools.key`（同目录的 `.pub` 是公钥，公钥已写进 `src-tauri/tauri.conf.json`）
+- **私钥口令**（仅当密钥设了口令）：写进 `~/.tauri/backend_dev_tools.key.password` 的**首行**，脚本自动读取；
+  也可以临时用 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD=xxx` 给。密钥不带口令就不用管这一项
+- **Gitee 令牌**：`GITEE_TOKEN` 环境变量，或写进 `.workbuddy/release.env` / `~/.gitee_token`（勾 `projects` 权限）
+
+
+
+#### 升级版本（每次发新版只做这些）
+
+**一次性准备**（已就绪即可跳过）：
+
+- 签名私钥 `~/.tauri/backend_dev_tools.key` —— **丢了只能换新密钥，已安装的老版本将无法自动升级**
+  （生成时别直接写 `~/...`：Windows 下 shell 不展开 `~`，会落到当前目录，写绝对路径或用 `$HOME`）
+- 私钥口令（仅当密钥设了口令）：写进 `~/.tauri/backend_dev_tools.key.password` —— 写一次就永久免管
+- Gitee 令牌：建议写进 `~/.gitee_token`（仓库外、不入库），此后每次发版都不必再处理令牌
+
+**每次发版**：
+
+```bash
+# 1. 先关掉正在运行的 backend_dev_tools.exe（否则构建最后一步会因文件占用失败）
+# 2. 一键发版：升版本号 → 构建签名 → 本地验签 → 上传 → 更新清单
+pnpm release --bump patch        # 或 --version 1.5.0
+
+# 3. 收尾：取回脚本经 API 提交的 latest.json，再提交版本号变更
+git restore latest.json && git pull
+git add -A && git commit -m "chore(release): v1.4.2" && git push
+```
+
+先演练不发远端：`pnpm release --bump patch --dry-run`。
+
+`pnpm release` 会自动做掉：改 `tauri.conf.json` / `Cargo.toml` / `package.json` 三处版本号 → 从上一个 `v*` 标签生成发布说明（去重、最多 15 条）→ 构建 NSIS 安装包并 minisign 签名 → 本地验签 → 创建 Gitee Release → 上传安装包 → 提交 `latest.json`。
+
+发版前它会自己卡这几道检查（不满足直接中止）：应用未在运行、本地 HEAD 与远端分支一致、产物签名与 `tauri.conf.json` 里的公钥匹配。
 
 ### 打包配置
 

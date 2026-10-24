@@ -83,6 +83,7 @@ impl CatalogProvider for PostgresCatalog {
         CatalogCapabilities {
             views: true,
             procedures: true,
+            functions: true,
             triggers: true,
             events: false, // PG 无内建事件调度器
             database_indexes: true,
@@ -92,6 +93,7 @@ impl CatalogProvider for PostgresCatalog {
             global_status: true,
             session_variables: true,
             global_variables: true,
+            object_source: true,
         }
     }
 
@@ -139,7 +141,11 @@ impl CatalogProvider for PostgresCatalog {
             .rows_two(
                 "SELECT c.column_name AS name, c.data_type AS data_type, c.is_nullable AS is_nullable, \
                  c.column_default AS default_value, \
-                 CASE WHEN pk.column_name IS NOT NULL THEN 'PRI' ELSE '' END AS column_key \
+                 CASE WHEN pk.column_name IS NOT NULL THEN 'PRI' ELSE '' END AS column_key, \
+                 CAST(c.ordinal_position AS BIGINT) AS ord, c.is_identity AS is_identity, \
+                 c.is_generated AS is_generated, \
+                 CAST(c.numeric_precision AS BIGINT) AS num_prec, CAST(c.numeric_scale AS BIGINT) AS num_scale, \
+                 CAST(c.character_maximum_length AS BIGINT) AS char_len \
                  FROM information_schema.columns c \
                  LEFT JOIN (SELECT ku.column_name FROM information_schema.table_constraints tc \
                    JOIN information_schema.key_column_usage ku ON tc.constraint_name = ku.constraint_name \
@@ -156,6 +162,8 @@ impl CatalogProvider for PostgresCatalog {
             .map(|r| {
                 let key = s(r, "column_key");
                 let nullable = s(r, "is_nullable");
+                let identity = s(r, "is_identity").unwrap_or_else(|| "NO".to_string());
+                let generated = s(r, "is_generated").unwrap_or_else(|| "NEVER".to_string());
                 ColumnInfo {
                     name: req(r, "name"),
                     data_type: req(r, "data_type"),
@@ -163,6 +171,12 @@ impl CatalogProvider for PostgresCatalog {
                     is_primary_key: key.as_deref() == Some("PRI"),
                     default_value: s(r, "default_value"),
                     comment: None,
+                    ordinal_position: r.try_get::<i64, _>("ord").unwrap_or(0) as i32,
+                    is_auto_increment: identity.eq_ignore_ascii_case("YES"),
+                    is_generated: generated.eq_ignore_ascii_case("ALWAYS"),
+                    numeric_precision: r.try_get::<i64, _>("num_prec").ok().map(|v| v as i32),
+                    numeric_scale: r.try_get::<i64, _>("num_scale").ok().map(|v| v as i32),
+                    character_max_length: r.try_get::<i64, _>("char_len").ok(),
                 }
             })
             .collect())
@@ -269,11 +283,79 @@ impl CatalogProvider for PostgresCatalog {
                  JOIN pg_namespace n ON n.nspname = r.routine_schema \
                  JOIN pg_proc p ON p.pronamespace = n.oid AND p.proname = r.routine_name \
                  WHERE r.routine_schema = COALESCE(NULLIF($1, ''), 'public') \
+                   AND r.routine_type = 'PROCEDURE' \
                  ORDER BY r.routine_name",
                 database,
             )
             .await?;
         Ok(rows.iter().map(object_from_row).collect())
+    }
+
+    async fn list_functions(&self, database: &str) -> Result<Vec<DatabaseObjectInfo>> {
+        let rows = self
+            .rows_one(
+                "SELECT DISTINCT r.routine_name AS name, r.routine_type AS object_type, \
+                 r.routine_schema AS database_name, \
+                 COALESCE(pg_get_userbyid(p.proowner), '') AS definer, \
+                 '' AS created, '' AS modified, '' AS comment_txt, '' AS status_txt, \
+                 '' AS event_txt, '' AS table_name \
+                 FROM information_schema.routines r \
+                 JOIN pg_namespace n ON n.nspname = r.routine_schema \
+                 JOIN pg_proc p ON p.pronamespace = n.oid AND p.proname = r.routine_name \
+                 WHERE r.routine_schema = COALESCE(NULLIF($1, ''), 'public') \
+                   AND r.routine_type = 'FUNCTION' \
+                 ORDER BY r.routine_name",
+                database,
+            )
+            .await?;
+        Ok(rows.iter().map(|r| object_from_row(r)).collect())
+    }
+
+    /// 取对象源码。PG 的三个内置函数各司其职。
+    ///
+    /// **同名例程可能有多个重载**（参数类型不同），这里把全部定义返回、空行分隔 ——
+    /// 漏给一份，用户就会以为另外那个版本的函数不存在。
+    async fn object_source(
+        &self,
+        kind: ObjectSourceKind,
+        database: &str,
+        name: &str,
+    ) -> Result<String> {
+        // pg_get_viewdef 只给 SELECT 部分，CREATE 头要自己补；
+        // pg_get_functiondef / pg_get_triggerdef 自带完整 CREATE 语句，不要再添头。
+        let sql: &'static str = match kind {
+            ObjectSourceKind::View => {
+                "SELECT 'CREATE OR REPLACE VIEW ' || quote_ident(c.relname) || E' AS\n' \
+                 || pg_get_viewdef(c.oid, true) AS src \
+                 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace \
+                 WHERE c.relkind IN ('v', 'm') AND c.relname = $2 \
+                   AND n.nspname = COALESCE(NULLIF($1, ''), 'public')"
+            }
+            ObjectSourceKind::Procedure | ObjectSourceKind::Function => {
+                "SELECT pg_get_functiondef(p.oid) AS src \
+                 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace \
+                 WHERE p.proname = $2 AND n.nspname = COALESCE(NULLIF($1, ''), 'public') \
+                 ORDER BY p.oid"
+            }
+            ObjectSourceKind::Trigger => {
+                "SELECT pg_get_triggerdef(t.oid) AS src \
+                 FROM pg_trigger t \
+                 JOIN pg_class c ON c.oid = t.tgrelid \
+                 JOIN pg_namespace n ON n.oid = c.relnamespace \
+                 WHERE t.tgname = $2 AND NOT t.tgisinternal \
+                   AND n.nspname = COALESCE(NULLIF($1, ''), 'public')"
+            }
+        };
+        let rows = self.rows_two(sql, database, name).await?;
+        let srcs: Vec<String> = rows
+            .iter()
+            .map(|r| req(r, "src"))
+            .filter(|v| !v.trim().is_empty())
+            .collect();
+        if srcs.is_empty() {
+            return Err(anyhow::anyhow!("未找到{}：{}", kind.label(), name));
+        }
+        Ok(srcs.join("\n\n"))
     }
 
     async fn list_triggers(&self, database: &str) -> Result<Vec<DatabaseObjectInfo>> {

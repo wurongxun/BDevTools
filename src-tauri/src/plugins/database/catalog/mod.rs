@@ -180,6 +180,7 @@ impl Scope {
 pub struct CatalogCapabilities {
     pub views: bool,
     pub procedures: bool,
+    pub functions: bool,
     pub triggers: bool,
     pub events: bool,
     pub database_indexes: bool,
@@ -189,6 +190,11 @@ pub struct CatalogCapabilities {
     pub global_status: bool,
     pub session_variables: bool,
     pub global_variables: bool,
+    /// 能否取到「对象的定义源码」（视图定义 / 存储过程体 …）。
+    ///
+    /// 与「能否列出该对象」是两件事：列表查的是目录表，源码要靠各库自己的
+    /// 元数据函数 / SHOW 语句。声明成独立能力，前端才知道要不要渲染「源码」页签。
+    pub object_source: bool,
 }
 
 impl CatalogCapabilities {
@@ -197,6 +203,7 @@ impl CatalogCapabilities {
         CatalogCapabilities {
             views: false,
             procedures: false,
+            functions: false,
             triggers: false,
             events: false,
             database_indexes: false,
@@ -206,6 +213,42 @@ impl CatalogCapabilities {
             global_status: false,
             session_variables: false,
             global_variables: false,
+            object_source: false,
+        }
+    }
+}
+
+/// 对象源码类型：决定取哪一种对象的定义语句
+///
+/// 由字符串解析（命令层传的是前端小写串），解析不了返回 `None` —— 宁可报错，
+/// 也不要把不认识的值当成某一种默认值，那样会拿着错误的对象名去查库。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ObjectSourceKind {
+    View,
+    Procedure,
+    Function,
+    Trigger,
+}
+
+impl ObjectSourceKind {
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "view" => Some(Self::View),
+            "procedure" => Some(Self::Procedure),
+            "function" => Some(Self::Function),
+            "trigger" => Some(Self::Trigger),
+            _ => None,
+        }
+    }
+
+    /// 中文名（错误文案直接拼接）
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::View => "视图源码",
+            Self::Procedure => "存储过程源码",
+            Self::Function => "函数源码",
+            Self::Trigger => "触发器源码",
         }
     }
 }
@@ -247,6 +290,24 @@ pub trait CatalogProvider: Send + Sync {
 
     async fn list_procedures(&self, _database: &str) -> Result<Vec<DatabaseObjectInfo>> {
         Err(unsupported(self.db_type(), "存储过程"))
+    }
+
+    async fn list_functions(&self, _database: &str) -> Result<Vec<DatabaseObjectInfo>> {
+        Err(unsupported(self.db_type(), "函数"))
+    }
+
+    /// 取对象的**定义源码**（视图的 SELECT / 存储过程体 / 触发器体 …）
+    ///
+    /// 这条路与 `table_schema` 刻意分开：`table_schema` 在 PG / SQL Server / Oracle 上
+    /// 是**按列信息拼出来**的可读 DDL（对视图会拼出不存在的 `CREATE TABLE`），
+    /// 而这里要的是数据库自己承认的那份源文本。
+    async fn object_source(
+        &self,
+        _kind: ObjectSourceKind,
+        _database: &str,
+        _name: &str,
+    ) -> Result<String> {
+        Err(unsupported(self.db_type(), "对象源码"))
     }
 
     async fn list_triggers(&self, _database: &str) -> Result<Vec<DatabaseObjectInfo>> {

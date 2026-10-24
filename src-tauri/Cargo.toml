@@ -1,6 +1,6 @@
 [package]
 name = "BDevTools"
-version = "1.6.1"
+version = "1.7.0"
 description = "A backend development tools"
 authors = ["you"]
 edition = "2021"
@@ -97,7 +97,30 @@ tauri-plugin-notification = "2"
 # 其内部 keydown 不会冒泡到宿主 window，DOM 层监听对插件内的按键无能为力）
 tauri-plugin-global-shortcut = "2"
 # 数据库驱动（MySQL + PostgreSQL）
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "mysql", "postgres"], optional = true }
+#
+# 下面几个「类型支持」特性的取舍，一句话：SQLx 的 `try_get` 会先做**列类型白名单**检查
+# （`Type::compatible`），不在白名单里的类型直接解码失败。缺哪个特性，对应那一类列就整列
+# 退化成「类型转换失败」，而不是报错到 UI —— 所以它们是**功能开关**，不是可选优化。
+# 各特性「为什么必须存在」的完整论证见 `plugins/database/operations.rs` 的类型分支注释。
+#
+# rust_decimal：DECIMAL/NUMERIC 的唯一无损接法。sqlx 刻意不让 f64 兼容 DECIMAL
+#   （源码注释原文：floating-point numbers have different semantics），塞进 f64 会静默丢精度。
+#   注意 sqlx 0.8 的特性名就叫 rust_decimal —— 没有叫 decimal 的。
+# chrono：DATE / TIME / DATETIME / TIMESTAMP / TIMESTAMPTZ。缺了它们这些列整列报废。
+# json：MySQL 的 ColumnType::Json 不在 str/[u8] 的白名单里，必须靠它才能读出来。
+# uuid：BINARY(16) 存 UUID 是 MySQL 主流做法；PG 的 UUID 列同理。
+# 四个依赖都是纯 Rust、无原生库（C/C++ 工具链）要求，加进来不会像 openssl 那样拖垮构建。
+sqlx = { version = "0.8", features = [
+  "runtime-tokio-rustls",
+  "mysql",
+  "postgres",
+  "rust_decimal",
+  "chrono",
+  "json",
+  "uuid",
+], optional = true }
+# 时间处理。版本必须与 sqlx 的约束（0.4.34+）落在同一 semver 区间，
+# 否则会出现两份 chrono ⇒ `chrono::TimeDelta` 与 sqlx 的 Decode 实现不是同一个类型。
 # SQL Server 驱动：纯 Rust TDS 协议实现，无原生依赖（sqlx 自 0.7 起移除 mssql，故单独引入）
 tiberius = { version = "0.12", default-features = false, features = ["tds73", "native-tls", "chrono"], optional = true }
 # tiberius 需要把 tokio 的 TcpStream 适配成 futures 的 AsyncRead/AsyncWrite

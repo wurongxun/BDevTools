@@ -5,7 +5,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import type { WorkspaceConfig, WorkspaceSummary } from '@/Types/workspace'
-import { workspaceService } from '@/services/workspaceService'
+import { workspaceService, isOtherWindow } from '@/services/workspaceService'
 import { setPluginWorkspaceId } from '@/composables/usePluginDir'
 import { fileTreeStore as getFileTreeStore } from '@/store/modules/fileTree'
 import { get_file_Api } from '@/api/file'
@@ -159,26 +159,54 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
-  /** 从工作区列表中找到一个未被锁定的工作区 */
+  /**
+   * 续用本窗口**自己已持有**的工作区锁（页面刷新 / 重载场景）。
+   *
+   * 为什么需要：窗口没关、只是页面重载时，Rust 进程没退，`WORKSPACE_LOCKS` 仍在内存里，
+   * 且持有者就是本窗口自己的 label —— 这恰恰是「刷新前在用的是哪个工作区」唯一可靠的记录。
+   * 缺了这一步，凡是没把绑定持久化的情况（临时工作区、未写回窗口预设等）都会掉进
+   * 「打开时选择」弹窗，还把自己刚在用的工作区标成「已被窗口 [X] 占用」。
+   * 新开的窗口 label 是全新的，锁表里没有它，自然扫不到、照旧弹窗。
+   */
+  async function resumeOwnWorkspace(): Promise<boolean> {
+    const list = allWorkspaces.value.length > 0
+      ? allWorkspaces.value
+      : await workspaceService.list().catch(() => [])
+
+    for (const summary of list) {
+      const holder = await workspaceService.lockStatus(summary.id).catch(() => null)
+      if (!holder || holder !== windowLabel.value) continue
+      const config = await workspaceService.get(summary.id).catch(() => null)
+      // 工作区已被删除，只剩悬空锁
+      if (!config) continue
+      currentWorkspace.value = config
+      await applyWorkspaceFolder(config)
+      console.info(`[workspace] 窗口 ${windowLabel.value} 重载后续用工作区 [${config.name}]`)
+      return true
+    }
+    return false
+  }
+
+  /** 从工作区列表中找到一个可用（未被**其他窗口**锁定）的工作区 */
   async function findUnlockedWorkspace(): Promise<WorkspaceConfig | null> {
     const list = allWorkspaces.value.length > 0
       ? allWorkspaces.value
       : await workspaceService.list()
 
     for (const summary of list) {
+      // 被**别的窗口**持有才跳过；本窗口自己持有（页面刷新）不算占用
       const holder = await workspaceService.lockStatus(summary.id).catch(() => null)
-      if (!holder) {
-        // 未被锁定，尝试锁定
-        const lockResult = await workspaceService.lock(summary.id, windowLabel.value).catch(() => ({ locked: false }))
-        if (lockResult.locked) {
-          return await workspaceService.get(summary.id)
-        }
+      if (isOtherWindow(holder)) continue
+      // 未锁定 / 自己持有：尝试锁定（Rust 侧对同一持有者的重入直接放行）
+      const lockResult = await workspaceService.lock(summary.id, windowLabel.value).catch(() => ({ locked: false }))
+      if (lockResult.locked) {
+        return await workspaceService.get(summary.id)
       }
     }
     return null
   }
 
-  /** 在已有工作区中查找包含指定文件夹且未被锁定的工作区（复用，避免同目录重复创建） */
+  /** 在已有工作区中查找包含指定文件夹且未被其他窗口锁定的工作区（复用，避免同目录重复创建） */
   async function findWorkspaceByFolder(dir: string): Promise<WorkspaceConfig | null> {
     const list = allWorkspaces.value.length > 0
       ? allWorkspaces.value
@@ -187,11 +215,10 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     for (const summary of list) {
       if (!summary.folders.includes(dir)) continue
       const holder = await workspaceService.lockStatus(summary.id).catch(() => null)
-      if (!holder) {
-        const lockResult = await workspaceService.lock(summary.id, windowLabel.value).catch(() => ({ locked: false }))
-        if (lockResult.locked) {
-          return await workspaceService.get(summary.id)
-        }
+      if (isOtherWindow(holder)) continue
+      const lockResult = await workspaceService.lock(summary.id, windowLabel.value).catch(() => ({ locked: false }))
+      if (lockResult.locked) {
+        return await workspaceService.get(summary.id)
       }
     }
     return null
@@ -381,6 +408,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     // 方法
     loadAllWorkspaces,
     loadCurrentWorkspace,
+    resumeOwnWorkspace,
     switchWorkspace,
     createWorkspace,
     updateCurrentWorkspace,

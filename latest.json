@@ -1,11 +1,11 @@
 {
-  "version": "1.6.1",
-  "notes": "1.6.1 - 2026-09-23 修复窗口BUG\n2、修复页面布局",
-  "pub_date": "2026-10-06T08:00:00+08:00",
+  "version": "1.7.0",
+  "notes": "1、修复数据库插件BUG \n2、优化数据库查询功能\n3、重构设置插件页面以支持国际化翻译\n4、优化SQL执行结果管理与右键菜单功能\n5、数据库插件虚拟滚动替换分批渲染并解除行数上限\n6、数据库插件支持无主键表编辑与幽灵行新增\n7、升级tauri版本\n8、修复其他已知BUG",
+  "pub_date": "2026-10-12T08:00:00+08:00",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUOFVHSVdiU3RaUTF5bndIVHFwa21zYzkyWm5Ya0NqaVJkVFlqVmEvREZxNWpxazB5Z0FJN2FDc3gxWWRiME9ZUFkrZnBIcXkzaXZpNVZTaG81bEVYWDgrV1dseXI2NncwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxMjcxNTM1CWZpbGU6QkRldlRvb2xzXzEuNi4xX3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjYuMQpiTHE1YWgzWmFIN3JHeEhKbUtJWEZENm9kM090eW94STFubGVLU0FIZU1EUUlzMzRpVG9DUE9pVmd6aXVNbGRDU05FZjZIOEM4UVFOeHRaZjI4aUtEUT09Cg==",
-      "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.6.1/BDevTools_1.6.1_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUOFVHSVdiU3RaUStTcGlPQ0VnVThBUXl0RFppOUdBYnpOamxTSlJkdVppWldpSEtOT3puem5NcmtBSldTNzBsU3VsR0tVekpGQmN6STJ5L1RNZ3J4czlvS0JUVUdZRnc4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNzk2MDU1CWZpbGU6QkRldlRvb2xzXzEuNy4wX3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjcuMAp5Mko4UGR6UFlmekdzNldzL3FYMzRBTjY0OFlaUENCT0l0aDFFQmViY3ZvWWFDRnVZZ0p3bS9rY3Mza3B4SWZlRGRCYk9vVC9iR1BvV2Nndy9XZDdCQT09Cg==",
+      "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.7.0/BDevTools_1.7.0_x64-setup.exe"
     }
   }
 }

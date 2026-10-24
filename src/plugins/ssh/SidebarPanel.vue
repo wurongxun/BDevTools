@@ -65,8 +65,8 @@
                   <circle cx="6" cy="3.5" r="0.8" />
                 </svg>
               </span>
+<!--              <span class="conn-addr">{{ conn.address }}:{{ conn.port }}</span>-->
               <span class="conn-name">{{ conn.name }}</span>
-              <span class="conn-addr">{{ conn.address }}:{{ conn.port }}</span>
               <!-- hover 操作按钮 -->
               <div class="conn-hover-actions">
                 <span class="action-btn" @click.stop="openTerminal(conn)" title="终端">

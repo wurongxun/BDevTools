@@ -20,6 +20,35 @@ use crate::plugins::database::odbc::OraclePool;
 
 const MAX_ROWS: usize = 10000;
 
+/// 分段读 CLOB 时每段的字节数。
+///
+/// `odbc.rs` 的文本列缓冲上限是 `MAX_STR_LEN = 4000` 字节，超过就被驱动悄悄截断；
+/// 而 `RAWTOHEX` 会把长度翻倍，所以这里取 1000 字节（2000 个 hex 字符）留足余量。
+const CLOB_CHUNK_BYTES: usize = 1000;
+
+/// 源码读取兜底上限。视图源文本一般几 KB，512KB 已经宽到离谱 ——
+/// 与其让一个异常大的对象把请求无限拖住，不如到量停手。
+const MAX_SOURCE_BYTES: usize = 512 * 1024;
+
+/// 十六进制解码（只用于 `RAWTOHEX` 回传的分段源码）
+///
+/// 非法字符**跳过而不是报错**：驱动偶尔会在末尾补空格，为它丢掉整段源码不划算。
+fn decode_hex(src: &str) -> Vec<u8> {
+    let mut out = Vec::with_capacity(src.len() / 2);
+    let mut hi: Option<u8> = None;
+    for ch in src.chars() {
+        let Some(v) = ch.to_digit(16).map(|d| d as u8) else { continue };
+        match hi {
+            None => hi = Some(v),
+            Some(h) => {
+                out.push((h << 4) | v);
+                hi = None;
+            }
+        }
+    }
+    out
+}
+
 pub struct OracleCatalog {
     pool: Arc<OraclePool>,
 }
@@ -37,6 +66,60 @@ impl OracleCatalog {
     /// 字符串字面量（Oracle 里未加引号的标识符存为大写，故统一大写后转义）
     fn owner_literal(&self, database: &str) -> String {
         self.escape_literal(&database.to_uppercase())
+    }
+
+    /// 取 PL/SQL 源码（存储过程 / 函数 / 触发器）
+    ///
+    /// `all_source` **按行存**，每行本身带换行符，天然绕开了 ODBC 文本列的 4000 字节上限 ——
+    /// 这比把 CLOB 一趟拉回来稳得多，也是各客户端工具取 Oracle 源码的通行做法。
+    async fn routine_source(&self, type_name: &str, database: &str, name: &str) -> Result<String> {
+        let owner = self.owner_literal(database);
+        let obj = self.escape_literal(&name.to_uppercase());
+        let sql = format!(
+            "SELECT text FROM all_source \
+             WHERE owner = '{}' AND name = '{}' AND type = '{}' ORDER BY line",
+            owner, obj, type_name
+        );
+        let rows = self.q(&sql).await?;
+        if rows.is_empty() {
+            return Err(anyhow::anyhow!("找不到 {} {}.{}（或没有权限）", type_name, database, name));
+        }
+        Ok(rows.iter().map(|r| cell(r, 0)).collect::<Vec<_>>().concat())
+    }
+
+    /// 取视图源码：`DBMS_METADATA.GET_DDL` 返回 CLOB，只能分段读
+    ///
+    /// 每段先 `RAWTOHEX` 再取：**直接取文本会在多字节字符的中间被 4000 字节切断**，
+    /// 驱动 layer 会把半个字节替换成 U+FFFD，源码就被改写了。转成十六进制（纯 ASCII）
+    /// 再在 Rust 侧拼字节、一次性解码，才能保住原文。
+    async fn view_source(&self, database: &str, name: &str) -> Result<String> {
+        let owner = self.owner_literal(database);
+        let obj = self.escape_literal(&name.to_uppercase());
+        let mut buf: Vec<u8> = Vec::new();
+        let mut offset = 1usize;
+        loop {
+            let sql = format!(
+                "SELECT RAWTOHEX(DBMS_LOB.SUBSTR( \
+                   DBMS_METADATA.GET_DDL('VIEW', '{}', '{}'), {}, {} \
+                 )) AS hx FROM DUAL",
+                obj, owner, CLOB_CHUNK_BYTES, offset
+            );
+            let rows = self.q(&sql).await?;
+            let hx = rows.first().map(|r| cell(r, 0)).unwrap_or_default();
+            let bytes = decode_hex(&hx);
+            if bytes.is_empty() {
+                break;
+            }
+            buf.extend_from_slice(&bytes);
+            offset += bytes.len();
+            if buf.len() >= MAX_SOURCE_BYTES {
+                break;
+            }
+        }
+        if buf.is_empty() {
+            return Err(anyhow::anyhow!("找不到视图 {}.{}（或没有权限）", database, name));
+        }
+        Ok(String::from_utf8_lossy(&buf).into_owned())
     }
 }
 
@@ -62,6 +145,7 @@ impl CatalogProvider for OracleCatalog {
         CatalogCapabilities {
             views: true,
             procedures: true,
+            functions: true,
             triggers: true,
             events: false, // 调度是 DBMS_SCHEDULER，语义不同
             database_indexes: true,
@@ -71,6 +155,7 @@ impl CatalogProvider for OracleCatalog {
             global_status: true,
             session_variables: true,
             global_variables: true,
+            object_source: true,
         }
     }
 
@@ -115,7 +200,10 @@ impl CatalogProvider for OracleCatalog {
             "SELECT c.column_name AS name, c.data_type AS data_type, c.nullable AS is_nullable, \
              c.data_default AS default_value, \
              CASE WHEN pk.column_name IS NOT NULL THEN 'PRI' ELSE '' END AS column_key, \
-             '' AS comment_txt \
+             '' AS comment_txt, \
+             c.column_id AS ord, NVL(c.identity_column, 'NO') AS identity_column, \
+             NVL(c.virtual_column, 'NO') AS virtual_column, \
+             c.data_precision AS prec, c.data_scale AS scale, c.char_length AS char_len \
              FROM all_tab_columns c \
              LEFT JOIN (SELECT acc.column_name FROM all_cons_columns acc \
                 JOIN all_constraints ac ON acc.constraint_name = ac.constraint_name \
@@ -136,6 +224,12 @@ impl CatalogProvider for OracleCatalog {
                     is_primary_key: cell(r, 4) == "PRI",
                     default_value: opt_cell(r, 3),
                     comment: opt_cell(r, 5),
+                    ordinal_position: r.get(6).and_then(num_of).unwrap_or(0) as i32,
+                    is_auto_increment: cell(r, 7).eq_ignore_ascii_case("YES"),
+                    is_generated: cell(r, 8).eq_ignore_ascii_case("YES"),
+                    numeric_precision: r.get(9).and_then(num_of).map(|v| v as i32),
+                    numeric_scale: r.get(10).and_then(num_of).map(|v| v as i32),
+                    character_max_length: r.get(11).and_then(num_of),
                 }
             })
             .collect())
@@ -231,12 +325,42 @@ impl CatalogProvider for OracleCatalog {
              TO_CHAR(last_ddl_time, 'YYYY-MM-DD HH24:MI:SS') AS modified, \
              '' AS comment_txt, status AS status_txt, '' AS event_txt, '' AS table_name \
              FROM all_objects \
-             WHERE owner = '{}' AND object_type IN ('PROCEDURE', 'FUNCTION') \
+             WHERE owner = '{}' AND object_type = 'PROCEDURE' \
              ORDER BY object_name",
             owner
         );
         let rows = self.q(&sql).await?;
         Ok(rows.iter().map(|r| object_from_row(r)).collect())
+    }
+
+    async fn list_functions(&self, database: &str) -> Result<Vec<DatabaseObjectInfo>> {
+        let owner = self.owner_literal(database);
+        let sql = format!(
+            "SELECT object_name AS name, object_type AS object_type, owner AS database_name, \
+             '' AS definer, TO_CHAR(created, 'YYYY-MM-DD HH24:MI:SS') AS created, \
+             TO_CHAR(last_ddl_time, 'YYYY-MM-DD HH24:MI:SS') AS modified, \
+             '' AS comment_txt, status AS status_txt, '' AS event_txt, '' AS table_name \
+             FROM all_objects \
+             WHERE owner = '{}' AND object_type = 'FUNCTION' \
+             ORDER BY object_name",
+            owner
+        );
+        let rows = self.q(&sql).await?;
+        Ok(rows.iter().map(|r| object_from_row(r)).collect())
+    }
+
+    async fn object_source(
+        &self,
+        kind: ObjectSourceKind,
+        database: &str,
+        name: &str,
+    ) -> Result<String> {
+        match kind {
+            ObjectSourceKind::View => self.view_source(database, name).await,
+            ObjectSourceKind::Procedure => self.routine_source("PROCEDURE", database, name).await,
+            ObjectSourceKind::Function => self.routine_source("FUNCTION", database, name).await,
+            ObjectSourceKind::Trigger => self.routine_source("TRIGGER", database, name).await,
+        }
     }
 
     async fn list_triggers(&self, database: &str) -> Result<Vec<DatabaseObjectInfo>> {
@@ -440,5 +564,38 @@ fn type_str(type_name: &str, data_len: i64, precision: Option<i64>, scale: Optio
             _ => "NUMBER".to_string(),
         },
         _ => type_name.to_string(),
+    }
+}
+
+
+#[cfg(test)]
+mod source_tests {
+    use super::*;
+
+    /// 分段 hex 解码必须能对回去：这是 Oracle 视图源码不被改写的唯一保障
+    #[test]
+    fn decode_hex_round_trips() {
+        let raw = "CREATE OR REPLACE VIEW v AS SELECT '你好' FROM dual";
+        let hx = raw.as_bytes().iter().fold(String::new(), |mut a, b| {
+            a.push_str(&format!("{:02X}", b));
+            a
+        });
+        assert_eq!(decode_hex(&hx), raw.as_bytes().to_vec());
+    }
+
+    /// 驱动补空白 / 小写 hex 都要容忍，不能因此丢整段源码
+    #[test]
+    fn decode_hex_tolerates_whitespace_and_lowercase() {
+        assert_eq!(decode_hex("48 65 6c 6c 6f\n"), b"Hello".to_vec());
+        assert_eq!(decode_hex("48656c6c6f"), b"Hello".to_vec());
+        assert!(decode_hex("").is_empty());
+        assert!(decode_hex("zz").is_empty());
+    }
+
+    /// 奇数长度的非法输入：多余的半个字节丢弃，不能 panic
+    #[test]
+    fn decode_hex_drops_trailing_nibble() {
+        assert_eq!(decode_hex("4"), Vec::<u8>::new());
+        assert_eq!(decode_hex("486"), b"H".to_vec());
     }
 }

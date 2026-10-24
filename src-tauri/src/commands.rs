@@ -1173,51 +1173,29 @@ pub async fn db_query_table_data(
     .await
 }
 
-/// 插入单行数据
+/// 结果网格：批量写回（一个事务，逐条返回受影响行数）
 #[cfg(feature = "plugin-database")]
 #[tauri::command]
-pub async fn db_insert_row(
+pub async fn db_apply_edits(
     config_id: String,
     database: String,
-    table: String,
-    data: serde_json::Value,
-) -> Response<bool> {
-    crate::plugins::database::operations::db_insert_row(config_id, database, table, data).await
+    ops: Vec<crate::plugins::database::editing::EditOp>,
+) -> Response<crate::plugins::database::editing::EditBatchResult> {
+    crate::plugins::database::editing::db_apply_edits(config_id, database, ops).await
 }
 
-/// 更新单行数据
+/// 结果网格：预览批量写将要执行的 SQL（与 `db_apply_edits` 同源，不落地）
 #[cfg(feature = "plugin-database")]
 #[tauri::command]
-pub async fn db_update_row(
+pub async fn db_preview_edits(
     config_id: String,
     database: String,
-    table: String,
-    primary_key: String,
-    primary_value: serde_json::Value,
-    data: serde_json::Value,
-) -> Response<bool> {
-    crate::plugins::database::operations::db_update_row(
-        config_id, database, table, primary_key, primary_value, data,
-    )
-    .await
-}
-
-/// 删除单行数据
-#[cfg(feature = "plugin-database")]
-#[tauri::command]
-pub async fn db_delete_row(
-    config_id: String,
-    database: String,
-    table: String,
-    primary_key: String,
-    primary_value: serde_json::Value,
-) -> Response<bool> {
-    crate::plugins::database::operations::db_delete_row(config_id, database, table, primary_key, primary_value)
-        .await
+    ops: Vec<crate::plugins::database::editing::EditOp>,
+) -> Response<crate::plugins::database::editing::EditPreview> {
+    crate::plugins::database::editing::db_preview_edits(config_id, database, ops).await
 }
 
 // ==================== 数据库元数据 ====================
-
 /// 获取所有数据库列表
 #[cfg(feature = "plugin-database")]
 #[tauri::command]
@@ -1292,6 +1270,28 @@ pub async fn db_list_procedures(
     database: String,
 ) -> Response<Vec<DatabaseObjectInfo>> {
     crate::plugins::database::metadata::db_list_procedures(config_id, database).await
+}
+
+/// 获取指定库的函数列表
+#[cfg(feature = "plugin-database")]
+#[tauri::command]
+pub async fn db_list_functions(
+    config_id: String,
+    database: String,
+) -> Response<Vec<DatabaseObjectInfo>> {
+    crate::plugins::database::metadata::db_list_functions(config_id, database).await
+}
+
+/// 取某个对象的定义源码（视图 / 存储过程 / 函数 / 触发器）
+#[cfg(feature = "plugin-database")]
+#[tauri::command]
+pub async fn db_object_source(
+    config_id: String,
+    database: String,
+    kind: String,
+    name: String,
+) -> Response<String> {
+    crate::plugins::database::metadata::db_object_source(config_id, database, kind, name).await
 }
 
 /// 获取指定库的触发器列表

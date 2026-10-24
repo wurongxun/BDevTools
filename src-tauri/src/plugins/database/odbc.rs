@@ -63,6 +63,33 @@ impl OraclePool {
         tokio::task::spawn_blocking(move || execute_blocking(&cs, &setup, &sql)).await?
     }
 
+    /// 在一个事务里顺序执行多条语句（共用**同一条 ODBC 连接**）。
+    ///
+    /// Oracle 侧默认是 autocommit，不开的话每条语句各自提交 —— 那就没有回滚可言了。
+    /// 所以这里 `set_autocommit(false)` → 逐条执行 → commit / rollback，最后恢复 autocommit
+    /// （连接虽然即用即关，但显式恢复可以避免将来改成池化时踩坑）。
+    pub async fn execute_batch_transaction(
+        &self,
+        setup: &str,
+        stmts: &[anyhow::Result<String>],
+        expect_one: &[bool],
+    ) -> Result<Vec<Result<u64>>> {
+        let cs = self.conn_str.clone();
+        let setup = setup.to_string();
+        let expect_one = expect_one.to_vec();
+        let stmts: Vec<anyhow::Result<String>> = stmts
+            .iter()
+            .map(|r| match r {
+                Ok(s) => Ok(s.clone()),
+                Err(e) => Err(anyhow!("{}", e)),
+            })
+            .collect();
+        tokio::task::spawn_blocking(move || {
+            execute_batch_blocking(&cs, &setup, stmts, &expect_one)
+        })
+        .await?
+    }
+
     /// 查询单个数值（用于 COUNT 统计）
     pub async fn query_count(&self, setup: &str, sql: &str) -> Result<u64> {
         let (_, rows) = self.query_rows(setup, sql, 1).await?;
@@ -196,6 +223,75 @@ fn query_rows_blocking(
             }
         }
         Ok((columns, rows))
+    })
+}
+
+fn execute_batch_blocking(
+    conn_str: &str,
+    setup: &str,
+    stmts: Vec<anyhow::Result<String>>,
+    expect_one: &[bool],
+) -> Result<Vec<Result<u64>>> {
+    with_connection(conn_str, |conn| {
+        if !setup.trim().is_empty() {
+            conn.execute(setup, (), None)?;
+        }
+        conn.set_autocommit(false)?;
+        let mut out: Vec<Result<u64>> = Vec::with_capacity(stmts.len());
+        let mut rolled_back = false;
+        for (i, item) in stmts.into_iter().enumerate() {
+            match item {
+                Err(e) => {
+                    out.push(Err(e));
+                    rolled_back = true;
+                    break;
+                }
+                Ok(sql) => {
+                    match conn.prepare(sql.as_str()) {
+                        Ok(mut prepared) => {
+                            // execute 返回的游标借住了 prepared，必须先把它消耗掉再取行数；
+                            // 用立即执行闭包把这段作用域收住，否则 row_count 会被判成二次可变借用
+                            let res: std::result::Result<u64, String> = (|| {
+                                prepared.execute(()).map_err(|e| e.to_string())?;
+                                Ok(prepared.row_count().map_err(|e| e.to_string())?.unwrap_or(0) as u64)
+                            })();
+                            match res {
+                                Ok(n) => {
+                                    // 要求恰好命中一行却不是一行 ⇒ 与执行失败同等对待：整批回滚
+                                    if expect_one.get(i) == Some(&true) && n != 1 {
+                                        out.push(Err(anyhow!(
+                                            "{}",
+                                            crate::plugins::database::editing::exact_one_violation(n)
+                                        )));
+                                        rolled_back = true;
+                                        break;
+                                    }
+                                    out.push(Ok(n));
+                                }
+                                Err(msg) => {
+                                    out.push(Err(anyhow!("{}", msg)));
+                                    rolled_back = true;
+                                    break;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            out.push(Err(anyhow!("{}", e)));
+                            rolled_back = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if rolled_back {
+            conn.rollback()?;
+        } else if let Err(e) = conn.commit() {
+            // 提交失败不能假装成功；前面的语句已经回滚不了，如实抛出
+            return Err(anyhow!("提交失败: {}", e));
+        }
+        let _ = conn.set_autocommit(true);
+        Ok(out)
     })
 }
 

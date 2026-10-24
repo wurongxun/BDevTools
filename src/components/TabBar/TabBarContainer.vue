@@ -174,11 +174,12 @@ onUnmounted(() => {
   user-select: none;
   position: relative;
   flex-shrink: 0;
-  // Chrome 风格：标签条底色用 sidebarBg（工具栏条，比内容区略深一档），
-  // 激活标签用 appMainBgColor 与下方内容连体——保证 side / tab / main 三段色板协调。
+  // Chrome 风格：标签条底色用专用 tabBarBg（比内容区 appMainBgColor 明显深/亮一档），
+  // 激活标签用 appMainBgColor 与下方内容连体——保证 side / tab / main 三段色板协调，
+  // 同时让未激活 tab（透出标签条底色）与激活 tab 形成清晰底色对比。
   // 跟随 light/dark 设计令牌，不再用 EP --el-bg-color-page（暗色下 ≈#0a0a0a，与设计色板脱节）
   @include theme.useTheme {
-    background-color: theme.getVar('sidebarBg');
+    background-color: theme.getVar('tabBarBg');
   }
 
   // 底线用 ::after 绘制而非 border-bottom：border 在内容盒之外，
@@ -215,7 +216,7 @@ onUnmounted(() => {
   padding: 0;
 
   @include theme.useTheme {
-    background-color: theme.getVar('sidebarBg');
+    background-color: theme.getVar('tabBarBg');
     color: theme.getVar('textSecondary');
   }
 

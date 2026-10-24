@@ -248,11 +248,18 @@ async function initEditorWindow() {
     console.warn('读取窗口绑定工作区失败:', e)
   }
 
-  // 已绑定工作区（注册表 meta 或布局配置）：未被占用则直接加载，不弹选择窗；
-  // 已被占用（同一工作区不能同时打开）：提示后降级弹窗选择
+  // ① 本窗口重载前就在用的工作区（自己持有的那把锁是最新的真相，优先续用）
+  if (await useWorkspaceStore.resumeOwnWorkspace()) {
+    useWorkspaceStore.pendingWorkspaceSelection = false
+    await restoreSessionIfAny()
+    return
+  }
+
+  // ② 已绑定工作区（注册表 meta 或布局配置）：只有**别的窗口**占着才算冲突
   const boundWorkspaceId = boundMetaWorkspaceId || layoutWorkspaceId
   if (boundWorkspaceId) {
-    const holder = await workspaceService.lockStatus(boundWorkspaceId).catch(() => null)
+    // 只看是不是**别的**窗口占着：自己持有说明本窗口重载过（锁没释放），续用即可
+    const holder = await workspaceService.lockedByOther(boundWorkspaceId).catch(() => null)
     if (!holder) {
       useWorkspaceStore.pendingWorkspaceSelection = false
       await useWorkspaceStore.loadCurrentWorkspace(boundWorkspaceId)
@@ -266,7 +273,7 @@ async function initEditorWindow() {
     }
   }
 
-  // 未绑定工作区：弹窗让用户选择或新建临时工作区（pending 标志已在 setup 阶段置位）
+  // 全新窗口：弹窗让用户选择或新建临时工作区（pending 标志已在 setup 阶段置位）
   if (!useWorkspaceStore.currentWorkspace) {
     showWorkspaceSelect.value = true
   } else {
@@ -434,8 +441,13 @@ async function initApp() {
   }
 
   let mainWorkspaceResolved = false
-  if (mainBoundWorkspaceId) {
-    const holder = await workspaceService.lockStatus(mainBoundWorkspaceId).catch(() => null)
+  // ① 本窗口重载前就在用的工作区（自己持有的那把锁是最新的真相，优先续用）
+  if (await useWorkspaceStore.resumeOwnWorkspace()) {
+    mainWorkspaceResolved = true
+  }
+  // ② 预设绑定的工作区：只有**别的窗口**占着才算冲突（页面刷新时锁还在自己手上）
+  if (!mainWorkspaceResolved && mainBoundWorkspaceId) {
+    const holder = await workspaceService.lockedByOther(mainBoundWorkspaceId).catch(() => null)
     if (!holder) {
       await useWorkspaceStore.loadCurrentWorkspace(mainBoundWorkspaceId)
       if (useWorkspaceStore.currentWorkspace) mainWorkspaceResolved = true
@@ -443,7 +455,7 @@ async function initApp() {
       NotificationUtil.warn(`绑定的工作区已在窗口 [${holder}] 中打开，请重新选择`)
     }
   }
-  // 已绑定且成功加载 / 未绑定 / 被占用 ⇒ 打开时选择工作区
+  // 仍然没有：打开时选择工作区
   if (!mainWorkspaceResolved) {
     useWorkspaceStore.pendingWorkspaceSelection = true
     showWorkspaceSelect.value = true
