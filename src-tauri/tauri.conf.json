@@ -91,7 +91,7 @@
       "windows": {
         "installMode": "passive"
       },
-      "endpoints": ["https://gitee.com/wurongxun/BackendDevTools/raw/BDevTools/latest.json"]
+      "endpoints": ["https://gitee.com/wurongxun/BackendDevTools/raw/BDevToolsUpdater/latest.json"]
     }
   }
 }
