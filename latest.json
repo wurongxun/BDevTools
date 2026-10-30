@@ -1,11 +1,11 @@
 {
-  "version": "1.7.0",
-  "notes": "1、修复数据库插件BUG \n2、优化数据库查询功能\n3、重构设置插件页面以支持国际化翻译\n4、优化SQL执行结果管理与右键菜单功能\n5、数据库插件虚拟滚动替换分批渲染并解除行数上限\n6、数据库插件支持无主键表编辑与幽灵行新增\n7、升级tauri版本\n8、修复其他已知BUG",
-  "pub_date": "2026-10-24T08:00:00+08:00",
+  "version": "1.7.2",
+  "notes": "1、修复数据库插件BUG 增加信息密度 \n 2、修复主题颜色搭配问题 ",
+  "pub_date": "2026-10-30T08:00:00+08:00",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUOFVHSVdiU3RaUXkzTHpoK1lpN1FNY3l3c01RVzVIaVVPOUtieGoxRXRCQ1ZkOFNPSDVjaU56U01OcTl3ZFQ2elB5YS9ESU9na09SNEJxWkVISVBoR2RRQVZEUHlYdUFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyODMzNTIxCWZpbGU6QkRldlRvb2xzXzEuNy4wX3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjcuMApiYXlsVmFyZi8zSHNIdkd2NFFQQXdiL1U1NXFWUUF4K25kT0dZL3pab0ZZS1dQbEs1VUIvRUNOZmpycnhPM3lWakxXcDZPSFRMZE5yQUt0a25wMm5BUT09Cg==",
-      "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.7.0/BDevTools_1.7.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUOFVHSVdiU3RaUXg2Rk0za0VkeTNJR2taeitOSU1VN1VJaDgyNkJUbEF2cFU1TzRGaGRMTWUrVGJsM0xRc28wVFZ1UFFPaDhuUmRZUXFtb2JiQTJxZTdTQ3ZmaC9tVkFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzMjY3NjYzCWZpbGU6QkRldlRvb2xzXzEuNy4yX3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjcuMgp5V1dXYm00ejlNZURlMW5RRzVjU3Vod1d6U3VncTdtTElFZFhtVUFBbjRvZTFSYXdtWjFEUEZZZklHbUs2OFVWemttdTREdkxGSEFYQjJEOEVSZE5BZz09Cg==",
+      "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.7.2/BDevTools_1.7.2_x64-setup.exe"
     }
   }
 }
