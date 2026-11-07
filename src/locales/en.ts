@@ -39,6 +39,9 @@ export default {
   darkMode: {
     name: 'Dark Mode'
   },
+  highContrast: {
+    name: 'High Contrast'
+  },
   about: {
     name: 'About'
   },
@@ -748,6 +751,7 @@ export default {
       sectionUpdate: 'Update',
       sectionOther: 'Other',
       darkModeDesc: 'Switch between light and dark themes (synced with the top bar theme button)',
+      highContrastDesc: 'Increase the contrast of text and borders (can be combined with light/dark)',
       localeDesc: 'Choose the interface display language',
       networkCheck: 'Network check',
       networkCheckDesc: 'Check the current network connection status (under development, not available yet)',
@@ -782,7 +786,8 @@ export default {
       checkUpdateFailed: 'Failed to check for updates: {msg}',
       noUpdateInfo: 'Could not get update package info; please check for updates again',
       installedRestart: 'Installed {version}; the app will restart shortly',
-      updateFailed: 'Update failed: {msg}'
+      updateFailed: 'Update failed: {msg}',
+      confirm: 'Confirm'
     },
     plugin: {
       manageDesc1: 'Built-in plugins are compiled with the app and cannot be uninstalled; third-party plugins are installed as packages (plugin.json + page assets + optional plugin.wasm). The page runs in an opaque-origin sandboxed iframe — it only occupies the main panel, with no sidebar and no tab bar takeover. The backend logic runs in the Extism WASM sandbox, and host capabilities (logging / KV / files / HTTP) are verified per call against the manifest before being granted. After installation they are enabled in all windows by default (those explicitly checked in a window preset are auto-appended).',

@@ -201,7 +201,7 @@ async function openInExplorer(path: string) {
   cursor: not-allowed;
 }
 .icon-btn.danger:hover:not(:disabled) {
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   background-color: var(--el-color-danger-light-9);
 }
 .add-btn {

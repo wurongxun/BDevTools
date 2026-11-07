@@ -2,7 +2,7 @@
 
 ******_一切皆是插件_**,BDevTools一款跨平台桌面管理工具集合。以「**_插件化_**」为核心，集文件编辑、大日志分析、SSH/SFTP、数据库、Java 堆分析、本地终端与 3D/游戏窗口于一身，并开放**第三方插件框架**——任何人都可以在沙箱里装一个纯前端页面、或带 Rust/WASM 后端的工具。轻量高效，GB 级日志与堆转储分析无压力。
 
-> 当前版本 **1.6.0**（`productName: BDevTools`，应用标识 `com.backend-development-tools.app`）。
+> 当前版本 **1.8.0**（`productName: BDevTools`，应用标识 `com.backend-development-tools.app`）。
 
 ## 功能概览
 
@@ -16,7 +16,7 @@
 | 远程连接          | `ssh` | SSH 终端 + SFTP | 多标签 SSH 终端（多终端主题）；SFTP 双栏管理（上传/下载/重命名/删除，含进度条与传输队列）；连接分组 / 书签；断线检测；远程日志拉取 |
 | 日志工作台         | `logs` | 大文件日志分析 | 分块懒加载（GB 级不卡）；关键词 / 正则搜索与命中导航；级别配色（Java/Logback/Python/系统日志归一化）；自定义高亮规则；堆栈识别与悬停元信息 |
 | 数据库           | `database` | 多数据库连接管理 | 支持 MySQL / PostgreSQL / SQL Server / Oracle；SQL 执行（语法高亮、计划查看）；表结构与数据网格浏览、分页；导入 / 导出 |
-| 内存分析          | `mat` | Java 堆转储分析 | HPROF / PHD 格式识别；浅堆直方图（真解析）；泄漏检测 / 支配树 / GC Roots 引用追踪 / OQL（子能力分批迭代接入） |
+| 内存分析          | `mat` | Java 堆转储分析 | HPROF / PHD 格式识别、`.hprof.gz` 自动解压（缓存复用）、本地索引（`.bdtidx`，二次打开秒开）；浅堆 / 深堆直方图（分组 / 导出）；Leak Suspects、Dominator Tree、GC Roots 多路径、大对象排行、线程 / 类加载器 / 内存浪费 / 不可达对象报告、多 dump 对比、OQL 安全子集、对象字段值（路线图 P0-P2 + P3-1/P3-3 已完成，见 `docs/design/mat-eclipse-parity-roadmap.md`） |
 | 本地终端          | `terminal` | 停靠面板（底部） | 多标签 / 分屏 / 可拖拽停靠；shell 集成（cwd、退出码）；活动栏图标即显隐开关，不占主区 |
 | 3D / 游戏       | `web3d` | 独立窗口托管 | 在新窗口里运行声明了页面能力 / 独立窗口的第三方 3D / 游戏插件（Unity WebGL、Godot、three.js 等）；列表占满主区 |
 | 设置            | `settings` | 宿主入口（固定底部） | 应用设置、窗口预设、插件管理；不可禁用 |
@@ -112,7 +112,7 @@ src/
 ## 项目规划
 
 - **数据库插件**：已落地（MySQL / PostgreSQL / SQL Server / Oracle + SQL 执行 / 表数据浏览 / 导入导出）。
-- **MAT（Java 堆分析）**：首批能力已上线（直方图），泄漏检测 / 支配树 / 引用追踪 / OQL 分批迭代。
+- **MAT（Java 堆分析）**：直方图（浅堆 / 深堆 / 分组 / 导出）、泄漏检测（含问题叙述与 HTML 报告）、支配树、GC Roots 多路径（可排除弱引用）、大对象排行、专用报告（线程 / 类加载器 / 内存浪费 / 不可达对象）、OQL 安全子集、对象字段值、多 dump 对比、`.hprof.gz` 自动解压（缓存复用，概览页可清理）、本地索引（图 + 支配树落盘，二次打开秒开）均已上线；剩余差距（PHD/ART 格式解析、精确浅堆、独立进程、子 tab 迁 TabBar）见路线图 P3。
 - **第三方插件生态**：完善插件市场与签名分发（当前为「从目录 / zip 安装」），扩展更多官方示例（消息队列、K8s、对象存储等）。
 
 ## 使用说明
@@ -155,13 +155,6 @@ pnpm release:build     # 只构建 + 签名 + 本地验签
 pnpm release:publish   # 只发布（需要令牌）
 pnpm release:verify    # 校验产物签名与配置里的公钥是否匹配
 ```
-
-发版需要这些（都不入库）：
-
-- **签名私钥**：`~/.tauri/backend_dev_tools.key`（同目录的 `.pub` 是公钥，公钥已写进 `src-tauri/tauri.conf.json`）
-- **私钥口令**（仅当密钥设了口令）：写进 `~/.tauri/backend_dev_tools.key.password` 的**首行**，脚本自动读取；
-  也可以临时用 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD=xxx` 给。密钥不带口令就不用管这一项
-- **Gitee 令牌**：`GITEE_TOKEN` 环境变量，或写进 `.workbuddy/release.env` / `~/.gitee_token`（勾 `projects` 权限）
 
 
 

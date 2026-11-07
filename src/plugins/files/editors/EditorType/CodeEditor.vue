@@ -1,27 +1,27 @@
 <template>
   <div class="code-editor">
     <!-- 顶栏：状态与保存 -->
-    <div class="code-editor-bar">
-      <span class="code-editor-status">
-        <span v-if="doc?.isLoading" class="status-item">加载中…</span>
-        <template v-else>
-          <span v-if="doc?.isDirty" class="status-item dirty">已修改</span>
-          <span v-else class="status-item">已保存</span>
-          <span v-if="doc?.isReadOnly" class="status-item readonly">只读</span>
-        </template>
-      </span>
-      <span class="code-editor-language">{{ languageLabel }}</span>
-      <app-button
-        v-if="!doc?.isReadOnly"
-        size="small"
-        type="primary"
-        :loading="saving"
-        :disabled="!doc?.isDirty"
-        @click="handleSave"
-      >
-        保存 (Ctrl+S)
-      </app-button>
-    </div>
+<!--    <div class="code-editor-bar">-->
+<!--      <span class="code-editor-status">-->
+<!--        <span v-if="doc?.isLoading" class="status-item">加载中…</span>-->
+<!--        <template v-else>-->
+<!--          <span v-if="doc?.isDirty" class="status-item dirty">已修改</span>-->
+<!--          <span v-else class="status-item">已保存</span>-->
+<!--          <span v-if="doc?.isReadOnly" class="status-item readonly">只读</span>-->
+<!--        </template>-->
+<!--      </span>-->
+<!--      <span class="code-editor-language">{{ languageLabel }}</span>-->
+<!--      <app-button-->
+<!--        v-if="!doc?.isReadOnly"-->
+<!--        size="small"-->
+<!--        type="primary"-->
+<!--        :loading="saving"-->
+<!--        :disabled="!doc?.isDirty"-->
+<!--        @click="handleSave"-->
+<!--      >-->
+<!--        保存 (Ctrl+S)-->
+<!--      </app-button>-->
+<!--    </div>-->
     <!-- Monaco 编辑器主体 -->
     <MonacoEditor
       ref="monacoRef"
@@ -220,11 +220,11 @@ onBeforeUnmount(() => {
 }
 
 .status-item.dirty {
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
 }
 
 .status-item.readonly {
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
 }
 
 .code-editor-language {

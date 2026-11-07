@@ -879,7 +879,7 @@ onMounted(() => {
 }
 
 .bookmark-icon {
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
   flex-shrink: 0;
 }
 
@@ -939,12 +939,13 @@ onMounted(() => {
 
 .loading-spinner {
   font-size: theme.getVar('fontSizeLg');
-  color: #409eff;
+  color: var(--el-color-primary);
 }
 
 .error-message {
   font-size: theme.getVar('fontSizeLg');
-  color: #f56c6c;
+  /* #f56c6c 是填充色，当文字用白底仅 2.90:1，不达 AA —— 用状态色族的文字色 */
+  color: var(--stateErrorFg);
   text-align: center;
   padding: 20px;
 }

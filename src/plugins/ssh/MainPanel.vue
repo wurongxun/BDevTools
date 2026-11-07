@@ -1,6 +1,8 @@
 <template>
   <div class="ssh-main-panel">
     <ConnectionPanel />
+    <!-- P3 设置中心：全局单例，由终端工具栏的 window 事件唤起 -->
+    <SshSettingsDialog />
   </div>
 </template>
 
@@ -8,6 +10,7 @@
 import { onMounted } from 'vue'
 import { useConnectionStore } from './store'
 import ConnectionPanel from './components/RemoteConnection/ConnectionPanel.vue'
+import SshSettingsDialog from './components/RemoteConnection/settings/SettingsDialog.vue'
 import { useRemoteAutoSave } from './composables/useRemoteAutoSave'
 
 const connectionStore = useConnectionStore()
@@ -16,8 +19,9 @@ const connectionStore = useConnectionStore()
 useRemoteAutoSave()
 
 onMounted(() => {
-  connectionStore.loadConnections()
+  // 连接列表由 store 创建时立即加载（ensureLoaded），这里只挂全局事件监听
   connectionStore.setupSshOutputListener()
+  connectionStore.setupSshClosedListener()
   connectionStore.setupTransferProgressListener()
 })
 </script>

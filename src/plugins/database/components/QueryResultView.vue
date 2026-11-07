@@ -80,6 +80,7 @@
         :columns="tableColumns"
         :rows="displayRows"
         :new-row-keys="insertRowKeys"
+        :column-metas="resultColumnMetas"
         :total-count="totalRowCount"
         :cell-tooltip="!canEdit"
         row-key="__key"
@@ -606,6 +607,15 @@ const pkResultIndex = computed(() => {
 
 /** 结果列名 → 表元数据（找不到 = 表达式列 / 跨表列） */
 const columnMeta = computed(() => mapResultColumns(tableColumns.value, tableCols.value))
+
+/**
+ * 同上，但**按结果列顺序**展开成数组 —— 表格按下标渲染，
+ * 而 `columnMeta` 是按列名索引的 Map。
+ *
+ * 单表浏览时有真实的 `ColumnInfo`（类型 / 可空 / 主键齐全）；
+ * 纯 SQL 查询时整份为空，表格会退化成「按采样值推断并在表头标明是推断」。
+ */
+const resultColumnMetas = computed(() => tableColumns.value.map(name => columnMeta.value.get(name)))
 
 /**
  * 行定位策略：主键 → 单列唯一索引 → 无。
@@ -1232,7 +1242,7 @@ function truncateLabel(s: string, n = 28): string {
 }
 
 /** 弹出列头菜单（DBeaver 风格：排序 / 按当前值过滤 / 自定义 / NULL / 移除全部） */
-function openColumnMenu(colIdx: number, event: MouseEvent) {
+function openColumnMenu(colIdx: number, event: MouseEvent | KeyboardEvent) {
   const field = tableColumns.value[colIdx]
   if (!field) return
   // 「当前值」：优先取选中行，否则取当前页第一行
@@ -1333,10 +1343,14 @@ function openColumnMenu(colIdx: number, event: MouseEvent) {
       { label: '移除所有过滤 / 排序', icon: '✕', danger: true, onClick: () => clearColumnFilters() }
     )
   }
-  showContextMenu({ x: event.clientX, y: event.clientY, items })
+  // 鼠标事件有坐标；键盘（Enter/Space）触发时无 clientX/Y，退回用触发元素定位到按钮旁
+  if (event instanceof MouseEvent) {
+    showContextMenu({ x: event.clientX, y: event.clientY, items })
+  } else {
+    const rect = (event.target as HTMLElement | null)?.getBoundingClientRect()
+    showContextMenu({ x: rect ? rect.left : 0, y: rect ? rect.bottom : 0, items })
+  }
 }
-
-// ===================================================================
 // 排序 / 选中
 // ===================================================================
 const sortState = ref<{ prop: string; order: 'ascending' | 'descending' | null }>({ prop: '', order: null })
@@ -2183,7 +2197,7 @@ watch(
   cursor: text;
 }
 .qr-cell-text.is-dirty {
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
   font-weight: 600;
 }
 .qr-cell-text.is-dirty::after {
@@ -2191,7 +2205,7 @@ watch(
   margin-left: 3px;
 }
 .qr-cell-text.has-error {
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   text-decoration: underline wavy var(--el-color-danger);
 }
 
@@ -2209,7 +2223,7 @@ watch(
 }
 /* 能新增但改不了已有行 */
 .meta-partial {
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
 }
 .meta-partial b {
   color: var(--el-color-primary);
@@ -2219,10 +2233,10 @@ watch(
   font-weight: 600;
 }
 .meta-perf {
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
 }
 .meta-filtered {
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
 }
 .mono {
   font-family: var(--font-family-mono);
@@ -2270,7 +2284,7 @@ watch(
 .fetch-all-warn {
   flex-shrink: 0;
   font-size: 28px;
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
   margin-top: 2px;
 }
 .fetch-all-text {

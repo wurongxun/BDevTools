@@ -5,7 +5,7 @@
 | 目录 | 前端插件 | 职责 |
 |---|---|---|
 | `files` | files | 文件/目录树、脚本文件、文件关联 |
-| `ssh` | ssh | SSH / SFTP 远程连接与会话 |
+| `ssh` | ssh | SSH / SFTP 远程连接与会话（**已拆到 `crates/plugin-ssh`**，此处仅 re-export） |
 | `logs` | logs | 日志索引、查询、流式读取 |
 | `database` | database | 数据库连接、查询、元数据、导入导出 |
 | `mat` | mat | Java 堆转储（HPROF）分析 |
@@ -30,14 +30,14 @@
   否则 App.vue / 会话恢复会因 files 被裁而连带崩掉。
 */
 #[cfg(feature = "plugin-database")]
-pub mod database;
+pub use bdevtools_plugin_database as database;
 #[cfg(feature = "plugin-files")]
 pub mod files;
 #[cfg(feature = "plugin-logs")]
-pub mod logs;
+pub use bdevtools_plugin_logs as logs;
 #[cfg(feature = "plugin-mat")]
-pub mod mat;
+pub use bdevtools_plugin_mat as mat;
 #[cfg(feature = "plugin-ssh")]
-pub mod ssh;
+pub use bdevtools_plugin_ssh as ssh;
 #[cfg(feature = "plugin-terminal")]
 pub mod terminal;

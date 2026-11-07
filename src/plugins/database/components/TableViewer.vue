@@ -85,7 +85,7 @@
           <el-icon class="reserve-icon" title="预留功能"><MoreFilled /></el-icon>
         </template>
         <div class="reserve-panel">
-          <p style="color: #909399; font-size: var(--font-size-md);">预留功能区（图表 / ER 图 / 统计 等后续可加）</p>
+          <p style="color: var(--textSecondary); font-size: var(--font-size-md);">预留功能区（图表 / ER 图 / 统计 等后续可加）</p>
         </div>
       </el-tab-pane>
     </el-tabs>

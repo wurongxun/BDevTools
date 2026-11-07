@@ -790,7 +790,7 @@ async function confirmUninstallPlugin() {
 
   &.is-off {
     @include theme.useTheme {
-      color: var(--el-color-danger);
+      color: var(--stateErrorFg);
     }
   }
 }
@@ -876,7 +876,7 @@ async function confirmUninstallPlugin() {
 
 .plugin-setting-key {
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-base);
 
   @include theme.useTheme {
     color: theme.getVar('textTertiary');
@@ -884,7 +884,7 @@ async function confirmUninstallPlugin() {
 }
 
 .plugin-setting-desc {
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-base);
   line-height: 1.5;
 
   @include theme.useTheme {

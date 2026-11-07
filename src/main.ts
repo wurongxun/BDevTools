@@ -10,6 +10,7 @@ import 'normalize.css/normalize.css'
 import '@/styles/index.scss'
 import SvgIcon from '@/components/SvgIcon.vue'
 import AppButton from '@/components/AppButton.vue'
+import AppStatusDot from '@/components/AppStatusDot.vue'
 import registerDirectives from '@/directives/index'
 import errorHandler from './errorHandler'
 import i18n from '../src/locales'
@@ -20,6 +21,7 @@ import { subscribe } from '@/core/runtime'
 import { initWindowPresetsSync } from '@/core/windowPresets'
 import { setHostLocaleProvider, setHostThemeProvider } from '@/core/plugin/window'
 import { initTheme, isDark } from '@/composables/useDark'
+import { initHighContrast } from '@/composables/useHighContrast'
 import { installNativeContextMenuGuard } from '@/core/nativeContextMenu'
 
 import ContextMenu from './components/context-menu/ContextMenu.vue'
@@ -46,6 +48,7 @@ async function initializeApp() {
   // 全局注册
   app.component('svg-icon', SvgIcon)
   app.component('AppButton', AppButton)
+  app.component('AppStatusDot', AppStatusDot)
   app.component('ContextMenu', ContextMenu)
   app.component('ContextMenuTrigger', ContextMenuTrigger)
   for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
@@ -62,6 +65,8 @@ async function initializeApp() {
   await appConfig.initializeApp()
   // 恢复主题偏好（KV 持久化），挂载前 await 避免首帧主题闪烁
   await initTheme()
+  // 高对比度是与明暗正交的第二个开关，同样要在首帧前定下来（否则会闪一下常规配色）
+  await initHighContrast()
 
   // 独立窗口型插件建窗时对齐宿主主题。core/ 不依赖 composables，故把取值函数注入进去
   // （与 initPluginHost(BUILTIN_PLUGINS) 同一思路）。只在建窗那一刻取值，宿主后来

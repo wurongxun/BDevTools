@@ -184,7 +184,7 @@ watch(
   }
 
   &--error {
-    color: var(--el-color-danger);
+    color: var(--stateErrorFg);
   }
 }
 
@@ -205,11 +205,11 @@ watch(
   font-weight: 600;
 
   &.is-ok {
-    color: var(--el-color-success);
+    color: var(--stateSuccessFg);
   }
 
   &.is-fail {
-    color: var(--el-color-danger);
+    color: var(--stateErrorFg);
   }
 
   &.is-unknown {

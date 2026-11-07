@@ -22,11 +22,24 @@ export interface MatDump {
   supported: boolean
   /** 不支持时的说明 / 识别附加信息 */
   detail: string
+  /** 是否是 gzip 压缩包（.hprof.gz；解析前由后端透明解压到缓存） */
+  compressed?: boolean
+  /** 压缩包的来源信息（源大小 → 解压后大小、是否命中缓存） */
+  sourceInfo?: import('./api/matApi').MatSourceInfo
   /** 打开过程中的错误信息（header 识别失败等） */
   error?: string
   /** 是否正在加载元信息 */
   loading: boolean
 }
 
-/** 概览 → 直方图等分析视图的 key（与 DumpViewer 子 tab 对应） */
-export type MatViewKey = 'overview' | 'histogram' | 'leak' | 'dominator' | 'refs' | 'oql' | 'reserve'
+/** 概览 → 各分析视图的 key（与 DumpViewer 子 tab 对应） */
+export type MatViewKey =
+  | 'overview'
+  | 'histogram'
+  | 'leak'
+  | 'dominator'
+  | 'refs'
+  | 'oql'
+  | 'top'
+  | 'reports'
+  | 'compare'

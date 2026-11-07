@@ -28,8 +28,8 @@ const emit = defineEmits<{ (e: 'click'): void }>()
   justify-content: center;
   border: none;
   background: transparent;
-  color: #57606a;
-  border-radius: 3px;
+  color: var(--textSecondary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   position: relative;
   transition: all .15s;
@@ -39,9 +39,9 @@ const emit = defineEmits<{ (e: 'click'): void }>()
     right: 1px;
     bottom: 1px;
     font-size: 8px !important;
-    color: #8c959f;
+    color: var(--textSecondary);
   }
-  &:hover { background: #eaeef2; color: #0969da; .arrow { color: #0969da; } }
-  &:disabled { opacity: .4; cursor: not-allowed; &:hover { background: transparent; color: #57606a; } }
+  &:hover { background: var(--hoverColor); color: var(--el-color-primary); .arrow { color: var(--el-color-primary); } }
+  &:disabled { opacity: .4; cursor: not-allowed; &:hover { background: transparent; color: var(--textDisabled); } }
 }
 </style>

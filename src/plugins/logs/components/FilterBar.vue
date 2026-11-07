@@ -341,6 +341,6 @@ const statusText = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
 }
 </style>

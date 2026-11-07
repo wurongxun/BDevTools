@@ -3,3 +3,4 @@
  */
 export { useConnectionStore } from './connection'
 export { useFtpStore } from './ftp'
+export { useSshPreferencesStore, uid } from './preferences'

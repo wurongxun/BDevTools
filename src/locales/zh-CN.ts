@@ -39,6 +39,9 @@ export default {
   darkMode: {
     name: '暗黑模式'
   },
+  highContrast: {
+    name: '高对比度'
+  },
   about: {
     name: '关于'
   },
@@ -747,6 +750,7 @@ export default {
       sectionUpdate: '更新',
       sectionOther: '其他设置',
       darkModeDesc: '切换界面深浅色（与顶栏主题按钮同步）',
+      highContrastDesc: '提高文字与边框的对比度（与明暗模式可同时开启）',
       localeDesc: '选择界面显示语言',
       networkCheck: '网络检测',
       networkCheckDesc: '检测当前网络连接状态（功能开发中，暂不可用）',
@@ -781,7 +785,8 @@ export default {
       checkUpdateFailed: '检查更新失败：{msg}',
       noUpdateInfo: '拿不到更新包信息，请重新检查更新',
       installedRestart: '已安装 {version}，应用即将重启',
-      updateFailed: '更新失败：{msg}'
+      updateFailed: '更新失败：{msg}',
+      confirm: '确认'
     },
     plugin: {
       manageDesc1: '内置插件随应用编译，不可卸载；第三方插件以包形式安装（plugin.json + 页面资源 + 可选 plugin.wasm），页面跑在不透明源的沙箱 iframe 中——只占用主面板，不提供侧栏、不接管标签条；后端逻辑跑在 Extism WASM 沙箱中，宿主能力（日志 / KV / 文件 / HTTP）按清单声明逐次校验后放行。安装后默认在所有窗口启用（窗口预设里已显式勾选插件清单的会自动追加该插件）。',

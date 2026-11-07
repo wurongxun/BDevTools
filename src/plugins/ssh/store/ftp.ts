@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { invoke } from '@/api/rpc'
-import type { TransferTask, FtpPanelState } from '../types'
+import type { TransferTask, TransferItem, FtpPanelState } from '../types'
 import NotificationUtil from '@/utils/NotificationUtil'
 
 let taskIdCounter = 0
@@ -10,13 +10,29 @@ function generateTaskId(): string {
   return `task-${Date.now()}-${taskIdCounter}`
 }
 
+const CONCURRENCY_KEY = 'ssh-transfer-concurrency'
+function readConcurrency(): number {
+  const n = Number(localStorage.getItem(CONCURRENCY_KEY))
+  return Number.isFinite(n) && n >= 1 && n <= 8 ? Math.floor(n) : 3
+}
+
+/** 全局正在跑的任务 id。跨所有 FTP 面板共享上限，避免多个 tab 同时打满同一条 SSH 连接 */
+const RUNNING = new Set<string>()
+/** 499 = 后端协作式取消（用户暂停 / 取消） */
+const CANCELLED_CODE = 499
+
 export const useFtpStore = defineStore('ftp', () => {
   // 每个 tab 独立的 FTP 面板状态
   const panels = ref<Map<string, FtpPanelState>>(new Map())
+  const concurrency = ref(readConcurrency())
 
-  /**
-   * 初始化 FTP 面板
-   */
+  function setConcurrency(n: number) {
+    const v = Math.max(1, Math.min(8, Math.floor(Number(n) || 3)))
+    concurrency.value = v
+    try { localStorage.setItem(CONCURRENCY_KEY, String(v)) } catch { /* ignore */ }
+    pumpAll()
+  }
+
   function initPanel(tabId: string) {
     if (!panels.value.has(tabId)) {
       panels.value.set(tabId, {
@@ -33,30 +49,32 @@ export const useFtpStore = defineStore('ftp', () => {
     return panels.value.get(tabId)!
   }
 
-  /**
-   * 获取面板状态
-   */
   function getPanel(tabId: string): FtpPanelState | null {
     return panels.value.get(tabId) || null
   }
 
-  /**
-   * 销毁面板
-   */
   function destroyPanel(tabId: string) {
+    // 关掉面板时取消仍在跑的任务，防止 spawn_blocking 继续写已销毁的 UI 状态
+    const panel = panels.value.get(tabId)
+    if (panel) {
+      for (const t of panel.transferTasks) {
+        if (t.status === 'transferring' || t.status === 'pending') {
+          RUNNING.delete(t.id)
+          if (t.status === 'transferring') {
+            void invoke('sftp_cancel_transfer', { taskId: t.id }).catch(() => {})
+          }
+          t.status = 'cancelled'
+        }
+      }
+    }
     panels.value.delete(tabId)
   }
 
-  /**
-   * 列出远程目录文件
-   */
   async function listRemoteFiles(tabId: string, sessionId: string, path: string) {
     const panel = panels.value.get(tabId)
     if (!panel) return
-
     try {
       const res = await invoke<any>('sftp_list_dir', { sessionId, path })
-      console.log("listRemoteFiles ",path,res)
       if (res.code === 200) {
         panel.remoteFiles = res.data
         panel.remotePath = path
@@ -70,13 +88,9 @@ export const useFtpStore = defineStore('ftp', () => {
     }
   }
 
-  /**
-   * 列出本地目录文件
-   */
   async function listLocalFiles(tabId: string, path: string) {
     const panel = panels.value.get(tabId)
     if (!panel) return
-
     try {
       const res = await invoke<any>('local_list_dir', { path })
       if (res.code === 200) {
@@ -92,261 +106,298 @@ export const useFtpStore = defineStore('ftp', () => {
     }
   }
 
-  /**
-   * 导航到远程目录
-   */
   async function navigateRemote(tabId: string, sessionId: string, path: string) {
     await listRemoteFiles(tabId, sessionId, path)
   }
 
-  /**
-   * 导航到本地目录
-   */
   async function navigateLocal(tabId: string, path: string) {
     await listLocalFiles(tabId, path)
   }
 
-  /**
-   * 上传文件
-   */
-  async function uploadFiles(tabId: string, sessionId: string, localFiles: string[], remotePath: string) {
-    const panel = panels.value.get(tabId)
-    if (!panel) return
+  // ==================== 传输队列（P1-C） ====================
 
-    for (const localFile of localFiles) {
-      const fileName = localFile.split(/[/\\]/).pop() || 'unknown'
-      const task: TransferTask = {
-        id: generateTaskId(),
-        tabId,
-        type: 'upload',
-        fileName,
-        remotePath: `${remotePath}/${fileName}`,
-        localPath: localFile,
-        totalSize: 0,
-        transferredSize: 0,
-        progress: 0,
-        status: 'pending',
-        speed: '',
-        error: '',
-        startTime: Date.now()
-      }
-      panel.transferTasks.unshift(task)
-      // 取数组内的响应式代理再改属性；直接改原始 task 变量 Vue 追踪不到，
-      // 会导致 activeCount/completedCount 与状态文本永远不更新（队列卡在「进行中」）。
-      const rt = panel.transferTasks[0]
+  function makeTask(
+    tabId: string,
+    sessionId: string,
+    type: 'upload' | 'download',
+    item: TransferItem
+  ): TransferTask {
+    return {
+      id: generateTaskId(),
+      tabId,
+      sessionId,
+      type,
+      fileName: item.fileName,
+      remotePath: type === 'upload' ? item.targetPath : item.sourcePath,
+      localPath: type === 'upload' ? item.sourcePath : item.targetPath,
+      totalSize: item.size,
+      transferredSize: 0,
+      progress: 0,
+      status: 'pending',
+      speed: '',
+      error: '',
+      startTime: Date.now(),
+      resume: false,
+      pauseRequested: false
+    }
+  }
 
-      try {
-        rt.status = 'transferring'
-        await invoke('sftp_upload', {
-          sessionId,
-          localPath: localFile,
-          remotePath: task.remotePath,
-          taskId: task.id
-        })
-        rt.status = 'completed'
-        rt.progress = 100
-        NotificationUtil.success(`${fileName} 上传完成`)
-      } catch (error) {
-        rt.status = 'failed'
-        rt.error = String(error)
-        NotificationUtil.error(`${fileName} 上传失败: ${error}`)
+  /** 入队一批上传任务；items 已由调用方递归展开并算好完整目标路径 */
+  function enqueueUploads(tabId: string, sessionId: string, items: TransferItem[]) {
+    const panel = initPanel(tabId)
+    for (const item of items) {
+      panel.transferTasks.unshift(makeTask(tabId, sessionId, 'upload', item))
+    }
+    pumpAll()
+  }
+
+  /** 入队一批下载任务 */
+  function enqueueDownloads(tabId: string, sessionId: string, items: TransferItem[]) {
+    const panel = initPanel(tabId)
+    for (const item of items) {
+      panel.transferTasks.unshift(makeTask(tabId, sessionId, 'download', item))
+    }
+    pumpAll()
+  }
+
+  /** 全局调度：并发上限以内按入队顺序启动 pending 任务 */
+  function pumpAll() {
+    for (const panel of panels.value.values()) {
+      while (RUNNING.size < concurrency.value) {
+        // unshift 入队 ⇒ 数组头部是最新任务；从尾部取才是 FIFO
+        const task = [...panel.transferTasks].reverse().find(t => t.status === 'pending')
+        if (!task) break
+        task.status = 'transferring'
+        RUNNING.add(task.id)
+        void runTask(panel, task)
       }
     }
+  }
 
-    // 刷新远程文件列表
-    await listRemoteFiles(tabId, sessionId, panel.remotePath)
+  async function runTask(panel: FtpPanelState, task: TransferTask) {
+    try {
+      const res = task.type === 'upload'
+        ? await invoke<any>('sftp_upload', {
+            sessionId: task.sessionId,
+            localPath: task.localPath,
+            remotePath: task.remotePath,
+            taskId: task.id,
+            resume: task.resume
+          })
+        : await invoke<any>('sftp_download', {
+            sessionId: task.sessionId,
+            remotePath: task.remotePath,
+            localPath: task.localPath,
+            taskId: task.id,
+            resume: task.resume
+          })
+
+      if (res.code === 200) {
+        task.status = 'completed'
+        task.progress = 100
+        task.transferredSize = task.totalSize || task.transferredSize
+      } else if (res.code === CANCELLED_CODE) {
+        task.status = task.pauseRequested ? 'paused' : 'cancelled'
+      } else {
+        task.status = 'failed'
+        task.error = String(res.msg || '传输失败')
+      }
+    } catch (error) {
+      if (task.pauseRequested) {
+        task.status = 'paused'
+      } else {
+        task.status = 'failed'
+        task.error = String(error)
+      }
+    } finally {
+      RUNNING.delete(task.id)
+      // 队列排空后刷新两侧列表（旧实现每次传输完都刷，多文件时会刷 N 次）
+      if (!panel.transferTasks.some(t => t.status === 'transferring' || t.status === 'pending')) {
+        void listRemoteFiles(panel.tabId, task.sessionId, panel.remotePath)
+        if (panel.localPath) void listLocalFiles(panel.tabId, panel.localPath)
+      }
+      pumpAll()
+    }
+  }
+
+  /** 暂停 / 取消是同一个后端动作，区别只在回落到哪个状态 */
+  async function stopTask(tabId: string, taskId: string, pause: boolean) {
+    const panel = panels.value.get(tabId)
+    const task = panel?.transferTasks.find(t => t.id === taskId)
+    if (!task) return
+    if (task.status === 'transferring') {
+      task.pauseRequested = pause
+      await invoke('sftp_cancel_transfer', { taskId }).catch(() => {})
+    } else if (task.status === 'pending') {
+      // 还没开跑：直接落状态，避免随后被 pumpAll 拉起来
+      task.status = pause ? 'paused' : 'cancelled'
+    }
+  }
+
+  function pauseTask(tabId: string, taskId: string) {
+    return stopTask(tabId, taskId, true)
+  }
+
+  function cancelTask(tabId: string, taskId: string) {
+    return stopTask(tabId, taskId, false)
+  }
+
+  /** 重试：复用同一 taskId，置 resume=true 让后端按已有字节续传 */
+  function retryTask(tabId: string, taskId: string) {
+    const panel = panels.value.get(tabId)
+    const task = panel?.transferTasks.find(t => t.id === taskId)
+    if (!task || !['paused', 'cancelled', 'failed'].includes(task.status)) return
+    task.status = 'pending'
+    task.resume = true
+    task.pauseRequested = false
+    task.error = ''
+    task.speed = ''
+    task.progress = task.totalSize > 0
+      ? Math.min(99, Math.round(task.transferredSize / task.totalSize * 100))
+      : 0
+    pumpAll()
+  }
+
+  function removeTask(tabId: string, taskId: string) {
+    const panel = panels.value.get(tabId)
+    if (!panel) return
+    const task = panel.transferTasks.find(t => t.id === taskId)
+    if (!task || task.status === 'transferring') return
+    panel.transferTasks = panel.transferTasks.filter(t => t.id !== taskId)
+  }
+
+  /** 大小预取：列目录结果里已有 size 时直接透传，拖放进来的路径单独 stat */
+  async function statLocal(path: string): Promise<number> {
+    try {
+      const res = await invoke<any>('local_stat', { path })
+      return res.code === 200 ? Number(res.data?.size) || 0 : 0
+    } catch { return 0 }
+  }
+
+  /** 修改远端权限（mode 为八进制数值，如 0o755 = 493） */
+  async function chmodRemote(tabId: string, sessionId: string, path: string, mode: number) {
+    try {
+      const res = await invoke<any>('sftp_chmod', { sessionId, path, mode })
+      if (res.code === 200) {
+        NotificationUtil.success('权限已修改')
+        const panel = panels.value.get(tabId)
+        if (panel) await listRemoteFiles(tabId, sessionId, panel.remotePath)
+      } else {
+        NotificationUtil.error(res.msg || '修改权限失败')
+      }
+    } catch (error) {
+      NotificationUtil.error(`修改权限失败: ${error}`)
+    }
   }
 
   /**
-   * 下载文件
+   * 更新传输进度。后端 transfer-progress 的 tabId 为空串（历史实现），
+   * 因此优先按 taskId 跨面板查找；totalSize 由后端下发，作为权威值覆盖预取值。
    */
-  async function downloadFiles(tabId: string, sessionId: string, remoteFiles: string[], localPath: string) {
-    const panel = panels.value.get(tabId)
-    if (!panel) return
-
-    for (const remoteFile of remoteFiles) {
-      const fileName = remoteFile.split('/').pop() || 'unknown'
-      const task: TransferTask = {
-        id: generateTaskId(),
-        tabId,
-        type: 'download',
-        fileName,
-        remotePath: remoteFile,
-        localPath: `${localPath}/${fileName}`,
-        totalSize: 0,
-        transferredSize: 0,
-        progress: 0,
-        status: 'pending',
-        speed: '',
-        error: '',
-        startTime: Date.now()
-      }
-      panel.transferTasks.unshift(task)
-      // 取数组内的响应式代理再改属性；直接改原始 task 变量 Vue 追踪不到，
-      // 会导致 activeCount/completedCount 与状态文本永远不更新（队列卡在「进行中」）。
-      const rt = panel.transferTasks[0]
-
-      try {
-        rt.status = 'transferring'
-        await invoke('sftp_download', {
-          sessionId,
-          remotePath: remoteFile,
-          localPath: task.localPath,
-          taskId: task.id
-        })
-        rt.status = 'completed'
-        rt.progress = 100
-        NotificationUtil.success(`${fileName} 下载完成`)
-      } catch (error) {
-        rt.status = 'failed'
-        rt.error = String(error)
-        NotificationUtil.error(`${fileName} 下载失败: ${error}`)
+  function updateTransferProgress(
+    tabId: string,
+    taskId: string,
+    progress: number,
+    transferredSize: number,
+    speed: string,
+    totalSize?: number
+  ) {
+    let panel: FtpPanelState | undefined = tabId ? panels.value.get(tabId) : undefined
+    if (!panel) {
+      for (const p of panels.value.values()) {
+        if (p.transferTasks.some(t => t.id === taskId)) { panel = p; break }
       }
     }
-
-    // 刷新本地文件列表
-    await listLocalFiles(tabId, panel.localPath)
+    if (!panel) return
+    const task = panel.transferTasks.find(t => t.id === taskId)
+    if (!task) return
+    if (Number.isFinite(totalSize) && (totalSize as number) > 0) {
+      task.totalSize = totalSize as number
+    }
+    if (task.status === 'pending' || task.status === 'transferring') {
+      task.progress = progress
+      task.transferredSize = transferredSize
+      task.speed = speed
+    }
   }
 
-  /**
-   * 创建远程目录
-   */
+  function selectRemoteFiles(tabId: string, files: string[]) {
+    const panel = panels.value.get(tabId)
+    if (panel) panel.selectedRemoteFiles = files
+  }
+
+  function selectLocalFiles(tabId: string, files: string[]) {
+    const panel = panels.value.get(tabId)
+    if (panel) panel.selectedLocalFiles = files
+  }
+
+  function clearCompletedTasks(tabId: string) {
+    const panel = panels.value.get(tabId)
+    if (panel) {
+      panel.transferTasks = panel.transferTasks.filter(
+        t => !['completed', 'failed', 'cancelled'].includes(t.status)
+      )
+    }
+  }
+
   async function createRemoteDir(tabId: string, sessionId: string, path: string, name: string) {
     try {
       const res = await invoke<any>('sftp_mkdir', { sessionId, path: `${path}/${name}` })
       if (res.code === 200) {
         NotificationUtil.success('目录创建成功')
-        const panel = panels.value.get(tabId)
-        if (panel) {
-          await listRemoteFiles(tabId, sessionId, panel.remotePath)
+        if (panels.value.has(tabId)) {
+          const p = panels.value.get(tabId)!
+          await listRemoteFiles(tabId, sessionId, p.remotePath)
         }
       } else {
         NotificationUtil.error(res.msg || '创建目录失败')
       }
     } catch (error) {
-      console.error('Failed to create remote dir:', error)
       NotificationUtil.error('创建目录失败')
     }
   }
 
-  /**
-   * 删除远程文件/目录
-   */
   async function deleteRemoteFile(tabId: string, sessionId: string, path: string) {
     try {
       const res = await invoke<any>('sftp_remove', { sessionId, path })
       if (res.code === 200) {
         NotificationUtil.success('删除成功')
-        const panel = panels.value.get(tabId)
-        if (panel) {
-          await listRemoteFiles(tabId, sessionId, panel.remotePath)
+        if (panels.value.has(tabId)) {
+          const p = panels.value.get(tabId)!
+          await listRemoteFiles(tabId, sessionId, p.remotePath)
         }
       } else {
         NotificationUtil.error(res.msg || '删除失败')
       }
-    } catch (error) {
-      console.error('Failed to delete remote file:', error)
-      NotificationUtil.error('删除失败')
-    }
+    } catch { NotificationUtil.error('删除失败') }
   }
 
-  /**
-   * 重命名远程文件/目录
-   */
   async function renameRemoteFile(tabId: string, sessionId: string, oldPath: string, newPath: string) {
     try {
       const res = await invoke<any>('sftp_rename', { sessionId, oldPath, newPath })
       if (res.code === 200) {
         NotificationUtil.success('重命名成功')
-        const panel = panels.value.get(tabId)
-        if (panel) {
-          await listRemoteFiles(tabId, sessionId, panel.remotePath)
+        if (panels.value.has(tabId)) {
+          const p = panels.value.get(tabId)!
+          await listRemoteFiles(tabId, sessionId, p.remotePath)
         }
       } else {
         NotificationUtil.error(res.msg || '重命名失败')
       }
-    } catch (error) {
-      console.error('Failed to rename remote file:', error)
-      NotificationUtil.error('重命名失败')
-    }
+    } catch { NotificationUtil.error('重命名失败') }
   }
 
-  /**
-   * 检测 SFTP 连接状态
-   */
   async function checkSftpConnection(sessionId: string): Promise<boolean> {
     try {
       const res = await invoke<any>('sftp_check', { sessionId })
       return res.code === 200 && res.data === true
-    } catch {
-      return false
-    }
-  }
-
-  /**
-   * 更新传输进度（由事件监听触发）
-   * 后端 transfer-progress 事件往往未携带正确的 tabId（历史实现传空串），
-   * 因此优先按 taskId 跨面板查找任务，保证进度条实时更新且最终能落到正确任务上。
-   */
-  function updateTransferProgress(tabId: string, taskId: string, progress: number, transferredSize: number, speed: string) {
-    // 优先使用 tabId 定位面板；tabId 为空时退化为按 taskId 全局查找
-    let panel: FtpPanelState | undefined =
-      tabId ? panels.value.get(tabId) : undefined
-    if (!panel) {
-      for (const p of panels.value.values()) {
-        if (p.transferTasks.some(t => t.id === taskId)) {
-          panel = p
-          break
-        }
-      }
-    }
-    if (!panel) return
-
-    const task = panel.transferTasks.find(t => t.id === taskId)
-    if (task) {
-      // 仅传输中/等待中的任务更新进度；已完成/失败/取消的任务不再回退
-      if (task.status === 'pending' || task.status === 'transferring') {
-        task.progress = progress
-        task.transferredSize = transferredSize
-        task.speed = speed
-      }
-    }
-  }
-
-  /**
-   * 选择远程文件
-   */
-  function selectRemoteFiles(tabId: string, files: string[]) {
-    const panel = panels.value.get(tabId)
-    if (panel) {
-      panel.selectedRemoteFiles = files
-    }
-  }
-
-  /**
-   * 选择本地文件
-   */
-  function selectLocalFiles(tabId: string, files: string[]) {
-    const panel = panels.value.get(tabId)
-    if (panel) {
-      panel.selectedLocalFiles = files
-    }
-  }
-
-  /**
-   * 清除已完成的任务
-   */
-  function clearCompletedTasks(tabId: string) {
-    const panel = panels.value.get(tabId)
-    if (panel) {
-      panel.transferTasks = panel.transferTasks.filter(
-        t => t.status !== 'completed' && t.status !== 'failed'
-      )
-    }
+    } catch { return false }
   }
 
   return {
     panels,
+    concurrency,
+    setConcurrency,
     initPanel,
     getPanel,
     destroyPanel,
@@ -354,8 +405,14 @@ export const useFtpStore = defineStore('ftp', () => {
     listLocalFiles,
     navigateRemote,
     navigateLocal,
-    uploadFiles,
-    downloadFiles,
+    enqueueUploads,
+    enqueueDownloads,
+    pauseTask,
+    cancelTask,
+    retryTask,
+    removeTask,
+    statLocal,
+    chmodRemote,
     createRemoteDir,
     deleteRemoteFile,
     renameRemoteFile,

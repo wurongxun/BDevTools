@@ -423,7 +423,7 @@ const saveMdText = async () => {
 
 .placeholder-content {
   text-align: center;
-  color: #909399;
+  color: var(--textSecondary);
 }
 
 .placeholder-text {

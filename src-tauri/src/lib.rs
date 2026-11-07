@@ -8,13 +8,16 @@ mod plugin_host;
 mod plugins;
 mod core;
 mod entity;
-mod response;
+pub use bdevtools_core::response;
 mod utils;
-mod sqlite;
+pub use bdevtools_core::sqlite;
 mod window_manager;
 mod workspace;
 mod session;
 mod immersive_shortcut;
+// MAT sidecar 作业管理（父进程侧；子进程逻辑在 bdevtools_plugin_mat::mat_worker）
+#[cfg(feature = "plugin-mat")]
+mod mat_worker_host;
 pub mod commands;
 
 use crate::app::app_store::{app_open_file, app_settings, APP};
@@ -64,14 +67,25 @@ use crate::commands::{
 use crate::commands::{
     mat_hprof_header, mat_hprof_histogram, mat_leak_suspects, mat_analysis_limits,
     mat_refs_build, mat_refs_inspect, mat_refs_instances, mat_refs_release,
-    mat_refs_search_classes,
+    mat_refs_search_classes, mat_dom_tree, mat_dom_retained_set, mat_object_values,
+    mat_gc_root_paths, mat_oql_query, mat_oql_check, mat_top_consumers,
+    mat_threads, mat_classloaders, mat_waste_report, mat_unreachable_histogram,
+    mat_compare_histograms,
+    mat_source_info, mat_cache_info, mat_cache_clear,
+    mat_index_info, mat_index_clear,
+    mat_worker_start, mat_worker_cancel, mat_worker_status, mat_worker_status_for_path,
 };
 #[cfg(feature = "plugin-ssh")]
 use crate::commands::{
     connection_create, connection_delete, connection_edit, connection_list, get_app_dir,
     local_list_dir, sftp_check, sftp_connect, sftp_disconnect, sftp_download, sftp_list_dir,
     sftp_mkdir, sftp_remove, sftp_rename, sftp_upload, logs_pull_remote, ssh_check,
-    ssh_connect, ssh_disconnect, ssh_resize_pty, ssh_write,
+    ssh_connect, ssh_disconnect, ssh_resize_pty, ssh_write, ssh_exec,
+    ssh_tunnel_start, ssh_tunnel_stop, ssh_tunnel_list, ssh_tunnel_stop_all,
+    sftp_stat, local_stat, sftp_chmod, sftp_cancel_transfer,
+    ssh_vault_status, ssh_vault_setup, ssh_vault_unlock, ssh_vault_lock,
+    ssh_vault_encrypt_existing, ssh_vault_disable,
+    ssh_log_append, ssh_log_list, ssh_log_read, ssh_log_delete, ssh_log_dir,
 };
 #[cfg(feature = "plugin-terminal")]
 use crate::commands::{
@@ -81,6 +95,13 @@ use crate::commands::{
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // sidecar 自派发：`<app> __mat_worker --path <dump>` 直接跑分析，不初始化 Tauri。
+    // 必须放在最前面 —— Builder 一旦执行就会建窗口、抢单实例锁。
+    #[cfg(feature = "plugin-mat")]
+    if let Some(code) = mat_worker_host::try_run_as_worker() {
+        std::process::exit(code);
+    }
+
     // 沉浸式快捷键状态（所有窗口共享一份，详见 immersive_shortcut.rs）
     let immersive_state = std::sync::Arc::new(std::sync::Mutex::new(
         immersive_shortcut::ImmersiveState::default(),
@@ -273,7 +294,34 @@ pub fn run() {
             
     #[cfg(feature = "plugin-ssh")]
     get_app_dir,
-            
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_exec,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_tunnel_start,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_tunnel_stop,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_tunnel_list,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_tunnel_stop_all,
+
+    #[cfg(feature = "plugin-ssh")]
+    sftp_stat,
+
+    #[cfg(feature = "plugin-ssh")]
+    local_stat,
+
+    #[cfg(feature = "plugin-ssh")]
+    sftp_chmod,
+
+    #[cfg(feature = "plugin-ssh")]
+    sftp_cancel_transfer,
+
     #[cfg(feature = "plugin-ssh")]
     connection_create,
             
@@ -285,6 +333,39 @@ pub fn run() {
             
     #[cfg(feature = "plugin-ssh")]
     connection_list,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_vault_status,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_vault_setup,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_vault_unlock,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_vault_lock,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_vault_encrypt_existing,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_vault_disable,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_log_append,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_log_list,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_log_read,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_log_delete,
+
+    #[cfg(feature = "plugin-ssh")]
+    ssh_log_dir,
             // 窗口管理
             create_editor_window,
             get_window_list,
@@ -343,6 +424,60 @@ pub fn run() {
             
     #[cfg(feature = "plugin-mat")]
     mat_refs_inspect,
+
+    #[cfg(feature = "plugin-mat")]
+    mat_dom_tree,
+
+    #[cfg(feature = "plugin-mat")]
+    mat_dom_retained_set,
+
+    #[cfg(feature = "plugin-mat")]
+    mat_object_values,
+
+    #[cfg(feature = "plugin-mat")]
+    mat_gc_root_paths,
+
+    #[cfg(feature = "plugin-mat")]
+    mat_oql_query,
+
+    #[cfg(feature = "plugin-mat")]
+    mat_oql_check,
+
+    #[cfg(feature = "plugin-mat")]
+    mat_top_consumers,
+
+    #[cfg(feature = "plugin-mat")]
+    mat_threads,
+
+    #[cfg(feature = "plugin-mat")]
+    mat_classloaders,
+
+    #[cfg(feature = "plugin-mat")]
+    mat_waste_report,
+
+    #[cfg(feature = "plugin-mat")]
+    mat_unreachable_histogram,
+
+    #[cfg(feature = "plugin-mat")]
+    mat_compare_histograms,
+    #[cfg(feature = "plugin-mat")]
+    mat_source_info,
+    #[cfg(feature = "plugin-mat")]
+    mat_cache_info,
+    #[cfg(feature = "plugin-mat")]
+    mat_cache_clear,
+    #[cfg(feature = "plugin-mat")]
+    mat_index_info,
+    #[cfg(feature = "plugin-mat")]
+    mat_index_clear,
+    #[cfg(feature = "plugin-mat")]
+    mat_worker_start,
+    #[cfg(feature = "plugin-mat")]
+    mat_worker_cancel,
+    #[cfg(feature = "plugin-mat")]
+    mat_worker_status,
+    #[cfg(feature = "plugin-mat")]
+    mat_worker_status_for_path,
             // 会话管理（主键：工作区 ID）
             session_save,
             session_load,

@@ -84,12 +84,12 @@ const exactOneCount = computed(() => props.statements.filter(s => s.expect_one).
 }
 .pv-warn {
   font-size: var(--font-size-sm);
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   margin-bottom: 8px;
 }
 .pv-note {
   font-size: var(--font-size-sm);
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
   margin-bottom: 8px;
 }
 .pv-flag {
@@ -99,7 +99,7 @@ const exactOneCount = computed(() => props.statements.filter(s => s.expect_one).
   line-height: 14px;
   padding: 0 3px;
   border-radius: 3px;
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
   border: 1px solid var(--el-color-warning-light-5);
 }
 .pv-list {
@@ -118,7 +118,7 @@ const exactOneCount = computed(() => props.statements.filter(s => s.expect_one).
   border-bottom: none;
 }
 .pv-item.is-invalid .pv-sql {
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
 }
 .pv-idx {
   flex-shrink: 0;

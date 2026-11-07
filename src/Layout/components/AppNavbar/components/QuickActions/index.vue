@@ -20,7 +20,9 @@
       </svg>
     </button>
 
-    <!-- 隐藏/显示插件面板（仅收起 sidebarPanel，保留活动栏图标列）；当前插件没有侧栏时禁用 -->
+    <!-- 隐藏/显示插件面板（仅收起 sidebarPanel，保留活动栏图标列）；当前插件没有侧栏时禁用。
+         图标与「切换侧边栏」同源：外框 + 右侧栏。面板显示时右侧栏实心、隐藏时空心，
+         与 VS Code「切换辅助侧栏」语义一致（面板在右侧）。 -->
     <button
       type="button"
       class="qa-icon"
@@ -31,8 +33,10 @@
       :title="sidebarToggleLabel"
       @click="toggleSidebarPanel"
     >
-      <el-icon v-if="sidebarPanelCollapsed" class="qa-el-icon"><Expand /></el-icon>
-      <el-icon v-else class="qa-el-icon"><Fold /></el-icon>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <rect x="9" y="3" width="6" height="18" rx="1" :fill="!sidebarPanelCollapsed ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.2" opacity="0.9"/>
+      </svg>
     </button>
 
     <!-- 沉浸式：只留插件界面（插件侧栏面板 + 主面板），隐藏标题栏 / 活动栏 / 状态栏。
@@ -77,7 +81,7 @@
 <script lang="ts" setup name="QuickActions">
 import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { Sunny, Moon, Fold, Expand } from '@element-plus/icons-vue'
+import { Sunny, Moon } from '@element-plus/icons-vue'
 import { load, Store } from '@/core/runtime'
 import { pluginManager } from '@/core/pluginManager'
 import { isDark, toggleDark } from '@/composables/useDark'

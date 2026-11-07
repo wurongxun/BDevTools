@@ -275,7 +275,7 @@ onUnmounted(() => {
     max-width: 360px;
     text-align: center;
     word-break: break-all;
-    color: var(--el-color-danger);
+    color: var(--stateErrorFg);
   }
 }
 

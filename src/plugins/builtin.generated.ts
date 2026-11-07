@@ -60,7 +60,7 @@ const MANIFESTS = {
   "mat": {
     "id": "mat",
     "name": "内存分析",
-    "description": "Java 堆转储分析：直方图、泄漏检测、支配树与引用追踪"
+    "description": "Java 堆转储分析：直方图、泄漏检测、支配树、引用追踪、OQL、多 dump 对比与专用报告（支持 .hprof.gz 与本地索引加速）"
   },
   "terminal": {
     "id": "terminal",

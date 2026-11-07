@@ -86,11 +86,12 @@ const MAX_READ_FILE_BYTES: u64 = 64 * 1024 * 1024;
  * 读取文件原始字节（图片查看用）。
  *
  * 刻意**不**包 `ResData`：`ResData<Vec<u8>>` 会被序列化成 JSON 数字数组，
- * 一张 5MB 的图会变成几百万个数字，既慢又爆内存。改用 `tauri::ipc::Response`
- * 走裸字节通道 —— 前端 `invoke` 直接拿到 `ArrayBuffer`（≥1KB 时 tauri 走
- * fetch 通道投递，既不 base64 也不展开成 JSON 数组）。
+ * 一张 5MB 的图会变成几百万个数字，既慢又爆内存。业务层只返回裸 `Vec<u8>`，
+ * 由 `commands.rs` 的 wrapper 包成 `tauri::ipc::Response` 走裸字节通道 ——
+ * 前端 `invoke` 直接拿到 `ArrayBuffer`（≥1KB 时 tauri 走 fetch 通道投递，
+ * 既不 base64 也不展开成 JSON 数组）。
  */
-pub async fn read_file_bytes(path: String) -> Result<tauri::ipc::Response, String> {
+pub async fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
     let meta = tokio::fs::metadata(&path)
         .await
         .map_err(|e| format!("读取文件信息失败: {}", e))?;
@@ -107,7 +108,7 @@ pub async fn read_file_bytes(path: String) -> Result<tauri::ipc::Response, Strin
     let bytes = tokio::fs::read(&path)
         .await
         .map_err(|e| format!("读取文件失败: {}", e))?;
-    Ok(tauri::ipc::Response::new(bytes))
+    Ok(bytes)
 }
 
 /**
@@ -492,7 +493,6 @@ pub async fn list_script_files(path: String) -> Result<ResData<Vec<ScriptFileEnt
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tauri::ipc::{InvokeResponseBody, IpcResponse};
 
     fn tmp_dir(name: &str) -> std::path::PathBuf {
         let d = std::env::temp_dir().join(name);
@@ -500,18 +500,15 @@ mod tests {
         d
     }
 
-    /// 读回的必须是**裸字节**通道（`InvokeResponseBody::Raw`）。
-    /// 一旦退化成 Json，前端拿到的是几百万个数字，图片直接卡死 —— 这条用例就是守这个的。
+    /// 业务层必须返回**裸字节**：一旦有人改回 ResData/JSON，前端拿到的是
+    /// 几百万个数字，图片直接卡死。裸字节通道本身由 commands.rs 的用例守着。
     #[tokio::test]
-    async fn read_file_bytes_returns_raw_body() {
+    async fn read_file_bytes_returns_plain_bytes() {
         let path = tmp_dir("bdevtools_read_bytes").join("sample.bin");
         std::fs::write(&path, b"\x89PNG\r\n\x1a\n\x00\x01\x02").unwrap();
 
-        let resp = read_file_bytes(path.to_string_lossy().to_string()).await.unwrap();
-        match resp.body().unwrap() {
-            InvokeResponseBody::Raw(v) => assert_eq!(v, b"\x89PNG\r\n\x1a\n\x00\x01\x02".to_vec()),
-            InvokeResponseBody::Json(s) => panic!("退化成 JSON 了（前端会拿到数字数组）: {}", s),
-        }
+        let bytes = read_file_bytes(path.to_string_lossy().to_string()).await.unwrap();
+        assert_eq!(bytes, b"\x89PNG\r\n\x1a\n\x00\x01\x02".to_vec());
     }
 
     #[tokio::test]

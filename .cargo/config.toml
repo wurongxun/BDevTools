@@ -1,0 +1,7 @@
+# workspace root 上提到仓库根后，Cargo 默认会把产物写到 <root>/target/。
+# 固定回 src-tauri/target 的两个原因：
+#   1. 复用已有编译缓存（否则全量重编 vendored-openssl / sqlx 等，约 10 分钟、19G）；
+#   2. 保持 Tauri CLI、构建脚本与既定产物路径（src-tauri/target/...）不变。
+# 相对路径以本 .cargo 的父目录（仓库根）为基准。
+[build]
+target-dir = "src-tauri/target"

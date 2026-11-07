@@ -26,6 +26,16 @@
 
       <div class="settings-item">
         <div class="setting-info">
+          <span class="setting-label">{{ $t('highContrast.name') }}</span>
+          <span class="setting-description">{{ $t('settingsPlugin.general.highContrastDesc') }}</span>
+        </div>
+        <div class="setting-control">
+          <el-switch v-model="highContrast" inline-prompt :active-icon="Check" :inactive-icon="Close" />
+        </div>
+      </div>
+
+      <div class="settings-item">
+        <div class="setting-info">
           <span class="setting-label">{{ $t('locale.language') }}</span>
           <span class="setting-description">{{ $t('settingsPlugin.general.localeDesc') }}</span>
         </div>
@@ -203,6 +213,7 @@ import useStore from '@/store'
 import { autostartDisable, autostartEnable, checkUpdate, getVersion, publish } from '@/core/runtime'
 import type { DownloadEvent, Store, Update } from '@/core/runtime'
 import { isDark, toggleDark } from '@/composables/useDark'
+import { isHighContrast, toggleHighContrast } from '@/composables/useHighContrast'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { useSettingsStore } from './useSettingsStore'
 
@@ -232,6 +243,17 @@ const dark = computed<boolean>({
   get: () => isDark.value,
   set: (value: boolean) => {
     void applyDarkChange(value)
+  },
+})
+
+/**
+ * 高对比度开关：与上面的暗黑开关同构（以全局单例为唯一真相）。
+ * 它是**正交**于明暗的第二个开关，两者可任意组合（浅/深 × 普通/高对比）。
+ */
+const highContrast = computed<boolean>({
+  get: () => isHighContrast.value,
+  set: (value: boolean) => {
+    void applyHighContrastChange(value)
   },
 })
 
@@ -296,6 +318,12 @@ onMounted(async () => {
     // 与顶栏保持一致：以持久化的值为准同步主题状态
     if (dark_val.value !== isDark.value) toggleDark()
   }
+  // 启动时已由 initHighContrast() 读过，这里再对齐一次（与 dark 同节奏），
+  // 防止 KV 值被别的窗口改过而本窗口的开关显示成旧值
+  const hc_val = await store.get<{ value: boolean }>('high_contrast')
+  if (hc_val !== undefined && hc_val.value !== isHighContrast.value) {
+    toggleHighContrast()
+  }
 })
 
 async function languageChange() {
@@ -328,6 +356,15 @@ async function applyDarkChange(value: boolean) {
   }
   if (value !== isDark.value) toggleDark()
   userStore.setDark(value)
+}
+
+/** 应用高对比度变更（键 `high_contrast`，与上面的 dark 同一套路） */
+async function applyHighContrastChange(value: boolean) {
+  if (store) {
+    await store.set('high_contrast', { value })
+    await store.save()
+  }
+  if (value !== isHighContrast.value) toggleHighContrast()
 }
 
 // 步骤1：注册应用到"打开方式"列表

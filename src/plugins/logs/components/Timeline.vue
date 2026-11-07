@@ -303,7 +303,7 @@ function onLeave() {
 }
 
 .tl-err {
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
 }
 
 .tl-svg {

@@ -367,16 +367,16 @@ onBeforeUnmount(stopFollow)
   margin-right: 2px;
 }
 .ce-layer .ce-null .el-checkbox__label {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   padding-left: 4px;
 }
 .ce-layer .ce-error {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
 }
 .ce-layer .ce-hint {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
   color: var(--el-text-color-secondary);
 }

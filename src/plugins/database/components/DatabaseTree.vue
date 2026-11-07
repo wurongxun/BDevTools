@@ -45,7 +45,12 @@
             class="node-label"
             :class="{ 'is-connected': data.type === 'table' && isTableActive(data) }"
           >{{ node.label }}</span>
-          <span v-if="data.type === 'connection' && isConnected(data.data?.id)" class="connected-badge">已连接</span>
+          <AppStatusDot
+            v-if="data.type === 'connection' && isConnected(data.data?.id)"
+            color="success"
+            label="已连接"
+            title="已连接"
+          />
         </span>
       </template>
     </el-tree>
@@ -1007,13 +1012,8 @@ defineExpose({ refreshTree })
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.connected-badge {
-  font-size: var(--font-size-xs);
-  color: #67c23a;
-  margin-left: 4px;
-}
 .is-connected {
-  color: #67c23a;
+  color: var(--stateSuccessFg);
 }
 .is-disconnected {
   color: var(--el-text-color-disabled);

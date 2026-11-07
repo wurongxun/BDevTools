@@ -4,6 +4,8 @@
 @use './tokens.scss';
 @use './element.scss';
 @use './logs.scss';
+// 必须排在 theme.scss 之后：contrast.scss 靠选择器特异性覆盖主主题变量
+@use './contrast.scss';
 
 // 生成设计令牌 CSS 变量（字体/字号/圆角/间距/阴影）
 @include tokens.tokensVars();

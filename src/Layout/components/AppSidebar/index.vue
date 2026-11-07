@@ -306,39 +306,83 @@ function isPanelVisible(pluginId: string): boolean {
   }
 }
 
+// 圆角「凹槽」：不再铺满整条 48px 轨道，而是居中留出 6px 沟槽的 36×36 圆角块。
+// 行高仍是 36 + 6 + 6 = 48px（与改造前一致，不影响布局与行对齐），但形状出来了 ——
+// 铺满整轨的直角色块看着像表格单元格；有边界、有圆角的块才有「按钮」的质感。
 .activity-item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 48px;
+  width: 36px;
+  height: 36px;
+  margin: 6px;
+  align-self: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: all 0.15s;
   // 语义化 <button> 需要抹平浏览器默认外观
   appearance: none;
   border: none;
   padding: 0;
   font-family: inherit;
+  background-color: transparent;
+  transition: background-color 0.15s, color 0.15s;
 
   @include theme.useTheme {
-    background-color: theme.getVar('activityBarBg');
     color: theme.getVar('textSecondary');
 
+    // 悬停图标色用 activityBarActive 而非 textColor：暗色下 activityBarHover 是饱和蓝
+    // (#4b6eaf)，textColor(#bbbbbb) 落在上面仅 2.64:1（需 4.5:1），转纯白后 5.06:1。
+    // 与 AppImmersiveBar 同一处理。亮色下两者同值（#212121），无差别。
     &:hover {
-      color: theme.getVar('textColor');
+      color: theme.getVar('activityBarActive');
       background-color: theme.getVar('activityBarHover');
     }
   }
+
+  // 键盘焦点环（roving tabindex，WCAG 2.4.7）
+  &:focus-visible {
+    outline: 2px solid var(--focusRing);
+    outline-offset: 1px;
+  }
 }
 
-// 选中指示条（左侧 2px）用 inset 阴影画，**不能用 border-left**：
-// 边框会占掉内容宽度，把 justify-content:center 的图标挤出中心
-// （历史 bug：左 13.5 / 右 11.5，偏右 1px）。
+// 选中态：专用蓝调凹槽 + 轨道左缘指示条（与中性灰的 hover 拉开色相差，
+// 旧实现两者都用 activityBarHover ⇒ 「鼠标划过就像选中了」）。
+//
+// 指示条改为专用 activityBarIndicator，修掉两个真 bug：
+//  ① 暗色下旧值 hoverColor 与 activityBarHover 同为 #4b6eaf —— 条子画在自己的底色上，等于不可见；
+//  ② 亮色下旧值 #ecf5ff 对 #dcdcdc 仅 1.25:1，远低于非文本要求的 3:1。
+// 新值对轨道底色：亮 5.81:1 / 暗 5.46:1。
 .activity-item-active {
   @include theme.useTheme {
-    box-shadow: inset 2px 0 0 theme.getVar('hoverColor');
-    color: theme.getVar('activityBarActive') !important;
-    background-color: theme.getVar('activityBarHover');
+    background-color: theme.getVar('activityBarActiveBg');
+    color: theme.getVar('activityBarActive');
+  }
+
+  // 指示条画在轨道左缘（凹槽外侧的 6px 沟槽处）：不占布局，也不挤偏居中图标
+  &::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 22px;
+    border-radius: var(--radius-xs);
+
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarIndicator');
+    }
+  }
+
+  // 与 .activity-item:hover 同特异度，靠源码顺序取胜 —— 不必再用 !important
+  &:hover {
+    @include theme.useTheme {
+      background-color: theme.getVar('activityBarActiveBg');
+      color: theme.getVar('activityBarActive');
+    }
   }
 }
 

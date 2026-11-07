@@ -3,7 +3,6 @@
     :class="['file-icon', `file-icon-${type}`]"
     viewBox="0 0 16 16"
     fill="currentColor"
-    :title="getFileTypeName(type)"
   >
     <!-- Markdown 文件 -->
     <g v-if="type === 'markdown'">
@@ -61,18 +60,6 @@ import { FileType } from '@/store/modules/documents'
 defineProps<{
   type: FileType | string
 }>()
-
-function getFileTypeName(type: FileType | string): string {
-  const typeNames: Record<string, string> = {
-    [FileType.MARKDOWN]: 'Markdown 文件',
-    [FileType.PDF]: 'PDF 文档',
-    [FileType.CODE]: '代码文件',
-    [FileType.TEXT]: '文本文件',
-    [FileType.IMAGE]: '图片文件',
-    [FileType.BINARY]: '二进制文件'
-  }
-  return typeNames[type] || '文件'
-}
 </script>
 
 <style scoped>

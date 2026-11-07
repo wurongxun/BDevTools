@@ -29,14 +29,14 @@
         一旦自定义就会把全选框盖掉。
         行的身份走 `row-config.keyField`（业务 ID）⇒ 滚动回收复用 DOM 时不会把勾选错位。
       -->
-      <VxeColumn v-if="selectable" type="checkbox" :width="48" fixed="left" align="center" />
+      <VxeColumn v-if="selectable" type="checkbox" :width="36" fixed="left" align="center" />
 
       <!--
         序号列。刻意**不用** vxe 的 `type="seq"`：它的序号渲染走内部实现，
         没法让「尚未入库的新增行」显示成 `*` 而不是下一个数字
         （这个标记很重要 —— 一眼要能看出哪几行是新加的）。
       -->
-      <VxeColumn v-if="showIndex" title="#" :width="60" fixed="left" align="center">
+      <VxeColumn v-if="showIndex" title="#" :width="44" fixed="left" align="center">
         <template #default="{ row, rowIndex }">
           <span :class="{ 'row-star': isNewRow(row) }">{{
             isNewRow(row) ? '*' : rowIndex + 1
@@ -55,28 +55,57 @@
         :sortable="sortable"
         :show-header-overflow="true"
         :show-overflow="cellTooltip"
-        align="left"
+        :align="columnAligns[idx] || 'left'"
+        header-align="left"
       >
         <!-- 自定义表头：字段名 + 可选的「排序/过滤」入口按钮。
              按钮必须 stop 冒泡 —— th 的 click 会触发排序、mousedown 会进列宽拖拽。
              字段名区域不拦截，点它仍然走原有的点表头排序。 -->
+        <!--
+          表头刻意排成两行：第一行「列名 + 角标」，第二行「类型标注」。
+          挤在同一行的话，类型要和列名抢横向空间，短值列照样被表头顶宽 ——
+          而表头宽度正是决定「一列能有多窄」的主力。换行的代价是一屏少半行，
+          换来的是横向多出好几列，这笔买卖划算。
+        -->
         <template #header>
           <span class="col-header" @contextmenu.stop="handleHeaderContextMenu(idx, $event)">
-            <span class="col-header-label">{{ col }}</span>
-            <span v-if="isRowKeyCol(col)" class="col-header-key" title="这一列用于定位一行">键</span>
+            <span class="col-header-line">
+              <span class="col-header-label">{{ col }}</span>
+              <span v-if="isRowKeyCol(col)" class="col-header-key" title="这一列用于定位一行">键</span>
+              <span
+                v-if="columnMenu"
+                class="col-header-btn"
+                title="排序 / 过滤"
+                role="button"
+                tabindex="0"
+                aria-label="排序 / 过滤"
+                @click.stop.prevent="emit('column-menu', idx, $event)"
+                @keydown.enter.stop.prevent="emit('column-menu', idx, $event)"
+                @keydown.space.stop.prevent="emit('column-menu', idx, $event)"
+                @mousedown.stop
+              >▾</span>
+            </span>
             <span
-              v-if="columnMenu"
-              class="col-header-btn"
-              title="排序 / 过滤"
-              @click.stop.prevent="emit('column-menu', idx, $event)"
-              @mousedown.stop
-            >▾</span>
+              v-if="typeTexts[idx]"
+              class="col-header-type"
+              :class="{ 'is-inferred': typeInferred[idx] }"
+              :title="typeTitles[idx]"
+              >{{ typeTexts[idx] }}</span
+            >
           </span>
         </template>
         <template #default="{ row }">
           <slot :name="`cell-${idx}`" :row="row" :column="col" :index="idx">
+            <!-- NULL 与空串是两回事：NULL 给一个显式标记，空串保持空白。
+                 否则「这格到底是没值还是值为空」只能靠猜。可用 showNullMark 关掉。 -->
+            <span
+              v-if="showNullMark && isNullish(row[String(idx)])"
+              class="cell-content cell-null"
+              title="NULL"
+              >NULL</span
+            >
             <!-- 自带 title：外部关掉 cellTooltip 时，hover 仍然能看到完整值 -->
-            <span class="cell-content" :title="String(row[String(idx)] ?? '')">{{
+            <span v-else class="cell-content" :title="String(row[String(idx)] ?? '')">{{
               formatCell(row[String(idx)])
             }}</span>
           </slot>
@@ -124,6 +153,13 @@ import { showContextMenu } from '@/components/context-menu/useContextMenu'
 import type { MenuItem } from '@/components/context-menu/ContextMenu.vue'
 import { VxeColumn, VxeTable } from 'vxe-table'
 import 'vxe-table/es/style.css'
+import type { ColumnInfo } from '../types'
+import {
+  computeColumnWidths,
+  inferColumnKinds,
+  inferredKindLabel,
+  typeLabelFromInfo,
+} from '../utils/columnWidth'
 
 interface Props {
   /** 列名 */
@@ -176,6 +212,22 @@ interface Props {
   showFooter?: boolean
   /** 列宽映射（列索引 => 宽度） */
   columnWidths?: Record<number, number>
+  /**
+   * 各列的真实表元数据，**按结果列的顺序**（查不到的一列为 undefined）。
+   *
+   * 只有「单表浏览」这类场景才有（`TableDataResult` 返回完整的 `ColumnInfo`）；
+   * SQL 查询结果压根没有类型信息，此时整份为空，表头退化成显示推断出来的类型。
+   */
+  columnMetas?: (ColumnInfo | undefined)[]
+  /** 表头是否显示第二行「类型标注」 */
+  showColumnTypes?: boolean
+  /**
+   * 是否按「首屏采样值 + 列名」估算列宽。
+   *
+   * 关掉就退回「统一退回 min-width」的老行为 —— 万一某个数据源的宽度估算出了问题，
+   * 这是可以立刻止损的开关，不用回滚代码。
+   */
+  autoColumnWidth?: boolean
   /** 可选行判断函数（注：vxe 的行级禁用与表头全选另有实现，本表当前无使用方，保留以待扩展） */
   selectableFn?: (row: any, index: number) => boolean
   /** 无障碍：区域是否处于忙碌状态（外部显式声明，与 loading 取并集） */
@@ -189,6 +241,13 @@ interface Props {
    * 自定义单元格插槽自己带 `title` 时应当关掉它（外部传 false）。
    */
   cellTooltip?: boolean
+  /**
+   * 是否把 NULL 值渲染成显式的 `NULL` 标记（灰色斜体）。
+   *
+   * 数据库结果集里 NULL 和空字符串是两种不同的值，全都显示成空白会让用户分不清。
+   * 关掉后退化成原来的行为（NULL / 空串都显示为空白）。
+   */
+  showNullMark?: boolean
   /** 底部「共 N 条」用的真实总数 */
   totalCount?: number
   /**
@@ -216,7 +275,8 @@ const props = withDefaults(defineProps<Props>(), {
   border: true,
   stripe: true,
   size: 'small',
-  colMinWidth: 100,
+  // 采样宽度能生效的前提：min-width 是 vxe 的硬下限，定在 100 会让「短值列变窄」完全不起作用
+  colMinWidth: 56,
   showHeader: true,
   selectable: false,
   showIndex: false,
@@ -228,9 +288,13 @@ const props = withDefaults(defineProps<Props>(), {
   emptyIcon: '',
   showFooter: false,
   columnWidths: () => ({}),
+  columnMetas: () => [],
+  showColumnTypes: true,
+  autoColumnWidth: true,
   ariaBusy: false,
   columnMenu: false,
   cellTooltip: true,
+  showNullMark: true,
   totalCount: undefined,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   selectableFn: (_row: any, _index: number) => true,
@@ -268,8 +332,8 @@ const emit = defineEmits<{
   (e: 'sort-change', column: string, order: string | null): void
   /** 列宽拖拽结束 */
   (e: 'column-resize', columnIndex: number, width: number): void
-  /** 列头菜单按钮点击（参数：列索引、鼠标事件——用于把菜单定位到按钮旁） */
-  (e: 'column-menu', columnIndex: number, event: MouseEvent): void
+  /** 列头菜单按钮点击（参数：列索引、鼠标/键盘事件——用于把菜单定位到按钮旁） */
+  (e: 'column-menu', columnIndex: number, event: MouseEvent | KeyboardEvent): void
   /** 列头右键「设为行标识 / 取消行标识」：怎么定位一行由调用方决定并存下来 */
   (e: 'pick-row-key', column: string): void
   /** 清除手动指定的行标识 */
@@ -390,9 +454,119 @@ function scrollToRow(key: string) {
 }
 
 // 获取列宽
+// ===================================================================
+// 表头类型标注 + 列宽采样
+//
+// 以前每列都退回统一的 min-width（100px）：自增 ID 列、布尔列照样占满一百个像素，
+// 横向一半以上的空间是空的。改成按「首屏采样值 + 列名」估算贴合宽度之后，
+// 省下来的宽度直接换成「一屏多看几列」。
+// ===================================================================
+
+/** 参与类型推断与宽度估算的采样行数 */
+const METRIC_SAMPLE_ROWS = 50
+
+/**
+ * 按采样值推断每列的语义归类。
+ *
+ * 与上面的 `columnAligns` 是同一套哲学（绝大多数值都同意才认），但两者刻意各走各的：
+ * 对齐推错只影响观感，类型是要写进表头给用户读的，召回条件不该共用。
+ */
+const inferredKinds = computed(() =>
+  inferColumnKinds(props.columns, props.rows, METRIC_SAMPLE_ROWS)
+)
+
+/**
+ * 表头第二行的内容。三档优先级，最终不一定每列都有东西可显示：
+ * 1. 有真实表元数据（单表浏览）→ 显示它，最可信；
+ * 2. 没有 → 落到采样推断，并打上 `inferred` 让 UI 用斜体区分「这是猜的」；
+ * 3. 推断下来只是普通文本列 → 什么都不显示（「这列是文本」属于零信息）。
+ */
+const headerTypes = computed(() =>
+  props.columns.map((_name, idx) => {
+    if (!props.showColumnTypes) return null
+    const info = props.columnMetas?.[idx]
+    if (info) {
+      return {
+        text: typeLabelFromInfo(info),
+        inferred: false,
+        title: info.is_nullable ? info.data_type : `${info.data_type} · NOT NULL`,
+      }
+    }
+    const guessed = inferredKindLabel(inferredKinds.value[idx])
+    if (!guessed) return null
+    return { text: guessed, inferred: true, title: `按前 ${METRIC_SAMPLE_ROWS} 行数据推断` }
+  })
+)
+
+/** 拆成三个平行数组：模板里按下标取值，省得写一串可能为 null 的类型断言 */
+const typeTexts = computed(() => headerTypes.value.map(t => t?.text ?? ''))
+const typeInferred = computed(() => headerTypes.value.map(t => !!t?.inferred))
+const typeTitles = computed(() => headerTypes.value.map(t => t?.title ?? ''))
+
+/**
+ * 估算列宽：内容是主力，表头是下限，语义是上限。
+ * `kinds` 复用上面的推断结果，避免只为取宽度上限再遍历一遍采样值。
+ */
+const autoWidths = computed(() =>
+  computeColumnWidths(props.columns, props.rows, {
+    minWidth: props.colMinWidth,
+    sampleRows: METRIC_SAMPLE_ROWS,
+    headerSubLabels: typeTexts.value,
+    kinds: inferredKinds.value,
+  })
+)
+
+/** 优先级：用户手动拖过 > 采样估算 > 没有（交回 vxe 自己分配剩余宽度） */
 const getColumnWidth = (idx: number) => {
-  return props.columnWidths[idx] || undefined
+  const manual = props.columnWidths[idx]
+  if (manual) return manual
+  return props.autoColumnWidth ? autoWidths.value[idx] : undefined
 }
+
+/** 只有 null / undefined 算「无值」；空串是有值的（要显示成空白而不是 NULL 标记） */
+const isNullish = (v: any): boolean => v === null || v === undefined
+
+/**
+ * 判断一个值是否「长得像数字」——用于列对齐推断。
+ * 排除前导零的编码（如 "007"、"0123"）：这类多是 ID / 编号，右对齐反而错位。
+ */
+const isNumericLike = (v: any): boolean => {
+  if (typeof v === 'number') return Number.isFinite(v)
+  if (typeof v !== 'string') return false
+  const s = v.trim()
+  if (s === '') return false
+  if (/^-?0\d/.test(s)) return false
+  return !Number.isNaN(Number(s))
+}
+
+/**
+ * 按列采样推断对齐方式：数值列右对齐（比对位数 / 量级更快），其余左对齐。
+ *
+ * 结果集不带列类型元信息，只能按值猜。刻意**只采样前若干行** —— 大数据集逐格扫描
+ * 太贵；用 0.8 阈值要求「绝大多数非空值都是数值」才右对齐，避免混入文本的列被误判。
+ * computed 按 rows 引用缓存，换数据集才重算。
+ */
+const ALIGN_SAMPLE_ROWS = 50
+const ALIGN_NUMERIC_RATIO = 0.8
+const columnAligns = computed<('left' | 'right')[]>(() => {
+  const colCount = props.columns.length
+  const aligns: ('left' | 'right')[] = new Array(colCount).fill('left')
+  const sample = props.rows.slice(0, ALIGN_SAMPLE_ROWS)
+  if (!sample.length) return aligns
+  for (let c = 0; c < colCount; c++) {
+    const key = String(c)
+    let numeric = 0
+    let seen = 0
+    for (const row of sample) {
+      const v = row[key]
+      if (isNullish(v) || v === '') continue
+      seen++
+      if (isNumericLike(v)) numeric++
+    }
+    aligns[c] = seen > 0 && numeric / seen >= ALIGN_NUMERIC_RATIO ? 'right' : 'left'
+  }
+  return aligns
+})
 
 // 格式化单元格内容（null / undefined / 空串 显示为 -，对象序列化为 JSON）
 const formatCell = (value: any) => {
@@ -644,17 +818,47 @@ defineExpose({
 
 /* 自定义表头：字段名 + 菜单按钮。
    slot 内容在 ResultTable 模板里编译，带本组件的 data-v 属性 ⇒ scoped 样式直接生效。 */
+/* 表头两行结构：第一行「列名 + 角标」，第二行「类型标注」。
+   scoped 对 slot 内容是生效的（它在本组件模板里编译，带本组件的 data-v）。 */
 .col-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.col-header-line {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
   max-width: 100%;
 }
 
 .col-header-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 类型标注：次要色 + 小字号，不与列名争视觉权重 */
+.col-header-type {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+  color: var(--el-text-color-secondary);
+}
+
+/* 推断出来的类型没有数据库背书：斜体 + 更淡的颜色，明确区分于真类型 */
+.col-header-type.is-inferred {
+  font-style: italic;
+  opacity: 0.7;
 }
 
 /* 「这一列用于定位一行」的角标（主键 / 唯一索引 / 手动指定的行标识） */
@@ -664,7 +868,7 @@ defineExpose({
   border-radius: 3px;
   font-size: 10px;
   line-height: 14px;
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
   border: 1px solid var(--el-color-warning-light-5);
   background: var(--el-color-warning-light-9);
 }
@@ -711,6 +915,12 @@ defineExpose({
   color: var(--el-text-color-primary);
   font-weight: 600;
 }
+
+/* NULL 标记：与真实值拉开区分度，用次要色 + 斜体，一眼能扫出哪些格是空的 */
+.cell-null {
+  color: var(--el-text-color-placeholder);
+  font-style: italic;
+}
 </style>
 
 <style>
@@ -722,10 +932,10 @@ defineExpose({
 .result-vxe {
   --vxe-ui-font-color: var(--el-text-color-regular);
   --vxe-ui-font-primary-color: var(--el-color-primary);
-  --vxe-ui-font-success-color: var(--el-color-success);
-  --vxe-ui-font-info-color: var(--el-color-info);
-  --vxe-ui-font-warning-color: var(--el-color-warning);
-  --vxe-ui-font-danger-color: var(--el-color-danger);
+  --vxe-ui-font-success-color: var(--stateSuccessFg);
+  --vxe-ui-font-info-color: var(--stateInfoFg);
+  --vxe-ui-font-warning-color: var(--stateWarningFg);
+  --vxe-ui-font-danger-color: var(--stateErrorFg);
   --vxe-ui-layout-background-color: var(--el-bg-color);
   --vxe-ui-base-popup-border-color: var(--el-border-color);
   --vxe-ui-input-border-color: var(--el-border-color);
@@ -759,6 +969,12 @@ defineExpose({
   font-size: var(--font-size-sm, 12px);
 }
 
+/* 等宽数字：让每个数字占等宽，列内小数点 / 位数纵向对齐，
+   配合数值列右对齐可显著提升扫描效率，且零空间成本。 */
+.result-vxe .vxe-cell {
+  font-variant-numeric: tabular-nums;
+}
+
 /* 待插入的新增行（幽灵行）：给一个稳定的视觉标记，
    不然「这几行到底是查出来的还是我刚加的」只能靠记性。 */
 .result-vxe .vxe-body--row.is-new-row td.vxe-body--column {
@@ -768,7 +984,7 @@ defineExpose({
   background-color: color-mix(in srgb, var(--el-color-success) 20%, transparent);
 }
 .result-vxe .row-star {
-  color: var(--el-color-success);
+  color: var(--stateSuccessFg);
   font-weight: 700;
 }
 

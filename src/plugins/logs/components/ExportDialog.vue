@@ -152,7 +152,7 @@ function formatBytes(n: number): string {
 .ex-hint {
   margin: -8px 0 12px 74px;
   font-size: var(--font-size-sm);
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
 }
 
 .ex-result {
@@ -162,7 +162,7 @@ function formatBytes(n: number): string {
   padding: 6px 8px;
   border-radius: var(--radius-sm);
   background: var(--el-color-success-light-9);
-  color: var(--el-color-success);
+  color: var(--stateSuccessFg);
   font-size: var(--font-size-sm);
 }
 
@@ -177,7 +177,7 @@ function formatBytes(n: number): string {
   padding: 6px 8px;
   border-radius: var(--radius-sm);
   background: var(--el-color-danger-light-9);
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   font-size: var(--font-size-sm);
 }
 </style>

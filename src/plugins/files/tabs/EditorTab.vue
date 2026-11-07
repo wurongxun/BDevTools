@@ -225,6 +225,8 @@ function handleTabClick(docId: string) {
 
 // 处理标签页关闭
 function handleTabClose(docId: string) {
+  // 关闭标签页  Tooltip也同时关闭
+  hideTooltip()
   docStore.closeDocument(docId)
 }
 

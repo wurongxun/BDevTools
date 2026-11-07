@@ -1,0 +1,33 @@
+[package]
+name = "bdevtools-plugin-mat"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "BDevTools built-in MAT / HPROF plugin (pure Rust business layer)"
+
+[lib]
+name = "bdevtools_plugin_mat"
+path = "src/lib.rs"
+
+[dependencies]
+bdevtools-core = { path = "../bdevtools-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = "0.4"
+anyhow = "1.0.104"
+log = "0.4.34"
+lazy_static = "1.5.1"
+parking_lot = "0.12.5"
+jvm-hprof = "0.1"
+memmap2 = "0.9"
+# `.hprof.gz` 透明解压。默认 rust_backend（miniz_oxide，纯 Rust）：
+# 一旦换成 zlib 后端就会把 C 工具链拖进来，跟 vendored-openssl 一样变成全量重编的触发器。
+flate2 = "1"
+
+# 物理内存探测按平台分支（见 mat_cfg.rs::probe_physical_bytes）：函数级 cfg + 平台桩，
+# 与宿主 crate 的 target 依赖保持同一版本，避免重复编译。
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.44.0", features = ["Win32_Foundation", "Win32_System_SystemInformation"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"

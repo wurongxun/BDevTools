@@ -303,7 +303,7 @@ watch(expanded, (v) => {
   .sql-icon {
     display: inline-flex;
     align-items: center;
-    color: var(--el-color-warning);
+    color: var(--stateWarningFg);
     flex-shrink: 0;
   }
   .sql-text {
@@ -407,7 +407,7 @@ watch(expanded, (v) => {
     gap: 4px;
     padding: 2px 8px;
     background: var(--el-color-info-light-9);
-    color: var(--el-color-info);
+    color: var(--stateInfoFg);
     border-radius: 3px;
     font-weight: 600;
   }
@@ -458,8 +458,8 @@ watch(expanded, (v) => {
       padding: 2px 8px;
       border-radius: 3px;
       font-weight: 500;
-      &.single { background: var(--el-color-success-light-9); color: var(--el-color-success); }
-      &.multi { background: var(--el-color-warning-light-9); color: var(--el-color-warning); }
+      &.single { background: var(--el-color-success-light-9); color: var(--stateSuccessFg); }
+      &.multi { background: var(--el-color-warning-light-9); color: var(--stateWarningFg); }
     }
     .line-info { color: var(--el-text-color-placeholder); font-family: var(--font-family-mono); }
   }

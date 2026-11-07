@@ -97,7 +97,7 @@ onMounted(() => {
   gap: 8px;
   padding: 4px 8px;
   font-size: var(--font-size-sm);
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   background: var(--el-color-danger-light-9);
   border-bottom: 1px solid var(--el-color-danger-light-7);
 

@@ -4,6 +4,18 @@
     <div class="panel-header">
       <span class="panel-title">连接管理器</span>
       <div class="header-actions">
+        <app-button
+          size="small"
+          link
+          class="header-more-btn"
+          :title="prefs.groupViewMode === 'tree' ? '切换为列表视图' : '切换为多级分组树'"
+          @click="toggleGroupView"
+        >
+          <el-icon><component :is="prefs.groupViewMode === 'tree' ? List : Files" /></el-icon>
+        </app-button>
+        <app-button size="small" link class="header-more-btn" title="SSH 设置中心" @click="openSettingsDialog">
+          <el-icon><Setting /></el-icon>
+        </app-button>
         <el-dropdown trigger="click" @command="handleHeaderCommand">
           <app-button size="small" link class="header-more-btn" title="更多操作">
             <el-icon><MoreFilled /></el-icon>
@@ -16,14 +28,48 @@
               <el-dropdown-item command="addConnection" divided>
                 <el-icon><Plus /></el-icon> 新建连接
               </el-dropdown-item>
+              <el-dropdown-item command="exportSessions" divided>
+                <el-icon><Download /></el-icon> 导出会话
+              </el-dropdown-item>
+              <el-dropdown-item command="importSessions">
+                <el-icon><Upload /></el-icon> 导入会话
+              </el-dropdown-item>
+              <el-dropdown-item command="importXsh">
+                <el-icon><Upload /></el-icon> 导入 Xshell .xsh
+              </el-dropdown-item>
+              <el-dropdown-item command="settings" divided>
+                <el-icon><Setting /></el-icon> SSH 设置中心
+              </el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
       </div>
     </div>
 
+    <!-- 会话搜索（Xshell 快速连接栏的轻量版） -->
+    <div class="panel-search">
+      <el-input
+        v-model="searchQuery"
+        placeholder="搜索名称 / 主机 / 用户 / 备注"
+        clearable
+        size="small"
+        aria-label="搜索会话"
+      />
+    </div>
+
     <!-- 分组列表 -->
     <div class="panel-body">
+      <SessionTree
+        v-if="prefs.groupViewMode === 'tree'"
+        :connections="connections"
+        :groups="allGroupNames"
+        :search-query="searchQuery"
+        :active-conn-id="activeConnId"
+        @open="openTerminal"
+        @set-conn-color="setConnColorFromTree"
+        @set-group-color="setGroupColorFromTree"
+      />
+      <template v-else>
       <template v-if="orderedGroups.length > 0">
         <div
           v-for="group in orderedGroups"
@@ -53,6 +99,7 @@
               :key="conn.id"
               class="conn-item"
               :class="{ 'conn-item-active': activeConnId === conn.id }"
+              :style="{ borderLeftColor: conn.color || 'transparent' }"
               @click="handleConnectionClick(conn)"
               @contextmenu.prevent="handleConnContext(conn, $event)"
             >
@@ -66,7 +113,10 @@
                 </svg>
               </span>
 <!--              <span class="conn-addr">{{ conn.address }}:{{ conn.port }}</span>-->
-              <span class="conn-name">{{ conn.name }}</span>
+              <el-icon v-if="conn.affix" class="conn-affix" title="已置顶"><Top /></el-icon>
+              <span class="conn-name" :title="conn.description || `${conn.username}@${conn.address}:${conn.port}`">
+                {{ conn.name }}
+              </span>
               <!-- hover 操作按钮 -->
               <div class="conn-hover-actions">
                 <span class="action-btn" @click.stop="openTerminal(conn)" title="终端">
@@ -95,6 +145,7 @@
         <p>暂无连接</p>
         <app-button size="small" @click="showConnectionDialog = true">新建连接</app-button>
       </div>
+      </template>
     </div>
 
     <!-- 分组右键菜单 -->
@@ -107,6 +158,20 @@
       >
         <div class="context-menu-item" @click="handleGroupRename">
           <el-icon><EditPen /></el-icon> 重命名分组
+        </div>
+        <div class="context-menu-submenu">
+          <span>分组颜色</span>
+          <el-icon class="submenu-arrow"><ArrowRight /></el-icon>
+          <div class="context-menu-submenu-list">
+            <div
+              v-for="c in SESSION_COLORS"
+              :key="c.value"
+              class="context-menu-item"
+              @click="setGroupColor(c.value)"
+            >
+              <i class="color-swatch" :style="{ background: c.value || 'transparent' }" /> {{ c.label }}
+            </div>
+          </div>
         </div>
         <div class="context-menu-item" @click="handleAddConnToGroup">
           <el-icon><Plus /></el-icon> 添加连接到本分组
@@ -129,8 +194,14 @@
         <div class="context-menu-item" @click="openTerminal(connContextMenu.conn!)">
           <el-icon><Monitor /></el-icon> 打开终端
         </div>
+        <div class="context-menu-item" @click="openNewTerminalTab(connContextMenu.conn!)">
+          <el-icon><Plus /></el-icon> 新建终端标签
+        </div>
         <div class="context-menu-item" @click="openFtp(connContextMenu.conn!)">
           <el-icon><FolderOpened /></el-icon> 文件管理
+        </div>
+        <div class="context-menu-item" @click="openTunnels(connContextMenu.conn!)">
+          <el-icon><Link /></el-icon> 端口转发 / 命令
         </div>
         <div class="context-menu-divider" />
         <!-- 移动到分组 -->
@@ -150,6 +221,23 @@
           </div>
         </div>
         <div class="context-menu-divider" />
+        <div class="context-menu-item" @click="handleConnDuplicate">
+          <el-icon><CopyDocument /></el-icon> 复制连接
+        </div>
+        <div class="context-menu-submenu">
+          <span>颜色标签</span>
+          <el-icon class="submenu-arrow"><ArrowRight /></el-icon>
+          <div class="context-menu-submenu-list">
+            <div
+              v-for="c in SESSION_COLORS"
+              :key="c.value"
+              class="context-menu-item"
+              @click="setConnColor(c.value)"
+            >
+              <i class="color-swatch" :style="{ background: c.value || 'transparent' }" /> {{ c.label }}
+            </div>
+          </div>
+        </div>
         <div class="context-menu-item" @click="handleConnEdit">
           <el-icon><EditPen /></el-icon> 编辑连接
         </div>
@@ -195,6 +283,44 @@
       </template>
     </GlobalDialog>
 
+    <!-- 会话导入 / 导出（JSON 文本，避免依赖被裁剪的 files 插件命令） -->
+    <GlobalDialog
+      v-model="showSessionTransfer"
+      :title="transferMode === 'export' ? '导出会话配置' : '导入会话配置'"
+      width="560px"
+    >
+      <p class="transfer-hint">
+        {{ transferMode === 'export'
+          ? '复制下面的 JSON 保存到文件。内容包含登录密码与私钥口令，请妥善保管。'
+          : '粘贴此前导出的 JSON，或单条/多条连接配置数组。重名会话会自动加后缀。' }}
+      </p>
+      <el-input
+        v-model="transferText"
+        type="textarea"
+        :rows="12"
+        :readonly="transferMode === 'export'"
+        spellcheck="false"
+        aria-label="会话配置 JSON"
+      />
+      <template #footer>
+        <app-button size="small" @click="showSessionTransfer = false">关闭</app-button>
+        <app-button v-if="transferMode === 'export'" size="small" type="primary" @click="copyTransferText">
+          复制到剪贴板
+        </app-button>
+        <app-button v-else size="small" type="primary" @click="confirmImport">导入</app-button>
+      </template>
+    </GlobalDialog>
+
+    <!-- .xsh 文件导入（解析后填入导入文本框，由用户确认再入库） -->
+    <input
+      ref="xshInputRef"
+      type="file"
+      accept=".xsh,.txt"
+      multiple
+      class="hidden-file-input"
+      @change="onXshFiles"
+    />
+
     <!-- 全局点击关闭菜单 -->
     <teleport to="body">
       <div
@@ -208,20 +334,36 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Plus, ArrowRight, MoreFilled, FolderAdd, EditPen, Delete, Monitor, FolderOpened } from '@element-plus/icons-vue'
+import {
+  Plus, ArrowRight, MoreFilled, FolderAdd, EditPen, Delete, Monitor, FolderOpened,
+  Download, Upload, Top, CopyDocument, Link, Setting, List, Files
+} from '@element-plus/icons-vue'
 import ConnectionDialog from './components/RemoteConnection/ConnectionDialog.vue'
 import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
 import GlobalDialog from '@/components/GlobalDialog.vue'
-import { useConnectionStore } from './store'
+import NotificationUtil from '@/utils/NotificationUtil'
+import { useConnectionStore, useSshPreferencesStore } from './store'
+import { SESSION_COLORS } from './types'
 import type { RemoteConnection } from './types'
+import SessionTree from './components/RemoteConnection/SessionTree.vue'
+import { buildSessionBundle, importSessionBundle } from './utils/sessionBundle'
+import { decodeXshBuffer, parseXsh } from './utils/xsh'
 
 const connectionStore = useConnectionStore()
+const prefs = useSshPreferencesStore()
+const xshInputRef = ref<HTMLInputElement>()
 
 const showConnectionDialog = ref(false)
 const editingConnection = ref<RemoteConnection | null>(null)
 const defaultGroupForNew = ref<string>('')
 const expandedGroups = ref<string[]>([])
 const activeConnId = ref<number | null>(null)
+const searchQuery = ref('')
+
+// 会话导入 / 导出
+const showSessionTransfer = ref(false)
+const transferMode = ref<'export' | 'import'>('export')
+const transferText = ref('')
 
 // 新建/重命名分组弹窗状态
 const showAddGroupDialog = ref(false)
@@ -248,16 +390,27 @@ function confirmDelete() {
 const connections = computed(() => connectionStore.connections)
 const allGroupNames = computed(() => connectionStore.connectionGroups)
 
+/** 搜索名称 / 主机 / 用户 / 备注 / 分组；置顶排序已由 store 的 connections 完成 */
+function matchesQuery(c: RemoteConnection, q: string): boolean {
+  if (!q) return true
+  const hay = `${c.name} ${c.address} ${c.username} ${c.description || ''} ${c.favorites_name || ''}`.toLowerCase()
+  return hay.includes(q)
+}
+
 // 按分组顺序组织连接
 const orderedGroups = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  const visible = connections.value.filter(c => matchesQuery(c, q))
   const groups: { name: string; connections: RemoteConnection[] }[] = []
   for (const groupName of allGroupNames.value) {
-    const conns = connections.value.filter(c => (c.favorites_name || '默认分组') === groupName)
+    const conns = visible.filter(c => (c.favorites_name || '默认分组') === groupName)
+    // 搜索时隐藏空分组，避免一屏无意义的折叠头
+    if (q && conns.length === 0) continue
     groups.push({ name: groupName, connections: conns })
   }
   // 添加未出现在分组列表中的连接（兜底）
   const knownGroups = new Set(allGroupNames.value)
-  const orphanConns = connections.value.filter(c => !knownGroups.has(c.favorites_name || '默认分组'))
+  const orphanConns = visible.filter(c => !knownGroups.has(c.favorites_name || '默认分组'))
   if (orphanConns.length > 0) {
     groups.push({ name: '其他', connections: orphanConns })
   }
@@ -300,9 +453,22 @@ function openTerminal(conn: RemoteConnection) {
   closeAllContextMenus()
 }
 
+/** 同连接再开一个 shell：显式跳过 openTab 的去重 */
+function openNewTerminalTab(conn: RemoteConnection) {
+  activeConnId.value = conn.id
+  connectionStore.openTab(conn, 'terminal', true)
+  closeAllContextMenus()
+}
+
 function openFtp(conn: RemoteConnection) {
   activeConnId.value = conn.id
   connectionStore.openTab(conn, 'ftp')
+  closeAllContextMenus()
+}
+
+function openTunnels(conn: RemoteConnection) {
+  activeConnId.value = conn.id
+  connectionStore.openTab(conn, 'tunnel')
   closeAllContextMenus()
 }
 
@@ -314,7 +480,110 @@ function handleHeaderCommand(cmd: string) {
     defaultGroupForNew.value = ''
     editingConnection.value = null
     showConnectionDialog.value = true
+  } else if (cmd === 'exportSessions') {
+    openTransfer('export')
+  } else if (cmd === 'importSessions') {
+    openTransfer('import')
+  } else if (cmd === 'importXsh') {
+    xshInputRef.value?.click()
+  } else if (cmd === 'settings' || cmd === 'openSettings') {
+    openSettingsDialog()
   }
+}
+
+function openTransfer(mode: 'export' | 'import') {
+  transferMode.value = mode
+  // P3：导出带上转发规则与偏好；转发规则额外带 connectionName 便于导入时重绑新 id
+  transferText.value = mode === 'export'
+    ? JSON.stringify(buildSessionBundle(connectionStore, prefs), null, 2)
+    : ''
+  showSessionTransfer.value = true
+}
+
+async function copyTransferText() {
+  try {
+    await navigator.clipboard.writeText(transferText.value)
+    NotificationUtil.success('已复制，请粘贴到文件中保存')
+  } catch {
+    NotificationUtil.warn('剪贴板不可用，请手动全选复制文本框内容')
+  }
+}
+
+async function confirmImport() {
+  const res = await importSessionBundle(transferText.value, connectionStore, prefs)
+  if (res.error) { NotificationUtil.error(res.error); return }
+  if (res.count > 0 || res.rules > 0) {
+    NotificationUtil.success(`成功导入 ${res.count} 个会话、${res.rules} 条转发规则（偏好已合并）`)
+    showSessionTransfer.value = false
+    expandedGroups.value = [...allGroupNames.value]
+  } else {
+    NotificationUtil.warn('未导入任何内容，请检查配置文本')
+  }
+}
+
+
+// ==================== P3：多级分组树 / 颜色标签 / .xsh 导入 ====================
+
+function toggleGroupView() {
+  prefs.groupViewMode = prefs.groupViewMode === 'tree' ? 'list' : 'tree'
+}
+
+function openSettingsDialog() {
+  window.dispatchEvent(new CustomEvent('ssh-open-settings', { detail: { tab: 'highlight' } }))
+}
+
+function setConnColor(color: string) {
+  const conn = connContextMenu.value.conn
+  if (!conn) return
+  conn.color = color
+  void connectionStore.updateConnection(conn)
+  closeAllContextMenus()
+}
+
+function setGroupColor(color: string) {
+  if (!groupContextMenu.value.groupName) return
+  prefs.setGroupColor(groupContextMenu.value.groupName, color)
+  closeAllContextMenus()
+}
+
+/** 树视图没有右键菜单，点击色点循环切换预设颜色，保持零额外弹窗 */
+function nextColor(current: string): string {
+  const list = SESSION_COLORS.map(c => c.value)
+  const idx = list.indexOf(current || '')
+  return list[(idx + 1) % list.length]
+}
+
+function setConnColorFromTree(conn: RemoteConnection) {
+  conn.color = nextColor(conn.color)
+  void connectionStore.updateConnection(conn)
+}
+
+function setGroupColorFromTree(path: string) {
+  prefs.setGroupColor(path, nextColor(prefs.groupColor(path)))
+}
+
+async function onXshFiles(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  const drafts: any[] = []
+  const warnings: string[] = []
+  for (const file of files) {
+    try {
+      const text = decodeXshBuffer(await file.arrayBuffer())
+      const result = parseXsh(text, file.name)
+      drafts.push(result.connection)
+      warnings.push(...result.warnings)
+    } catch {
+      warnings.push(`${file.name} 解析失败`)
+    }
+  }
+  input.value = ''
+  if (!drafts.length) { NotificationUtil.warn('没有可导入的 .xsh 会话'); return }
+  // 复用已有导入弹窗：用户能看到 JSON、确认后再入库
+  transferMode.value = 'import'
+  transferText.value = JSON.stringify({ connections: drafts }, null, 2)
+  showSessionTransfer.value = true
+  NotificationUtil.info(`已解析 ${drafts.length} 个 .xsh 会话；${[...new Set(warnings)].join(' ') || '请确认后点击导入'}`)
 }
 
 // 添加分组
@@ -384,6 +653,13 @@ function handleConnContext(conn: RemoteConnection, event: MouseEvent) {
   }
 }
 
+function handleConnDuplicate() {
+  const conn = connContextMenu.value.conn
+  closeAllContextMenus()
+  if (!conn) return
+  void connectionStore.duplicateConnection(conn)
+}
+
 function handleConnEdit() {
   editingConnection.value = connContextMenu.value.conn
   closeAllContextMenus()
@@ -411,9 +687,9 @@ function closeAllContextMenus() {
   connContextMenu.value.visible = false
 }
 
-onMounted(() => {
-  connectionStore.loadConnections()
-  connectionStore.loadGroups()
+onMounted(async () => {
+  // store 创建时已发起首次读取；这里 await 它，保证展开状态拿到的是磁盘上的真实分组
+  await connectionStore.loadConnections()
   expandedGroups.value = allGroupNames.value.length > 0
     ? [...allGroupNames.value]
     : ['默认分组']
@@ -433,6 +709,26 @@ onMounted(() => {
   // 侧边栏根背景用 sidebarBg（与 Layout/.panel-area 同源），保证 side 色板协调
   @include theme.useTheme {
     background-color: theme.getVar('sidebarBg');
+  }
+}
+
+.panel-search {
+  padding: 0 12px 6px;
+  flex-shrink: 0;
+}
+
+.conn-affix {
+  flex-shrink: 0;
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+}
+
+.transfer-hint {
+  margin: 0 0 8px;
+  line-height: 1.6;
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
   }
 }
 
@@ -576,7 +872,9 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 8px 3px 20px;
+  // P3 颜色标签：左侧 3px 竖条，未标色时完全透明，不改变原有布局
+  border-left: 3px solid transparent;
+  padding: 3px 8px 3px 17px;
   cursor: pointer;
   transition: background-color 0.1s;
   position: relative;
@@ -747,11 +1045,11 @@ onMounted(() => {
 }
 
 .context-menu-danger {
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
 
   &:hover {
     background-color: rgba(245, 108, 108, 0.15);
-    color: var(--el-color-danger);
+    color: var(--stateErrorFg);
   }
 }
 
@@ -850,5 +1148,11 @@ onMounted(() => {
 .delete-confirm-message {
   white-space: pre-line;
   line-height: 1.6;
+}
+
+.hidden-file-input { display: none; }
+.color-swatch {
+  display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+  border: 1px solid rgba(128, 128, 128, 0.5); vertical-align: middle;
 }
 </style>

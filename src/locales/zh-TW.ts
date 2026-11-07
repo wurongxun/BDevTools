@@ -39,6 +39,9 @@ export default {
   darkMode: {
     name: '暗黑模式'
   },
+  highContrast: {
+    name: '高對比度'
+  },
   about: {
     name: '關於'
   },
@@ -741,6 +744,7 @@ export default {
       sectionUpdate: '更新',
       sectionOther: '其他設定',
       darkModeDesc: '切換介面深淺色（與頂欄主題按鈕同步）',
+      highContrastDesc: '提高文字與邊框的對比度（可與明暗模式同時開啟）',
       localeDesc: '選擇介面顯示語言',
       networkCheck: '網路偵測',
       networkCheckDesc: '偵測目前網路連線狀態（功能開發中，暫不可用）',
@@ -775,7 +779,8 @@ export default {
       checkUpdateFailed: '檢查更新失敗：{msg}',
       noUpdateInfo: '拿不到更新套件資訊，請重新檢查更新',
       installedRestart: '已安裝 {version}，應用即將重啟',
-      updateFailed: '更新失敗：{msg}'
+      updateFailed: '更新失敗：{msg}',
+      confirm: '確認'
     },
     plugin: {
       manageDesc1: '內建插件隨應用編譯，不可卸載；第三方插件以套件形式安裝（plugin.json + 頁面資源 + 可選 plugin.wasm），頁面跑在不透明源的沙箱 iframe 中——只佔用主面板，不提供側欄、不接管標籤條；後端邏輯跑在 Extism WASM 沙箱中，宿主能力（日誌 / KV / 檔案 / HTTP）按清單宣告逐次校驗後放行。安裝後預設在所有視窗啟用（視窗預設裡已顯式勾選插件清單的會自動追加該插件）。',

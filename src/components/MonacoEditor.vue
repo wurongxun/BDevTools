@@ -16,6 +16,7 @@
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import * as monaco from 'monaco-editor'
 import { isDark } from '@/composables/useDark'
+import { isHighContrast } from '@/composables/useHighContrast'
 
 // ==================== monaco worker 配置（全应用只需一次） ====================
 // vite 通过 `?worker` 把 worker 打成独立 chunk；MonacoEnvironment 按语言 label 分发。
@@ -47,6 +48,70 @@ const LANGUAGE_ALIAS: Record<string, string> = {
   vue: 'html',
   javascriptreact: 'javascript',
   typescriptreact: 'typescript'
+}
+
+// ==================== 编辑器主题：与外壳同源 ====================
+// monaco 的 defineTheme 只吃具体色值、不认 CSS 变量，所以从 :root 上把编辑器令牌
+// （theme.scss 的 editorBg/editorFg/...）读出来喂给它 —— 改 theme.scss 编辑器就跟着变，
+// 不再各自维护一套。
+// colors 只覆盖「UI 外壳色」，`inherit: true` 保留内置 vs/vs-dark 成熟的语法高亮着色
+// （自绘 20+ 条 token 规则成本高、且很难做得比内置好）。
+const EDITOR_THEME = 'bdev-tools'
+const EDITOR_FALLBACK: Record<string, [string, string]> = {
+  // [亮色兜底, 暗色兜底]：令牌缺失时不至于让编辑器变黑底黑字
+  editorBg: ['#ffffff', '#2b2b2b'],
+  editorFg: ['#212121', '#bbbbbb'],
+  editorGutterBg: ['#ffffff', '#2b2b2b'],
+  editorLineNumberFg: ['#666666', '#949494'],
+  editorSelectionBg: ['#add6ff', '#234060'],
+  editorLineHighlightBg: ['#f0f0f0', '#323537'],
+  editorCursorFg: ['#005a9e', '#79c0ff'],
+  editorIndentGuideBg: ['#e6e6e6', '#373a3c'],
+  editorWidgetBorder: ['#808080', '#8c9094'],
+}
+
+/** 读取当前主题下的编辑器令牌值（必须在主题 class 已生效后调用，见下方 flush:'post'） */
+function readEditorTokens(dark: boolean): Record<string, string> {
+  const style = getComputedStyle(document.documentElement)
+  const out: Record<string, string> = {}
+  for (const key of Object.keys(EDITOR_FALLBACK)) {
+    const raw = style.getPropertyValue(`--${key}`).trim()
+    out[key] = raw || EDITOR_FALLBACK[key][dark ? 1 : 0]
+  }
+  return out
+}
+
+/**
+ * 定义/重定义编辑器主题。
+ * 主题切换时必须重新 define：monaco 的主题是「定义时的快照」，
+ * 不会因为我们改了 CSS 变量而自动更新。
+ */
+function defineEditorTheme(dark: boolean) {
+  const c = readEditorTokens(dark)
+  monaco.editor.defineTheme(EDITOR_THEME, {
+    base: dark ? 'vs-dark' : 'vs',
+    inherit: true,
+    rules: [],
+    colors: {
+      'editor.background': c.editorBg,
+      'editor.foreground': c.editorFg,
+      'editorGutter.background': c.editorGutterBg,
+      'editorLineNumber.foreground': c.editorLineNumberFg,
+      'editorLineNumber.activeForeground': c.editorFg,
+      'editor.selectionBackground': c.editorSelectionBg,
+      'editor.lineHighlightBackground': c.editorLineHighlightBg,
+      'editorCursor.foreground': c.editorCursorFg,
+      'editorIndentGuide.background': c.editorIndentGuideBg,
+      'editorIndentGuide.activeBackground': c.editorIndentGuideBg,
+      // 悬浮/建议类浮层：跟随面板色，避免与外壳割裂
+      'editorWidget.background': c.editorBg,
+      'editorWidget.border': c.editorWidgetBorder,
+      'editorSuggestWidget.background': c.editorBg,
+      'editorSuggestWidget.border': c.editorWidgetBorder,
+      'editorHoverWidget.background': c.editorBg,
+      'editorHoverWidget.border': c.editorWidgetBorder
+    }
+  })
 }
 
 const props = withDefaults(
@@ -83,10 +148,11 @@ function resolveLanguage(lang: string): string {
 onMounted(() => {
   if (!containerRef.value) return
   const language = resolveLanguage(props.language)
+  defineEditorTheme(isDark.value)
   editor = monaco.editor.create(containerRef.value, {
     value: props.modelValue,
     language,
-    theme: isDark.value ? 'vs-dark' : 'vs',
+    theme: EDITOR_THEME,
     minimap: { enabled: false },
     fontSize: 14,
     lineNumbers: 'on',
@@ -133,9 +199,21 @@ onMounted(() => {
 })
 
 // 暗黑模式：monaco 主题跟随全局单例（setTheme 为全局操作，实例实时生效）
-watch(isDark, (dark) => {
-  monaco.editor.setTheme(dark ? 'vs-dark' : 'vs')
-})
+//
+// flush:'post' 是硬要求：useDark 先改 isDark 再给 <html> 加 class，
+// 默认（pre）时机读到的还是**旧主题**的 CSS 变量 ⇒ 编辑器会拿着上一套颜色。
+// 明暗切换 + 高对比度切换都会改变编辑器令牌的取值，两件事都要重新 define 再 setTheme
+//（monaco 的主题是「定义时的快照」，只 setTheme 不会重读变量）。
+// flush:'post' 是硬要求：useDark 先改 isDark 再给 <html> 加 class，
+// 默认（pre）时机读到的还是**旧主题**的 CSS 变量 ⇒ 编辑器会拿着上一套颜色。
+watch(
+  [isDark, isHighContrast],
+  ([dark]) => {
+    defineEditorTheme(dark)
+    monaco.editor.setTheme(EDITOR_THEME)
+  },
+  { flush: 'post' }
+)
 
 // 外部内容变化（如切换文档 / 重新加载）→ 仅在值不同时回写，避免滚动与光标跳动
 watch(

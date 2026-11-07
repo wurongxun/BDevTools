@@ -41,10 +41,12 @@ const emit = defineEmits<{
   flex-shrink: 0;
   padding: 4px var(--space-3);
   font-size: var(--font-size-sm);
-  color: var(--el-color-warning);
-  background: var(--el-color-warning-light-9);
-  border-top: 1px solid var(--el-color-warning-light-7);
-  border-bottom: 1px solid var(--el-color-warning-light-7);
+  /* 文字色必须用状态色族的 *Fg：--el-color-warning 是填充色，
+     当文字用对比度不达标（同 dangerText 的教训） */
+  color: var(--stateWarningFg);
+  background: var(--stateWarningFill);
+  border-top: 1px solid var(--stateWarningFg);
+  border-bottom: 1px solid var(--stateWarningFg);
 }
 .pb-icon {
   font-size: 13px;
@@ -53,7 +55,7 @@ const emit = defineEmits<{
   font-family: var(--font-family-mono);
 }
 .pb-err {
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
 }
 .spacer {
   flex: 1;

@@ -1,0 +1,47 @@
+[package]
+name = "bdevtools-plugin-database"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "BDevTools built-in database plugin (pure Rust business layer)"
+
+[lib]
+name = "bdevtools_plugin_database"
+path = "src/lib.rs"
+
+[dependencies]
+bdevtools-core = { path = "../bdevtools-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0.104"
+log = "0.4.34"
+chrono = "0.4"
+uuid = { version = "1", features = ["v4"] }
+lazy_static = "1.5.1"
+parking_lot = "0.12.5"
+rusqlite = { version = "0.31", features = ["bundled"] }
+async-trait = "0.1"
+futures-util = "0.3"
+regex = "1.13.1"
+encoding_rs = "0.8"
+hex = "0.4"
+md5 = "0.8"
+
+# 下面几个 sqlx 的「类型支持」特性是功能开关而非可选优化：缺哪个，
+# 对应那一类列就整列退化成「类型转换失败」。完整论证见 operations.rs 的类型分支注释。
+sqlx = { version = "0.8", features = [
+  "runtime-tokio-rustls",
+  "mysql",
+  "postgres",
+  "rust_decimal",
+  "chrono",
+  "json",
+  "uuid",
+] }
+tiberius = { version = "0.12", default-features = false, features = ["tds73", "native-tls", "chrono"] }
+tokio-util = { version = "0.7", features = ["compat"] }
+odbc-api = "29"
+calamine = "0.37.0"
+rust_xlsxwriter = "0.80"
+csv = "1.4"

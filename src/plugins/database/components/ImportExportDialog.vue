@@ -220,7 +220,7 @@ function handleClose() {
 .error-item {
   font-size: var(--font-size-base);
   /* 错误文字用 EP danger（light=#f56c6c / dark 已注入），跟随主题 */
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   line-height: 1.6;
 }
 </style>

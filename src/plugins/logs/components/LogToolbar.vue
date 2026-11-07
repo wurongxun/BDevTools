@@ -243,7 +243,7 @@ watch(
   top: 50%;
   transform: translateY(-50%);
   font-size: var(--font-size-xs);
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   cursor: help;
 }
 
@@ -287,7 +287,7 @@ watch(
 
 /* 跳转失败是"操作没生效"，用告警色以区别于普通的降级说明 */
 .tb-jump-hint {
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
 }
 
 .tb-spacer {

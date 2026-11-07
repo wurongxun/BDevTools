@@ -38,7 +38,7 @@
     <!-- 空态：提示从按钮或拖拽打开 -->
     <div v-if="!store.dumps.length" class="sb-drop" @dragover.prevent @drop.prevent="onDrop">
       <p class="sb-empty">还没有打开堆转储文件</p>
-      <p class="sb-hint">点击上方按钮选择 .hprof / .phd 文件，或直接拖拽到此处</p>
+      <p class="sb-hint">点击上方按钮选择 .hprof / .hprof.gz / .phd 文件，或直接拖拽到此处</p>
     </div>
   </div>
 </template>
@@ -54,14 +54,14 @@ import type { MatDump } from './types'
 const store = useMatStore()
 const picking = ref(false)
 
-/** 打开文件对话框（支持 HPROF / Android .hprof / IBM PHD） */
+/** 打开文件对话框（HPROF / Android .hprof / IBM PHD / gzip 压缩的 .hprof.gz） */
 async function pickFile() {
   picking.value = true
   try {
     const selected = await open({
       multiple: true,
       filters: [
-        { name: '堆转储文件', extensions: ['hprof', 'phd'] },
+        { name: '堆转储文件', extensions: ['hprof', 'phd', 'gz', 'gzip'] },
         { name: '所有文件', extensions: ['*'] },
       ],
     })
@@ -219,7 +219,7 @@ function kindClass(d: MatDump): string {
 
 .sb-err {
   font-size: var(--font-size-xs);
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

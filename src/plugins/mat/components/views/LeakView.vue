@@ -11,7 +11,13 @@
 
     <!-- 分析中（支配树计算较重，明确提示耗时） -->
     <div v-else-if="state.loading" v-loading="true" class="lk-loading">
-      <div class="lk-loading-tip">正在解析对象引用图并计算支配树（Retained Heap）…</div>
+      <WorkerProgress
+        v-if="worker && !worker.finished"
+        :dump-id="dump.id"
+        hint="分析跑在独立子进程里，主窗口可以正常操作；完成后本页自动显示结果。"
+        counters
+      />
+      <div v-else class="lk-loading-tip">正在解析对象引用图并计算支配树（Retained Heap）…</div>
     </div>
 
     <template v-else-if="result">
@@ -26,6 +32,8 @@
         <app-button size="small" text class="lk-budget" @click="store.openSettings()">
           <el-icon class="lk-budget-ic"><Setting /></el-icon>分析预算
         </app-button>
+        <ExportButton :rows="csvRows" :columns="csvColumns" :filename="`${dump.name}-leak-suspects.csv`" label="CSV" />
+        <app-button size="small" text :disabled="!result.suspects.length" @click="exportHtmlReport">导出报告</app-button>
       </div>
 
       <!-- 堆统计条 -->
@@ -41,6 +49,31 @@
         <el-icon class="lk-notes-ic"><InfoFilled /></el-icon>
         <div class="lk-notes-body">
           <div v-for="(n, i) in result.notes" :key="i" class="lk-notes-line">{{ n }}</div>
+        </div>
+      </div>
+
+      <!-- 问题叙述 + 占比饼图 -->
+      <div v-if="result.suspects.length" class="lk-overview">
+        <div class="lk-narr">
+          <div class="lk-narr-head">
+            <b>问题叙述</b>
+            <span class="lk-narr-hint">由报告自动生成的结论摘要，便于直接贴进问题单</span>
+          </div>
+          <ol class="lk-narr-list">
+            <li v-for="(n, i) in narratives" :key="i">
+              <b>{{ n.head }}</b>{{ n.body }}
+            </li>
+          </ol>
+        </div>
+        <div class="lk-pie">
+          <div class="lk-pie-chart" :style="{ background: pie.gradient }" role="img" aria-label="可达堆占比饼图"></div>
+          <div class="lk-pie-legend">
+            <div v-for="s in pie.segs" :key="s.label" class="lk-pie-item">
+              <i class="lk-pie-dot" :style="{ background: s.color }"></i>
+              <span class="lk-pie-name" :title="s.label">{{ s.label }}</span>
+              <span class="lk-pie-pct">{{ s.pct.toFixed(2) }}%</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -90,15 +123,22 @@
                 </span>
               </div>
 
-              <!-- 引用路径 -->
+              <!-- 引用路径（长链默认折叠，避免把卡片撑高） -->
               <div class="lk-path mono">
                 <template v-if="sp.path.length">
-                  <template v-for="(p, i) in sp.path" :key="i">
+                  <template v-for="(p, i) in visiblePath(sp)" :key="i">
                     <span v-if="i" class="lk-arrow">→</span>
                     <span class="lk-node" :class="{ root: p.is_root }" :title="p.is_root ? 'GC Root 对象' : p.class_name">
                       {{ p.class_name }}
                     </span>
                   </template>
+                  <button
+                    v-if="sp.path.length > PATH_FOLD"
+                    type="button"
+                    class="lk-fold"
+                    :aria-label="expanded.has(sp.rank) ? '收起支配链' : '展开完整支配链'"
+                    @click="togglePath(sp.rank)"
+                  >{{ expanded.has(sp.rank) ? '收起' : `…+${sp.path.length - PATH_FOLD}` }}</button>
                 </template>
                 <span v-else class="lk-node">（无支配链信息）</span>
               </div>
@@ -125,12 +165,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Aim, CircleCheck, InfoFilled, Refresh, Setting, WarningFilled } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useMatStore } from '../../store'
+import WorkerProgress from '../WorkerProgress.vue'
 import { formatBytes, formatInt } from '../../api/matApi'
 import type { MatLeakSummary, MatLeakSuspect } from '../../api/matApi'
 import type { MatDump } from '../../types'
+import { exportHtml, reportHtml, escapeHtml } from '../../utils/export'
+import type { ExportColumn } from '../../utils/export'
+import ExportButton from '../ExportButton.vue'
 
 /**
  * 泄漏检测（Leak Suspects）：后端基于对象引用图 → Lengauer-Tarjan 支配树
@@ -147,6 +192,8 @@ const props = defineProps<{
 const store = useMatStore()
 
 const state = computed(() => store.leakCache[props.dump.id] ?? { loading: false, error: '', data: null })
+/** 后台分析作业（有就显示进度，别让用户对着一个转圈猜） */
+const worker = computed(() => store.workerJobOf(props.dump.id))
 const result = computed(() => state.value.data)
 
 /** 加载（缓存命中 / 分析中不重复请求） */
@@ -157,6 +204,199 @@ async function load() {
 /** 跳到引用追踪并定位该嫌疑对象（双向引用 + Path to GC Roots） */
 function track(sp: MatLeakSuspect) {
   store.openRefs(props.dump.id, { kind: 'object', objId: sp.obj_id, className: sp.class_name })
+}
+
+// ---------- 支配链折叠 ----------
+/** 折叠时保留的节点数：GC Root 在链首、嫌疑对象在链尾，中间才是噪音 */
+const PATH_FOLD = 6
+/** 已展开的嫌疑（按 rank 记，rank 在同一次分析里稳定） */
+const expanded = ref<Set<number>>(new Set())
+
+function togglePath(rank: number): void {
+  const next = new Set(expanded.value)
+  if (next.has(rank)) next.delete(rank)
+  else next.add(rank)
+  expanded.value = next
+}
+
+/** 折叠态保留「头 2 + 尾 4」，跨过中间的委托/包装层 */
+function visiblePath(sp: MatLeakSuspect): MatLeakSuspect['path'] {
+  const p = sp.path
+  if (p.length <= PATH_FOLD || expanded.value.has(sp.rank)) return p
+  return [...p.slice(0, 2), ...p.slice(p.length - 4)]
+}
+
+// ---------- 问题叙述（模板化结论） ----------
+/**
+ * 按「类名 / 持有形态」给一条定位建议。
+ * 这是启发式规则（不做类型推断），命中就给出方向，不命中只报事实 ——
+ * 报告的价值在「哪些对象值得看」，不在替用户下判断，因此文案里不写「就是泄漏」。
+ */
+function hintOf(sp: MatLeakSuspect): string {
+  const c = sp.class_name
+  if (sp.is_class) return '类对象被静态字段持有 ⇒ 检查该类的 static 集合/缓存是否有上限与清理'
+  if (/ClassLoader|^sun\..*Loader/.test(c)) return '类加载器未被释放 ⇒ 检查热部署/动态代理/线程上下文类加载器'
+  if (/Thread|Executor|Pool/.test(c)) return '由线程/线程池持有 ⇒ 检查 ThreadLocal、任务队列与线程生命周期'
+  if (/Map|Cache|Dictionary|Table|Set$/.test(c)) return '集合/缓存类 ⇒ 检查容量上限、过期策略与 key 是否被外部强引用'
+  if (/\[\]$|^\[/.test(c)) return '数组对象 ⇒ 检查批量读取、缓冲区与扩容后的旧数组引用'
+  if (/String|CharSequence/.test(c)) return '字符串聚集 ⇒ 检查重复构造与 substring 保留大底串'
+  if (/Connection|Session|Client|Channel|Stream/.test(c)) return '资源类对象 ⇒ 检查是否关闭/归还，连接池是否回收'
+  return '按支配链逐层定位持有者，确认该引用是否仍应存在'
+}
+
+interface Narrative { head: string; body: string }
+
+const narratives = computed<Narrative[]>(() => {
+  const r = result.value
+  const sps = r?.suspects ?? []
+  if (!r || !sps.length) return []
+  const out: Narrative[] = []
+  const reach = r.summary.reachable_shallow
+
+  const top = sps[0]
+  const share = reach > 0 ? ((top.retained_bytes / reach) * 100).toFixed(1) : top.pct.toFixed(1)
+  out.push({
+    head: `${top.class_name}：`,
+    body:
+      `仅该对象就支配 ${formatBytes(top.retained_bytes)}，占可达堆（${formatBytes(reach)}）的 ${share}%，`
+      + `合计 ${formatInt(top.retained_objects)} 个对象；最近 GC Root 为「${rootLabel(top.root_kind)}」。`
+      + `${hintOf(top)}。`,
+  })
+
+  const rest = sps.slice(1, 3)
+  if (rest.length) {
+    const sum = sps.reduce((a, s) => a + s.retained_bytes, 0)
+    const shareAll = reach > 0 ? ((sum / reach) * 100).toFixed(1) : '—'
+    out.push({
+      head: `Top ${sps.length} 合计：`,
+      body:
+        `共支配 ${formatBytes(sum)}，占可达堆 ${shareAll}%。`
+        + rest.map((s, i) => `第 ${i + 2} 名 ${s.class_name}（${s.pct.toFixed(1)}%，${hintOf(s)}）`).join('；')
+        + '。',
+    })
+  }
+
+  const un = r.summary.unreachable_shallow
+  if (un > 0) {
+    out.push({
+      head: '不可达对象：',
+      body:
+        `${formatInt(r.summary.unreachable_nodes)} 个对象（${formatBytes(un)}）已不可达但仍占文件体积 —— `
+        + '这部分是 dump 时刻尚未被 GC 回收的垃圾，重启/GC 后会释放，不计入泄漏。',
+    })
+  }
+  return out
+})
+
+// ---------- 占比饼图（纯 CSS conic-gradient，无图表库） ----------
+/**
+ * 只画 Top 5 + 其余可达对象。用 CSS 变量当色值，深色主题自动跟随 ——
+ * 引 echarts 需要额外处理 useDark 的类名时序（先改 ref 后加类），收益不抵成本。
+ */
+const PIE_COLORS = [
+  'var(--el-color-danger)',
+  'var(--el-color-warning)',
+  'var(--el-color-primary)',
+  'var(--el-color-success)',
+  'var(--el-color-info)',
+]
+const pie = computed<{ segs: { label: string; pct: number; color: string }[]; gradient: string }>(() => {
+  const sps = result.value?.suspects ?? []
+  const top = sps.slice(0, 5)
+  const segs = top.map((s, i) => ({
+    label: s.class_name,
+    pct: Math.max(0, s.pct),
+    color: PIE_COLORS[i],
+  }))
+  const used = segs.reduce((a, s) => a + s.pct, 0)
+  const restPct = Math.max(0, 100 - used)
+  if (restPct > 0.05) segs.push({ label: '其他可达对象', pct: restPct, color: 'var(--el-fill-color-dark)' })
+
+  let acc = 0
+  const stops = segs.map((s) => {
+    const from = acc
+    acc = Math.min(100, acc + s.pct)
+    return `${s.color} ${from.toFixed(2)}% ${acc.toFixed(2)}%`
+  })
+  return { segs, gradient: `conic-gradient(${stops.join(', ')})` }
+})
+
+
+// ---------- 导出 ----------
+const csvColumns: ExportColumn[] = [
+  { key: 'rank', label: 'Rank' },
+  { key: 'obj_id', label: 'Object ID' },
+  { key: 'class_name', label: 'Class Name' },
+  { key: 'shallow_bytes', label: 'Shallow (bytes)' },
+  { key: 'retained_bytes', label: 'Retained (bytes)' },
+  { key: 'retained_objects', label: 'Retained Objects' },
+  { key: 'pct', label: 'Retained %' },
+  { key: 'root_kind', label: 'GC Root Kind' },
+  { key: 'path', label: 'Dominator Path' },
+]
+const csvRows = computed(() =>
+  (result.value?.suspects ?? []).map(sp => ({
+    rank: sp.rank,
+    obj_id: sp.obj_id,
+    class_name: sp.class_name,
+    shallow_bytes: sp.shallow_bytes,
+    retained_bytes: sp.retained_bytes,
+    retained_objects: sp.retained_objects,
+    pct: sp.pct.toFixed(2),
+    root_kind: sp.root_kind,
+    path: sp.path.map(p => p.class_name).join(' → '),
+  }))
+)
+
+/** HTML 报告：内联样式、可脱离应用独立打开 */
+function exportHtmlReport(): void {
+  const r = result.value
+  if (!r) return
+  const s = r.summary
+  const meta = [
+    `文件：${props.dump.path}`,
+    `格式：${props.dump.format} · 大小：${formatBytes(props.dump.size)}`,
+    `可达对象：${formatInt(s.reachable_nodes)} · 可达浅堆：${formatBytes(s.reachable_shallow)}`,
+    `支配树：${s.truncated ? '因规模限制跳过' : '已计算'}`,
+  ]
+  const parts: string[] = []
+  parts.push('<h2>堆概览</h2><table>')
+  const stats: [string, string][] = [
+    ['堆对象总数', formatInt(s.total_nodes)],
+    ['全部浅堆', formatBytes(s.total_shallow)],
+    ['GC Roots', formatInt(s.root_nodes)],
+    ['引用边', formatInt(s.edge_count)],
+    ['可达对象 / 浅堆', `${formatInt(s.reachable_nodes)} / ${formatBytes(s.reachable_shallow)}`],
+    ['不可达对象 / 浅堆', `${formatInt(s.unreachable_nodes)} / ${formatBytes(s.unreachable_shallow)}`],
+  ]
+  for (const [k, v] of stats) parts.push(`<tr><th>${escapeHtml(k)}</th><td class="num">${escapeHtml(v)}</td></tr>`)
+  parts.push('</table>')
+  if (r.notes.length) {
+    parts.push('<h2>分析说明</h2><ul>' + r.notes.map(n => `<li>${escapeHtml(n)}</li>`).join('') + '</ul>')
+  }
+  if (narratives.value.length) {
+    parts.push(
+      '<h2>问题叙述</h2><ol>'
+      + narratives.value.map(n => `<li><b>${escapeHtml(n.head)}</b>${escapeHtml(n.body)}</li>`).join('')
+      + '</ol>',
+    )
+  }
+  parts.push(`<h2>Top ${r.suspects.length} 泄漏嫌疑</h2>`)
+  for (const sp of r.suspects) {
+    const pct = Math.min(100, Math.max(0, sp.pct))
+    parts.push('<div class="card">')
+    parts.push(`<b>#${sp.rank} ${escapeHtml(sp.class_name)}</b> <span class="muted">${escapeHtml(sp.obj_id)}</span>`)
+    parts.push(`<p>Retained Heap：${escapeHtml(formatBytes(sp.retained_bytes))}（${sp.pct.toFixed(2)}% 可达堆，${formatInt(sp.retained_objects)} 个对象） · Shallow：${escapeHtml(formatBytes(sp.shallow_bytes))} · GC Root：${escapeHtml(sp.root_kind)}</p>`)
+    parts.push(`<div class="bar"><i style="width:${pct}%"></i></div>`)
+    parts.push(`<p class="muted">支配链：${sp.path.map(p => escapeHtml(p.class_name)).join(' → ') || '—'}</p>`)
+    parts.push('</div>')
+  }
+  try {
+    exportHtml(`${props.dump.name}-leak-report.html`, reportHtml('Leak Suspects 报告', meta, parts.join('')))
+    ElMessage.success('泄漏报告已导出')
+  } catch (e: any) {
+    ElMessage.error('导出失败：' + (e?.message || String(e)))
+  }
 }
 
 /** GC Root 分类 → 中文标签（未知分类原样展示） */
@@ -218,7 +458,10 @@ function retClass(pct: number): string {
 
 watch(
   () => props.dump.id,
-  () => void load()
+  () => {
+    expanded.value = new Set()
+    void load()
+  }
 )
 
 onMounted(() => {
@@ -241,7 +484,7 @@ onMounted(() => {
   gap: 8px;
   padding: 8px 12px;
   font-size: var(--font-size-sm);
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   background: var(--el-color-danger-light-9);
   border-bottom: 1px solid var(--el-color-danger-light-7);
 
@@ -342,7 +585,7 @@ onMounted(() => {
   gap: 8px;
   padding: 6px 12px;
   font-size: var(--font-size-sm);
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
   background: var(--el-color-warning-light-9);
   border-bottom: 1px solid var(--el-color-warning-light-7);
   flex-shrink: 0;
@@ -479,11 +722,11 @@ onMounted(() => {
   font-variant-numeric: tabular-nums;
 
   &.high {
-    color: var(--el-color-danger);
+    color: var(--stateErrorFg);
   }
 
   &.mid {
-    color: var(--el-color-warning);
+    color: var(--stateWarningFg);
   }
 }
 
@@ -492,11 +735,11 @@ onMounted(() => {
   font-variant-numeric: tabular-nums;
 
   &.high {
-    color: var(--el-color-danger);
+    color: var(--stateErrorFg);
   }
 
   &.mid {
-    color: var(--el-color-warning);
+    color: var(--stateWarningFg);
   }
 }
 
@@ -568,6 +811,115 @@ onMounted(() => {
   }
 }
 
+// ---------- 问题叙述 + 饼图 ----------
+.lk-overview {
+  display: flex;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.lk-narr {
+  flex: 1;
+  min-width: 320px;
+}
+
+.lk-narr-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: var(--font-size-sm);
+  color: var(--el-text-color-primary);
+  flex-wrap: wrap;
+}
+
+.lk-narr-hint {
+  font-size: var(--font-size-xs);
+  color: var(--el-text-color-placeholder);
+}
+
+.lk-narr-list {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  font-size: var(--font-size-sm);
+  line-height: 1.8;
+  color: var(--el-text-color-regular);
+
+  li { word-break: break-word; }
+
+  b { color: var(--el-text-color-primary); }
+}
+
+.lk-pie {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.lk-pie-chart {
+  width: 88px;
+  height: 88px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--el-border-color-lighter);
+  // 中心留白，做成环形，露出面板底色
+  mask: radial-gradient(circle, transparent 44%, #000 45%);
+}
+
+.lk-pie-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--font-size-xs);
+  max-width: 240px;
+}
+
+.lk-pie-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lk-pie-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-xs);
+  flex-shrink: 0;
+}
+
+.lk-pie-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-family-mono);
+  color: var(--el-text-color-regular);
+}
+
+.lk-pie-pct {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--el-text-color-secondary);
+}
+
+// ---------- 支配链折叠 ----------
+.lk-fold {
+  border: 1px solid var(--el-border-color-lighter);
+  background: transparent;
+  color: var(--el-color-primary);
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: var(--font-size-xs);
+  line-height: 16px;
+  cursor: pointer;
+
+  &:hover { border-color: var(--el-color-primary); }
+}
+
 // 无嫌疑
 .lk-none {
   display: flex;
@@ -582,7 +934,7 @@ onMounted(() => {
 
 .lk-none-ic {
   font-size: 18px;
-  color: var(--el-color-success);
+  color: var(--stateSuccessFg);
 }
 
 .lk-budget {
