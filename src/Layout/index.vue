@@ -185,9 +185,9 @@ const setSidebarWidthNow = (target: number) => {
 
 /** 插件切换时恢复该插件记住的宽度：无动画、宽度相同则跳过；切换后即时通知一次布局更新（消除延迟链） */
 watch(() => pluginManager.activeToolId.value, async (newId) => {
-  // 面板收起、或该插件未提供 sidebarPanel：保持活动栏宽度，不恢复插件记住的宽度
+  // 面板收起、或该插件未提供 sidebarPanel：只剩活动栏（活动栏也隐藏时收起为 0），不恢复插件记住的宽度
   if (useLayoutStore.sidebarPanelCollapsed || !hasSidebar.value) {
-    setSidebarWidthNow(ACTIVITY_BAR_WIDTH)
+    setSidebarWidthNow(activityBarHidden.value ? 0 : ACTIVITY_BAR_WIDTH)
     await nextTick()
     triggerLayoutUpdate('plugin-switch')
     return
@@ -198,13 +198,13 @@ watch(() => pluginManager.activeToolId.value, async (newId) => {
   triggerLayoutUpdate('plugin-switch')
 })
 
-/** 插件面板收起/展开：收起时缩到活动栏宽度，展开时恢复该插件记住的宽度 */
+/** 插件面板收起/展开：收起时缩到活动栏宽度（活动栏隐藏则收起为 0），展开时恢复记住的宽度 */
 watch(() => useLayoutStore.sidebarPanelCollapsed, async (collapsed) => {
   const activeId = pluginManager.activeToolId.value
   if (collapsed) {
     // 记住收起前的宽度，展开时恢复（无侧栏插件不记，避免把活动栏宽度存成该插件的宽度）
     if (hasSidebar.value) pluginSidebarWidths[activeId] = sidebarWidth.value
-    setSidebarWidthNow(ACTIVITY_BAR_WIDTH)
+    setSidebarWidthNow(activityBarHidden.value ? 0 : ACTIVITY_BAR_WIDTH)
   } else if (hasSidebar.value) {
     setSidebarWidthNow(pluginSidebarWidths[activeId] ?? activeSidebarCfg.value.def)
   }
@@ -213,26 +213,27 @@ watch(() => useLayoutStore.sidebarPanelCollapsed, async (collapsed) => {
 })
 
 /**
- * 活动栏是否被隐藏：专注模式（窗口预设）与沉浸式都会隐藏它
+ * 活动栏是否被隐藏：专注模式（窗口预设）、沉浸式，或用户收起插件入口（QuickActions 第三个按钮）
  * 活动栏被隐藏且当前插件没有侧栏面板时，侧栏整条收起（0）——留一个活动栏的宽度会变成一条空白带
  */
-const activityBarHidden = computed(() => isFocusMode.value || isImmersive.value)
+const activityBarHidden = computed(() => isFocusMode.value || isImmersive.value || useLayoutStore.activityBarCollapsed)
 
 /** 按「有无侧栏面板 + 活动栏是否隐藏」把侧栏宽度收敛到该有的值 */
 const syncSidebarWidth = () => {
   const activeId = pluginManager.activeToolId.value
-  if (!hasSidebar.value) {
+  // 面板收起或当前插件没有侧栏时只剩活动栏；活动栏也被隐藏则整条侧栏收起为 0
+  if (!hasSidebar.value || useLayoutStore.sidebarPanelCollapsed) {
     setSidebarWidthNow(activityBarHidden.value ? 0 : ACTIVITY_BAR_WIDTH)
-  } else if (!useLayoutStore.sidebarPanelCollapsed) {
+  } else {
     setSidebarWidthNow(pluginSidebarWidths[activeId] ?? activeSidebarCfg.value.def)
   }
 }
 
 /**
- * 侧栏有无会随激活插件、启用插件列表（布局预设）、沉浸式开关变化
+ * 侧栏有无会随激活插件、启用插件列表（布局预设）、沉浸式、插件入口显隐变化
  * 无侧栏：收敛到活动栏宽度（活动栏也被隐藏时为 0）；恢复有侧栏：回到该插件记住的宽度
  */
-watch([hasSidebar, isImmersive], () => {
+watch([hasSidebar, isImmersive, activityBarHidden], () => {
   syncSidebarWidth()
   nextTick(() => triggerLayoutUpdate('sidebar-availability'))
 }, { immediate: true })

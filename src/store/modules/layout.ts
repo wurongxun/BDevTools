@@ -31,6 +31,8 @@ const useLayoutStore = defineStore('layout', {
     immersiveMode: false,
     /** 插件面板收起：仅隐藏 sidebarPanel（panel-area），保留活动栏图标列 */
     sidebarPanelCollapsed: false,
+    /** 活动栏（插件入口图标列，含底部常驻入口）收起：只隐藏图标列，保留插件面板 */
+    activityBarCollapsed: false,
     /**
      * 停靠面板状态（key = 停靠位置，目前只有 'bottom'）。
      * 停靠面板由 `ToolPlugin.dockPanel` 声明，**不参与 activeToolId 切换**——
@@ -108,6 +110,11 @@ const useLayoutStore = defineStore('layout', {
       }
     },
 
+    /** 切换活动栏（插件入口图标列）显隐 */
+    toggleActivityBar() {
+      this.activityBarCollapsed = !this.activityBarCollapsed
+    },
+
     /** 切换插件面板显隐 */
     toggleSidebarPanel() {
       this.sidebarPanelCollapsed = !this.sidebarPanelCollapsed
@@ -183,6 +190,7 @@ const useLayoutStore = defineStore('layout', {
       this.focusMode = false
       this.immersiveMode = false
       this.sidebarPanelCollapsed = false
+      this.activityBarCollapsed = false
       this.dockPanelVisible = { bottom: false }
       this.dockPanelHeight = { bottom: 280 }
       this.dockPanelExpanded = { bottom: false }

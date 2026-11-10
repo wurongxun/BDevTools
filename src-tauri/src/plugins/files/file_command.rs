@@ -1,6 +1,5 @@
 use crate::response::resp_data::ResData;
 use std::path::{Path, PathBuf};
-use chardetng::EncodingDetector;
 
 // 获取目录下笔记
 pub async fn get_note_list(path: String) -> Result<ResData<Vec<String>>, String> {
@@ -35,21 +34,16 @@ pub async fn get_note_list(path: String) -> Result<ResData<Vec<String>>, String>
 }
 // ... existing code ...
 
-// 读取本地笔记文件
+// 读取本地笔记文件（自动检测编码，并剥掉 BOM）
 pub async fn read_note_file(path: String) -> Result<ResData<String>, String> {
-    // 首先读取原始字节
     let bytes = tokio::fs::read(&path)
         .await
         .map_err(|err| format!("读取文件失败: {}", err))?;
 
-    let mut detector = EncodingDetector::new(chardetng::Iso2022JpDetection::Allow);
-    detector.feed(&bytes[..], bytes.is_empty());
-    let encoding = detector.guess(None, chardetng::Utf8Detection::Allow);
-
-    // 根据检测到的编码解码文件内容
-    let (cow_text, _encoding_used, _had_errors) = encoding.decode(&bytes);
-    // 转换为 String
-    let content = cow_text.into_owned();
+    // 统一走 file_meta 的解码口径：BOM 优先、chardetng 兜底。
+    // 旧实现没剥 BOM，UTF-8 BOM 会以 U+FEFF 出现在首行并被反复写回。
+    let (_encoding, _bom, content) =
+        crate::plugins::files::file_meta::decode_bytes(&bytes);
 
     Ok(ResData {
         code: 200,
@@ -111,10 +105,15 @@ pub async fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
+/// 文件名是否自带扩展名（含 `.gitignore` 这类隐藏文件）。
+fn has_extension(name: &str) -> bool {
+    name.starts_with('.') || Path::new(name).extension().is_some()
+}
+
 /**
- * 创建笔记文件
- * @param father_path 父文件夹路径
- * @param new_note_md_file_name 新笔记文件名
+ * 创建文件。
+ * 用户输入带扩展名时原样创建（.json / .env / .py / .gitignore ...）；
+ * 不带扩展名时沿用旧的「新建笔记」默认补 `.md`，避免破坏既有交互。
  */
 pub async fn create_note_file(
     father_path: String,
@@ -127,125 +126,170 @@ pub async fn create_note_file(
             data: String::new(),
         });
     }
-    //检查路径是否存在
-    if !Path::new(&father_path).exists() {
+    if !Path::new(&father_path).is_dir() {
         return Ok(ResData {
             code: 500,
             msg: "选择不存在！".to_string(),
             data: String::new(),
         });
     }
-    let mut path_ = PathBuf::from(father_path);
-    let filename_clone = new_note_md_file_name.clone();
-    path_.push(filename_clone + ".md");
-    let res = std::fs::File::create(path_);
-    match res {
-        Ok(_) => {
-            return Ok(ResData {
-                code: 200,
-                msg: "创建成功".to_string(),
-                data: new_note_md_file_name,
-            })
-        }
-        Err(err) => {
-            return Ok(ResData {
-                code: 500,
-                msg: format!("创建失败：{0}", err.to_string()),
-                data: String::new(),
-            })
-        }
+    let filename = if has_extension(&new_note_md_file_name) {
+        new_note_md_file_name.clone()
+    } else {
+        format!("{}.md", new_note_md_file_name)
+    };
+    let target = PathBuf::from(&father_path).join(&filename);
+    if target.exists() {
+        return Ok(ResData {
+            code: 500,
+            msg: "同名文件已存在！".to_string(),
+            data: String::new(),
+        });
+    }
+    match tokio::fs::File::create(&target).await {
+        Ok(_) => Ok(ResData {
+            code: 200,
+            msg: "创建成功".to_string(),
+            data: filename,
+        }),
+        Err(err) => Ok(ResData {
+            code: 500,
+            msg: format!("创建失败：{err}"),
+            data: String::new(),
+        }),
     }
 }
 
-/**
- * @param path 全路径名
- * @param md_title 标题/文件名
- * @param md_text 内容
- */
-pub async fn save_note(
-    path: String,
-    md_text: String,
-) -> Result<ResData<String>, String> {
-    //format!("save_note1 {}", path);
-    println!("save_note1 {}", path);
-
-    // 克隆path以避免所有权问题
-    let path_clone = path.clone();
-    //判断文件是否存在
-    match tokio::fs::metadata(path_clone).await {
-        Ok(_) => {
-            let wres = std::fs::write(&path, md_text);
-            match wres {
-                Ok(_) => {
-                    println!("文件已保存");
-                    return Ok(ResData {
-                        code: 200,
-                        msg: "操作成功".to_string(),
-                        data: String::new(),
-                    });
-                }
-                Err(e) => {
-                    return Ok(ResData {
-                        code: 500,
-                        msg: e.to_string(),
-                        data: String::new(),
-                    });
-                }
-            }
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            println!("文件不存在");
-            return Ok(ResData {
-                code: 500,
-                msg: "文件不存在".to_string(),
-                data: String::new(),
-            });
-        }
-        Err(e) => {
-            println!("检查文件时出错: {}", e);
-            return Ok(ResData {
-                code: 500,
-                msg: "检查文件时出错".to_string(),
-                data: String::new(),
-            });
-        }
-    }
+/// 兼容旧签名的薄转发：正式保存链路已改到 `file_meta::save_note`（原子写 + 编码/EOL + 冲突检测）。
+/// 草稿备份、脚本写入等不传元数据的调用点继续走这里，行为与改造前一致。
+pub async fn save_note(path: String, md_text: String) -> Result<ResData<String>, String> {
+    crate::plugins::files::file_meta::save_note(
+        path,
+        md_text,
+        crate::plugins::files::file_meta::SaveMeta::default(),
+    )
+    .await
 }
 
 /**
- * 更新文件名
+ * 更新文件名：保留原扩展名。
+ * 旧实现把所有文件都重命名成 `.md`（`a.json` → `a.json.md`），会直接破坏代码文件。
  */
 pub async fn up_file_name(
     path: String,
     up_file_name: String,
 ) -> Result<ResData<String>, String> {
-    println!("up_file_name {},--------{}", path, up_file_name);
-    //检查路径是否存在
-    if !Path::new(&path).exists() {
+    let src = PathBuf::from(&path);
+    if !src.exists() {
         return Ok(ResData {
             code: 500,
             msg: "选择文件不存在！".to_string(),
             data: String::new(),
         });
     }
-    let new_file_path = rename_file_path(&path, &up_file_name, ".md");
-    println!("new_file_path {}", new_file_path);
-    let new_name_res = tokio::fs::rename(&path, &new_file_path).await;
-    match new_name_res {
-        Ok(_) => {
-            return Ok(ResData {
-                code: 200,
-                msg: "操作成功".to_string(),
-                data: String::new(),
-            });
-        }
-        Err(e) => {
+    let extension = src
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy()))
+        .unwrap_or_default();
+    let new_name = if extension.is_empty() || up_file_name.ends_with(&extension) {
+        up_file_name
+    } else {
+        format!("{}{}", up_file_name, extension)
+    };
+    let dest = src
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .join(&new_name);
+    if dest.exists() {
+        return Ok(ResData {
+            code: 500,
+            msg: "同名文件已存在！".to_string(),
+            data: String::new(),
+        });
+    }
+    match tokio::fs::rename(&src, &dest).await {
+        Ok(_) => Ok(ResData {
+            code: 200,
+            msg: "操作成功".to_string(),
+            data: dest.to_string_lossy().to_string(),
+        }),
+        Err(e) => Ok(ResData {
+            code: 500,
+            msg: e.to_string(),
+            data: String::new(),
+        }),
+    }
+}
+
+/// 移动文件/文件夹（文件树拖拽）。
+/// 旧前端调用了一个从未注册的 `move_file`，拖拽必然失败；这里补上真正的后端实现。
+pub async fn move_file(old_path: String, new_path: String) -> Result<ResData<String>, String> {
+    let src = PathBuf::from(&old_path);
+    let dst = PathBuf::from(&new_path);
+    if !src.exists() {
+        return Ok(ResData {
+            code: 500,
+            msg: "源文件不存在！".to_string(),
+            data: String::new(),
+        });
+    }
+    if dst.exists() {
+        return Ok(ResData {
+            code: 500,
+            msg: "目标位置已有同名文件，已阻止覆盖！".to_string(),
+            data: String::new(),
+        });
+    }
+    // 目录不能拖进自己的子目录，否则会产生递归/丢失
+    if src.is_dir() && dst.starts_with(&src) {
+        return Ok(ResData {
+            code: 500,
+            msg: "不能把文件夹移动到它自己的子目录中！".to_string(),
+            data: String::new(),
+        });
+    }
+    if let Some(parent) = dst.parent() {
+        if let Err(e) = tokio::fs::create_dir_all(parent).await {
             return Ok(ResData {
                 code: 500,
-                msg: e.to_string(),
+                msg: format!("创建目标目录失败: {e}"),
                 data: String::new(),
             });
         }
+    }
+    match tokio::fs::rename(&src, &dst).await {
+        Ok(_) => Ok(ResData {
+            code: 200,
+            msg: "操作成功".to_string(),
+            data: dst.to_string_lossy().to_string(),
+        }),
+        Err(rename_err) if src.is_file() => {
+            // 跨卷 rename 会失败：退化为 copy + delete（先复制成功才删源，避免丢文件）
+            match tokio::fs::copy(&src, &dst).await {
+                Ok(_) => match tokio::fs::remove_file(&src).await {
+                    Ok(_) => Ok(ResData {
+                        code: 200,
+                        msg: "操作成功".to_string(),
+                        data: dst.to_string_lossy().to_string(),
+                    }),
+                    Err(e) => Ok(ResData {
+                        code: 500,
+                        msg: format!("已复制到目标，但删除源文件失败: {e}"),
+                        data: String::new(),
+                    }),
+                },
+                Err(e) => Ok(ResData {
+                    code: 500,
+                    msg: format!("移动失败（跨卷复制也失败）: {e} / {rename_err}"),
+                    data: String::new(),
+                }),
+            }
+        }
+        Err(e) => Ok(ResData {
+            code: 500,
+            msg: e.to_string(),
+            data: String::new(),
+        }),
     }
 }
 /**
@@ -364,16 +408,6 @@ pub async fn get_path_childrenFoldersAndFiles(
         }),
     }
 }
-fn rename_file_path(original_path: &str, new_filename: &str, suffix: &str) -> String {
-    let path = Path::new(original_path);
-    let new_path = path.to_path_buf();
-    // 获取目录部分
-    let parent = new_path.parent().unwrap_or_else(|| Path::new(""));
-    // 添加新的文件名
-    let new_file_path = parent.join(format!("{}{}", new_filename, suffix));
-    new_file_path.to_string_lossy().to_string()
-}
-
 /// 写入脚本文件（不存在则创建，存在则覆盖；供数据库插件查询文件管理器使用）
 pub async fn write_script_file(path: String, content: String) -> Result<ResData<String>, String> {
     match tokio::fs::write(&path, content.as_bytes()).await {

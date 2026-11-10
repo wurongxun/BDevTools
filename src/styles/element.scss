@@ -94,10 +94,11 @@ html.dark {
   }
 
   // 无边框纯图标工具栏按钮（桌面风格，复刻各插件 .header-btn）：
-  // 透明背景、无边框、紧凑 22×22，hover 浮起浅色背景
+  // 透明背景、无边框、24×24（正好等于无障碍命中区下限，比 small 按钮的 28–32 更省空间），
+  // hover 浮起浅色背景
   &.is-bare {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     border: none;
     background: transparent;

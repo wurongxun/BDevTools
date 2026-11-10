@@ -119,11 +119,58 @@ pub async fn create_note_file(
     file_command::create_note_file(father_path, new_note_md_file_name).await
 }
 
-/// 保存笔记
+/// 保存笔记。
+/// 新增的 5 个 Option 全是可选的：草稿备份 / 数据库脚本等旧调用点不传时行为不变。
+/// `expected_mtime_ms` 与 `expected_size` 由前端从 `read_file_meta` 带回，用于阻止并发覆盖。
 #[cfg(feature = "plugin-files")]
 #[tauri::command]
-pub async fn save_note(path: String, md_text: String) -> Result<ResData<String>, String> {
-    file_command::save_note(path, md_text).await
+pub async fn save_note(
+    path: String,
+    md_text: String,
+    encoding: Option<String>,
+    eol: Option<String>,
+    bom: Option<String>,
+    expected_mtime_ms: Option<i64>,
+    expected_size: Option<u64>,
+) -> Result<ResData<String>, String> {
+    file_meta::save_note(
+        path,
+        md_text,
+        file_meta::SaveMeta {
+            encoding,
+            eol,
+            bom,
+            expected_mtime_ms,
+            expected_size,
+        },
+    )
+    .await
+}
+
+/// 读取文件元数据（编码 / EOL / BOM / mtime / size），供编辑器按原值回写。
+/// 失败时 `data: null`，前端回退 UTF-8 + LF，不阻断打开。
+#[cfg(feature = "plugin-files")]
+#[tauri::command]
+pub async fn read_file_meta(path: String) -> Result<ResData<Option<FileMeta>>, String> {
+    Ok(match file_meta::read_file_meta(&path).await {
+        Ok(m) => ResData {
+            code: 200,
+            msg: "success".to_string(),
+            data: Some(m),
+        },
+        Err(e) => ResData {
+            code: 500,
+            msg: e,
+            data: None,
+        },
+    })
+}
+
+/// 移动文件/文件夹（文件树拖拽用）。目标已存在或把目录拖进自己子目录时拒绝，避免覆盖。
+#[cfg(feature = "plugin-files")]
+#[tauri::command]
+pub async fn move_file(old_path: String, new_path: String) -> Result<ResData<String>, String> {
+    file_command::move_file(old_path, new_path).await
 }
 
 /// 更新文件名
@@ -216,4 +263,183 @@ pub async fn register_file_association() -> ResData<String> {
 #[tauri::command]
 pub async fn open_default_apps_settings() -> ResData<String> {
     file_association::open_default_apps_settings().await
+}
+
+// ==================== 跨文件搜索与批量替换（files 自建，不依赖 plugin-logs） ====================
+// TextView 的单文件查询也走这里，避免 files 前端隐式耦合 `plugin-logs` feature。
+// 所有命令都只做参数归一化 + 转发，业务逻辑全在 `plugins/files/file_search.rs`。
+
+/// 跨目录搜索：glob 过滤、可取消、有上限；结果带编码/EOL/mtime，直接作为替换基线。
+#[cfg(feature = "plugin-files")]
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn files_search_in_files(
+    root_path: String,
+    keyword: String,
+    mode: Option<String>,
+    ignore_case: Option<bool>,
+    include: Option<String>,
+    exclude: Option<String>,
+    max_file_size: Option<u64>,
+    max_files: Option<usize>,
+    max_matches: Option<usize>,
+    task_id: Option<String>,
+) -> Result<ResData<file_search::SearchOutcome>, String> {
+    file_search::search_in_files(file_search::SearchRequest {
+        root_path,
+        keyword,
+        mode: mode.unwrap_or_else(|| "text".to_string()),
+        ignore_case: ignore_case.unwrap_or(true),
+        include: include.unwrap_or_default(),
+        exclude: exclude.unwrap_or_default(),
+        max_file_size: max_file_size.unwrap_or(DEFAULT_MAX_FILE_SIZE),
+        max_files: max_files.unwrap_or(DEFAULT_MAX_FILES),
+        max_matches: max_matches.unwrap_or(DEFAULT_MAX_MATCHES),
+        task_id,
+    })
+    .await
+}
+
+/// 单文件按行查询。返回 `lines / matched / matches_truncated`，与旧 logs 契约同名。
+#[cfg(feature = "plugin-files")]
+#[tauri::command]
+pub async fn files_query_lines(
+    file_path: String,
+    keyword: String,
+    mode: Option<String>,
+    ignore_case: Option<bool>,
+    max_matches: Option<usize>,
+    task_id: Option<String>,
+) -> Result<ResData<file_search::LineQueryOutcome>, String> {
+    file_search::query_lines(file_search::LineQueryRequest {
+        file_path,
+        keyword,
+        mode: mode.unwrap_or_else(|| "text".to_string()),
+        ignore_case: ignore_case.unwrap_or(true),
+        max_matches: max_matches.unwrap_or(DEFAULT_MAX_MATCHES),
+        task_id,
+    })
+    .await
+}
+
+/// 批量替换。`dry_run` 缺省为 true（不落盘）；应用时逐文件备份 + 原子写 + 409 检测。
+#[cfg(feature = "plugin-files")]
+#[tauri::command]
+pub async fn files_replace_in_files(
+    keyword: String,
+    replacement: String,
+    mode: Option<String>,
+    ignore_case: Option<bool>,
+    targets: Vec<ReplaceTarget>,
+    dry_run: Option<bool>,
+    task_id: Option<String>,
+) -> Result<ResData<file_search::ReplaceOutcome>, String> {
+    file_search::replace_in_files(file_search::ReplaceRequest {
+        keyword,
+        replacement,
+        mode: mode.unwrap_or_else(|| "text".to_string()),
+        ignore_case: ignore_case.unwrap_or(true),
+        targets,
+        dry_run: dry_run.unwrap_or(true),
+        task_id,
+    })
+    .await
+}
+
+/// 撤销批量替换：从 `.bak` 原样恢复字节。
+#[cfg(feature = "plugin-files")]
+#[tauri::command]
+pub async fn files_replace_undo(
+    entries: Vec<UndoEntry>,
+) -> Result<ResData<file_search::UndoOutcome>, String> {
+    file_search::undo_replace(entries).await
+}
+
+/// 取消正在进行的搜索/替换任务；前端凭 task_id 静默丢弃过期结果。
+#[cfg(feature = "plugin-files")]
+#[tauri::command]
+pub fn files_search_cancel(task_id: String) -> Result<ResData<bool>, String> {
+    Ok(ResData {
+        code: 200,
+        msg: "已请求取消".to_string(),
+        data: file_search::cancel_task(task_id),
+    })
+}
+
+/// 编码 / EOL / BOM 显式转换（M4 / E4+E5 遗留）。
+/// 只有用户在对话框里确认后才调用：先整份备份、再走唯一写回通道，
+/// 415（目标编码无法表示）/ 409（外部已改）都保证原文件不变且不留孤儿备份。
+#[cfg(feature = "plugin-files")]
+#[tauri::command]
+pub async fn files_convert_encoding_eol(
+    path: String,
+    target_encoding: String,
+    target_eol: String,
+    target_bom: String,
+    expected_mtime_ms: Option<i64>,
+    expected_size: Option<u64>,
+) -> Result<ResData<file_convert::ConvertOutcome>, String> {
+    file_convert::convert_encoding_eol(file_convert::ConvertRequest {
+        path,
+        target_encoding,
+        target_eol,
+        target_bom,
+        expected_mtime_ms,
+        expected_size,
+    })
+    .await
+}
+
+/// 撤销清单探测：重启后只把备份仍存在的条目恢复成「可撤销」，避免假可用状态。
+#[cfg(feature = "plugin-files")]
+#[tauri::command]
+pub async fn files_undo_probe(
+    entries: Vec<UndoEntry>,
+) -> Result<ResData<Vec<UndoEntry>>, String> {
+    Ok(ResData {
+        code: 200,
+        msg: "success".to_string(),
+        data: file_search::probe_undo_entries(entries).await,
+    })
+}
+
+/// 主动丢弃撤销清单（用户点「不再撤销」）：把对应 `.bak` 一起删掉，不让磁盘堆垃圾。
+#[cfg(feature = "plugin-files")]
+#[tauri::command]
+pub async fn files_undo_discard(
+    entries: Vec<UndoEntry>,
+) -> Result<ResData<Vec<String>>, String> {
+    Ok(ResData {
+        code: 200,
+        msg: "success".to_string(),
+        data: file_search::discard_undo_entries(entries).await,
+    })
+}
+
+/// 大文件（>1MB）行级补丁保存（M4 / E7）。
+/// 前端只提交脏行区间，宿主读一次原文件、应用补丁后仍走 `file_meta::save_note`：
+/// 编码 / EOL / BOM / 原子写 / 409 / 415 的保护与普通文件保存完全一致。
+#[cfg(feature = "plugin-files")]
+#[tauri::command]
+pub async fn files_apply_line_edits(
+    path: String,
+    edits: Vec<LineEdit>,
+    encoding: Option<String>,
+    eol: Option<String>,
+    bom: Option<String>,
+    expected_mtime_ms: Option<i64>,
+    expected_size: Option<u64>,
+) -> Result<ResData<file_large::LineEditOutcome>, String> {
+    file_large::apply_line_edits_to_file(
+        path,
+        edits,
+        file_meta::SaveMeta {
+            encoding,
+            eol,
+            bom,
+            expected_mtime_ms,
+            expected_size,
+        },
+    )
+    .await
 }

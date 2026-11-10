@@ -10,6 +10,13 @@ import StringUtil from '@/utils/StringUtil'
 import { load, Store } from '@/core/runtime'
 import { pdf_store_tem_key_prefix, pdf_store_tem_key, pdf_store_conten_key_prefix } from '@/setting'
 import { useDocumentManagerStore } from '@/store/modules/documents'
+import SearchPanel from '../search/SearchPanel.vue'
+import { openSearchPanel, searchPanelVisible } from '../search/useFileSearch'
+
+// 模板里不给「import 进来的 ref」直接赋值：统一走函数写 .value，避免编译器解包差异
+function showTreeView() {
+    searchPanelVisible.value = false
+}
 
 // 常量定义
 const INVALID_CHARS_REGEX = /.*[/\\:*?|].*/
@@ -311,8 +318,13 @@ function handleHeaderCommand(cmd: string) {
             </el-dropdown>
         </div>
 
-        <!-- 文件树 -->
-        <div class="file-tree-section">
+        <!-- 文件树 / 搜索：宿主 dock 是单槽位且被 terminal 占用，故复用 files 自己的侧栏 -->
+        <div class="view-switch">
+            <button :class="{ active: !searchPanelVisible }" @click="showTreeView()">文件树</button>
+            <button :class="{ active: searchPanelVisible }" @click="openSearchPanel()">搜索</button>
+        </div>
+
+        <div v-show="!searchPanelVisible" class="file-tree-section">
             <file-info-tree
                 ref="fileTreeRef"
                 :data="file_node"
@@ -324,6 +336,10 @@ function handleHeaderCommand(cmd: string) {
                 @delete-node="handleDeleteNode"
                 @rename-node="handleRenameNode"
             />
+        </div>
+
+        <div v-show="searchPanelVisible" class="search-section">
+            <SearchPanel />
         </div>
 
         <!-- 删除确认弹窗（统一使用 GlobalDialog） -->
@@ -388,8 +404,46 @@ function handleHeaderCommand(cmd: string) {
     }
 }
 
+// ===== 文件树 / 搜索 视图切换 =====
+.view-switch {
+    display: flex;
+    flex: none;
+    gap: 2px;
+    padding: 2px 8px 6px;
+
+    button {
+        flex: 1;
+        padding: 3px 6px;
+        border: 1px solid transparent;
+        border-radius: var(--radius-md);
+        background: transparent;
+        font-size: var(--font-size-xs);
+        font-family: var(--font-family-base);
+        cursor: pointer;
+
+        @include theme.useTheme {
+            color: theme.getVar('textSecondary');
+        }
+
+        &:hover {
+            @include theme.useTheme {
+                background: theme.getVar('activityBarHover');
+            }
+        }
+
+        &.active {
+            border-color: var(--el-border-color-lighter);
+            @include theme.useTheme {
+                color: theme.getVar('textColor');
+                background: theme.getVar('activityBarHover');
+            }
+        }
+    }
+}
+
 // ===== 文件树区域 =====
-.file-tree-section {
+.file-tree-section,
+.search-section {
     display: flex;
     flex-direction: column;
     flex: 1;

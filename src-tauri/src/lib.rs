@@ -33,7 +33,7 @@ use crate::commands::{
     plugin_set_enabled, plugin_set_memdump, plugin_set_order, plugin_uninstall,
     plugin_set_page_caps, session_clear, session_delete, session_delete_workspace,
     session_list, session_load, session_load_all, session_load_workspace, session_save,
-    update_window_position_cmd, windows_close, windows_hide, windows_maximize,
+    update_window_position_cmd, quit_app, windows_close, windows_hide, windows_maximize,
     windows_minimize, workspace_create, workspace_delete, workspace_get, workspace_get_default,
     workspace_add_plugin_external_dir, workspace_get_plugin_dir, workspace_get_plugin_subdir,
     workspace_list, workspace_list_plugin_external_dirs, workspace_lock, workspace_lock_status,
@@ -57,6 +57,10 @@ use crate::commands::{
     open_default_apps_settings,
     read_note_file, read_file_bytes, register_file_association, remove_file, remove_folder,
     rename_script_file, save_note, up_file_name, up_folder_name, write_script_file,
+    move_file, read_file_meta,
+    files_search_in_files, files_query_lines, files_replace_in_files, files_replace_undo,
+    files_search_cancel, files_apply_line_edits, files_convert_encoding_eol,
+    files_undo_probe, files_undo_discard,
 };
 #[cfg(feature = "plugin-logs")]
 use crate::commands::{
@@ -189,7 +193,40 @@ pub fn run() {
             
     #[cfg(feature = "plugin-files")]
     save_note,
-            
+
+    #[cfg(feature = "plugin-files")]
+    move_file,
+
+    #[cfg(feature = "plugin-files")]
+    read_file_meta,
+
+    #[cfg(feature = "plugin-files")]
+    files_search_in_files,
+
+    #[cfg(feature = "plugin-files")]
+    files_query_lines,
+
+    #[cfg(feature = "plugin-files")]
+    files_replace_in_files,
+
+    #[cfg(feature = "plugin-files")]
+    files_replace_undo,
+
+    #[cfg(feature = "plugin-files")]
+    files_search_cancel,
+
+    #[cfg(feature = "plugin-files")]
+    files_apply_line_edits,
+
+    #[cfg(feature = "plugin-files")]
+    files_convert_encoding_eol,
+
+    #[cfg(feature = "plugin-files")]
+    files_undo_probe,
+
+    #[cfg(feature = "plugin-files")]
+    files_undo_discard,
+
     #[cfg(feature = "plugin-files")]
     up_file_name,
             
@@ -210,6 +247,7 @@ pub fn run() {
             windows_minimize,
             windows_maximize,
             windows_close,
+            quit_app,
             
                 
                 

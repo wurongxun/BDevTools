@@ -15,7 +15,7 @@ import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { isDark } from '@/composables/useDark'
 import { load as loadKv, openUrl } from '@/core/runtime'
 import useStore from '@/store/index'
-import { fetchTerminalDefaults, listShells } from './api'
+import { fetchTerminalDefaults, listShells, writeTerminal } from './api'
 import { DEFAULT_FONT_FAMILY, domIsDark, resolvePalette } from './theme'
 import { TerminalSession } from './session'
 import {
@@ -74,6 +74,11 @@ export interface TermLaunchSpec {
   args?: string[]
   /** 标签标题（默认用 shell 名） */
   title?: string
+  /**
+   * M4 / F4：会话就绪后自动送入 PTY 的命令（不含回车）。
+   * 只作为「启动意图」记录在这里，不传给 session.open —— 后者只认 PTY 启动参数。
+   */
+  command?: string
 }
 
 const DEFAULT_APPEARANCE: TerminalAppearance = {
@@ -93,6 +98,8 @@ const DEFAULT_APPEARANCE: TerminalAppearance = {
 const sessions = new Map<string, TerminalSession>()
 /** 窗格 id → 启动参数（组件挂载时消费一次） */
 const launchSpecs = new Map<string, TermLaunchSpec>()
+/** 窗格 id → 会话就绪后要自动执行的命令（M4 / F4） */
+const launchCommands = new Map<string, string>()
 /** `<html>` 主题类观察器（模块级单例，避免重复安装） */
 let themeObserver: MutationObserver | null = null
 
@@ -289,13 +296,16 @@ export const useTerminalStore = defineStore('terminal', () => {
     // 启动参数与窗格元数据共用同一份 cwd：spec 显式给了就用它（分屏继承当前窗格目录），
     // 否则取工作区目录 → 系统默认目录。两处若各算一次，会出现
     //「界面显示工作区目录、PTY 实际开在 HOME」的错位。
-    const launch: TermLaunchSpec = { ...spec, cwd: spec.cwd || resolveDefaultCwd(workspaceCwd.value, defaults.value?.cwd) }
+    const { command, ...openSpec } = spec
+    const launch: TermLaunchSpec = { ...openSpec, cwd: spec.cwd || resolveDefaultCwd(workspaceCwd.value, defaults.value?.cwd) }
     launchSpecs.set(paneId, launch)
+    if (command) launchCommands.set(paneId, command)
     panes.value = { ...panes.value, [paneId]: createPaneState(paneId, launch) }
     return paneId
   }
 
   function removePane(paneId: string) {
+    launchCommands.delete(paneId)
     unregisterSession(paneId)
     const { [paneId]: _removed, ...rest } = panes.value
     panes.value = rest
@@ -610,6 +620,18 @@ export const useTerminalStore = defineStore('terminal', () => {
       exited: false,
       exitCode: null,
     })
+
+    // M4 / F4：外部插件请求「在集成终端运行当前脚本」。会话刚建立时 shell 可能还没
+    // 接上 PTY，立即写入会被吞掉，稍等一拍再用唯一通道送入命令 + 回车。
+    const command = launchCommands.get(paneId)
+    if (command) {
+      launchCommands.delete(paneId)
+      window.setTimeout(() => {
+        void writeTerminal(info.sessionId, `${command}\r`).catch((e) => {
+          lastError.value = `发送命令到终端失败：${e instanceof Error ? e.message : String(e)}`
+        })
+      }, 250)
+    }
   }
 
   return {

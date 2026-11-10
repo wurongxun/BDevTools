@@ -46,6 +46,22 @@ export interface ViewState {
   splitView?: boolean
 }
 
+/**
+ * 大文件（>1MB）行级补丁（M4 / E7）。
+ * 这类文档 `content === null`（不整读），未保存的改动以「磁盘行号 → 新文本」的补丁形式挂着，
+ * 保存时整体交给后端 `files_apply_line_edits`，仍走 `save_note` 的唯一写回通道。
+ * 行号一律是**打开时磁盘上的原始行号**，因此多行展开 / 删除不会让后续补丁错位。
+ */
+export interface LargeLineEdit {
+  start_line: number
+  end_line: number
+  text: string
+  delete?: boolean
+}
+
+/** 大文件补丁保存成功后通知 TextView 丢掉块缓存重新加载（行号可能因增删行变化）。 */
+export const LARGE_REFRESH_EVENT = 'files:large-refresh'
+
 // 文档状态接口
 export interface DocumentState {
   key:string
@@ -56,7 +72,14 @@ export interface DocumentState {
   originalContent: string | ArrayBuffer | null  // 原始内容（用于判断是否修改）
   isDirty: boolean             // 是否有未保存的修改
   language: string             // 编程语言（仅代码文件）
-  encoding: string             // 文件编码
+  encoding: string             // 文件编码（read_file_meta 探测，保存时按原编码回写）
+  eol?: string                 // 磁盘换行符 LF / CRLF / CR，保存时按原值还原
+  bom?: string                 // BOM 种类 none / utf8 / utf16le / utf16be
+  diskMtimeMs?: number         // 打开时的文件 mtime，保存时回传做外部修改冲突检测
+  diskSize?: number            // 打开时的文件大小，与 mtime 一起做冲突检测
+  externalModified?: boolean   // 保存被 409 阻止后置位，供状态栏提示
+  /** 大文件行级补丁（content === null 时的唯一未保存内容真源） */
+  largeEdits?: LargeLineEdit[]
   viewState: ViewState         // 视图状态
   lastModified: number         // 最后修改时间戳
   isReadOnly: boolean          // 是否只读
@@ -312,6 +335,8 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
         doc.isLoading = false
         doc.lastModified = Date.now()
       }
+      // 读取磁盘元数据（编码 / EOL / BOM / mtime / size）：保存时按原值回写并检测外部修改
+      await applyFileMeta(filePath, filePath)
     } catch (error) {
       console.error(`Failed to load file: ${filePath}`, error)
       doc.isLoading = false
@@ -371,6 +396,8 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
       doc.content = content
       doc.originalContent = content
       doc.isLoading = false
+      // 远程文档落盘在本地临时文件，元数据按临时文件探测（保存时回写远程仍用同一套口径）
+      await applyFileMeta(key, localTempPath)
     } catch (error) {
       console.error(`Failed to load remote file: ${remotePath}`, error)
       doc.isLoading = false
@@ -454,10 +481,113 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     }
   }
 
+  // ===== 大文件（>1MB）行级编辑（M4 / E7） =====
+  //
+  // 这类文档 `content === null`（不整读），未保存内容只存在于 `largeEdits` 里。
+  // 所有写盘仍然收口在 saveDocument：Ctrl+S / 关闭标签 / 全部保存 / 命令面板走的是同一条路径。
+
+  /** 磁盘内容已变（保存成功或外部刷新）→ 让 TextView 失效块缓存并重载当前块。 */
+  function notifyLargeRefresh(path: string) {
+    if (typeof window === 'undefined') return
+    // 事件名与 navigation/editorEvents.ts 共用同一个导出常量，禁止两边各写一份字符串
+    window.dispatchEvent(new CustomEvent(LARGE_REFRESH_EVENT, { detail: { path } }))
+  }
+
+  function largeEditsFor(filePath: string): LargeLineEdit[] {
+    return [...(documents.value.get(filePath)?.largeEdits || [])]
+      .sort((a, b) => a.start_line - b.start_line)
+  }
+
+  /** text=null 删除整行；text=undefined 撤销这一行的改动；其余为替换（可含 \n 展开多行）。 */
+  function setLargeLineEdit(filePath: string, line: number, text: string | null | undefined) {
+    const doc = documents.value.get(filePath)
+    if (!doc || !Number.isInteger(line) || line < 1) return
+    const list = (doc.largeEdits || []).filter(
+      (e) => !(e.start_line === line && e.end_line === line)
+    )
+    if (text !== undefined) {
+      list.push({ start_line: line, end_line: line, text: text ?? '', delete: text === null })
+    }
+    doc.largeEdits = list.sort((a, b) => a.start_line - b.start_line)
+    doc.isDirty = list.length > 0
+    doc.lastModified = Date.now()
+  }
+
+  function clearLargeEdits(filePath: string) {
+    const doc = documents.value.get(filePath)
+    if (!doc) return
+    doc.largeEdits = []
+    doc.isDirty = false
+  }
+
+  async function saveLargeDocument(
+    filePath: string,
+    doc: DocumentState,
+    opts?: { force?: boolean }
+  ): Promise<boolean> {
+    const edits = largeEditsFor(filePath)
+    if (!edits.length) return true
+    // 前端先做一次区间校验：重叠/乱序的补丁绝不能落到磁盘（后端仍会再校验一次）
+    let prevEnd = 0
+    for (const e of edits) {
+      if (e.start_line < 1 || e.end_line < e.start_line || e.start_line <= prevEnd) {
+        NotificationUtil.error('行改动区间重叠或非法，已阻止保存')
+        return false
+      }
+      prevEnd = e.end_line
+    }
+    try {
+      const res = await tauri_request<ResponseData<{
+        mtime_ms: string
+        total_lines: number
+        encoding: string
+        eol: string
+        bom: string
+      }>>('files_apply_line_edits', {
+        path: filePath,
+        edits,
+        encoding: doc.encoding || undefined,
+        eol: doc.eol || undefined,
+        bom: doc.bom || undefined,
+        expectedMtimeMs: opts?.force ? undefined : doc.diskMtimeMs,
+        expectedSize: opts?.force ? undefined : doc.diskSize
+      })
+      if (res && res.code === 200) {
+        doc.largeEdits = []
+        doc.isDirty = false
+        doc.externalModified = false
+        doc.lastModified = Date.now()
+        const newMtime = Number(res.data?.mtime_ms)
+        if (Number.isFinite(newMtime) && newMtime > 0) doc.diskMtimeMs = newMtime
+        // 写出字节数会随增删行变化，size 基线不可靠，之后只按 mtime 比对
+        doc.diskSize = undefined
+        if (res.data?.encoding) doc.encoding = res.data.encoding
+        if (res.data?.eol) doc.eol = res.data.eol
+        if (res.data?.bom) doc.bom = res.data.bom
+        notifyLargeRefresh(filePath)
+        return true
+      }
+      if (res && res.code === 409) {
+        doc.externalModified = true
+        NotificationUtil.error(res.msg || '文件已被外部修改，已阻止保存')
+        return false
+      }
+      if (res && (res.code === 413 || res.code === 415)) {
+        NotificationUtil.error(res.msg || '已阻止保存')
+        return false
+      }
+      NotificationUtil.error('大文件保存失败：' + (res?.msg || '未知错误'))
+      return false
+    } catch (error) {
+      console.error('Failed to save large file:', filePath, error)
+      throw error
+    }
+  }
+
   /**
    * 保存文档到磁盘
    */
-  async function saveDocument(filePath: string): Promise<boolean> {
+  async function saveDocument(filePath: string, opts?: { force?: boolean }): Promise<boolean> {
     const doc = documents.value.get(filePath)
     if (!doc) return true
 
@@ -470,25 +600,44 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     // 未保存内容由会话草稿机制保护（captureSnapshot → draftSave）
     if (doc.id.startsWith('untitled:')) return true
 
+    // 大文件行补丁：必须放在下面的 content 早退判断之前（这类文档 content === null）
+    if (doc.content === null && doc.largeEdits?.length) {
+      return await saveLargeDocument(filePath, doc, opts)
+    }
+
     if (!doc.content||doc.content==doc.originalContent) return true;
+    if (typeof doc.content !== 'string') return false
 
     try {
-      // await invoke('save_file', {
-      //   path: filePath,
-      //   content: doc.content,
-      //   encoding: doc.encoding
-      // })
-      //   doc.originalContent = doc.content
-      //   doc.isDirty = false
-      //   doc.lastModified = Date.now()
-      const res = await tauri_request<ResponseData<string[]>>("save_note", {
+      // 元数据随保存一起回传：后端按原编码 / 原 EOL / 原 BOM 写回，并比对 mtime+size
+      // 阻止外部进程并发覆盖（409）；目标编码无法表示新字符时拒绝保存（415）。
+      const res = await tauri_request<ResponseData<string>>("save_note", {
         path: filePath,
         mdText: doc.content,
+        encoding: doc.encoding || undefined,
+        eol: doc.eol || undefined,
+        bom: doc.bom || undefined,
+        // force 只由「外部修改三选一 → 强制保存」显式触发：不传基线即跳过 409 检测
+        expectedMtimeMs: opts?.force ? undefined : doc.diskMtimeMs,
+        expectedSize: opts?.force ? undefined : doc.diskSize
       });
       if (res && res.code === 200) {
         doc.originalContent = doc.content
         doc.isDirty = false
         doc.lastModified = Date.now()
+        doc.externalModified = false
+        // 后端返回写入后的新 mtime：刷新基线，避免连续保存被自己的上一次写入误判成冲突
+        const newMtime = Number(res.data)
+        if (Number.isFinite(newMtime) && newMtime > 0) doc.diskMtimeMs = newMtime
+        // 写出字节数会随编码变化，size 基线不再可靠，之后只按 mtime 比对
+        doc.diskSize = undefined
+      } else if (res && res.code === 409) {
+        doc.externalModified = true
+        NotificationUtil.error(res.msg || "文件已被外部修改，已阻止保存")
+        return false
+      } else if (res && res.code === 415) {
+        NotificationUtil.error(res.msg || "当前编码无法表示新内容，已阻止保存")
+        return false
       } else {
         NotificationUtil.error("笔记保存失败：" + (res?.msg || "未知错误"));
         return false;
@@ -521,19 +670,20 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
    *   工作区切换清理 / LRU 缓存逐出 → false：这两种不是用户关闭意图，不应动快照
    *   （切换场景的快照在 closeAllDocuments 之前已整体保存，逐出场景保持旧语义）。
    */
-  function closeDocument(filePath: string, opts?: { syncSession?: boolean }) {
+  function closeDocument(filePath: string, opts?: { syncSession?: boolean; skipSave?: boolean }) {
     //删除打开方式 保存的文件
     deleteAppOpenFile(filePath)
     //删除打开记录
     const doc = documents.value.get(filePath)
     if (!doc) return
 
-    //保存文档
-     saveDocument(filePath).then(r =>  {
-      if (!r){
-        NotificationUtil.error("笔记保存失败：" + (r|| "未知错误"));
-      }
-     });
+    // 用户主动关闭走 EditorTab 的「保存 / 不保存 / 取消」确认弹窗，这里不再重复写回；
+    // 其余调用点（工作区切换 / 批量清理）保留原有兜底保存，避免静默丢数据。
+    if (opts?.skipSave !== true) {
+      saveDocument(filePath).then(r =>  {
+        if (!r) NotificationUtil.error("笔记保存失败");
+      });
+    }
 
     // 保存到最近关闭列表
     const index = documentOrder.value.indexOf(filePath)
@@ -704,15 +854,21 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     if (!doc) return
     try {
       doc.isLoading = true
+      // 重新加载后必须刷新 mtime/编码/EOL 基线，否则下一次保存仍被旧基线误判成 409
+      await applyFileMeta(filePath, filePath)
+      doc.externalModified = false
       // 代码/文本文件同样做大小分诊：>1MB 不整读（TextView 分块），避免 reload 卡顿
       if (doc.type === FileType.CODE || doc.type === FileType.TEXT) {
         const size = await getFileSizeBytes(filePath)
         if (size != null && size > EDITOR_MAX_SIZE_BYTES) {
           doc.content = null
           doc.originalContent = null
+          // 磁盘已变，旧行号上的补丁失效；同时通知 TextView 失效块缓存重载
+          doc.largeEdits = []
           doc.isDirty = false
           doc.lastModified = Date.now()
           doc.isLoading = false
+          notifyLargeRefresh(filePath)
           return
         }
       }
@@ -919,6 +1075,47 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
   }
 
   /**
+   * 读取文件元数据（编码 / EOL / BOM / mtime / size）。
+   * 后端只读文件头 64KB，大文件也能秒回；失败时回退 UTF-8 + LF，不阻断打开。
+   */
+  interface FileMetaResult {
+    encoding: string
+    eol: string
+    bom: string
+    mtime_ms: number
+    size: number
+  }
+
+  async function readFileMeta(filePath: string): Promise<FileMetaResult | null> {
+    try {
+      const res = await tauri_request<ResponseData<FileMetaResult | null>>('read_file_meta', { path: filePath })
+      if (res && res.code === 200 && res.data) return res.data
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  /** 把磁盘元数据写进文档状态，作为「按原值回写」与冲突检测的基线 */
+  async function applyFileMeta(filePath: string, diskPath: string) {
+    const meta = await readFileMeta(diskPath)
+    const doc = documents.value.get(filePath)
+    // 异步回来时文档可能已被关闭，此时不能凭空建一个新状态
+    if (!meta || !doc) return
+    doc.encoding = meta.encoding
+    doc.eol = meta.eol
+    doc.bom = meta.bom
+    doc.diskMtimeMs = meta.mtime_ms
+    doc.diskSize = meta.size
+  }
+
+  /** 状态栏手动切换语法；语言是文档级状态，切 tab 不会串 */
+  function setDocumentLanguage(filePath: string, language: string) {
+    const doc = documents.value.get(filePath)
+    if (doc) doc.language = language
+  }
+
+  /**
    * 导出文档快照数据（用于会话快照）
    */
   function exportOpenFiles(): OpenFileInfo[] {
@@ -963,6 +1160,11 @@ export const useDocumentManagerStore = defineStore('documentManager', () => {
     setActiveDocument,
     updateDocumentContent,
     updateViewState,
+    setDocumentLanguage,
+    // 大文件行级编辑（M4）
+    largeEditsFor,
+    setLargeLineEdit,
+    clearLargeEdits,
     saveDocument,
     saveRemoteDocument,
     saveAllDocuments,

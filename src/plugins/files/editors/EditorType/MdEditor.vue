@@ -46,8 +46,7 @@ import { getCurrentWindow } from "@/core/runtime";
 import { MdEditor } from "md-editor-v3";
 import type { ExposeParam } from 'md-editor-v3';
 import "md-editor-v3/lib/style.css";
-import { ResponseData } from "@/entity/entitys";
-import { tauri_request } from "@/utils/tauri_request";
+// 保存统一走 docStore.saveDocument（editor-and-tabs.md:11），组件内不再直接 invoke 后端
 import { Document } from '@element-plus/icons-vue';
 import { subscribe, Unsubscribe } from "@/core/runtime";
 import { isDark } from '@/composables/useDark';
@@ -268,26 +267,13 @@ const saveMd = async (mdText: string, path: string) => {
     return false;
   }
 
-  try {
-    const res = await tauri_request<ResponseData<string[]>>("save_note", {
-      path: path,
-      mdText: mdText,
-    });
-    if (res && res.code === 200) {
-      data.notEditedMdtext_md = mdText;
-      NotificationUtil.success("笔记保存成功");
-      // 更新文档状态
-      docStore.updateDocumentContent(path, mdText)
-      return true;
-    } else {
-      NotificationUtil.error("笔记保存失败：" + (res?.msg || "未知错误"));
-      return false;
-    }
-  } catch (error) {
-    console.error("保存笔记异常:", error);
-    NotificationUtil.error("笔记保存发生异常");
-    return false;
-  }
+  // md-editor-v3 的 @onSave 拿到的是最新文本，先同步进 store 再走统一保存链路。
+  // 旧实现在这里直接 invoke('save_note')，绕开了编码/EOL/原子写/冲突检测，
+  // 也导致保存后 originalContent 不更新、脏圆点不消失（editor-and-tabs.md:11）。
+  docStore.updateDocumentContent(path, mdText)
+  const ok = await docStore.saveDocument(path)
+  if (ok) data.notEditedMdtext_md = mdText
+  return ok
 };
 
 /**

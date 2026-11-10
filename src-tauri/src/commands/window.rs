@@ -47,6 +47,15 @@ pub fn windows_close(handle: tauri::AppHandle, label: String) {
     app_window::windows_close(handle, label)
 }
 
+/// 退出应用（与托盘「退出」同一入口）
+///
+/// 主窗口的 `CloseRequested` 被拦成「隐藏到托盘」，所以 window.close() 不能用来退出；
+/// `app.exit` 走 `ExitRequested`，不经过 `CloseRequested`，能真正结束进程。
+#[tauri::command]
+pub fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 // ==================== 窗口管理 ====================
 
 /// 创建新的编辑器窗口

@@ -5,7 +5,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::regex_util;
 use crate::response::resp_data::ResData;
 
 /// 目录与文件信息（仅文件模块使用）
@@ -89,20 +88,20 @@ pub fn get_dir_and_file_with_depth(
             let name = path_dir_entry
                 .file_name()
                 .map_or(String::new(), |n| n.to_string_lossy().to_string());
-            // 判断文件后缀（md/pdf/txt 作为文件节点）
-            let is_md = regex_util::validate(r#"(?:md)$"#, &name);
-            let is_pdf = regex_util::validate(r#"(?:pdf)$"#, &name);
-            let is_txt = regex_util::validate(r#"(?:txt)$"#, &name);
+            // 文件节点按扩展名标 data_type。旧实现只认 md/pdf/txt，其余一律标 "folder"，
+            // 导致 .json/.ts/.py 等代码文件的类型失真（isFolder 另按 isfile 算，所以文件仍能显示）。
             let path = path_dir_entry.to_string_lossy().to_string();
             let folder = get_directory_path(&path).unwrap_or_default();
             let md5 = generate_md5_hash(&path);
-
-            let data_type = if is_md {
-                "md".to_string()
-            } else if is_pdf {
-                "pdf".to_string()
-            } else if is_txt {
-                "txt".to_string()
+            let data_type = if path_dir_entry.is_file() {
+                let ext = path_dir_entry
+                    .extension()
+                    .map(|e| e.to_string_lossy().to_lowercase())
+                    .unwrap_or_else(|| "txt".to_string());
+                match ext.as_str() {
+                    "markdown" => "md".to_string(),
+                    _ => ext,
+                }
             } else {
                 "folder".to_string()
             };

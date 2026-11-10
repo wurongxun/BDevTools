@@ -157,6 +157,11 @@
               <FolderOpened />
             </el-icon> 在文件管理器中显示
           </div>
+          <div class="ctx-item" @click="handleOpenTerminalHere">
+            <el-icon>
+              <Monitor />
+            </el-icon> 在集成终端打开此文件夹
+          </div>
           <div class="ctx-divider" />
           <div class="ctx-item" @click="showRenameDialog">
             <el-icon>
@@ -185,6 +190,16 @@
             <el-icon>
               <FolderOpened />
             </el-icon> 在文件管理器中显示
+          </div>
+          <div class="ctx-item" @click="handleOpenTerminalHere">
+            <el-icon>
+              <Monitor />
+            </el-icon> 在集成终端打开所在目录
+          </div>
+          <div class="ctx-item" @click="handleRunCurrentFile">
+            <el-icon>
+              <VideoPlay />
+            </el-icon> 在集成终端运行此脚本
           </div>
           <div class="ctx-divider" />
           <div class="ctx-item" @click="showRenameDialog">
@@ -225,7 +240,9 @@ import {
   Picture,
   Notebook,
   Grid,
-  Refresh
+  Refresh,
+  Monitor,
+  VideoPlay
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
@@ -236,6 +253,11 @@ import { useDocumentManagerStore } from '@/store/modules/documents'
 import useStore from '@/store/index'
 import { TreeNode } from '@/Types/entitys'
 import { changeWorkspace } from '@/utils/index'
+import {
+  openDirectoryInTerminal,
+  openInTerminal,
+  runCurrentFile
+} from '../terminal/useTerminalLaunch'
 
 const { appConfig } = useStore()
 const docStore = useDocumentManagerStore()
@@ -487,6 +509,22 @@ async function handleOpenInExplorer() {
   closeContextMenu()
 }
 
+/** M4 / F4：文件夹节点直接用自身路径作 cwd，文件节点取其所在目录。 */
+function handleOpenTerminalHere() {
+  const node = contextNode.value
+  if (!node) return
+  const path = node.folder || node.filePath || ''
+  if (node.isFolder) openDirectoryInTerminal(path)
+  else openInTerminal(path)
+  closeContextMenu()
+}
+
+function handleRunCurrentFile() {
+  const path = contextNode.value?.filePath || ''
+  if (path) runCurrentFile(path)
+  closeContextMenu()
+}
+
 function showRenameDialog() {
   const node = contextNode.value
   if (!node) return
@@ -622,37 +660,21 @@ async function handleNodeDrop(draggingNode: any, dropNode: any, type: string) {
   try {
     const oldPath = dragged.filePath || dragged.folder
     const name = oldPath.split(/[/\\]/).pop() || ''
-    const newPath = `${target.folder}/${name}`
+    // 目标文件夹的真实路径：根节点是工作区本身（folder），其余文件夹用 filePath
+    const targetDir = target.isRoot ? (target.folder || target.filePath) : (target.filePath || target.folder)
+    if (!oldPath || !targetDir) {
+      NotificationUtil.error('无法解析拖拽路径')
+      return
+    }
+    const newPath = `${targetDir.replace(/[\\/]+$/, '')}/${name}`
 
-    if (dragged.isFolder) {
-      const res = await tauri_request<ResponseData<string>>('up_folder_name', {
-        path: oldPath,
-        upFolderName: name,
-        fatherPath: target.folder
-      })
-      // 后端可能需要不同的参数，这里尝试 move
-      if (res?.code !== 200) {
-        // 尝试用 rename 方式移动
-        const res2 = await tauri_request<ResponseData<string>>('move_file', {
-          oldPath,
-          newPath
-        })
-        if (res2?.code !== 200 && res?.code !== 200) {
-          NotificationUtil.error('移动失败：后端不支持拖拽移动')
-          emit('refresh')
-          return
-        }
-      }
-    } else {
-      const res = await tauri_request<ResponseData<string>>('move_file', {
-        oldPath,
-        newPath
-      })
-      if (res?.code !== 200) {
-        NotificationUtil.error('移动失败')
-        emit('refresh')
-        return
-      }
+    // 统一走 move_file：旧实现文件夹分支先把 fatherPath 喂给只接受 (path, name) 的
+    // up_folder_name，再回退到一个从未注册的 move_file，两条路都必然失败。
+    const res = await tauri_request<ResponseData<string>>('move_file', { oldPath, newPath })
+    if (res?.code !== 200) {
+      NotificationUtil.error(res?.msg || '移动失败')
+      emit('refresh')
+      return
     }
     NotificationUtil.success(`已移动到 ${target.label}`)
     emit('refresh')

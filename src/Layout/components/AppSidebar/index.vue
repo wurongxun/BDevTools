@@ -1,8 +1,8 @@
 <template>
   <div class="sidebar-container">
-    <!-- 活动栏（左侧图标列）：hideActivityBar（专注模式）或 immersive（沉浸式）时隐藏
+    <!-- 活动栏（左侧图标列）：hideActivityBar（专注模式）/ immersive（沉浸式）/ 用户收起插件入口时隐藏
          语义：垂直 tablist + roving tabindex，支持 ↑↓/Home/End 键盘切换（WCAG 2.1.1 / 4.1.2） -->
-    <div v-show="!hideActivityBar && !immersive" class="activity-bar">
+    <div v-show="!hideActivityBar && !immersive && !useLayoutStore.activityBarCollapsed" class="activity-bar">
       <!-- 插件图标列表（roving tabindex 的 tablist；固定在底部的宿主入口不在此列） -->
       <div class="activity-list" role="tablist" aria-label="插件面板" aria-orientation="vertical">
         <button

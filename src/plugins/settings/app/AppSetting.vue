@@ -61,7 +61,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { settingsRequestedTab } from '@/core/settingsNavigation'
 import SettingNav from '@/plugins/settings/components/SettingNav.vue'
 import AppGeneralPane from '@/plugins/settings/components/AppGeneralPane.vue'
 import WindowPresetPane from '@/plugins/settings/components/WindowPresetPane.vue'
@@ -75,6 +76,13 @@ const activeSettingTab = ref<SettingTab>('app')
 
 /** 插件分区内部页签：管理（内置/第三方插件的安装与排序）/ 开发（第三方插件开发文档） */
 const pluginTab = ref<PluginTab>('manage')
+
+/** 宿主「关于」菜单可指定直达分区：消费一次即清空，避免下次打开还停在旧分区 */
+watch(settingsRequestedTab, (tab) => {
+  if (!tab) return
+  activeSettingTab.value = tab
+  settingsRequestedTab.value = null
+}, { immediate: true })
 
 /** 顶部固定条上的分区标题（插件分区走页签，不用标题）；标题由模板按当前分区取 i18n 文案 */
 

@@ -25,6 +25,16 @@ use crate::plugins::files::file_association;
 use crate::plugins::files::file_command::{self, ScriptFileEntry};
 #[cfg(feature = "plugin-files")]
 use crate::plugins::files::file_utils;
+#[cfg(feature = "plugin-files")]
+use crate::plugins::files::file_meta::{self, FileMeta};
+#[cfg(feature = "plugin-files")]
+use crate::plugins::files::file_large::{self, LineEdit};
+#[cfg(feature = "plugin-files")]
+use crate::plugins::files::file_convert;
+#[cfg(feature = "plugin-files")]
+use crate::plugins::files::file_search::{
+    self, ReplaceTarget, UndoEntry, DEFAULT_MAX_FILES, DEFAULT_MAX_FILE_SIZE, DEFAULT_MAX_MATCHES,
+};
 #[cfg(feature = "plugin-logs")]
 use crate::plugins::logs::log_index::{
     self, LogExportResult, LogIndexMeta, LogQueryResult,

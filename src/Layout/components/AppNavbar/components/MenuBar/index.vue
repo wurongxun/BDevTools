@@ -128,7 +128,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { load, Store } from '@/core/runtime'
+import { load, Store, checkUpdate } from '@/core/runtime'
+import { settingsRequestedTab } from '@/core/settingsNavigation'
 import { invoke } from '@/api/rpc'
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/Types/entitys'
@@ -199,6 +200,22 @@ const hasFilesPlugin = computed(() => {
   return enabled.length === 0 || enabled.includes('files')
 })
 
+
+/** 结果落在 files 插件的菜单命令：执行前先切过去，否则打开的文件 / 目录变化看不见 */
+const FILE_MENU_COMMANDS = new Set(['openFile', 'openWorkingDirectory', 'openRecentProject'])
+
+/**
+ * 跳到 files 插件：打开的文件由它的主面板（编辑器）承载，选中的目录由它的侧栏（文件树）呈现。
+ * 侧栏收起时顺带展开 —— 与活动栏点击插件的行为一致，否则「跳转」只剩图标高亮、文件树仍不可见。
+ * 本窗口未启用或当前构建未注册 files 插件时保持原状，避免把别的插件面板误展开。
+ */
+function switchToFilesPlugin() {
+  if (!hasFilesPlugin.value || !pluginManager.hasPlugin('files')) return
+  pluginManager.switchTool('files')
+  if (useLayoutStore.sidebarPanelCollapsed) {
+    useLayoutStore.setSidebarPanelCollapsed(false)
+  }
+}
 
 // ===== 最近文件夹 =====
 // 统一从当前工作区的 folders 获取（打开文件夹时由 workspace store 置顶写入），不再单独维护
@@ -275,6 +292,16 @@ const menus = computed<Menu[]>(() => {
     {
       label: `${t('menu.window')}(W)`,
       items: windowItems
+    },
+    {
+      label: `${t('menu.aboutMenu')}(A)`,
+      items: [
+        { label: t('menu.aboutApp'), command: 'aboutApp' },
+        { divider: true, label: '', command: '' },
+        { label: t('menu.checkUpdate'), command: 'checkUpdate' },
+        { divider: true, label: '', command: '' },
+        { label: t('menu.quitApp'), command: 'quitApp' }
+      ]
     }
   ]
 })
@@ -330,6 +357,27 @@ async function handleNameConfirm(name: string) {
   }
 }
 
+/**
+ * 菜单「检查更新」：与设置页共用 `checkUpdate`（同一事实源），这里只做即时反馈；
+ * 发现新版本时切到设置插件的「应用」分区，下载安装仍由那边的更新卡片负责。
+ */
+async function checkForAppUpdate() {
+  try {
+    const result = await checkUpdate()
+    if (result) {
+      NotificationUtil.success(t('settingsPlugin.general.updateFoundToast', { version: result.version || '' }))
+      settingsRequestedTab.value = 'app'
+      pluginManager.switchTool('settings')
+    } else {
+      NotificationUtil.info(t('settingsPlugin.general.upToDate'))
+    }
+  } catch (e) {
+    NotificationUtil.error(t('settingsPlugin.general.checkUpdateFailed', {
+      msg: e instanceof Error ? e.message : String(e)
+    }))
+  }
+}
+
 const handleMenuClick = (menu: Menu) => {
   if (menu.action) {
     handleMenuCommand({ label: '', command: menu.action })
@@ -349,6 +397,9 @@ const handleMenuCommand = async (item: MenuItem) => {
     await switchLanguage(item.command.slice(5) as AppLocale)
     return
   }
+
+  // 打开文件 / 打开文件夹 / 最近文件夹统一先落到 files 插件，再弹选择框（对话框期间视图已就位）
+  if (FILE_MENU_COMMANDS.has(item.command)) switchToFilesPlugin()
 
   switch (item.command) {
     case 'newFile': {
@@ -446,6 +497,26 @@ const handleMenuCommand = async (item: MenuItem) => {
       const encoding = item.label
       window.dispatchEvent(new CustomEvent('encoding-change', { detail: { encoding } }))
       NotificationUtil.success(t('menu.encodingChanged', { encoding }))
+      break
+    }
+    case 'aboutApp': {
+      // 关于：直达设置插件的「关于」分区，不再另开独立窗口
+      settingsRequestedTab.value = 'about'
+      pluginManager.switchTool('settings')
+      break
+    }
+    case 'checkUpdate': {
+      await checkForAppUpdate()
+      break
+    }
+    case 'quitApp': {
+      // 与托盘「退出」同一入口：app.exit(0) 走 ExitRequested，绕过主窗口 close-to-tray
+      try {
+        await invoke('quit_app')
+      } catch (e) {
+        console.warn('退出应用失败:', e)
+        NotificationUtil.error(t('menu.quitAppFailed'))
+      }
       break
     }
     case 'help': {
