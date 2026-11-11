@@ -15,12 +15,26 @@ host function 注入，每个函数**先校验权限、再干活**。
 | `fs:read` | `host_fs_read` / `host_fs_list` / `host_fs_stat` | 读插件私有数据目录 `{app_dir}/plugin_data_ext/<id>/` |
 | `fs:read:<路径>` | 同上 | 额外可读该路径前缀（`$HOME` / `~/` 会展开；必须是绝对路径） |
 | `fs:write[:<路径>]` | `host_fs_write` / `host_fs_mkdir` / `host_fs_remove` | 同上，写 |
+| `fs:read:*` / `fs:write:*` | 同上 | **任意路径**（与 `net:*` 同构的字面通配），但其它插件的数据目录与插件安装目录仍是禁区 —— 见下节 |
 | `net:<host>[:<port>]` | Extism 内建 `http_request`；`host_tcp_connect` / `host_tcp_send` / `host_tcp_recv` / `host_tcp_close` | **网络访问授权（协议无关）**：一条声明同时放行两个出口 —— HTTP（按 host glob 匹配）与原始 socket（按 `host:port` 匹配）。宿主只判定「这个目标能不能连」，**不管上面跑什么协议**；字节收发与协议实现（RESP / TLS / 自定义）全在插件侧。`host` / `port` 支持 `*` 通配 |
 | — | `host_info` | 不需要权限：返回插件 id / 数据目录 / 已授权作用域，便于自查 |
 | 同 `fs:*`（**无新增权限名**） | `host_fs_open` / `host_fs_size` / `host_fs_read_at` / `host_fs_write_at` / `host_fs_append` / `host_fs_truncate` / `host_fs_close` | **流式通道**：按偏移读写，给超过一次性上限的大文件用（见下节） |
 
 **默认无权限**：没声明就走不通对应 host 函数（返回结构化错误）。路径参数由宿主解析成绝对
 路径后与已授权作用域做**组件级前缀比较**（`canonicalize` 之后），`../`、软链逃逸一律拒绝。
+
+## `fs:*:` 的边界：任意路径，但不是别的插件的地盘
+
+`fs:read:*` / `fs:write:*` 是字面意义上的**任意路径**（能读 `%APPDATA%`、SSH 私钥 —— 要防恶意
+插件唯一的手段是**不安装它**）。唯一收窄的是**跨插件隔离**，以下三处即使声明了 `*` 也一律拒绝：
+
+1. 其它第三方插件的数据目录 `{app_dir}/plugin_data_ext/<其它 id>/`
+2. 内置插件数据根 `{app_dir}/plugin_data/`
+3. 插件安装根 `{app_dir}/plugins_ext/`（否则 `fs:write:*` 能改写**别人的** `plugin.wasm`，
+   把一次越权变成持久感染）
+
+自己的数据目录不受影响。这不是「多一道安全边界」（那要靠不安装），而是**一个插件的越权不该
+连带污染另一个插件的持久状态** —— 故障半径要按插件切分，而不是按声明切分。
 
 ## 信任模型：安装即信任
 
@@ -77,6 +91,7 @@ fuel（指令数）、wall-clock 超时、线性内存页上限、HTTP 响应上
 插件退化成「纯前端沙箱页面」，前端桥与插件页代码无需改动。
 */
 use serde::Serialize;
+use std::path::{Path, PathBuf};
 
 /// 单次调用 wall-clock 超时
 const CALL_TIMEOUT_MS: u64 = 15_000;
@@ -114,6 +129,24 @@ const MAX_HTTP_HOSTS: usize = 16;
 pub(crate) const MEMDUMP_FILE: &str = "last-error.mem";
 /// 编译缓存指纹里区分「开了出错快照」的盐值（快照是编译期选项，切换开关要让缓存失配）
 const MEMDUMP_FP_SALT: u64 = 0x4D45_4D44_554D_5001;
+/// 同时执行的 WASM 调用数上限
+///
+/// 每次调用都要实例化一块最多 32MB 的线性内存 + 走一次
+/// [`tokio::task::spawn_blocking`] 的线程；不设上限的话，一个插件里几十个面板同时发请求
+/// 就能把阻塞线程池与内存一起吃光。
+const MAX_CONCURRENT_CALLS: usize = 4;
+/// 拿不到并发额度时最多等多久（毫秒）
+///
+/// 队列本身也是资源，所以是「排队 + 超时报错」而不是「无限排队」：宁可让页面立刻拿到一句
+/// 「太忙了」，也不要让点击变成「转圈十几秒然后超时」。
+const CALL_QUEUE_WAIT_MS: u64 = 3_000;
+/// 连续多少次**宿主级故障**后跳闸（见 `imp::is_host_fault` 的取舍）
+const BREAKER_THRESHOLD: u32 = 3;
+/// 跳闸后的冷却时长（毫秒）
+///
+/// 冷却结束不直接「恢复」，而是**放一次探针通过**（`Circuit::check` 顺手清零计数）：
+/// 探针成功就彻底恢复，失败则重新计数。省掉一个 half-open 状态，语义一样。
+const BREAKER_COOLDOWN_MS: u64 = 30_000;
 
 /// 运行时信息（`plugin_runtime_info` 命令返回；设置页展示 + 排查用）
 #[derive(Debug, Clone, Serialize)]
@@ -180,11 +213,35 @@ pub fn runtime_info_placeholder() -> RuntimeInfo {
 /// 套出目录结构。判定用的就是 WASM 侧 `host_fs_open` 的同一份 `read_roots` / `write_roots`，
 /// **不另写一套前缀比较**，避免两处口径漂移成「声明了却拦不住」或反过来。
 #[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FsRoots {
     /// `fs:read[:作用域]` 解析出的根目录（不带作用域 = 插件私有数据目录）
     pub read: Vec<String>,
     /// `fs:write[:作用域]` 解析出的根目录
     pub write: Vec<String>,
+    /// 声明了 `fs:read:*`：任意路径可读（`read` 可能为空，判定以本字段为准）
+    pub read_any: bool,
+    /// 声明了 `fs:write:*`：任意路径可写
+    pub write_any: bool,
+    /// 即使在 `*_any` 下也**禁止**选择的路径（跨插件隔离：其它插件数据目录 / 内置插件数据 / 插件安装根）
+    ///
+    /// 前端对话框用它做排除：不给这份列表，用户会在对话框里选到「选完才被拒」的路径。
+    pub deny: Vec<String>,
+}
+
+/// 一条路径是否被 fs 权限放行（**纯函数**，判定只有这一处，便于单测）
+///
+/// - `deny` **优先级最高**：跨插件隔离不因「显式声明了该作用域」而放开 —— 故障半径要按插件切分。
+/// - `any` 为真（声明了 `fs:read:*` / `fs:write:*`）时，除 `deny` 之外一律放行。
+/// - 其余情况逐个 `roots` 做组件级前缀比较（入参都已 `canonicalize`，`../` 与软链逃逸已在解析阶段解决）。
+pub(crate) fn fs_permitted(any: bool, roots: &[PathBuf], deny: &[PathBuf], abs: &Path) -> bool {
+    if deny.iter().any(|r| abs.starts_with(r)) {
+        return false;
+    }
+    if any {
+        return true;
+    }
+    roots.iter().any(|r| abs.starts_with(r))
 }
 
 // ==================== 进程内存口径（宿主侧） ====================
@@ -264,6 +321,13 @@ pub struct CallStats {
     pub memdump_path: Option<String>,
     /// 出错快照文件大小（字节）——**等于出错那一刻插件的线性内存字节数**
     pub memdump_bytes: Option<u64>,
+    /// 连续「宿主级故障」次数（累计到 `BREAKER_THRESHOLD` 就跳闸）
+    pub consec_failures: u32,
+    /// 熔断剩余冷却毫秒（0 = 没在冷却）
+    ///
+    /// 出现在这个结构体里是为了让设置页能回答「为什么这个插件点不动」：
+    /// 熔断期间的调用会被直接拒，**不会产生新的交付**，不写在这里就查不到。
+    pub circuit_cooldown_ms: u64,
 }
 
 /// 调试开关：插件调用出错时是否导出线性内存快照
@@ -290,8 +354,8 @@ mod imp {
     use std::fs;
     use std::hash::{Hash, Hasher};
     use std::path::{Path, PathBuf};
-    use std::sync::{Arc, LazyLock, Mutex, MutexGuard};
-    use std::time::UNIX_EPOCH;
+    use std::sync::{Arc, Condvar, LazyLock, Mutex, MutexGuard};
+    use std::time::{Duration, Instant, UNIX_EPOCH};
 
     use extism::{
         CompiledPlugin, CurrentPlugin, Error, Function, Manifest, Plugin, PluginBuilder, UserData,
@@ -299,15 +363,17 @@ mod imp {
     };
 
     use super::{
-        memdump_enabled, proc_mem, runtime_info_of, CallStats, FsRoots, ProcMem, RuntimeInfo,
-        CALL_FUEL,
-        CALL_TIMEOUT_MS, MAX_FS_CHUNK, MAX_FS_HANDLES, MAX_FS_READ, MAX_FS_WRITE, MAX_HTTP_HOSTS,
+        fs_permitted, memdump_enabled, proc_mem, runtime_info_of, CallStats, FsRoots, ProcMem,
+        RuntimeInfo,
+        BREAKER_COOLDOWN_MS, BREAKER_THRESHOLD, CALL_FUEL,
+        CALL_QUEUE_WAIT_MS, CALL_TIMEOUT_MS, MAX_CONCURRENT_CALLS, MAX_FS_CHUNK, MAX_FS_HANDLES,
+        MAX_FS_READ, MAX_FS_WRITE, MAX_HTTP_HOSTS,
         MAX_HTTP_RESPONSE, MAX_MEMORY_PAGES, MAX_TCP_CHUNK, MAX_TCP_CONNS, MEMDUMP_FILE,
         MEMDUMP_FP_SALT, TCP_CONNECT_TIMEOUT_MS, TCP_RW_TIMEOUT_MS,
     };
     use crate::app::kv_store;
-    use crate::plugin_host::host::{parse_manifest, plugin_data_ext_dir, plugin_dir,
-        plugin_settings_of, PluginManifest};
+    use crate::plugin_host::host::{install_root, parse_manifest, plugin_data_ext_dir,
+        plugin_data_root, plugin_dir, plugin_settings_of, PluginManifest};
     use crate::response::response::Response;
 
     /// 路径参数长度上限
@@ -350,6 +416,9 @@ mod imp {
     }
 
     /// 丢弃某插件的编译产物与调用统计（安装 / 卸载 / 禁用后调用）
+    ///
+    /// 顺带清熔断计数：重装 / 重新启用本来就是用户表达「我已经修好了」，
+    /// 让它继续吃上一次的冷却期只会让人以为「重装也没用」。
     pub fn drop_instance(id: &str) {
         if let Ok(mut reg) = registry() {
             reg.remove(id);
@@ -357,6 +426,7 @@ mod imp {
         if let Ok(mut stats) = LAST_STATS.lock() {
             stats.remove(id);
         }
+        circuits().remove(id);
     }
 
     // ==================== 路径工具 ====================
@@ -583,6 +653,12 @@ mod imp {
         read_roots: Vec<PathBuf>,
         /// 允许写入的根目录（已规范化）
         write_roots: Vec<PathBuf>,
+        /// `fs:read:*`：任意路径可读（**排除区除外**，见 `deny_roots`）
+        read_any: bool,
+        /// `fs:write:*`：任意路径可写（同上）
+        write_any: bool,
+        /// 跨插件隔离的排除区：即使 `*_any` 为真也一律拒绝（其它插件数据 / 内置插件数据 / 插件安装根）
+        deny_roots: Vec<PathBuf>,
         can_log: bool,
         can_kv: bool,
         /// 流式 FS 句柄（跨调用保留，见 `HandleTable`）
@@ -642,10 +718,39 @@ mod imp {
             Ok(canonicalize_loose(&abs))
         }
 
+        /// 是否落在跨插件隔离的排除区（自己的数据目录**不在**其中）
+        fn is_denied(&self, abs: &Path) -> bool {
+            self.deny_roots.iter().any(|r| abs.starts_with(r))
+        }
+
+        /// 读权限判定：`fs:read:*` 时只剩「排除区」这一道闸
+        fn read_permitted(&self, abs: &Path) -> bool {
+            fs_permitted(self.read_any, &self.read_roots, &self.deny_roots, abs)
+        }
+
+        fn write_permitted(&self, abs: &Path) -> bool {
+            fs_permitted(self.write_any, &self.write_roots, &self.deny_roots, abs)
+        }
+
+        /// 读或写任一作用域覆盖即可（用于 `host_fs_stat` 这类中性的存在性查询）
+        fn any_permitted(&self, abs: &Path) -> bool {
+            if self.read_any || self.write_any {
+                fs_permitted(true, &[], &self.deny_roots, abs)
+            } else {
+                fs_permitted(false, &self.read_roots, &self.deny_roots, abs)
+                    || fs_permitted(false, &self.write_roots, &self.deny_roots, abs)
+            }
+        }
+
         fn read_path(&self, req: &str) -> Result<PathBuf, Error> {
             let abs = self.resolve(req)?;
-            if self.read_roots.iter().any(|r| abs.starts_with(r)) {
+            if self.read_permitted(&abs) {
                 Ok(abs)
+            } else if self.is_denied(&abs) {
+                Err(Error::msg(format!(
+                    "无读取权限（其它插件的数据目录与插件安装目录即使声明 fs:read:* 也不可访问）: {}",
+                    req
+                )))
             } else {
                 Err(Error::msg(format!(
                     "无读取权限（插件未声明覆盖该路径的 fs:read 作用域）: {}",
@@ -656,8 +761,13 @@ mod imp {
 
         fn write_path(&self, req: &str) -> Result<PathBuf, Error> {
             let abs = self.resolve(req)?;
-            if self.write_roots.iter().any(|r| abs.starts_with(r)) {
+            if self.write_permitted(&abs) {
                 Ok(abs)
+            } else if self.is_denied(&abs) {
+                Err(Error::msg(format!(
+                    "无写入权限（其它插件的数据目录与插件安装目录即使声明 fs:write:* 也不可访问）: {}",
+                    req
+                )))
             } else {
                 Err(Error::msg(format!(
                     "无写入权限（插件未声明覆盖该路径的 fs:write 作用域）: {}",
@@ -666,16 +776,15 @@ mod imp {
             }
         }
 
-        /// 读或写任一作用域覆盖即可（用于 `host_fs_stat` 这类中性的存在性查询）
         fn any_path(&self, req: &str) -> Result<PathBuf, Error> {
             let abs = self.resolve(req)?;
-            let ok = self
-                .read_roots
-                .iter()
-                .chain(self.write_roots.iter())
-                .any(|r| abs.starts_with(r));
-            if ok {
+            if self.any_permitted(&abs) {
                 Ok(abs)
+            } else if self.is_denied(&abs) {
+                Err(Error::msg(format!(
+                    "无访问权限（其它插件的数据目录与插件安装目录即使声明 fs:*:* 也不可访问）: {}",
+                    req
+                )))
             } else {
                 Err(Error::msg(format!("无访问权限（未声明覆盖该路径的 fs 作用域）: {}", req)))
             }
@@ -781,6 +890,36 @@ mod imp {
         }
     }
 
+    /// 跨插件隔离的排除区（`CapCtx::deny_roots`）
+    ///
+    /// 三条：其它第三方插件的数据目录、内置插件数据根、插件安装根。自己的数据目录**不在**其中 ——
+    /// 声明了 `fs:read:*` 的插件当然还得能读自己的地盘。
+    ///
+    /// 这里**枚举**兄弟目录而不是「整根排除 + 单独放行自己」：排除根会同时被前端对话框拿去做
+    /// 前缀比较，整根排除就得再传一份「例外」，两处口径很容易漂。
+    fn foreign_roots(id: &str, data_dir: &Path) -> Vec<PathBuf> {
+        let mut out: Vec<PathBuf> = Vec::new();
+        // 第三方插件数据根就是自己数据目录的父目录
+        if let Some(ext_root) = data_dir.parent() {
+            if let Ok(entries) = fs::read_dir(ext_root) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if name.eq_ignore_ascii_case(id) {
+                        continue;
+                    }
+                    let p = entry.path();
+                    if !p.is_dir() {
+                        continue;
+                    }
+                    out.push(canonicalize_loose(&p));
+                }
+            }
+        }
+        out.push(canonicalize_loose(&plugin_data_root()));
+        out.push(canonicalize_loose(&install_root()));
+        out
+    }
+
     fn build_ctx(id: &str, manifest: &PluginManifest) -> Result<Arc<CapCtx>, String> {
         let data_dir = plugin_data_ext_dir(id)?;
         fs::create_dir_all(&data_dir).map_err(|e| format!("创建插件数据目录失败: {}", e))?;
@@ -791,6 +930,9 @@ mod imp {
             data_dir: data_root.clone(),
             read_roots: Vec::new(),
             write_roots: Vec::new(),
+            read_any: false,
+            write_any: false,
+            deny_roots: foreign_roots(id, &data_root),
             can_log: false,
             can_kv: false,
             handles: Mutex::new(HandleTable::default()),
@@ -802,6 +944,12 @@ mod imp {
                 ctx.can_log = true;
             } else if perm == "kv" {
                 ctx.can_kv = true;
+            } else if perm == "fs:read:*" {
+                // 通配作用域必须**先**判：`strip_prefix("fs:read")` 也会命中它，
+                // 落到 `scope_root` 会被当成路径解析而报「必须是绝对路径」。
+                ctx.read_any = true;
+            } else if perm == "fs:write:*" {
+                ctx.write_any = true;
             } else if let Some(scope) = perm.strip_prefix("fs:read") {
                 ctx.read_roots.push(scope_root(scope, &data_root)?);
             } else if let Some(scope) = perm.strip_prefix("fs:write") {
@@ -830,6 +978,13 @@ mod imp {
                 .collect(),
             write: ctx
                 .write_roots
+                .iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect(),
+            read_any: ctx.read_any,
+            write_any: ctx.write_any,
+            deny: ctx
+                .deny_roots
                 .iter()
                 .map(|p| p.to_string_lossy().to_string())
                 .collect(),
@@ -1000,6 +1155,10 @@ mod imp {
             "canKv": ctx.can_kv,
             "readRoots": ctx.read_roots.iter().map(|p| p.to_string_lossy().to_string()).collect::<Vec<_>>(),
             "writeRoots": ctx.write_roots.iter().map(|p| p.to_string_lossy().to_string()).collect::<Vec<_>>(),
+            // 通配作用域：readRoots 为空不代表「哪儿都读不了」，要看这两个标志
+            "readAny": ctx.read_any,
+            "writeAny": ctx.write_any,
+            "denyRoots": ctx.deny_roots.iter().map(|p| p.to_string_lossy().to_string()).collect::<Vec<_>>(),
             // 线性内存上限：让插件能自己算「用了多少 / 上限多少」
             // （插件侧用 core::arch::wasm32::memory_size(0) * 64KiB 读自己的用量）
             "memoryLimitMb": (MAX_MEMORY_PAGES as u64 * 64) / 1024,
@@ -1807,6 +1966,9 @@ mod imp {
             working_set: a.working_set.saturating_sub(b.working_set),
         });
         let (memdump_path, memdump_bytes) = memdump_info(id);
+        // 必须在 `circuit_record` **之后**读：这里想展示的是「算上本次」的状态 ——
+        // 第 3 次故障时应该立刻看到「已跳闸」，而不是下一次调用才看到
+        let (consec_failures, circuit_cooldown_ms) = circuit_snapshot(id);
         let stats = CallStats {
             plugin_id: id.to_string(),
             func: func.to_string(),
@@ -1817,15 +1979,171 @@ mod imp {
             proc_commit_bytes: after.map(|a| a.commit),
             memdump_path,
             memdump_bytes,
+            consec_failures,
+            circuit_cooldown_ms,
         };
         if let Ok(mut m) = LAST_STATS.lock() {
             m.insert(id.to_string(), stats);
         }
     }
 
+    // ==================== 并发额度与熔断（故障隔离） ====================
+    //
+    // 两道闸门各管一类「一个插件生病，整个宿主跟着遭殃」：
+    //   * 并发额度 —— 限制同时在跑的实例数：每次调用要实例化一块最多 32MB 的线性内存并占住一个
+    //     阻塞线程，不封顶的话几个面板并发请求就能把线程池和内存一起吃光（外部反馈症状是「整
+    //     个应用变卡」，而不是「这个插件失败」）；
+    //   * 熔断 —— 反复失败的插件（wasm 损坏、死循环撞超时）在冷却期内**直接被拒**，不重编译、
+    //     不实例化、不占线程。这是唯一一条能让「一个插件坏了」变成「所有插件都变慢」的路径。
+    //
+    // 都用 std 同步原语：`call()` 是同步函数（跑在 spawn_blocking 线程里），不能用 tokio 的
+    // async 信号量（`acquire().await` 在这里没有可以 await 的地方）。
+
+    /// 并发额度闸：`MAX_CONCURRENT_CALLS` 个额度，超出后有上限地排队
+    struct Slots {
+        active: Mutex<usize>,
+        free: Condvar,
+    }
+
+    impl Slots {
+        const fn new() -> Self {
+            Self { active: Mutex::new(0), free: Condvar::new() }
+        }
+
+        /// 取一个额度，最多等 `timeout`；拿不到返回 `None`
+        fn acquire(&self, timeout: Duration) -> Option<SlotGuard<'_>> {
+            let deadline = Instant::now() + timeout;
+            let mut active = self.lock();
+            loop {
+                if *active < MAX_CONCURRENT_CALLS {
+                    *active += 1;
+                    return Some(SlotGuard(self));
+                }
+                let left = deadline.saturating_duration_since(Instant::now());
+                if left.is_zero() {
+                    return None;
+                }
+                // 被唤醒或超时都回到循环顶部重新判定：醒来那一刻额度可能又被别人抢走了
+                let (guard, _) = self
+                    .free
+                    .wait_timeout(active, left)
+                    .unwrap_or_else(|e| e.into_inner());
+                active = guard;
+            }
+        }
+
+        /// 中毒恢复：持锁期间 panic 只会让计数偏差，**不该让所有插件从此都调不动**
+        /// （互斥语义由 `Mutex` 本身保证，这里承受得起状态略有偏差）
+        fn lock(&self) -> MutexGuard<'_, usize> {
+            self.active.lock().unwrap_or_else(|e| e.into_inner())
+        }
+
+        fn release(&self) {
+            let mut active = self.lock();
+            *active = active.saturating_sub(1);
+            self.free.notify_one();
+        }
+    }
+
+    /// 额度句柄：离开作用域即归还（panic 时 `Drop` 同样会跑，不会漏还）
+    struct SlotGuard<'a>(&'a Slots);
+
+    impl Drop for SlotGuard<'_> {
+        fn drop(&mut self) {
+            self.0.release();
+        }
+    }
+
+    static CALL_SLOTS: Slots = Slots::new();
+
+    /// 单个插件的熔断状态
+    #[derive(Debug, Clone, Default)]
+    struct Circuit {
+        /// 连续宿主级故障次数
+        consec: u32,
+        /// 跳闸截止时刻（`None` = 没跳闸）
+        open_until: Option<Instant>,
+    }
+
+    impl Circuit {
+        /// 放行判定；`Err(剩余冷却毫秒)` = 仍在冷却期内
+        fn check(&mut self, now: Instant) -> Result<(), u64> {
+            match self.open_until {
+                Some(until) if until > now => Err((until - now).as_millis() as u64),
+                // 冷却自然结束 → 清零并放行：这一次调用就是探针，再失败会重新计数
+                Some(_) => {
+                    self.open_until = None;
+                    self.consec = 0;
+                    Ok(())
+                }
+                None => Ok(()),
+            }
+        }
+
+        /// 记一次调用结果；成功（非故障）立刻复位
+        fn record(&mut self, now: Instant, fault: bool) {
+            if !fault {
+                self.consec = 0;
+                self.open_until = None;
+                return;
+            }
+            self.consec = self.consec.saturating_add(1);
+            if self.consec >= BREAKER_THRESHOLD {
+                self.open_until = Some(now + Duration::from_millis(BREAKER_COOLDOWN_MS));
+            }
+        }
+    }
+
+    static CIRCUITS: LazyLock<Mutex<HashMap<String, Circuit>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+
+    fn circuits() -> MutexGuard<'static, HashMap<String, Circuit>> {
+        CIRCUITS.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// 剩余冷却毫秒；`None` = 可以调用（顺手清掉已过期的冷却）
+    fn circuit_remaining(id: &str) -> Option<u64> {
+        circuits().get_mut(id).and_then(|c| c.check(Instant::now()).err())
+    }
+
+    /// 记一次调用是否宿主级故障
+    fn circuit_record(id: &str, fault: bool) {
+        circuits().entry(id.to_string()).or_default().record(Instant::now(), fault);
+    }
+
+    /// 当前故障计数与剩余冷却，给 `CallStats` 用（设置页据此回答「为什么点不动」）
+    fn circuit_snapshot(id: &str) -> (u32, u64) {
+        match circuits().get(id) {
+            Some(c) => (
+                c.consec,
+                c.open_until
+                    .and_then(|u| u.checked_duration_since(Instant::now()))
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0),
+            ),
+            None => (0, 0),
+        }
+    }
+
+    /// 哪些错误算「宿主级故障」
+    ///
+    /// 只认**重试也没用**的两类：`oom` / `timeout`（撞到资源限额，是插件的结构性问题），
+    /// 以及编译 / 实例化失败（不经过这里，调用点直接传 `true`）。
+    ///
+    /// 插件自己 `return Err` 不算 —— 那可能只是这次的输入不对，重试是有价值的；
+    /// 把它算成故障会让用户看到「点两次就失灵」，比没有熔断更难解释。
+    fn is_host_fault(error: &Error) -> bool {
+        is_host_fault_cause(&error.root_cause().to_string())
+    }
+
+    fn is_host_fault_cause(cause: &str) -> bool {
+        matches!(cause, "oom" | "timeout")
+    }
+
     /// 调用插件导出的函数（每次新建实例，见模块头「状态归属」）
     ///
     /// 顺带记一次资源占用（进程内存增量 + fuel），见 `last_stats`。
+    /// 入口处依次过熔断闸门与并发闸门，见「并发额度与熔断」。
     pub fn call(
         id: &str,
         dir: &Path,
@@ -1833,20 +2151,62 @@ mod imp {
         func: &str,
         input: &str,
     ) -> Result<String, String> {
+        // 闸门 ①：熔断。正在冷却的插件连编译都不做 —— 坏掉的 wasm 每次调用都会重编译一次，
+        // 再加上一次 15s 超时，这是「一个插件坏了」唯一能拖慢**别的插件**的路径。
+        if let Some(left) = circuit_remaining(id) {
+            record_stats(id, func, false, None, None, None);
+            return Err(format!(
+                "插件 {} 连续失败过多，已熔断 {}s（还剩约 {}s）。修好后会自动恢复，急用可在设置里重装该插件",
+                id,
+                BREAKER_COOLDOWN_MS / 1000,
+                (left + 999) / 1000,
+            ));
+        }
+
+        // 闸门 ②：并发额度。`_slot` 活到函数返回为止（含整个实例化的存活期）；
+        // panic 时 Drop 也会跑 —— 额度不会漏还，几次异常扩张不会让所有插件从此永久排队。
+        let _slot = match CALL_SLOTS.acquire(Duration::from_millis(CALL_QUEUE_WAIT_MS)) {
+            Some(s) => s,
+            None => {
+                record_stats(id, func, false, None, None, None);
+                return Err(format!(
+                    "插件调用过多（同时最多 {} 个，已等 {}s），请稍后再试",
+                    MAX_CONCURRENT_CALLS,
+                    CALL_QUEUE_WAIT_MS / 1000,
+                ));
+            }
+        };
+
         let wasm_path = wasm_path_of(dir, manifest)?;
         let fp = fingerprint(dir, &dir.join("plugin.json"), &wasm_path);
-        let compiled = compiled_for(id, manifest, &wasm_path, fp)?;
+        // 编译失败是结构性的：再试一次也是同样的错误，所以直接算故障
+        let compiled = match compiled_for(id, manifest, &wasm_path, fp) {
+            Ok(c) => c,
+            Err(e) => {
+                circuit_record(id, true);
+                return Err(e);
+            }
+        };
 
         // 采样点 1：实例化之前，取进程内存基线
         let before = proc_mem();
-        let mut plugin = Plugin::new_from_compiled(&compiled)
-            .map_err(|e| format!("实例化插件失败（缺少 Extism PDK 导入？）: {}", e))?;
+        let mut plugin = match Plugin::new_from_compiled(&compiled) {
+            Ok(p) => p,
+            Err(e) => {
+                let after = proc_mem();
+                circuit_record(id, true);
+                record_stats(id, func, false, before, after, None);
+                return Err(format!("实例化插件失败（缺少 Extism PDK 导入？）: {}", e));
+            }
+        };
 
         // 清单声明了 init 时，先在同一实例上跑一次初始化（不与目标函数同名时）
         if let Some(init) = manifest.init.as_deref() {
             if !init.is_empty() && init != func {
                 if let Err(e) = plugin.call::<&str, String>(init, "") {
+                    let fault = is_host_fault(&e);
                     let after = proc_mem();
+                    circuit_record(id, fault);
                     record_stats(id, func, false, before, after, plugin.fuel_consumed());
                     return Err(explain(&e, "插件 init 执行"));
                 }
@@ -1858,6 +2218,8 @@ mod imp {
         let after = proc_mem();
         // fuel_consumed 是「实例创建至今」的差额 ⇒ 本次调用（含 init）的指令数
         let fuel_used = plugin.fuel_consumed();
+        let fault = out_res.as_ref().err().is_some_and(is_host_fault);
+        circuit_record(id, fault);
         record_stats(id, func, out_res.is_ok(), before, after, fuel_used);
 
         out_res.map_err(|e| explain(&e, "插件执行"))
@@ -1866,6 +2228,72 @@ mod imp {
     /// 运行时信息
     pub fn runtime_info() -> Response<RuntimeInfo> {
         Response::new(200, runtime_info_of(true, memdump_enabled()), "ok")
+    }
+
+    #[cfg(test)]
+    mod isolation_tests {
+        use std::time::{Duration, Instant};
+
+        use super::{
+            is_host_fault_cause, Circuit, Slots, BREAKER_COOLDOWN_MS, BREAKER_THRESHOLD,
+            MAX_CONCURRENT_CALLS,
+        };
+
+        #[test]
+        fn circuit_trips_after_threshold_then_probes() {
+            let mut c = Circuit::default();
+            let now = Instant::now();
+            for i in 1..BREAKER_THRESHOLD {
+                c.record(now, true);
+                assert!(c.check(now).is_ok(), "第 {i} 次故障还不该跳闸");
+            }
+            c.record(now, true);
+            let left = c.check(now).unwrap_err();
+            assert!(
+                left > 0 && left <= BREAKER_COOLDOWN_MS,
+                "跳闸后要给出剩余冷却毫秒，实测 {left}"
+            );
+
+            // 冷却期内一律不放行（也不重编译/不沾线程池的那条捷径靠它）
+            assert!(c.check(now + Duration::from_millis(BREAKER_COOLDOWN_MS - 1)).is_err());
+            // 冷却结束不是「恢复」而是「放一次探针」：清零后才算真正自愈
+            assert!(c.check(now + Duration::from_millis(BREAKER_COOLDOWN_MS + 1)).is_ok());
+            assert_eq!(c.consec, 0, "探针放行必须连带清零");
+        }
+
+        #[test]
+        fn plugin_logic_errors_never_trip() {
+            let now = Instant::now();
+            let mut c = Circuit::default();
+            for _ in 0..BREAKER_THRESHOLD * 3 {
+                c.record(now, false);
+                assert!(c.check(now).is_ok(), "插件自己的业务报错不该跳闸");
+            }
+            // 中间夹一次非故障（成功）同样要复位累计
+            let mut c = Circuit::default();
+            c.record(now, true);
+            c.record(now, false);
+            assert_eq!(c.consec, 0);
+        }
+
+        #[test]
+        fn only_resource_faults_count() {
+            assert!(is_host_fault_cause("oom"));
+            assert!(is_host_fault_cause("timeout"));
+            assert!(!is_host_fault_cause("bad input"), "普通报错不该算宿主故障");
+        }
+
+        #[test]
+        fn slots_bound_concurrency_and_recover() {
+            let slots = Slots::new();
+            let held: Vec<_> = (0..MAX_CONCURRENT_CALLS)
+                .map(|_| slots.acquire(Duration::from_millis(50)).expect("额度未满应可取到"))
+                .collect();
+            // 第 N+1 个：排队到超时也不该放行（宁可报错，也不无限排队）
+            assert!(slots.acquire(Duration::from_millis(30)).is_none());
+            drop(held);
+            assert!(slots.acquire(Duration::from_millis(30)).is_some(), "归还后要能再取到");
+        }
     }
 
     #[cfg(test)]
@@ -2056,6 +2484,78 @@ mod tests {
         }
         assert!(info.permissions.iter().any(|p| p.starts_with("fs:read")));
         assert!(info.permissions.iter().any(|p| p.starts_with("net:")));
+    }
+
+    /// `fs:read:*` 是任意路径，但跨插件隔离的排除区仍然拦得住
+    ///
+    /// 判定只有 `fs_permitted` 一处，所以测它就等于测读写两条通道（含流式句柄的打开）。
+    #[test]
+    fn fs_wildcard_scope_blocks_foreign_plugin_dirs() {
+        let root = PathBuf::from(if cfg!(windows) { "D:/app" } else { "/app" });
+        let join = |parts: &[&str]| {
+            let mut p = root.clone();
+            for s in parts {
+                p.push(s);
+            }
+            p
+        };
+        let deny = vec![
+            join(&["plugin_data_ext", "other-plugin"]),
+            join(&["plugin_data"]),
+            join(&["plugins_ext"]),
+        ];
+        let own = join(&["plugin_data_ext", "me"]);
+
+        // 通配：任意位置一律放行（能读 SSH 私钥是它的字面语义，防不住也不该假装防得住）
+        assert!(fs_permitted(true, &[], &deny, &join(&["Users", "x", ".ssh", "id_rsa"])));
+        // 自己的数据目录不受排除区影响
+        assert!(fs_permitted(true, &[], &deny, &own.join("state.json")));
+        // 别人的数据目录：即使声明了 `*` 也拒绝
+        assert!(!fs_permitted(
+            true,
+            &[],
+            &deny,
+            &join(&["plugin_data_ext", "other-plugin", "state.json"])
+        ));
+        // 内置插件数据 + 插件安装目录（写权限尤其不能放开：否则能改别人的 plugin.wasm）
+        assert!(!fs_permitted(
+            true,
+            &[],
+            &deny,
+            &join(&["plugin_data", "ws", "database", "x.json"])
+        ));
+        assert!(!fs_permitted(
+            true,
+            &[],
+            &deny,
+            &join(&["plugins_ext", "other-plugin", "plugin.wasm"])
+        ));
+        // 排除区优先级**高于**显式作用域：显式声明也不放开（故障半径按插件切分）
+        assert!(!fs_permitted(
+            false,
+            &deny,
+            &deny,
+            &join(&["plugins_ext", "other-plugin", "plugin.wasm"])
+        ));
+        // 非通配：没声明就是拒绝，声明过的前缀才放行
+        assert!(!fs_permitted(false, &[], &deny, &join(&["Users", "x", ".ssh", "id_rsa"])));
+        assert!(fs_permitted(false, &[own.clone()], &deny, &own.join("a/b.txt")));
+    }
+
+    /// 通配标志与排除区要给前端对话框用，字段名必须是 camelCase（前端按 `readAny` / `deny` 读）
+    #[test]
+    fn fs_roots_serializes_wildcard_flags_in_camel_case() {
+        let r = FsRoots {
+            read: vec![],
+            write: vec![],
+            read_any: true,
+            write_any: false,
+            deny: vec!["/x".to_string()],
+        };
+        let v = serde_json::to_value(&r).expect("FsRoots 应可序列化");
+        assert_eq!(v["readAny"], serde_json::json!(true));
+        assert_eq!(v["writeAny"], serde_json::json!(false));
+        assert_eq!(v["deny"][0], serde_json::json!("/x"));
     }
 
     /// 进程内存采样：Windows 上必须拿得到（否则 B 方案的数字全是 None 却没人发现）

@@ -54,6 +54,15 @@ const CARGO_FILE = path.join(ROOT, 'src-tauri', 'Cargo.toml')
 const NPM_FILE = path.join(ROOT, 'package.json')
 const BUNDLE_NSIS = path.join(ROOT, 'src-tauri', 'target', 'release', 'bundle', 'nsis')
 const MANIFEST_FILE = path.join(ROOT, 'latest.json')
+/**
+ * tauri 缓存的 NSIS 工具链目录（与已有的 WiX 工具同级）。
+ * `tauri build --bundles nsis` 首次会往这里下载 makensis 及插件，缺了才联网。
+ */
+const NSIS_CACHE_DIR = process.env.LOCALAPPDATA
+  ? path.join(process.env.LOCALAPPDATA, 'tauri', 'NSIS')
+  : ''
+/** 走 GitHub 镜像预置 NSIS 工具链的脚本（见其头部说明） */
+const NSIS_FETCH_SCRIPT = path.join(ROOT, 'scripts', 'fetch-nsis.ps1')
 
 const API = 'https://gitee.com/api/v5'
 const OWNER = process.env.GITEE_OWNER || 'wurongxun'
@@ -416,6 +425,41 @@ function checkNotRunning() {
   ok('应用未在运行')
 }
 
+/**
+ * 确保 NSIS 工具链已就位。
+ *
+ * `tauri build --bundles nsis` 首次会从 GitHub 下载 nsis-3.13.zip 与 nsis_tauri_utils.dll，
+ * 国内直连常超时 → `timeout: global` → 整个发版在最后一步才中止（白等一轮 vite build + Rust 编译）。
+ * 这里在构建**之前**先探测缓存，缺了就调用 scripts/fetch-nsis.ps1 走镜像预置好。
+ *
+ * 只在 Windows 上做（NSIS 仅 Windows 打包需要）；探测到已存在则直接跳过，幂等。
+ */
+function ensureNsisToolchain() {
+  if (process.platform !== 'win32' || !NSIS_CACHE_DIR) return
+  const makensis = path.join(NSIS_CACHE_DIR, 'makensis.exe')
+  const utilsDll = path.join(NSIS_CACHE_DIR, 'Plugins', 'x86-unicode', 'nsis_tauri_utils.dll')
+  if (existsSync(makensis) && existsSync(utilsDll)) {
+    ok('NSIS 工具链已就位（跳过预置）')
+    return
+  }
+  if (!existsSync(NSIS_FETCH_SCRIPT)) {
+    warn(`未找到 NSIS 缓存（${NSIS_CACHE_DIR}），且缺少预置脚本 ${path.relative(ROOT, NSIS_FETCH_SCRIPT)}`)
+    warn('tauri 将尝试自行从 GitHub 下载，若网络受限可能在打包最后一步超时失败')
+    return
+  }
+  warn('NSIS 工具链缺失，先用镜像预置（否则 tauri 会在打包最后一步直连 GitHub 下载并可能超时）')
+  run('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', NSIS_FETCH_SCRIPT])
+  // 预置后再校验一次：缺文件就早失败，别浪费一轮编译
+  if (!existsSync(makensis) || !existsSync(utilsDll)) {
+    fail(
+      `NSIS 工具链预置后仍不完整，检查 ${NSIS_CACHE_DIR}\n` +
+        '  需要：makensis.exe 与 Plugins\\x86-unicode\\nsis_tauri_utils.dll\n' +
+        `  可手动重跑：powershell -ExecutionPolicy Bypass -File ${path.relative(ROOT, NSIS_FETCH_SCRIPT)}`
+    )
+  }
+  ok('NSIS 工具链预置完成')
+}
+
 function checkSync() {
   const head = git(['rev-parse', 'HEAD'])
   if (head.status !== 0) {
@@ -579,6 +623,7 @@ async function cmdBuild(opts) {
   if (!keyCheck.ok) fail(keyCheck.message)
   ok(`签名自检通过（keyid ${keyCheck.keyId}）：私钥可解开，且与配置里的公钥配对`)
   checkNotRunning()
+  ensureNsisToolchain()
 
   // 不升版本号就构建，会沿用当前版本重发同一个版本（Release/tag 已存在 → 报错或需要 --force）。
   // 这是最容易不小心踩的一脚，所以显式提示。

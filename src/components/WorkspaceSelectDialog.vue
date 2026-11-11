@@ -3,42 +3,43 @@
 <template>
   <GlobalDialog
     v-model="visible"
-    title="选择工作区"
+    :title="t('workspace.selectTitle')"
     width="440px"
     height="420px"
   >
     <div class="ws-select">
-      <div class="ws-select-tip">为新窗口选择一个工作区，或新建一个临时工作区</div>
+      <div class="ws-select-tip">{{ t('workspace.selectTip') }}</div>
       <div class="ws-select-list">
-        <div v-if="loading" class="ws-select-empty">加载中...</div>
-        <div v-else-if="items.length === 0" class="ws-select-empty">暂无可用工作区</div>
+        <div v-if="loading" class="ws-select-empty">{{ t('workspace.loading') }}</div>
+        <div v-else-if="items.length === 0" class="ws-select-empty">{{ t('workspace.noAvailableWorkspaces') }}</div>
         <div
           v-for="item in items"
           :key="item.id"
           class="ws-select-item"
           :class="{ 'is-locked': item.locked }"
-          :title="item.locked ? `已被窗口 [${item.holder}] 占用` : ''"
+          :title="item.locked ? t('workspace.occupiedBy', { holder: item.holder }) : ''"
           @click="handleSelect(item)"
         >
           <div class="ws-item-name">
             {{ item.name }}
-            <span v-if="item.isTemp" class="ws-item-badge ws-item-badge-temp">临时</span>
-            <span v-if="item.locked" class="ws-item-badge">已占用</span>
+            <span v-if="item.isTemp" class="ws-item-badge ws-item-badge-temp">{{ t('workspace.temp') }}</span>
+            <span v-if="item.locked" class="ws-item-badge">{{ t('workspace.occupied') }}</span>
           </div>
-          <div class="ws-item-folders">{{ item.folders.join(', ') || '无关联文件夹' }}</div>
+          <div class="ws-item-folders">{{ item.folders.join(', ') || t('workspace.noFolders') }}</div>
         </div>
       </div>
     </div>
     <template #footer>
-      <app-button size="small" type="primary" @click="handleCreateTemp">+ 新建工作区（临时）</app-button>
+      <app-button size="small" type="primary" @click="handleCreateTemp">{{ t('workspace.newWorkspaceTemp') }}</app-button>
     </template>
   </GlobalDialog>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import GlobalDialog from './GlobalDialog.vue'
-import { workspaceService } from '@/services/workspaceService'
+import { workspaceService, isOtherWindow } from '@/services/workspaceService'
 import type { WorkspaceSummary } from '@/Types/workspace'
 
 interface Props {
@@ -56,6 +57,7 @@ interface Emits {
 }
 
 const emit = defineEmits<Emits>()
+const { t } = useI18n()
 
 interface WorkspaceItem extends WorkspaceSummary {
   locked: boolean
@@ -88,9 +90,10 @@ async function loadList() {
           workspaceService.lockStatus(ws.id).catch(() => null),
           workspaceService.get(ws.id).catch(() => null)
         ])
+        // 只把**别的窗口**持有的算「已占用」：自己持有＝本窗口重载前的在用品，选它就是续用
         return {
           ...ws,
-          locked: !!holder,
+          locked: isOtherWindow(holder),
           holder: holder ?? undefined,
           isTemp: config?.settings?.isTemporary === true
         }

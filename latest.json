@@ -1,11 +1,11 @@
 {
-  "version": "1.7.2",
-  "notes": "1、修复数据库插件BUG 增加信息密度 \n 2、修复主题颜色搭配问题 ",
-  "pub_date": "2026-10-30T08:00:00+08:00",
+  "version": "1.7.4",
+  "notes": "feat(code-editor): 启用编辑器顶栏并扩展多项编辑功能\n\n- 重新启用并扩展顶栏：光标行列、选区统计、编码/EOL、字号显示\n- 工具栏改为 bare 图标按钮（24×24），含书签、大纲、偏好、缩放、语言切换、保存\n- 新增外部修改冲突三选一对话框（重新加载/强制保存/稍后处理）\n- 新增分屏同步滚动、宏录制回放、行操作（排序/去重/大小写转换）\n- 新增 DiffEditor.vue 文本比较视图组件\n- store 层增加文件元数据字段（eol/bom/diskMtimeMs/diskSize）及 409 冲突检测\n- 新增大文件（>1MB）行级补丁编辑与保存机制\n- 移除组件内直接 import monaco，统一通过 MonacoEditor 封装透传\n- 样式使用 CSS 间距令牌与主题变量替代硬编码值",
+  "pub_date": "2026-11-11T08:00:00+08:00",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUOFVHSVdiU3RaUXg2Rk0za0VkeTNJR2taeitOSU1VN1VJaDgyNkJUbEF2cFU1TzRGaGRMTWUrVGJsM0xRc28wVFZ1UFFPaDhuUmRZUXFtb2JiQTJxZTdTQ3ZmaC9tVkFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzMjY3NjYzCWZpbGU6QkRldlRvb2xzXzEuNy4yX3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjcuMgp5V1dXYm00ejlNZURlMW5RRzVjU3Vod1d6U3VncTdtTElFZFhtVUFBbjRvZTFSYXdtWjFEUEZZZklHbUs2OFVWemttdTREdkxGSEFYQjJEOEVSZE5BZz09Cg==",
-      "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.7.2/BDevTools_1.7.2_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUOFVHSVdiU3RaUTNnVWpGZUMwQjhyRitNRmh6bUN6NDhaRktyWDJxWU1XVE5XTUFGVlpIUVNsenE5ZmhxSjlKZ3pNRHZxemc5QkllMXRwRmc1L0VZaTYwVk5qQW94ekFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MzU2NTcwCWZpbGU6QkRldlRvb2xzXzEuNy40X3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjcuNApoUDhLR0NFTXh1cUZUYUVsS0tTbjlNdmd2bGdaVFRSYVpOR2FaOHV2Sk1lb1doU2xBc1RGQkZkNDNyRGtJUVJ1bDFKQWQ0QWhIZWZHTm9xZnI4aXdCdz09Cg==",
+      "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.7.4/BDevTools_1.7.4_x64-setup.exe"
     }
   }
 }

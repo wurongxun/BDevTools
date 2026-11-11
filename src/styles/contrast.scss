@@ -1,0 +1,66 @@
+/**
+ * 高对比度模式（High Contrast）—— 对标 VSCode 的 HC 主题。
+ *
+ * 机制：**一个正交开关**，不是第三套主题。`<html>` 上同时有 `light`/`dark` 与 `hc`，
+ * 本文件在 `html.light.hc` / `html.dark.hc` 下**覆盖**主主题的变量（特异性高于
+ * `themeVars()` 生成的 `html.light` / `html.dark`），所以所有引用变量的组件自动生效，
+ * 不需要任何组件改代码。
+ *
+ * 为什么用「覆盖变量」而不是另写一套组件样式：高对比要改的是**色值**，不是结构；
+ * 另写一套必然与日后的样式改动脱节（改了主主题、HC 忘了同步）。
+ *
+ * 目标口径（比常规主题高一级）：
+ *   - 文字 ≥ 7:1（WCAG AAA 1.4.6），而不是常规的 4.5:1
+ *   - 非文本（边框 / 图标 / 分隔线）≥ 3:1
+ *   下方每个色值后的数字是该色在 4 种真实底色上的**最差**比值，改色时必须重新验
+ *   （用 .workbuddy/tools/theme-audit.mjs 的思路，别手算）。
+ *
+ * 注意：给元素加分离边框**不要用 border** —— border 会占掉内容宽度、把居中元素挤偏
+ * （活动栏图标曾被 1px border 挤偏 1px）。统一用 `box-shadow: inset`，它不参与布局。
+ */
+
+html.light.hc {
+  --textColor: #000000; // 17.14:1
+  --textSecondary: #1a1a1a; // 14.20:1（仍比正文浅一档，保留层级）
+  --textDisabled: #404040; // 8.46:1
+  --borderColor: #6b6b6b; // 4.35:1（装饰线在 HC 下也要可辨）
+  --borderStrong: #000000; // 17.14:1
+  --focusRing: #000000; // 17.14:1
+  --stateErrorFg: #8a0000; // 8.24:1
+  --stateWarningFg: #5c3a00; // 8.32:1
+  --stateInfoFg: #003b73; // 9.15:1
+  --stateSuccessFg: #14461a; // 8.92:1
+  --editorFg: #000000; // 17.14:1
+  --editorLineNumberFg: #333333; // 10.31:1
+  --editorWidgetBorder: #000000; // 17.14:1
+  --editorIndentGuideBg: #6b6b6b; // 4.35:1
+  --editorSelectionBg: #c2dcf7; // 前景落在选区上 14.87:1
+}
+
+html.dark.hc {
+  --textColor: #ffffff; // 10.61:1
+  --textSecondary: #f2f2f2; // 9.48:1
+  --textDisabled: #d6d6d6; // 7.30:1
+  --borderColor: #9a9a9a; // 3.77:1
+  --borderStrong: #ffffff; // 10.61:1
+  --focusRing: #ffffff; // 10.61:1
+  --stateErrorFg: #ffc7c7; // 7.20:1
+  --stateWarningFg: #ffd28a; // 7.50:1
+  --stateInfoFg: #a6d8ff; // 7.02:1
+  --stateSuccessFg: #9be89b; // 7.28:1
+  --editorFg: #ffffff; // 10.61:1
+  --editorLineNumberFg: #dcdcdc; // 7.74:1
+  --editorWidgetBorder: #ffffff; // 10.61:1
+  --editorIndentGuideBg: #8f8f8f; // 3.28:1
+  --editorSelectionBg: #1f4b73; // 前景落在选区上 9.08:1
+}
+
+html.hc {
+  // 控件边界加粗一层（inset 阴影不占布局，见文件头说明）
+  .el-input__wrapper,
+  .el-textarea__inner,
+  .el-select__wrapper,
+  .el-button {
+    box-shadow: inset 0 0 0 1px var(--contrastBorder);
+  }
+}

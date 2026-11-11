@@ -30,13 +30,29 @@ export function pluginAssetOrigin(): string {
   return assetOrigin
 }
 
-/** 拼装插件包内资源 URL；`rel` 必须是包内相对路径 */
-export function pluginAssetUrl(pluginId: string, rel: string): string {
+/**
+ * 拼装插件包内资源 URL；`rel` 必须是包内相对路径。
+ *
+ * `query` 会被拼成 `?k=v`：后端 `split_plugin_uri` 只用 `uri.path()` 解析 `<插件ID>/<相对路径>`，
+ * **query 不参与路径解析**，所以追加参数是安全的（不会 404、也不会被当成目录名）。
+ * 这是「独立窗口插件页拿宿主初值」的唯一通道 —— 那种窗口拿不到桥，见 `window.ts` 文件头。
+ */
+export function pluginAssetUrl(
+  pluginId: string,
+  rel: string,
+  query?: Record<string, string | undefined>,
+): string {
   const clean = String(rel || '').replace(/^\.?\/+/, '')
   const segs = clean
     .split('/')
     .filter(Boolean)
     .map(encodeURIComponent)
     .join('/')
-  return `${assetOrigin}${encodeURIComponent(pluginId)}/${segs}`
+  const base = `${assetOrigin}${encodeURIComponent(pluginId)}/${segs}`
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(query ?? {})) {
+    if (v !== undefined && v !== '') params.set(k, v)
+  }
+  const qs = params.toString()
+  return qs ? `${base}?${qs}` : base
 }

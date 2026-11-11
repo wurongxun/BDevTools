@@ -1,7 +1,7 @@
 import { markRaw } from 'vue'
 import { Setting } from '@element-plus/icons-vue'
-import type { ToolPlugin } from '@/core/pluginManager'
-import MainPanel from './MainPanel.vue'
+import type { BuiltinPluginImpl } from '@/core/pluginManager'
+import { lazyView } from '@/core/plugin/lazy'
 
 /**
  * 设置（宿主级常驻入口）
@@ -15,11 +15,8 @@ import MainPanel from './MainPanel.vue'
  * 内容直接复用 `src/views/app/AppSetting.vue`（原独立窗口页面），避免两份维护。
  */
 export default {
-  id: 'settings',
-  label: '设置',
-  description: '应用设置、窗口预设与插件管理',
   icon: markRaw(Setting),
-  mainPanel: markRaw(MainPanel),
+  mainPanel: lazyView('settings', 'main', () => import('./MainPanel.vue')),
   pinnedBottom: true,
   order: 999,
-} satisfies ToolPlugin
+} satisfies BuiltinPluginImpl

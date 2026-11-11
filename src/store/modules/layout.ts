@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { pluginManager, type ToolPlugin } from '@/core/pluginManager'
+import { contributionRegistry } from '@/core/registry'
 import { getCurrentWindow, publish } from '@/core/runtime'
 import { IMMERSIVE_STATE_EVENT } from '@/composables/useImmersiveShortcut'
 
@@ -30,6 +31,8 @@ const useLayoutStore = defineStore('layout', {
     immersiveMode: false,
     /** 插件面板收起：仅隐藏 sidebarPanel（panel-area），保留活动栏图标列 */
     sidebarPanelCollapsed: false,
+    /** 活动栏（插件入口图标列，含底部常驻入口）收起：只隐藏图标列，保留插件面板 */
+    activityBarCollapsed: false,
     /**
      * 停靠面板状态（key = 停靠位置，目前只有 'bottom'）。
      * 停靠面板由 `ToolPlugin.dockPanel` 声明，**不参与 activeToolId 切换**——
@@ -98,12 +101,18 @@ const useLayoutStore = defineStore('layout', {
           else pluginManager.activeToolId.value = ''
         }
       }
-      for (const p of pluginManager.plugins) {
-        if (p.pinnedBottom || !p.dockPanel || ids.includes(p.id)) continue
-        if (this.dockPanelVisible[p.dockPanel.position]) {
-          this.setDockPanelVisible(p.dockPanel.position, false)
-        }
+      // 查注册表而不是读插件的 `dockPanel` 字段：「有没有停靠面板、停在哪」是贡献事实，
+      // 与 Layout 渲染时用的是同一张表 —— 两处判定不一致就会出现「面板还在、开关没了」
+      for (const e of contributionRegistry.views('dock')) {
+        if (ids.includes(e.pluginId)) continue
+        const pos = e.payload.position
+        if (pos && this.dockPanelVisible[pos]) this.setDockPanelVisible(pos, false)
       }
+    },
+
+    /** 切换活动栏（插件入口图标列）显隐 */
+    toggleActivityBar() {
+      this.activityBarCollapsed = !this.activityBarCollapsed
     },
 
     /** 切换插件面板显隐 */
@@ -181,6 +190,7 @@ const useLayoutStore = defineStore('layout', {
       this.focusMode = false
       this.immersiveMode = false
       this.sidebarPanelCollapsed = false
+      this.activityBarCollapsed = false
       this.dockPanelVisible = { bottom: false }
       this.dockPanelHeight = { bottom: 280 }
       this.dockPanelExpanded = { bottom: false }

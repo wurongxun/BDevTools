@@ -10,6 +10,7 @@ import { computed, ref } from 'vue'
 import { pluginManager } from '@/core/pluginManager'
 import type { ToolPlugin } from '@/core/pluginManager'
 import { publish, subscribe } from '@/core/runtime'
+import { activationMsOf } from '@/core/plugin/activation'
 import * as pluginApi from './api'
 import { toToolPlugin } from './adapter'
 import { initPluginAssetOrigin } from './url'
@@ -101,6 +102,43 @@ export async function setPluginMemdumpEnabled(enabled: boolean): Promise<void> {
   await refreshPluginRuntimeInfo()
 }
 
+// ==================== 插件依赖 ====================
+// 依赖是「声明的关系」，不是「打包的关系」：宿主据此阻止停用别人还依赖着的插件，
+// 并在依赖缺失时给出明确提示。刻意**不**自动启用/安装依赖 —— 一次点击产生一串隐式
+// 副作用（连带启用、连带拉起窗口）比多一步手动操作难排查得多。
+
+/** 全部已知插件 ID（内置静态清单 + 已安装第三方） */
+function knownIds(): string[] {
+  return [...builtinPlugins.value.map(p => p.id), ...installed.value.map(p => p.id)]
+}
+
+/** 某插件声明的依赖（内置取自静态清单，第三方取自安装记录） */
+function declaredDeps(id: string): string[] {
+  return (
+    builtinPlugins.value.find(p => p.id === id)?.dependencies ??
+    installed.value.find(p => p.id === id)?.dependencies ??
+    []
+  )
+}
+
+/** 依赖了 `id` 且**当前处于启用状态**的插件（停用保护用） */
+export function dependentsOf(id: string): string[] {
+  return knownIds().filter(
+    other => other !== id && !disabledIds.value.has(other) && declaredDeps(other).includes(id),
+  )
+}
+
+/**
+ * `id` 声明了但当前不可用的依赖：没打包（内置） / 没安装（第三方） / 被停用。
+ *
+ * 内置插件「没打包」也能查出来：静态清单 `builtinPlugins` 只包含本次编译进来的插件，
+ * 裁剪掉的插件不在里面 —— 这正是「只打包 database 却裁了 files」时该报警的地方。
+ */
+export function missingDepsOf(id: string): string[] {
+  const known = new Set(knownIds())
+  return declaredDeps(id).filter(d => !known.has(d) || disabledIds.value.has(d))
+}
+
 /** 当前生效的插件 ID 顺序：内置在前（按已生效顺序），其后为已启用的第三方 */
 function effectiveIds(): string[] {
   // 固定底部的宿主入口（如「设置」）不进入可排序序列
@@ -162,6 +200,9 @@ export const pluginListItems = computed<PluginListItem[]>(() => {
       sizeBytes: 0,
       installedAt: '',
       lastStats: null,
+      dependencies: p.dependencies ?? [],
+      missingDependencies: missingDepsOf(p.id),
+      activationMs: activationMsOf(p.id),
     })
   }
   for (const p of installed.value) {
@@ -184,6 +225,9 @@ export const pluginListItems = computed<PluginListItem[]>(() => {
       sizeBytes: p.size_bytes,
       installedAt: p.installed_at,
       lastStats: stats.value[p.id] ?? null,
+      dependencies: p.dependencies ?? [],
+      missingDependencies: missingDepsOf(p.id),
+      activationMs: activationMsOf(p.id),
     })
   }
   return displayOrder.value
@@ -384,6 +428,15 @@ export async function uninstallThirdPartyPlugin(id: string, removeData: boolean)
  * 内置只需重读启用状态后本地重排，切开关不会卡一下。
  */
 export async function setPluginEnabled(id: string, enabled: boolean): Promise<void> {
+  // 停用保护：别人还依赖着就不能停。放在最前面，避免「后端已经停了、前端才报错」的半截状态。
+  // 反过来（启用）不检查依赖：依赖缺失时插件仍可启用，只是设置页会标出「缺少依赖」，
+  // 由用户自己决定要不要先补上 —— 强行连带启用会把一次点击变成一串隐式副作用。
+  if (!enabled) {
+    const blockers = dependentsOf(id)
+    if (blockers.length) {
+      throw new Error(`无法停用「${id}」：${blockers.join('、')} 仍依赖它，请先停用这些插件`)
+    }
+  }
   await pluginApi.setPluginEnabled(id, enabled)
   if (isBuiltinPluginId(id)) {
     await refreshDisabledPlugins()

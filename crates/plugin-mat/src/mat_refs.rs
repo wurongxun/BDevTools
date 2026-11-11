@@ -1,0 +1,1876 @@
+//! # 对象引用追踪（Reference Tracking）
+//!
+//! 纯业务层模块：在 `mat_graph` 的对象引用图上做**会话式**多轮查询——
+//! 类名搜索 → 该类实例样本 → 单个对象详情（outgoing / incoming / Path to GC Roots），
+//! 任一引用对象可继续点击追踪（链式导航）。
+//!
+//! ## 会话缓存
+//! 引用追踪的交互是「建图一次、查询多次」，而大 dump 建图可达分钟级，因此本模块
+//! 维护 `path → Arc<Session>` 的全局会话表（LRU 逐出，`SESSION_CAP` 上限），
+//! `Session` 内：对象图（与泄漏检测共用 `mat_graph::build_graph`，同一 dump 不存两份图）+
+//! 若干 `OnceLock` 惰性派生索引：
+//! - `idx`：obj_id → 节点索引（二分查找，供 inspect 定位）；
+//! - `reachable`：从 GC Roots 正向 BFS 的可达标记（不可达 = 垃圾，无 GC Root 路径）；
+//! - `pred`：反向引用索引（谁引用我，incoming 聚合 / Path BFS 共用）；
+//! - `class_index`：类名 → 该类全部实例节点（搜索与实例样本）。
+//! 惰性构建一次后所有查询毫秒级；`closeDump` 时应调用 `mat_refs_release` 释放。
+//!
+//! ## 引用点（edge_slot）
+//! `mat_graph` 为每条边记录了「引用点」：实例字段在继承链中的位置 / 静态字段下标 /
+//! 数组元素下标。本模块据此还原「通过哪个字段引用」，展示与 MAT 的
+//! "Path to GC Roots" 引用链口径一致（GC Root →(字段) 对象 → …）。
+//!
+//! ## 规模保护
+//! 引用追踪需要额外物化反向索引与类索引（内存约为泄漏检测的 1.8×），上限设得
+//! 比泄漏检测更保守。上限不再是写死常量：按「分析内存预算」换算（见 `mat_cfg`，
+//! 默认随本机物理内存自适应，用户可在「分析预算」设置中覆盖），超限时
+//! build 返回 `truncated` 标记、查询返回明确提示，不强行分析。
+
+use crate::mat_graph::{
+    build_graph, chain_fields_named, ref_kind_name, ClassMeta, Graph, Node, NodeKind, RK_STRONG,
+};
+use crate::mat_cfg::{self, MatLimits, QueryLimits};
+use crate::mat_dom::DomTree;
+use crate::mat_hprof::{catch_parse, count_heap_objects, read_head, sniff_format};
+use bdevtools_core::response::resp_data::ResData;
+use serde::Serialize;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::{Mutex, OnceLock};
+
+// ==================== 返回结构（与前端 mat api 字段一一对应，snake_case） ====================
+
+/// build 会话后的图规模与可达性汇总
+#[derive(Debug, Serialize)]
+pub struct RefBuildInfo {
+    pub total_nodes: u64,
+    pub total_shallow: u64,
+    pub root_nodes: u64,
+    pub edge_count: u64,
+    pub skipped_edge_count: u64,
+    pub field_mismatch: u64,
+    pub classes: u64,
+    pub reachable_nodes: u64,
+    pub reachable_shallow: u64,
+    pub unreachable_nodes: u64,
+    pub unreachable_shallow: u64,
+    /// 是否因规模超限无法提供引用追踪（search/inspect 将返回提示）
+    pub truncated: bool,
+    /// 是否命中了已有会话缓存（无需重新解析）
+    pub cached: bool,
+    /// 是否由本地索引（`.bdtidx`）还原（跳过了解析；与 cached 不同：
+    /// cached = 本次进程里已有会话，index_hit = 图来自上次运行落盘的索引）
+    pub index_hit: bool,
+    /// 浅堆口径（对象头 / 对齐 / 压缩指针）：数值随 dump 与配置变化，
+    /// 前端直接展示这行文本，避免「用户以为数值算错了」
+    pub shallow_caliber: String,
+    pub elapsed_ms: u64,
+    pub notes: Vec<String>,
+}
+
+/// 类名搜索命中行
+#[derive(Debug, Serialize)]
+pub struct RefClassHit {
+    pub class_name: String,
+    /// 该类实例数（含对象数组；primitive 数组如 byte[] 亦统计）
+    pub count: u64,
+    /// 该类全部实例浅堆字节
+    pub shallow_bytes: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RefSearchResult {
+    pub total: u64,
+    pub hits: Vec<RefClassHit>,
+    pub elapsed_ms: u64,
+}
+
+/// 实例样本行
+#[derive(Debug, Serialize)]
+pub struct RefInstanceRow {
+    /// 对象 id（0x 十六进制展示）
+    pub obj_id: String,
+    pub shallow_bytes: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RefInstances {
+    pub class_name: String,
+    /// 该类实例总数
+    pub total: u64,
+    /// 本次返回的起始下标
+    pub offset: u64,
+    /// 本次请求的单页上限
+    pub limit: u64,
+    /// 排序口径：shallow（默认，浅堆降序）/ id（对象 id 升序）
+    pub sort: String,
+    pub rows: Vec<RefInstanceRow>,
+    pub elapsed_ms: u64,
+}
+
+/// outgoing 明细项 / incoming 样例引用点统一描述
+#[derive(Debug, Serialize)]
+pub struct RefOutItem {
+    /// field（字段引用）/ elem（对象数组单元素）/ group（数组元素聚合组）
+    pub kind: String,
+    /// 字段名 / "[下标]" / 组的目标类名（由 count 配合）
+    pub label: String,
+    pub target_class: String,
+    /// 目标对象 id（0x；group 为该组首个样例对象）
+    pub target_obj_id: String,
+    pub target_shallow: u64,
+    /// 目标节点类型：instance / object-array / primitive-array / class
+    pub target_kind: String,
+    /// 聚合组元素数（field / elem 恒为 1）
+    pub count: u64,
+    /// 引用强度：strong / weak / soft / phantom / finalizer
+    pub ref_kind: String,
+}
+
+/// incoming 聚合：谁引用了我（按引用者类分组）
+#[derive(Debug, Serialize)]
+pub struct RefIncomingGroup {
+    pub class_name: String,
+    pub count: u64,
+    pub shallow_bytes: u64,
+}
+
+/// incoming 样例（每引用者类前若干条），via = 引用点
+#[derive(Debug, Serialize)]
+pub struct RefIncomingSample {
+    pub referrer_obj_id: String,
+    pub referrer_class: String,
+    /// 引用点：字段名 / <静态>: 字段名 / [下标]
+    pub via: String,
+    /// 引用强度（weak/soft/phantom/finalizer 时前端标红提示）
+    pub ref_kind: String,
+    pub referrer_shallow: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RefPathItem {
+    pub class_name: String,
+    pub obj_id: String,
+    pub is_root: bool,
+    /// 本对象如何被链上**前一节点**引用（root 首项为空）
+    pub via: String,
+    /// 这一跳的引用强度（root 首项为 strong）
+    pub ref_kind: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RefObjectDetail {
+    pub obj_id: String,
+    pub class_name: String,
+    /// instance / object-array / primitive-array / class
+    pub kind: String,
+    pub shallow_bytes: u64,
+    pub reachable: bool,
+    /// 该对象自身是否为 GC Root
+    pub is_root: bool,
+    /// GC Root 分类标签（is_root 时有效）
+    pub root_kind: String,
+    /// outgoing：它引用了谁
+    pub outgoing_total: u64,
+    pub outgoing_truncated: bool,
+    pub outgoing: Vec<RefOutItem>,
+    /// incoming：谁引用了它（聚合 + 样例）
+    pub incoming_total: u64,
+    pub incoming_truncated: bool,
+    pub incoming_by_class: Vec<RefIncomingGroup>,
+    pub incoming_samples: Vec<RefIncomingSample>,
+    /// Path to GC Roots（GC Root → … → 本对象）
+    pub path_state: String, // ok / unreachable / truncated / is-root
+    pub path_note: String,
+    pub path: Vec<RefPathItem>,
+    pub elapsed_ms: u64,
+}
+
+// ==================== 规模阈值 ====================
+
+// 节点/边上限由 mat_cfg 按「分析内存预算」动态换算（16GB 参考机 ≈ 20M/100M，
+// 默认随物理内存自适应、可在前端「分析预算」设置中覆盖）。
+/// 会话缓存容量（超限 LRU 逐出最久未用）
+const SESSION_CAP: usize = 3;
+
+/// 查询级上限统一由 `mat_cfg::QueryLimits` 提供（可经 plugins/mat.json 覆盖），
+/// 本模块不再各自定义常量 —— 见 `q()`。
+fn q() -> QueryLimits {
+    mat_cfg::query_limits()
+}
+
+// ==================== 会话缓存 ====================
+
+/// 对象 id → 节点索引（按 id 升序，二分定位）
+struct IdxTable {
+    pairs: Vec<(u64, u32)>,
+}
+
+impl IdxTable {
+    fn build(nodes: &[Node]) -> Self {
+        let mut pairs: Vec<(u64, u32)> = nodes
+            .iter()
+            .enumerate()
+            .map(|(i, nd)| (nd.id, i as u32))
+            .collect();
+        pairs.sort_unstable_by_key(|p| p.0);
+        IdxTable { pairs }
+    }
+
+    fn get(&self, id: u64) -> Option<u32> {
+        self.pairs
+            .binary_search_by_key(&id, |p| p.0)
+            .ok()
+            .map(|i| self.pairs[i].1)
+    }
+}
+
+/// 反向引用索引：pred_head[v] → 引用 v 的对象节点链表
+struct PredIndex {
+    head: Vec<u32>,
+    to: Vec<u32>,
+    next: Vec<u32>,
+    /// 与 to/next 等长的引用强度（RK_*），路径过滤与 via 标注共用
+    kind: Vec<u8>,
+}
+
+fn build_pred(g: &Graph) -> PredIndex {
+    let n = g.nodes.len();
+    let mut head: Vec<u32> = vec![u32::MAX; n];
+    let mut to: Vec<u32> = Vec::with_capacity(g.edge_to.len());
+    let mut next: Vec<u32> = Vec::with_capacity(g.edge_to.len());
+    let mut kind: Vec<u8> = Vec::with_capacity(g.edge_to.len());
+    for (u, &e0) in g.edge_head.iter().enumerate() {
+        let mut e = e0;
+        while e != u32::MAX {
+            let v = g.edge_to[e as usize] as usize;
+            let ne = to.len() as u32;
+            to.push(u as u32);
+            next.push(head[v]);
+            kind.push(g.edge_kind.get(e as usize).copied().unwrap_or(RK_STRONG));
+            head[v] = ne;
+            e = g.edge_next[e as usize];
+        }
+    }
+    PredIndex { head, to, next, kind }
+}
+
+/// 类名 → 该类实例节点索引 + 浅堆合计
+struct ClassIndex {
+    map: HashMap<String, (Vec<u32>, u64)>,
+}
+
+fn build_class_index(g: &Graph) -> ClassIndex {
+    let mut map: HashMap<String, (Vec<u32>, u64)> = HashMap::new();
+    // 预填 primitive 伪类（保证空类也出现在搜索里）
+    for m in g.meta.iter().take(8) {
+        map.entry(m.name.clone()).or_default();
+    }
+    for (i, nd) in g.nodes.iter().enumerate() {
+        if nd.kind == NodeKind::Class {
+            continue; // 类对象不参与类名搜索
+        }
+        let name = g.meta[nd.class as usize].name.clone();
+        let e = map.entry(name).or_default();
+        e.0.push(i as u32);
+        e.1 += nd.shallow;
+    }
+    ClassIndex { map }
+}
+
+/// 单个 dump 的引用追踪会话（建图一次、查询多次）。
+/// `pub(crate)`：泄漏检测（mat_leak）经 `session_graph` / `session_reachable` 复用其图。
+pub(crate) struct Session {
+    g: Graph,
+    /// 源 dump 路径（索引读写要用它定位 sidecar 并校验指纹）
+    pub(crate) path: String,
+    /// 本会话的图是否由本地索引还原（跳过了解析）
+    pub(crate) from_index: bool,
+    pub(crate) truncated: bool,
+    /// 建图时的预算上限快照：预算调高后旧截断会话据此自动重建（mat_refs_build 升级判定）
+    lim: MatLimits,
+    idx: OnceLock<IdxTable>,
+    reachable: OnceLock<Vec<bool>>,
+    pred: OnceLock<PredIndex>,
+    class_index: OnceLock<ClassIndex>,
+    /// 支配树（Leak Suspects / Dominator Tree / Retained 列共用）。
+    /// 缓存挂在 Session 上 ⇒ 会话重建（预算升级 / 关闭 dump）时自动失效，无需额外广播。
+    pub(crate) dom: OnceLock<std::sync::Arc<DomTree>>,
+    /// 只保护「支配树计算」这一段，避免同一 dump 并发查询重复跑 LT；
+    /// 普通引用查询不碰这把锁。
+    pub(crate) dom_lock: Mutex<()>,
+    /// 继承链字段 memo（chain_fields_named 缓存）
+    chain_memo: Mutex<HashMap<usize, Option<Vec<(u8, String)>>>>,
+    /// 是否只用强引用（弱/软/虚/终结器不参与可达性与支配树）。
+    /// 取自 `mat_cfg::include_weak_refs()` 的反值，建会话时定死 ⇒ 改配置需重建会话。
+    strong_only: bool,
+}
+
+impl Session {
+    fn new(g: Graph, path: String, from_index: bool) -> Session {
+        let lim = mat_cfg::current_limits();
+        let truncated = g.nodes.len() > lim.refs_nodes || g.edge_to.len() > lim.refs_edges;
+        Session {
+            g,
+            path,
+            from_index,
+            truncated,
+            lim,
+            idx: OnceLock::new(),
+            reachable: OnceLock::new(),
+            pred: OnceLock::new(),
+            class_index: OnceLock::new(),
+            dom: OnceLock::new(),
+            dom_lock: Mutex::new(()),
+            chain_memo: Mutex::new(HashMap::new()),
+            strong_only: !mat_cfg::include_weak_refs(),
+        }
+    }
+
+    /// 该边是否计入可达性 / 支配树（强引用口径下跳过弱/软/虚/终结器引用）
+    fn edge_counts(&self, e: u32) -> bool {
+        !self.strong_only || self.g.edge_is_strong(e)
+    }
+
+    fn idx(&self) -> &IdxTable {
+        self.idx.get_or_init(|| IdxTable::build(&self.g.nodes))
+    }
+
+    fn reachable(&self) -> &[bool] {
+        self.reachable.get_or_init(|| {
+            let n = self.g.nodes.len();
+            let mut mark = vec![false; n];
+            let mut q: VecDeque<u32> = VecDeque::new();
+            for &(ri, _) in self.g.roots.iter() {
+                if !mark[ri as usize] {
+                    mark[ri as usize] = true;
+                    q.push_back(ri);
+                }
+            }
+            while let Some(u) = q.pop_front() {
+                let mut e = self.g.edge_head[u as usize];
+                while e != u32::MAX {
+                    // 强引用口径：referent 之外的普通字段边才传播可达性
+                    if self.edge_counts(e) {
+                        let v = self.g.edge_to[e as usize] as usize;
+                        if !mark[v] {
+                            mark[v] = true;
+                            q.push_back(v as u32);
+                        }
+                    }
+                    e = self.g.edge_next[e as usize];
+                }
+            }
+            mark
+        })
+    }
+
+    fn pred(&self) -> &PredIndex {
+        self.pred.get_or_init(|| build_pred(&self.g))
+    }
+
+    fn class_index(&self) -> &ClassIndex {
+        self.class_index.get_or_init(|| build_class_index(&self.g))
+    }
+
+    /// 节点基本展示信息
+    fn node_label(&self, ni: u32) -> (String, u64, String) {
+        let nd = &self.g.nodes[ni as usize];
+        (
+            self.g.meta[nd.class as usize].name.clone(),
+            nd.shallow,
+            kind_str(nd.kind).to_string(),
+        )
+    }
+}
+
+fn kind_str(k: NodeKind) -> &'static str {
+    match k {
+        NodeKind::Instance => "instance",
+        NodeKind::ObjectArray => "object-array",
+        NodeKind::PrimitiveArray => "primitive-array",
+        NodeKind::Class => "class",
+    }
+}
+
+// ---- 会话表（全局，LRU）----
+struct Entry {
+    last: std::time::Instant,
+    session: std::sync::Arc<Session>,
+}
+
+static SESSIONS: OnceLock<Mutex<HashMap<String, Entry>>> = OnceLock::new();
+
+fn sessions() -> &'static Mutex<HashMap<String, Entry>> {
+    SESSIONS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// 取（或构建）会话：命中刷新 LRU；未命中在锁外构建避免长图解析阻塞其他 dump。
+/// `pub(crate)`：泄漏检测（mat_leak）也复用同一会话图，同一 dump 不二次全量解析。
+pub(crate) fn ensure_session(path: &str) -> Result<std::sync::Arc<Session>, String> {
+    {
+        let mut map = sessions().lock().unwrap();
+        if let Some(e) = map.get_mut(path) {
+            e.last = std::time::Instant::now();
+            return Ok(e.session.clone());
+        }
+    }
+    // 锁外建图（可能耗时数十秒级）：先试本地索引，命中就跳过整个解析过程
+    let (graph, from_index) = match crate::mat_index::load_graph(path) {
+        Some(g) => (g, true),
+        None => {
+            let head = read_head(path, 64)?;
+            let (_format, supported) = sniff_format(&head);
+            if !supported {
+                return Err(format!(
+                    "不支持的堆转储格式（{}），当前仅支持 JAVA PROFILE 1.0.x",
+                    String::from_utf8_lossy(&head)
+                ));
+            }
+            let g = catch_parse(|| build_graph(path))?;
+            // 落索引：失败（目录只读 / 超过写入上限 / 磁盘满）只影响下次打开速度，
+            // 绝不影响本次分析，所以这里只丢弃错误。
+            let _ = crate::mat_index::save_graph(path, &g);
+            (g, false)
+        }
+    };
+    let session = std::sync::Arc::new(Session::new(graph, path.to_string(), from_index));
+
+    let mut map = sessions().lock().unwrap();
+    if let Some(e) = map.get_mut(path) {
+        // 并发双建：他人已插入，用已有的（丢弃自己的，省内存）
+        e.last = std::time::Instant::now();
+        return Ok(e.session.clone());
+    }
+    // LRU 逐出
+    while map.len() >= SESSION_CAP {
+        let oldest = map
+            .iter()
+            .min_by_key(|(_, e)| e.last)
+            .map(|(k, _)| k.clone());
+        match oldest {
+            Some(k) => {
+                map.remove(&k);
+            }
+            None => break,
+        }
+    }
+    map.insert(path.to_string(), Entry { last: std::time::Instant::now(), session: session.clone() });
+    Ok(session)
+}
+
+fn release_session(path: &str) -> bool {
+    sessions().lock().unwrap().remove(path).is_some()
+}
+
+// ---- 跨模块复用（泄漏检测共用同一会话图，避免同 dump 二次全量解析） ----
+
+pub(crate) fn refs_has_session(path: &str) -> bool {
+    sessions().lock().unwrap().contains_key(path)
+}
+
+pub(crate) fn session_graph(s: &Session) -> &Graph {
+    &s.g
+}
+
+/// 会话图的浅堆口径（支配树索引落盘时要一并记下，否则读回的口径可能不同）
+pub(crate) fn session_layout(s: &Session) -> crate::mat_layout::HeapLayout {
+    s.g.layout
+}
+
+pub(crate) fn session_reachable(s: &Session) -> &[bool] {
+    s.reachable()
+}
+
+/// 会话是否处于「强引用口径」（弱/软/虚引用不参与可达性）
+pub(crate) fn session_strong_only(s: &Session) -> bool {
+    s.strong_only
+}
+
+/// 反向引用索引三元组（路径搜索 / incoming 展示共用；kind 与 to 等长）
+pub(crate) fn session_pred(s: &Session) -> (&[u32], &[u32], &[u32], &[u8]) {
+    let p = s.pred();
+    (&p.head, &p.to, &p.next, &p.kind)
+}
+
+/// 支配树缓存读取 / 写入（mat_dom 用；缓存失效随 Session 重建自动发生）
+pub(crate) fn session_dom(s: &Session) -> Option<std::sync::Arc<DomTree>> {
+    s.dom.get().cloned()
+}
+
+pub(crate) fn session_set_dom(s: &Session, d: std::sync::Arc<DomTree>) {
+    let _ = s.dom.set(d);
+}
+
+/// 对象 id（数值）→ 节点索引，供支配树按 id 定位
+pub(crate) fn session_node_by_id(s: &Session, id: u64) -> Option<u32> {
+    s.idx().get(id)
+}
+
+/// 可达性统计（与泄漏检测 summary 同口径）
+pub(crate) fn reach_stats(s: &Session) -> (u64, u64, u64, u64) {
+    let reach = s.reachable();
+    let mut r_cnt = 0u64;
+    let mut r_sh = 0u64;
+    let mut u_cnt = 0u64;
+    let mut u_sh = 0u64;
+    for (i, &ok) in reach.iter().enumerate() {
+        if ok {
+            r_cnt += 1;
+            r_sh += s.g.nodes[i].shallow;
+        } else {
+            u_cnt += 1;
+            u_sh += s.g.nodes[i].shallow;
+        }
+    }
+    (r_cnt, r_sh, u_cnt, u_sh)
+}
+
+// ==================== 命令入口 ====================
+
+pub fn mat_refs_build(path: &str) -> Result<ResData<RefBuildInfo>, String> {
+    let started = std::time::Instant::now();
+    let cached = refs_has_session(path);
+    // 索引命中时也不必跑「先数一遍对象」的预检：那条闸是为了避免大 dump 白跑建图，
+    // 而索引命中根本不建图（只读 sidecar）。
+    let index_ok = !cached && crate::mat_index::graph_valid(path);
+    // 冷启动先轻量数对象：节点超限时原逻辑必然截断（节点数 OR 边数超限即截断），
+    // 预检直接返回，避免大 dump 白跑一次 GB 级建图。会话已缓存时跳过预检走精确统计。
+    let mut s = if cached || index_ok {
+        ensure_session(path)?
+    } else {
+        let head = read_head(path, 64)?;
+        let (_format, supported) = sniff_format(&head);
+        if !supported {
+            return Err(format!(
+                "不支持的堆转储格式（{}），当前仅支持 JAVA PROFILE 1.0.x",
+                String::from_utf8_lossy(&head)
+            ));
+        }
+        let cnt = catch_parse(|| count_heap_objects(path))?;
+        let lim = mat_cfg::current_limits();
+        if cnt > lim.refs_nodes as u64 {
+            return Ok(ResData {
+                code: 200,
+                msg: "ok".to_string(),
+                data: RefBuildInfo {
+                    total_nodes: cnt,
+                    total_shallow: 0,
+                    root_nodes: 0,
+                    edge_count: 0,
+                    skipped_edge_count: 0,
+                    field_mismatch: 0,
+                    classes: 0,
+                    reachable_nodes: 0,
+                    reachable_shallow: 0,
+                    unreachable_nodes: cnt,
+                    unreachable_shallow: 0,
+                    truncated: true,
+                    cached: false,
+                    index_hit: false,
+                    shallow_caliber: String::new(), // 预检阶段还没建图，口径无意义
+                    elapsed_ms: started.elapsed().as_millis() as u64,
+                    notes: vec![format!(
+                        "对象总数 {} 超过当前分析上限（预算 {} GB → 约 {} 节点 / {} 边；本机物理内存 {} GB）。预检阶段直接跳过全量建图以降低内存峰值；可在「分析预算」设置中调高后重试",
+                        cnt, lim.budget_gb, lim.refs_nodes, lim.refs_edges, mat_cfg::physical_mem_gb()
+                    )],
+                },
+            });
+        }
+        ensure_session(path)?
+    };
+    // 预算调高后旧截断会话自动升级：释放重建（新预算下可能已可提供引用查询）
+    if s.truncated {
+        let cur = mat_cfg::current_limits();
+        if cur.refs_nodes > s.lim.refs_nodes || cur.refs_edges > s.lim.refs_edges {
+            release_session(path);
+            s = ensure_session(path)?;
+        }
+    }
+    let mut notes: Vec<String> = Vec::new();
+    if s.from_index {
+        notes.push("已命中本地索引（.bdtidx），跳过 HPROF 解析；源文件改动或删除索引后会自动重建".to_string());
+    }
+    if s.g.field_mismatch > 0 {
+        notes.push(format!(
+            "{} 个实例的字段字节与类定义不符，未提取引用（多为继承链元数据缺失的类）",
+            s.g.field_mismatch
+        ));
+    }
+    if s.g.skipped > 0 {
+        notes.push(format!("{} 条引用指向堆外对象，已忽略", s.g.skipped));
+    }
+    if s.truncated {
+        let lim = mat_cfg::current_limits();
+        notes.push(format!(
+            "对象图规模超过当前分析上限（预算 {} GB → 约 {} 节点 / {} 边；本机物理内存 {} GB），无法提供引用查询。可在「分析预算」设置中调高后重试",
+            lim.budget_gb, lim.refs_nodes, lim.refs_edges, mat_cfg::physical_mem_gb()
+        ));
+    }
+    let (r_cnt, r_sh, u_cnt, u_sh) = reach_stats(&s);
+    let total_shallow: u64 = s.g.nodes.iter().map(|nd| nd.shallow).sum();
+    let data = RefBuildInfo {
+        total_nodes: s.g.nodes.len() as u64,
+        total_shallow,
+        root_nodes: s.g.roots.len() as u64,
+        edge_count: s.g.edge_to.len() as u64,
+        skipped_edge_count: s.g.skipped,
+        field_mismatch: s.g.field_mismatch,
+        classes: s.g.meta.len() as u64,
+        reachable_nodes: r_cnt,
+        reachable_shallow: r_sh,
+        unreachable_nodes: u_cnt,
+        unreachable_shallow: u_sh,
+        truncated: s.truncated,
+        cached,
+        index_hit: s.from_index,
+        shallow_caliber: session_layout(&s).describe(),
+        elapsed_ms: started.elapsed().as_millis() as u64,
+        notes,
+    };
+    Ok(ResData { code: 200, msg: "ok".to_string(), data })
+}
+
+pub fn mat_refs_release(path: &str) -> Result<ResData<bool>, String> {
+    let ok = release_session(path);
+    Ok(ResData { code: 200, msg: "ok".to_string(), data: ok })
+}
+
+/// 通配匹配（`*` 任意串、`?` 单字符）。刻意不用正则：一次类名搜索不值得引入
+/// 回溯风险，且 MAT 的类名匹配本来就是通配语义。
+pub(crate) fn glob_match(name: &str, pat: &str) -> bool {
+    let n: Vec<char> = name.chars().collect();
+    let p: Vec<char> = pat.chars().collect();
+    let (mut i, mut j) = (0usize, 0usize);
+    let (mut star, mut mark) = (usize::MAX, 0usize);
+    while i < n.len() {
+        if j < p.len() && (p[j] == '?' || p[j] == n[i]) {
+            i += 1;
+            j += 1;
+        } else if j < p.len() && p[j] == '*' {
+            star = j;
+            j += 1;
+            mark = i;
+        } else if star != usize::MAX {
+            j = star + 1;
+            mark += 1;
+            i = mark;
+        } else {
+            return false;
+        }
+    }
+    while j < p.len() && p[j] == '*' {
+        j += 1;
+    }
+    j == p.len()
+}
+
+/// 类名匹配：含 `*` / `?` 走通配，否则大小写不敏感子串。
+/// 入参 `q` 需已小写（调用方统一处理，避免每个类名重复 to_lowercase）。
+///
+/// `pub(crate)`：多 dump 对比（`mat_compare`）复用同一套匹配规则，
+/// 否则「直方图能搜到、对比搜不到」这种不一致很难解释。
+pub(crate) fn class_matches(name: &str, q: &str) -> bool {
+    if q.is_empty() {
+        return true;
+    }
+    let name = name.to_lowercase();
+    if q.contains('*') || q.contains('?') {
+        glob_match(&name, q)
+    } else {
+        name.contains(q)
+    }
+}
+
+/// 类名搜索：通配（`*`/`?`）或大小写不敏感子串，按浅堆合计降序。
+pub fn mat_refs_search_classes(
+    path: &str,
+    query: &str,
+    limit: usize,
+) -> Result<ResData<RefSearchResult>, String> {
+    let started = std::time::Instant::now();
+    let s = ensure_session(path)?;
+    if s.truncated {
+        return Err("对象图规模超过引用追踪上限，无法搜索".to_string());
+    }
+    let q_lower = query.trim().to_lowercase();
+    let mut hits: Vec<RefClassHit> = Vec::new();
+    for (name, (nodes, shallow)) in s.class_index().map.iter() {
+        if class_matches(name, &q_lower) {
+            hits.push(RefClassHit {
+                class_name: name.clone(),
+                count: nodes.len() as u64,
+                shallow_bytes: *shallow,
+            });
+        }
+    }
+    hits.sort_by(|a, b| b.shallow_bytes.cmp(&a.shallow_bytes).then(b.count.cmp(&a.count)));
+    let total = hits.len() as u64;
+    let lim = limit.min(q().search_limit).max(1);
+    hits.truncate(lim);
+    let data = RefSearchResult { total, hits, elapsed_ms: started.elapsed().as_millis() as u64 };
+    Ok(ResData { code: 200, msg: "ok".to_string(), data })
+}
+
+/// 取某类的实例（**分页**，不再是 Top N 硬截断）。
+/// 排序口径：`shallow`（浅堆降序，默认，等价 MAT 的「按 Retained/Shallow 排序」入口）/
+/// `id`（对象 id 升序，便于稳定性比对）。
+pub fn mat_refs_instances(
+    path: &str,
+    class_name: &str,
+    offset: usize,
+    limit: usize,
+    sort: &str,
+) -> Result<ResData<RefInstances>, String> {
+    let started = std::time::Instant::now();
+    let s = ensure_session(path)?;
+    if s.truncated {
+        return Err("对象图规模超过引用追踪上限，无法查询".to_string());
+    }
+    let sort = if sort == "id" { "id" } else { "shallow" };
+    let page = limit.clamp(1, q().instance_page);
+    let nodes = match s.class_index().map.get(class_name) {
+        Some((v, _)) => v.clone(),
+        None => {
+            return Ok(ResData {
+                code: 200,
+                msg: "ok".to_string(),
+                data: RefInstances {
+                    class_name: class_name.to_string(),
+                    total: 0,
+                    offset: offset as u64,
+                    limit: page as u64,
+                    sort: sort.to_string(),
+                    rows: Vec::new(),
+                    elapsed_ms: started.elapsed().as_millis() as u64,
+                },
+            });
+        }
+    };
+    let total = nodes.len() as u64;
+    let mut idx: Vec<u32> = nodes;
+    match sort {
+        "id" => idx.sort_unstable_by_key(|ni| s.g.nodes[*ni as usize].id),
+        _ => idx.sort_unstable_by(|a, b| {
+            let (sa, sb) = (s.g.nodes[*a as usize].shallow, s.g.nodes[*b as usize].shallow);
+            sb.cmp(&sa).then(a.cmp(b))
+        }),
+    }
+    let rows: Vec<RefInstanceRow> = idx
+        .into_iter()
+        .skip(offset)
+        .take(page)
+        .map(|ni| RefInstanceRow {
+            obj_id: format!("0x{:x}", s.g.nodes[ni as usize].id),
+            shallow_bytes: s.g.nodes[ni as usize].shallow,
+        })
+        .collect();
+    let data = RefInstances {
+        class_name: class_name.to_string(),
+        total,
+        offset: offset as u64,
+        limit: page as u64,
+        sort: sort.to_string(),
+        rows,
+        elapsed_ms: started.elapsed().as_millis() as u64,
+    };
+    Ok(ResData { code: 200, msg: "ok".to_string(), data })
+}
+
+/// 单个对象详情：outgoing / incoming / Path to GC Roots。
+pub fn mat_refs_inspect(path: &str, obj_id: &str) -> Result<ResData<RefObjectDetail>, String> {
+    let started = std::time::Instant::now();
+    let s = ensure_session(path)?;
+    if s.truncated {
+        return Err("对象图规模超过引用追踪上限，无法查询".to_string());
+    }
+    let id = parse_obj_id(obj_id)?;
+    let ni = match s.idx().get(id) {
+        Some(v) => v,
+        None => {
+            return Err(format!("堆中不存在对象 0x{:x}（可能来自其他 dump）", id));
+        }
+    };
+    let detail = inspect_object(&s, ni, id, started.elapsed().as_millis() as u64);
+    Ok(ResData { code: 200, msg: "ok".to_string(), data: detail })
+}
+
+// ==================== 多条 Path to GC Roots（mat_gc_root_paths） ====================
+
+/// 一条 GC Root 路径（root 在前，目标对象在后）
+#[derive(Debug, Serialize)]
+pub struct GcRootPath {
+    /// 起点根分类（thread / static / jni-global / …）
+    pub root_kind: String,
+    /// 边数（= items.len() - 1）
+    pub length: u64,
+    pub items: Vec<RefPathItem>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GcRootPathsResult {
+    pub obj_id: String,
+    /// ok / is-root / unreachable / truncated
+    pub state: String,
+    pub note: String,
+    /// 本次枚举到的路径条数（受上限约束）
+    pub total: u64,
+    pub offset: u64,
+    pub limit: u64,
+    /// 是否只走强引用（MAT 默认口径）
+    pub exclude_weak: bool,
+    /// 因「排除弱引用」被跳过的边数（>0 时提示用户存在弱引用可达路径）
+    pub weak_skipped: u64,
+    /// 是否因条数 / 搜索节点上限截断
+    pub truncated: bool,
+    pub paths: Vec<GcRootPath>,
+    pub elapsed_ms: u64,
+}
+
+/// 从 root 朝目标方向枚举一条最短路径（`dist` = 距目标的反向 BFS 层数）。
+/// 递归深度 = 路径长度（真实堆通常 < 50），比手工栈更容易看懂。
+#[allow(clippy::too_many_arguments)]
+fn walk_paths(
+    cur: u32,
+    start: u32,
+    dist: &HashMap<u32, u32>,
+    g: &Graph,
+    exclude_weak: bool,
+    trail: &mut Vec<u32>,
+    out: &mut Vec<Vec<u32>>,
+    cap: usize,
+    steps: &mut usize,
+) {
+    if out.len() >= cap || *steps == 0 {
+        return;
+    }
+    *steps -= 1;
+    if cur == start {
+        out.push(trail.clone());
+        return;
+    }
+    let dc = match dist.get(&cur) {
+        Some(&d) => d,
+        None => return,
+    };
+    if dc == 0 {
+        return;
+    }
+    // 朝目标方向走：出边目标必须恰好离目标更近一层（保证仍是最短路径）
+    let mut e = g.edge_head[cur as usize];
+    while e != u32::MAX {
+        if out.len() >= cap || *steps == 0 {
+            return;
+        }
+        if !exclude_weak || g.edge_is_strong(e) {
+            let v = g.edge_to[e as usize];
+            if dist.get(&v).copied() == Some(dc - 1) {
+                trail.push(v);
+                walk_paths(v, start, dist, g, exclude_weak, trail, out, cap, steps);
+                trail.pop();
+            }
+        }
+        e = g.edge_next[e as usize];
+    }
+}
+
+fn empty_paths(obj_id: &str, state: &str, note: String, elapsed: u64) -> ResData<GcRootPathsResult> {
+    ResData {
+        code: 200,
+        msg: "ok".to_string(),
+        data: GcRootPathsResult {
+            obj_id: obj_id.to_string(),
+            state: state.to_string(),
+            note,
+            total: 0,
+            offset: 0,
+            limit: 0,
+            exclude_weak: true,
+            weak_skipped: 0,
+            truncated: false,
+            paths: Vec::new(),
+            elapsed_ms: elapsed,
+        },
+    }
+}
+
+/// 多条最短 Path to GC Roots：支持「排除弱/软/虚/终结器引用」与分页。
+/// 与 `mat_refs_inspect` 的单条路径互补：这里有条数上限、可按强度过滤、可翻页。
+pub fn mat_gc_root_paths(
+    path: &str,
+    obj_id: &str,
+    exclude_weak: bool,
+    offset: usize,
+    limit: usize,
+) -> Result<ResData<GcRootPathsResult>, String> {
+    let started = std::time::Instant::now();
+    let s = ensure_session(path)?;
+    if s.truncated {
+        return Err("对象图规模超过引用追踪上限，无法追踪路径".to_string());
+    }
+    let id = parse_obj_id(obj_id)?;
+    let ni = match s.idx().get(id) {
+        Some(v) => v,
+        None => return Err(format!("堆中不存在对象 0x{:x}（可能来自其他 dump）", id)),
+    };
+    let g = &s.g;
+    let elapsed = |t: &std::time::Instant| t.elapsed().as_millis() as u64;
+    let page = limit.clamp(1, 50);
+    let cap = (offset + page).min(50);
+
+    // 根节点 → 分类
+    let mut root_kind_of: HashMap<u32, &'static str> = HashMap::new();
+    for &(ri, k) in g.roots.iter() {
+        root_kind_of.entry(ri).or_insert(k);
+    }
+
+    // 自身就是 GC Root
+    if let Some(k) = root_kind_of.get(&ni).copied() {
+        let nd = &g.nodes[ni as usize];
+        let item = RefPathItem {
+            class_name: g.meta[nd.class as usize].name.clone(),
+            obj_id: format!("0x{:x}", nd.id),
+            is_root: true,
+            via: String::new(),
+            ref_kind: "strong".to_string(),
+        };
+        return Ok(ResData {
+            code: 200,
+            msg: "ok".to_string(),
+            data: GcRootPathsResult {
+                obj_id: obj_id.to_string(),
+                state: "is-root".to_string(),
+                note: String::new(),
+                total: 1,
+                offset: 0,
+                limit: page as u64,
+                exclude_weak,
+                weak_skipped: 0,
+                truncated: false,
+                paths: vec![GcRootPath { root_kind: k.to_string(), length: 0, items: vec![item] }],
+                elapsed_ms: elapsed(&started),
+            },
+        });
+    }
+
+    if !s.reachable()[ni as usize] {
+        return Ok(empty_paths(
+            obj_id,
+            "unreachable",
+            if s.strong_only {
+                "该对象在「强引用」口径下不可达（可能仅被弱/软/虚引用持有，或本身是垃圾）。\
+                 如需计入非强引用，可在 plugins/mat.json 设 includeWeakRefs=true 后重新打开 dump"
+                    .to_string()
+            } else {
+                "该对象不可达（垃圾），不存在到 GC Roots 的路径".to_string()
+            },
+            elapsed(&started),
+        ));
+    }
+
+    // ---- 反向 BFS：求每个节点「距目标的层数」，同时统计被排除的弱引用边 ----
+    let (phead, pto, pnext, pkind) = session_pred(&s);
+    let mut dist: HashMap<u32, u32> = HashMap::new();
+    dist.insert(ni, 0);
+    let mut queue: VecDeque<u32> = VecDeque::new();
+    queue.push_back(ni);
+    let mut weak_skipped: u64 = 0;
+    let mut visited: usize = 0;
+    let mut truncated = false;
+    while let Some(u) = queue.pop_front() {
+        visited += 1;
+        if visited > q().path_visit {
+            truncated = true;
+            break;
+        }
+        let du = dist[&u];
+        let mut e = phead[u as usize];
+        while e != u32::MAX {
+            if exclude_weak && pkind[e as usize] != RK_STRONG {
+                weak_skipped += 1;
+            } else {
+                let p = pto[e as usize];
+                if !dist.contains_key(&p) {
+                    dist.insert(p, du + 1);
+                    queue.push_back(p);
+                }
+            }
+            e = pnext[e as usize];
+        }
+    }
+
+    // 最近的根层数
+    let mut root_dist = u32::MAX;
+    for &(ri, _) in g.roots.iter() {
+        if let Some(&d) = dist.get(&ri) {
+            if d < root_dist {
+                root_dist = d;
+            }
+        }
+    }
+    if root_dist == u32::MAX {
+        return Ok(empty_paths(
+            obj_id,
+            "unreachable",
+            if weak_skipped > 0 {
+                format!("只存在经过弱/软/虚引用的路径（已排除 {weak_skipped} 条非强引用边）")
+            } else {
+                "未找到 GC Root 路径".to_string()
+            },
+            elapsed(&started),
+        ));
+    }
+
+    // ---- 枚举最短路径（只从「距离 = 最短层数」的根出发）----
+    let mut chains: Vec<Vec<u32>> = Vec::new();
+    let mut steps: usize = q().path_visit.min(400_000);
+    let mut trail: Vec<u32> = Vec::new();
+    for &(ri, _) in g.roots.iter() {
+        if chains.len() >= cap || steps == 0 {
+            break;
+        }
+        if dist.get(&ri).copied() != Some(root_dist) {
+            continue;
+        }
+        trail.clear();
+        trail.push(ri);
+        walk_paths(ri, ni, &dist, g, exclude_weak, &mut trail, &mut chains, cap, &mut steps);
+    }
+
+    let enumerated = chains.len();
+    let truncated = truncated || steps == 0 || enumerated >= cap;
+    let mut paths: Vec<GcRootPath> = Vec::new();
+    for chain in chains.into_iter().skip(offset).take(page) {
+        let mut items: Vec<RefPathItem> = Vec::with_capacity(chain.len());
+        for (i, &nix) in chain.iter().enumerate() {
+            let nd = &g.nodes[nix as usize];
+            let (via, rk) = if i == 0 {
+                (String::new(), RK_STRONG)
+            } else {
+                locate_ref_full(&s, chain[i - 1], nix)
+            };
+            items.push(RefPathItem {
+                class_name: g.meta[nd.class as usize].name.clone(),
+                obj_id: format!("0x{:x}", nd.id),
+                is_root: i == 0,
+                via,
+                ref_kind: ref_kind_name(rk).to_string(),
+            });
+        }
+        paths.push(GcRootPath {
+            root_kind: root_kind_of.get(&chain[0]).copied().unwrap_or("gc-root").to_string(),
+            length: chain.len().saturating_sub(1) as u64,
+            items,
+        });
+    }
+
+    let mut note = String::new();
+    if excluded_weak_note(exclude_weak, weak_skipped) {
+        note.push_str(&format!(
+            "已排除 {weak_skipped} 条非强引用边（弱/软/虚/终结器）；关闭「排除弱引用」可看到这些路径"
+        ));
+    }
+    if truncated {
+        if !note.is_empty() {
+            note.push_str("；");
+        }
+        note.push_str(&format!(
+            "仅枚举最近 {} 条最短路径的前 {cap} 条（可用分页继续查看）",
+            root_dist
+        ));
+    }
+
+    Ok(ResData {
+        code: 200,
+        msg: "ok".to_string(),
+        data: GcRootPathsResult {
+            obj_id: obj_id.to_string(),
+            state: "ok".to_string(),
+            note,
+            total: enumerated as u64,
+            offset: offset as u64,
+            limit: page as u64,
+            exclude_weak,
+            weak_skipped,
+            truncated,
+            paths,
+            elapsed_ms: elapsed(&started),
+        },
+    })
+}
+
+/// 是否值得提示「排除弱引用」的影响
+fn excluded_weak_note(exclude_weak: bool, weak_skipped: u64) -> bool {
+    exclude_weak && weak_skipped > 0
+}
+
+/// "0x…" / 纯十六进制 → u64（4/8 字节 id 都按无符号解析）
+fn parse_obj_id(s: &str) -> Result<u64, String> {
+    let t = s.trim().trim_start_matches("0x").trim_start_matches("0X");
+    if t.is_empty() || !t.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(format!("无效的对象 id：{s}"));
+    }
+    u64::from_str_radix(t, 16).map_err(|_| format!("无效的对象 id：{s}"))
+}
+
+// ==================== inspect 核心 ====================
+
+fn inspect_object(s: &Session, ni: u32, id: u64, elapsed: u64) -> RefObjectDetail {
+    let g = &s.g;
+    let nd: Node = g.nodes[ni as usize]; // Copy
+    let (class_name, shallow, kind) = s.node_label(ni);
+
+    // 自身 root 判定
+    let mut is_root = false;
+    let mut root_kind = String::new();
+    if let Some((_, k)) = g.roots.iter().find(|(ri, _)| *ri == ni) {
+        is_root = true;
+        root_kind = k.to_string();
+    }
+    let reachable = s.reachable()[ni as usize];
+
+    // ---- outgoing（它引用了谁）：先收集出边（引用点 slot, 目标），再按类型展示 ----
+    let mut out_edges: Vec<(u32, u32, u8)> = Vec::new();
+    {
+        let mut e = g.edge_head[ni as usize];
+        while e != u32::MAX {
+            out_edges.push((
+                g.edge_slot[e as usize],
+                g.edge_to[e as usize],
+                g.edge_kind.get(e as usize).copied().unwrap_or(RK_STRONG),
+            ));
+            e = g.edge_next[e as usize];
+        }
+    }
+    out_edges.sort_by_key(|x| x.0);
+    let out_total = out_edges.len();
+    let mut out_items: Vec<RefOutItem> = Vec::new();
+    let mut out_trunc = false;
+    match nd.kind {
+        NodeKind::PrimitiveArray => {
+            // 基本类型数组无引用
+        }
+        NodeKind::ObjectArray => {
+            if out_total <= q().array_detail {
+                // 元素少：逐个列出（label = 元素下标）
+                for (slot, ti, k) in out_edges {
+                    let mut it = make_out_item(g, "elem", &format!("[{}]", slot), ti, 1);
+                    it.ref_kind = ref_kind_name(k).to_string();
+                    out_items.push(it);
+                }
+            } else {
+                // 元素多：按目标类聚合，每组给首个样例
+                let mut by_class: HashMap<u32, (u64, u32)> = HashMap::new(); // class idx → (count, 样例节点)
+                for (_slot, ti, _k) in out_edges.iter() {
+                    let cls = g.nodes[*ti as usize].class;
+                    let e2 = by_class.entry(cls).or_insert((0, *ti));
+                    e2.0 += 1;
+                }
+                let mut groups: Vec<(u32, u64, u32)> = by_class
+                    .into_iter()
+                    .map(|(cls, (cnt, sample))| (cls, cnt, sample))
+                    .collect();
+                groups.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+                for (cls, cnt, sample) in groups.into_iter().take(q().array_group) {
+                    let mut it = make_out_item(g, "group", "", sample, cnt);
+                    it.target_class = g.meta[cls as usize].name.clone();
+                    it.label = format!("× {} 个 {}", cnt, it.target_class);
+                    out_items.push(it);
+                }
+                out_trunc = out_total > q().array_group;
+            }
+        }
+        _ => {
+            // 实例（字段引用）/ 类对象（静态引用）：按引用点排序输出明细
+            for (slot, ti, k) in out_edges.into_iter().take(q().out_item) {
+                let label = if nd.kind == NodeKind::Class {
+                    stat_name(g, &nd, slot)
+                } else {
+                    field_name(s, &nd, slot)
+                };
+                let mut it = make_out_item(g, "field", &label, ti, 1);
+                it.ref_kind = ref_kind_name(k).to_string();
+                out_items.push(it);
+            }
+            out_trunc = out_total > q().out_item;
+        }
+    }
+
+    // ---- incoming（谁引用我）----
+    let pred = s.pred();
+    let mut in_total = 0usize;
+    let mut e = pred.head[ni as usize];
+    while e != u32::MAX {
+        in_total += 1;
+        e = pred.next[e as usize];
+    }
+    // 聚合 by referrer class + 收样例
+    let mut by_class: HashMap<u32, (u64, u64, Vec<u32>)> = HashMap::new(); // class idx → (count, shallow, samples)
+    {
+        let mut e = pred.head[ni as usize];
+        while e != u32::MAX {
+            let p = pred.to[e as usize] as usize;
+            let cls = g.nodes[p].class;
+            let en = by_class.entry(cls).or_insert((0, 0, Vec::new()));
+            en.0 += 1;
+            en.1 += g.nodes[p].shallow;
+            if en.2.len() < q().incoming_sample {
+                en.2.push(p as u32);
+            }
+            e = pred.next[e as usize];
+        }
+    }
+    let mut groups: Vec<(u32, u64, u64, Vec<u32>)> = by_class
+        .into_iter()
+        .map(|(cls, (cnt, sh, smp))| (cls, cnt, sh, smp))
+        .collect();
+    groups.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    let in_trunc = groups.len() > q().incoming_group;
+    let mut in_by_class: Vec<RefIncomingGroup> = Vec::new();
+    let mut in_samples: Vec<RefIncomingSample> = Vec::new();
+    for (cls, cnt, sh, smp) in groups.into_iter().take(q().incoming_group) {
+        in_by_class.push(RefIncomingGroup {
+            class_name: g.meta[cls as usize].name.clone(),
+            count: cnt,
+            shallow_bytes: sh,
+        });
+        for p in smp {
+            let (via, k) = locate_ref_full(s, p, ni);
+            in_samples.push(RefIncomingSample {
+                referrer_obj_id: format!("0x{:x}", g.nodes[p as usize].id),
+                referrer_class: g.meta[g.nodes[p as usize].class as usize].name.clone(),
+                via,
+                ref_kind: ref_kind_name(k).to_string(),
+                referrer_shallow: g.nodes[p as usize].shallow,
+            });
+        }
+    }
+
+    // ---- Path to GC Roots ----
+    let (path_state, path_note, path_items) = path_to_root(s, ni, is_root, reachable);
+
+    RefObjectDetail {
+        obj_id: format!("0x{:x}", id),
+        class_name,
+        kind: kind.to_string(),
+        shallow_bytes: shallow,
+        reachable,
+        is_root,
+        root_kind,
+        outgoing_total: out_total as u64,
+        outgoing_truncated: out_trunc,
+        outgoing: out_items,
+        incoming_total: in_total as u64,
+        incoming_truncated: in_trunc,
+        incoming_by_class: in_by_class,
+        incoming_samples: in_samples,
+        path_state,
+        path_note,
+        path: path_items,
+        elapsed_ms: elapsed,
+    }
+}
+
+/// 由「引用者节点 + 引用点 slot」构造 outgoing 项
+fn make_out_item(g: &Graph, kind: &str, label: &str, ti: u32, count: u64) -> RefOutItem {
+    let nd = &g.nodes[ti as usize];
+    RefOutItem {
+        kind: kind.to_string(),
+        label: label.to_string(),
+        target_class: g.meta[nd.class as usize].name.clone(),
+        target_obj_id: format!("0x{:x}", nd.id),
+        target_shallow: nd.shallow,
+        target_kind: kind_str(nd.kind).to_string(),
+        count,
+        ref_kind: "strong".to_string(),
+    }
+}
+
+/// 类节点静态字段名（slot = statics 下标）
+fn stat_name(g: &Graph, _nd: &Node, slot: u32) -> String {
+    // 类节点出边 = 静态引用；静态字段名放在「目标类的 statics_names」不适用——
+    // 需要该 class meta 的 statics_names。类节点的 class 字段指向自身 meta。
+    let mi = _nd.class as usize;
+    let m: &ClassMeta = &g.meta[mi];
+    m.statics_names
+        .get(slot as usize)
+        .cloned()
+        .unwrap_or_else(|| "<静态>".to_string())
+}
+
+/// 实例字段名（slot = 继承链位置）
+fn field_name(s: &Session, nd: &Node, slot: u32) -> String {
+    let mi = nd.class as usize;
+    let mut memo = s.chain_memo.lock().unwrap();
+    let mut busy = HashSet::new();
+    match chain_fields_named(mi, &s.g.meta, &mut memo, &mut busy) {
+        Some(chain) => chain
+            .get(slot as usize)
+            .map(|(_, n)| n.clone())
+            .unwrap_or_else(|| "<字段>".to_string()),
+        None => "<字段>".to_string(),
+    }
+}
+
+/// 引用点标注：对象 p（引用者）通过什么引用指向对象 q，并返回这条边的引用强度。
+fn locate_ref_full(s: &Session, p: u32, q: u32) -> (String, u8) {
+    let g = &s.g;
+    let pnd = &g.nodes[p as usize];
+    // 在 p 的出边中找 target == q 的边，取其引用点
+    let mut e = g.edge_head[p as usize];
+    while e != u32::MAX {
+        if g.edge_to[e as usize] == q {
+            let slot = g.edge_slot[e as usize];
+            let label = match pnd.kind {
+                NodeKind::Class => stat_name(g, pnd, slot),
+                NodeKind::ObjectArray => format!("[{}]", slot),
+                NodeKind::Instance => field_name(s, pnd, slot),
+                NodeKind::PrimitiveArray => "<引用>".to_string(),
+            };
+            let k = g.edge_kind.get(e as usize).copied().unwrap_or(RK_STRONG);
+            return (label, k);
+        }
+        e = g.edge_next[e as usize];
+    }
+    ("<引用>".to_string(), RK_STRONG)
+}
+
+
+/// GC Root → … → 目标对象 的最短引用路径（反向 BFS）。
+/// 返回 (state, note, items)：state ∈ ok / is-root / unreachable / truncated。
+fn path_to_root(s: &Session, start: u32, is_root: bool, reachable: bool) -> (String, String, Vec<RefPathItem>) {
+    let g = &s.g;
+    if is_root {
+        let nd = &g.nodes[start as usize];
+        let item = RefPathItem {
+            class_name: g.meta[nd.class as usize].name.clone(),
+            obj_id: format!("0x{:x}", nd.id),
+            is_root: true,
+            via: String::new(),
+            ref_kind: "strong".to_string(),
+        };
+        return ("is-root".to_string(), String::new(), vec![item]);
+    }
+    if !reachable {
+        return (
+            "unreachable".to_string(),
+            "该对象不可达（垃圾），不存在到 GC Roots 的路径".to_string(),
+            Vec::new(),
+        );
+    }
+    let pred = s.pred();
+    // root 集合（去重）
+    let root_set: HashSet<u32> = g.roots.iter().map(|(ri, _)| *ri).collect();
+    // parent[x] = y：沿反向边从 y 扩展到达 x（x 更靠近 GC Root）
+    let mut parent: HashMap<u32, u32> = HashMap::new();
+    let mut queue: VecDeque<u32> = VecDeque::new();
+    parent.insert(start, u32::MAX);
+    queue.push_back(start);
+    let mut goal: Option<u32> = None;
+    let mut visited: usize = 0;
+    while let Some(u) = queue.pop_front() {
+        visited += 1;
+        if root_set.contains(&u) {
+            goal = Some(u);
+            break;
+        }
+        if visited > q().path_visit {
+            break;
+        }
+        let mut e = pred.head[u as usize];
+        while e != u32::MAX {
+            // 强引用口径：弱/软/虚/终结器引用不构成「Path to GC Roots」
+            if !s.strong_only || pred.kind[e as usize] == RK_STRONG {
+                let p = pred.to[e as usize];
+                if !parent.contains_key(&p) {
+                    parent.insert(p, u);
+                    queue.push_back(p);
+                }
+            }
+            e = pred.next[e as usize];
+        }
+    }
+    let goal = match goal {
+        Some(g) => g,
+        None => {
+            if visited > q().path_visit {
+                return (
+                    "truncated".to_string(),
+                    format!(
+                        "反向搜索超过 {} 个节点未收敛（超大引用环），路径可能不存在或极长",
+                        q().path_visit
+                    ),
+                    Vec::new(),
+                );
+            }
+            // 理论不可达（与 reachable 冲突，防御）
+            return ("unreachable".to_string(), "未找到 GC Root 路径".to_string(), Vec::new());
+        }
+    };
+    // 重建：goal(root) → … → start（天然 GC Root 在前）
+    let mut chain: Vec<u32> = Vec::new();
+    let mut cur = goal;
+    while cur != u32::MAX {
+        chain.push(cur);
+        if cur == start {
+            break;
+        }
+        cur = match parent.get(&cur) {
+            Some(&p) => p,
+            None => break,
+        };
+    }
+    let mut items: Vec<RefPathItem> = Vec::with_capacity(chain.len());
+    for (i, &nix) in chain.iter().enumerate() {
+        let nd = &g.nodes[nix as usize];
+        let (via, rk) = if i == 0 {
+            (String::new(), RK_STRONG)
+        } else {
+            // chain[i-1]（更靠 GC Root）引用 chain[i]：引用点为前一跳的边
+            locate_ref_full(s, chain[i - 1], chain[i])
+        };
+        items.push(RefPathItem {
+            class_name: g.meta[nd.class as usize].name.clone(),
+            obj_id: format!("0x{:x}", nd.id),
+            is_root: root_set.contains(&nix),
+            via,
+            ref_kind: ref_kind_name(rk).to_string(),
+        });
+    }
+    ("ok".to_string(), String::new(), items)
+}
+
+
+// ==================== 测试 ====================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ---- 合成 HPROF 构造（tag 常量见 HPROF 规范 / mat_leak 测试）----
+    fn u1(v: &mut Vec<u8>, x: u8) { v.push(x); }
+    fn u2(v: &mut Vec<u8>, x: u16) { v.extend_from_slice(&x.to_be_bytes()); }
+    fn u4(v: &mut Vec<u8>, x: u32) { v.extend_from_slice(&x.to_be_bytes()); }
+    fn u8(v: &mut Vec<u8>, x: u64) { v.extend_from_slice(&x.to_be_bytes()); }
+    fn id(v: &mut Vec<u8>, x: u64) { u8(v, x); }
+    fn rec(v: &mut Vec<u8>, tag: u8, payload: &[u8]) {
+        u1(v, tag);
+        u4(v, 0);
+        u4(v, payload.len() as u32);
+        v.extend_from_slice(payload);
+    }
+
+    struct HprofBuilder { f: Vec<u8>, next_name: u64, next_serial: u32 }
+    impl HprofBuilder {
+        fn new() -> Self {
+            let mut f = Vec::new();
+            f.extend_from_slice(b"JAVA PROFILE 1.0.2\0");
+            u4(&mut f, 8);
+            u8(&mut f, 0);
+            HprofBuilder { f, next_name: 0x1000, next_serial: 1 }
+        }
+        fn utf8(&mut self, text: &str) -> u64 {
+            let nid = self.next_name;
+            self.next_name += 1;
+            let mut p = Vec::new();
+            id(&mut p, nid);
+            p.extend_from_slice(text.as_bytes());
+            rec(&mut self.f, 0x01, &p);
+            nid
+        }
+        fn load_class(&mut self, class_obj: u64, name_id: u64) {
+            let mut p = Vec::new();
+            u4(&mut p, self.next_serial);
+            self.next_serial += 1;
+            id(&mut p, class_obj);
+            u4(&mut p, 0);
+            id(&mut p, name_id);
+            rec(&mut self.f, 0x02, &p);
+        }
+        fn heap(&mut self, sub: &[u8]) { rec(&mut self.f, 0x0C, sub); }
+        fn into_bytes(self) -> Vec<u8> { self.f }
+    }
+
+    /// ClassDump：全静态/实例字段共用同一名字（name id），对象引用类型
+    fn sub_class(
+        class_obj: u64,
+        super_obj: Option<u64>,
+        instance_size: u32,
+        static_refs: &[u64],
+        inst_fields: usize,
+        field_name_id: u64,
+    ) -> Vec<u8> {
+        let mut b = Vec::new();
+        u1(&mut b, 0x20);
+        id(&mut b, class_obj);
+        u4(&mut b, 0);
+        match super_obj { Some(s) => id(&mut b, s), None => id(&mut b, 0) }
+        id(&mut b, 0); id(&mut b, 0); id(&mut b, 0); id(&mut b, 0); id(&mut b, 0);
+        u4(&mut b, instance_size);
+        u2(&mut b, 0);
+        u2(&mut b, static_refs.len() as u16);
+        for &t in static_refs {
+            id(&mut b, field_name_id);
+            u1(&mut b, 0x02);
+            id(&mut b, t);
+        }
+        u2(&mut b, inst_fields as u16);
+        for _ in 0..inst_fields {
+            id(&mut b, field_name_id);
+            u1(&mut b, 0x02);
+        }
+        b
+    }
+
+    fn sub_instance(obj: u64, class_obj: u64, fields: &[u8]) -> Vec<u8> {
+        let mut b = Vec::new();
+        u1(&mut b, 0x21);
+        id(&mut b, obj);
+        u4(&mut b, 0);
+        id(&mut b, class_obj);
+        u4(&mut b, fields.len() as u32);
+        b.extend_from_slice(fields);
+        b
+    }
+
+    fn sub_obj_array(obj: u64, elem_class: u64, elems: &[u64]) -> Vec<u8> {
+        let mut b = Vec::new();
+        u1(&mut b, 0x22);
+        id(&mut b, obj);
+        u4(&mut b, 0);
+        u4(&mut b, elems.len() as u32);
+        id(&mut b, elem_class);
+        for &e in elems {
+            id(&mut b, e);
+        }
+        b
+    }
+
+    fn sub_prim_array(obj: u64, n: usize, ty: u8) -> Vec<u8> {
+        let mut b = Vec::new();
+        u1(&mut b, 0x23);
+        id(&mut b, obj);
+        u4(&mut b, 0);
+        u4(&mut b, n as u32);
+        u1(&mut b, ty);
+        let w = if ty == 0x05 { 2 } else { 1 }; // char 2B，其余测试类型 1B
+        b.extend(std::iter::repeat(0u8).take(n * w));
+        b
+    }
+
+    fn sub_root_system_class(obj: u64) -> Vec<u8> {
+        let mut b = Vec::new();
+        u1(&mut b, 0x05);
+        id(&mut b, obj);
+        b
+    }
+
+    /// 合成 dump（9 节点 / 8 边）：
+    ///   Root(0x100, 系统类根, 静态 ref→keeper, ref→array) → keeper(0x201) → leaf(0x301) → char[](0x501)
+    ///   Root → array(0x410)[leaf2×3 + keeper]（leaf2 0x302 仅被数组持有）；
+    ///   byte[](0x601) 无人引用 → 不可达。leaf(0x301) 的入边唯一（keeper），路径断言确定。
+    fn write_synthetic_dump() -> String {
+        let mut hb = HprofBuilder::new();
+        let n_root = hb.utf8("mem/Root");
+        let n_keeper = hb.utf8("mem/Keeper");
+        let n_leaf = hb.utf8("mem/Leaf");
+        let n_arrcls = hb.utf8("[Lmem/Leaf;");
+        let ref_name = hb.utf8("ref");
+        hb.load_class(0x100, n_root);
+        hb.load_class(0x200, n_keeper);
+        hb.load_class(0x300, n_leaf);
+        hb.load_class(0x700, n_arrcls);
+
+        let mut h1 = Vec::new();
+        h1.extend_from_slice(&sub_root_system_class(0x100));
+        // Root：静态引用 keeper + array
+        h1.extend_from_slice(&sub_class(0x100, None, 0, &[0x201, 0x410], 0, ref_name));
+        // Keeper：实例字段 1（对象引用）
+        h1.extend_from_slice(&sub_class(0x200, None, 32, &[], 1, ref_name));
+        // Leaf：实例字段 1
+        h1.extend_from_slice(&sub_class(0x300, None, 24, &[], 1, ref_name));
+        // keeper → leaf(0x301)
+        let mut kf = Vec::new();
+        id(&mut kf, 0x301);
+        h1.extend_from_slice(&sub_instance(0x201, 0x200, &kf));
+        // leaf(0x301) → char[]；另一个 leaf(0x302) 无字段引用（仅被数组持有）
+        let mut lf = Vec::new();
+        id(&mut lf, 0x501);
+        h1.extend_from_slice(&sub_instance(0x301, 0x300, &lf));
+        h1.extend_from_slice(&sub_instance(0x302, 0x300, &[0u8; 8]));
+        // 对象数组：元素 [leaf2, leaf2, leaf2, keeper]（不引用 0x301，保证其路径唯一）
+        h1.extend_from_slice(&sub_obj_array(0x410, 0x700, &[0x302, 0x302, 0x302, 0x201]));
+        // char[] 2KB（被 leaf 引用）+ 无人引用的 byte[] 1KB
+        h1.extend_from_slice(&sub_prim_array(0x501, 2000, 0x05));
+        h1.extend_from_slice(&sub_prim_array(0x601, 1000, 0x08));
+        hb.heap(&h1);
+
+        // 每次调用用独立文件名：同一个测试二进制里多个用例并行跑，若共用同一个文件，
+        // 先 mmap 的用例会让后写入的用例拿到 os error 5（Windows 不允许写已映射的文件）。
+        static SEQ: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("mat_refs_e2e_{}_{n}.hprof", std::process::id()));
+        std::fs::write(&dir, hb.into_bytes()).unwrap();
+        dir.to_str().unwrap().to_string()
+    }
+
+    #[test]
+    fn refs_synthetic_end_to_end() {
+        let p = write_synthetic_dump();
+        // 清理历史会话，保证从零 build
+        let _ = mat_refs_release(&p);
+
+        // ---- build ----
+        let b = mat_refs_build(&p).unwrap();
+        assert_eq!(b.code, 200);
+        let info = &b.data;
+        assert_eq!(info.total_nodes, 9, "nodes");
+        assert_eq!(info.edge_count, 8, "edges");
+        assert_eq!(info.root_nodes, 1);
+        assert_eq!(info.reachable_nodes, 6);
+        assert_eq!(info.unreachable_nodes, 3);
+        assert!(!info.truncated);
+        // 超限预检用的轻量计数应与图节点数一致（build 冷启动内部已跑过一次）
+        assert_eq!(crate::mat_hprof::count_heap_objects(&p).unwrap(), 9);
+
+        // ---- 类名搜索 ----
+        let r = mat_refs_search_classes(&p, "keeper", 20).unwrap().data;
+        assert!(r.hits.iter().any(|h| h.class_name == "mem/Keeper" && h.count == 1));
+        let r = mat_refs_search_classes(&p, "[L", 20).unwrap().data;
+        assert!(r.hits.iter().any(|h| h.class_name == "[Lmem/Leaf;" && h.count == 1));
+        let r = mat_refs_search_classes(&p, "char", 20).unwrap().data;
+        assert!(r.hits.iter().any(|h| h.class_name == "char[]" && h.count == 1));
+
+        // ---- 实例样本（按浅堆降序）----
+        let inst = mat_refs_instances(&p, "mem/Keeper", 0, 10, "shallow").unwrap().data;
+        assert_eq!(inst.total, 1);
+        assert_eq!(inst.rows.len(), 1);
+        assert_eq!(inst.rows[0].obj_id, "0x201");
+        assert_eq!(inst.rows[0].shallow_bytes, 32);
+
+        // ---- inspect char[] 0x501：出边空、入边来自 leaf、最短路径 Root→keeper→leaf→char[] ----
+        let d = mat_refs_inspect(&p, "0x501").unwrap().data;
+        assert_eq!(d.kind, "primitive-array");
+        assert!(d.reachable);
+        assert!(!d.is_root);
+        assert_eq!(d.shallow_bytes, 16 + 2000 * 2);
+        assert_eq!(d.outgoing_total, 0);
+        assert_eq!(d.incoming_total, 1);
+        assert_eq!(d.incoming_by_class[0].class_name, "mem/Leaf");
+        assert_eq!(d.incoming_by_class[0].count, 1);
+        assert_eq!(d.incoming_samples.len(), 1);
+        assert_eq!(d.incoming_samples[0].via, "ref");
+        assert_eq!(d.path_state, "ok");
+        assert_eq!(d.path.len(), 4);
+        assert!(d.path[0].is_root);
+        assert_eq!(d.path[0].class_name, "mem/Root");
+        assert_eq!(d.path[0].via, "");
+        assert_eq!(d.path[1].class_name, "mem/Keeper");
+        assert_eq!(d.path[1].via, "ref"); // Root 静态字段
+        assert_eq!(d.path[2].class_name, "mem/Leaf");
+        assert_eq!(d.path[2].via, "ref"); // keeper 字段
+        assert_eq!(d.path[3].class_name, "char[]");
+        assert_eq!(d.path[3].obj_id, "0x501");
+        assert_eq!(d.path[3].via, "ref"); // leaf 字段
+
+        // ---- inspect keeper 0x201：出边 1 字段、入边来自 Root(静态) + 数组(下标 [3]) ----
+        let d = mat_refs_inspect(&p, "0x201").unwrap().data;
+        assert_eq!(d.kind, "instance");
+        assert_eq!(d.class_name, "mem/Keeper");
+        assert_eq!(d.outgoing_total, 1);
+        assert_eq!(d.outgoing[0].label, "ref");
+        assert_eq!(d.outgoing[0].target_class, "mem/Leaf");
+        assert_eq!(d.outgoing[0].target_obj_id, "0x301");
+        assert_eq!(d.incoming_total, 2);
+        let g1 = d.incoming_by_class.iter().find(|g| g.class_name == "mem/Root").unwrap();
+        assert_eq!(g1.count, 1);
+        let g2 = d.incoming_by_class.iter().find(|g| g.class_name == "[Lmem/Leaf;").unwrap();
+        assert_eq!(g2.count, 1);
+        // 数组的引用点应标出下标 [3]
+        let smp = d.incoming_samples.iter().find(|s| s.referrer_obj_id == "0x410").unwrap();
+        assert_eq!(smp.via, "[3]");
+        // 类对象（静态）引用点
+        let smp = d.incoming_samples.iter().find(|s| s.referrer_obj_id == "0x100").unwrap();
+        assert_eq!(smp.via, "ref");
+
+        // ---- inspect 对象数组 0x410：出边 4 元素逐个列出 ----
+        let d = mat_refs_inspect(&p, "0x410").unwrap().data;
+        assert_eq!(d.kind, "object-array");
+        assert_eq!(d.outgoing_total, 4);
+        assert!(!d.outgoing_truncated);
+        assert_eq!(d.outgoing[0].label, "[0]");
+        assert_eq!(d.outgoing[0].target_class, "mem/Leaf");
+        assert_eq!(d.outgoing[3].label, "[3]");
+        assert_eq!(d.outgoing[3].target_class, "mem/Keeper");
+
+        // ---- inspect 类对象 Root 0x100：自身是 GC Root → path_state = is-root ----
+        let d = mat_refs_inspect(&p, "0x100").unwrap().data;
+        assert_eq!(d.kind, "class");
+        assert!(d.is_root);
+        assert_eq!(d.path_state, "is-root");
+        assert_eq!(d.outgoing_total, 2);
+
+        // ---- 不可达 byte[] 0x601 ----
+        let d = mat_refs_inspect(&p, "0x601").unwrap().data;
+        assert!(!d.reachable);
+        assert_eq!(d.path_state, "unreachable");
+        assert!(d.path.is_empty());
+
+        // ---- 未知对象 / 坏 id ----
+        assert!(mat_refs_inspect(&p, "0xffff").is_err());
+        assert!(mat_refs_inspect(&p, "zz").is_err());
+
+        // ---- 释放 ----
+        assert!(mat_refs_release(&p).unwrap().data);
+        assert!(!mat_refs_release(&p).unwrap().data);
+
+        let _ = std::fs::remove_file(&p);
+    }
+
+    /// 引用强度判定 + 类名通配（不依赖 dump，纯函数级）
+    #[test]
+    fn ref_kind_and_glob() {
+        use crate::mat_graph::{classify_ref_kind, RK_PHANTOM, RK_SOFT, RK_STRONG, RK_WEAK};
+        assert_eq!(classify_ref_kind(RK_WEAK, "referent"), RK_WEAK);
+        assert_eq!(classify_ref_kind(RK_SOFT, "referent"), RK_SOFT);
+        assert_eq!(classify_ref_kind(RK_PHANTOM, "referent"), RK_PHANTOM);
+        // 非 referent 字段、非 Reference 家族：一律强引用
+        assert_eq!(classify_ref_kind(RK_WEAK, "queue"), RK_STRONG);
+        assert_eq!(classify_ref_kind(RK_STRONG, "referent"), RK_STRONG);
+
+        assert!(glob_match("java.util.hashmap", "*hashmap"));
+        assert!(glob_match("abcd", "a?c*"));
+        assert!(glob_match("abcd", "*"));
+        assert!(!glob_match("abcd", "b*"));
+        assert!(!glob_match("abcd", "a?"));
+        assert!(class_matches("java/lang/String", "string"));
+        assert!(class_matches("java/lang/String", "java*str?ng"));
+        assert!(!class_matches("java/lang/String", "hashmap"));
+    }
+
+    /// 实例分页 + 多路径 GC Roots（同一份合成 dump）
+    #[test]
+    fn paging_and_multi_paths() {
+        let p = write_synthetic_dump();
+        let _ = mat_refs_release(&p);
+        let _ = mat_refs_build(&p).unwrap();
+
+        // ---- 分页：两页各 1 行且互不重复，total 保持 2 ----
+        let page0 = mat_refs_instances(&p, "mem/Leaf", 0, 1, "shallow").unwrap().data;
+        assert_eq!(page0.total, 2);
+        assert_eq!(page0.rows.len(), 1);
+        assert_eq!(page0.limit, 1);
+        let page1 = mat_refs_instances(&p, "mem/Leaf", 1, 1, "shallow").unwrap().data;
+        assert_eq!(page1.rows.len(), 1);
+        assert_ne!(page0.rows[0].obj_id, page1.rows[0].obj_id);
+        let over = mat_refs_instances(&p, "mem/Leaf", 2, 1, "shallow").unwrap().data;
+        assert!(over.rows.is_empty());
+
+        // ---- 多路径：leaf2 被数组 [0][1][2] 三处引用 ⇒ 3 条等长最短路径 ----
+        let paths = mat_gc_root_paths(&p, "0x302", true, 0, 5).unwrap().data;
+        assert_eq!(paths.state, "ok");
+        assert_eq!(paths.paths.len(), 3, "应有三条等长最短路径");
+        for pth in &paths.paths {
+            assert_eq!(pth.length, 2, "Root → array → leaf2");
+            assert!(pth.items[0].is_root);
+            assert_eq!(pth.items[0].class_name, "mem/Root");
+            assert_eq!(pth.items[2].obj_id, "0x302");
+        }
+        // 分页取第 2 条
+        let one = mat_gc_root_paths(&p, "0x302", true, 1, 1).unwrap().data;
+        assert_eq!(one.paths.len(), 1);
+
+        // ---- 单路径：char[] 只能由 leaf 持有 ----
+        let paths = mat_gc_root_paths(&p, "0x501", true, 0, 5).unwrap().data;
+        assert_eq!(paths.paths.len(), 1);
+        assert_eq!(paths.paths[0].length, 3);
+        assert_eq!(paths.paths[0].items[0].class_name, "mem/Root");
+        assert_eq!(paths.paths[0].items[3].obj_id, "0x501");
+
+        // ---- 自身是根 / 不可达 ----
+        let rootp = mat_gc_root_paths(&p, "0x100", true, 0, 5).unwrap().data;
+        assert_eq!(rootp.state, "is-root");
+        let dead = mat_gc_root_paths(&p, "0x601", true, 0, 5).unwrap().data;
+        assert_eq!(dead.state, "unreachable");
+        assert!(mat_gc_root_paths(&p, "zz", true, 0, 5).is_err());
+
+        let _ = mat_refs_release(&p);
+        let _ = std::fs::remove_file(&p);
+    }
+
+    /// 真实 HotSpot dump 集成探针。
+    ///
+    /// 跑法：`BDT_MAT_SAMPLE=<leak_demo.hprof> cargo test -p bdevtools-plugin-mat --lib real_dump -- --nocapture`
+    /// 未设置环境变量时打印 skip 并返回（CI 无样例也能全绿）；样例来源见 `mat-realcheck/README.md`。
+    #[test]
+    fn real_dump_probe() {
+        let Some(owned) = crate::test_support::sample_dump() else {
+            println!("skip: 未设置 BDT_MAT_SAMPLE（指向 mat-realcheck 里的真实 .hprof）");
+            return;
+        };
+        let p = owned.as_str();
+        let _ = mat_refs_release(p);
+        let info = mat_refs_build(p).unwrap().data;
+        println!(
+            "build: nodes={} shallow={} roots={} edges={} reachable={} unreachable={} classes={} cached={} truncated={} elapsed={}ms",
+            info.total_nodes, info.total_shallow, info.root_nodes, info.edge_count,
+            info.reachable_nodes, info.unreachable_nodes, info.classes, info.cached,
+            info.truncated, info.elapsed_ms
+        );
+        for n in &info.notes {
+            println!("note: {n}");
+        }
+        assert!(!info.truncated, "synthetic dump 不应超限");
+
+        // LeakDemo 类无实例（纯静态持有），类名搜索命中数应为 0
+        let hits = mat_refs_search_classes(p, "leakdemo", 20).unwrap().data;
+        assert!(
+            hits.hits.is_empty(),
+            "LeakDemo 无实例，搜索应为空：{}",
+            serde_json::to_string(&hits.hits).unwrap()
+        );
+        // 展示根 char[]（main 栈局部）→ is-root
+        let hit = mat_refs_search_classes(p, "char[]", 20).unwrap().data;
+        let hit = hit.hits.iter().find(|h| h.class_name == "char[]").unwrap();
+        println!("char[] count={} shallow={}", hit.count, hit.shallow_bytes);
+        let inst = mat_refs_instances(p, "char[]", 0, 5, "shallow").unwrap().data;
+        let top_obj = inst.rows[0].obj_id.clone();
+        let d = mat_refs_inspect(p, &top_obj).unwrap().data;
+        println!(
+            "root char[] {}: shallow={} path_state={} path_len={}",
+            top_obj, d.shallow_bytes, d.path_state, d.path.len()
+        );
+        assert_eq!(d.path_state, "is-root");
+
+        // 选一个被静态持有的大 byte[]（LeakDemo.BIG 2MB）做 inspect → 长路径 + incoming
+        let inst = mat_refs_instances(p, "byte[]", 0, 10, "shallow").unwrap().data;
+        assert!(!inst.rows.is_empty(), "byte[] 应有实例");
+        let top_obj = inst.rows[0].obj_id.clone();
+        println!("top byte[]: obj={} shallow={}", top_obj, inst.rows[0].shallow_bytes);
+        let d = mat_refs_inspect(p, &top_obj).unwrap().data;
+        println!(
+            "inspect {}: kind={} class={} shallow={} reachable={} outgoing={} incoming={} path_state={} path_len={}",
+            d.obj_id, d.kind, d.class_name, d.shallow_bytes, d.reachable,
+            d.outgoing_total, d.incoming_total, d.path_state, d.path.len()
+        );
+        let chain: Vec<String> = d
+            .path
+            .iter()
+            .map(|x| format!("{}{}", x.class_name, if x.is_root { "*" } else { "" }))
+            .collect();
+        println!("path: {}", chain.join(" -> "));
+        for g in d.incoming_by_class.iter().take(5) {
+            println!("incoming: {} × {}", g.class_name, g.count);
+        }
+        assert_eq!(d.path_state, "ok", "被持有的 byte[] 应有 GC Root 路径");
+        assert!(d.path.len() >= 2);
+        assert!(
+            d.path.last().unwrap().obj_id == d.obj_id,
+            "路径末节点应是被检查对象自身"
+        );
+
+        // 双 build 命中缓存
+        let info2 = mat_refs_build(p).unwrap().data;
+        assert!(info2.cached);
+        let _ = mat_refs_release(p);
+    }
+}

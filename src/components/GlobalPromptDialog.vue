@@ -129,6 +129,6 @@ const handleConfirm = (): void => {
 .prompt-error {
   margin-top: 4px;
   font-size: var(--font-size-base);
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
 }
 </style>

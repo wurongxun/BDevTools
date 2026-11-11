@@ -156,7 +156,7 @@ watch(() => [props.configId, props.subType], load)
 }
 .viewer-error {
   padding: 16px;
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   font-size: var(--font-size-md);
 }
 .viewer-footer {

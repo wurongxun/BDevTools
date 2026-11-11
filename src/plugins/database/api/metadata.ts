@@ -17,6 +17,7 @@ import type {
   DbAdminInfo,
   DbUserInfo,
   KeyValueRow,
+  ObjectSourceKind,
 } from '../types'
 
 /** 获取数据库列表 */
@@ -57,6 +58,7 @@ export async function dbCatalogCapabilities(configId: string): Promise<CatalogCa
   return {
     views: false,
     procedures: false,
+    functions: false,
     triggers: false,
     events: false,
     database_indexes: false,
@@ -66,6 +68,7 @@ export async function dbCatalogCapabilities(configId: string): Promise<CatalogCa
     global_status: false,
     session_variables: false,
     global_variables: false,
+    object_source: false,
   }
 }
 
@@ -79,6 +82,26 @@ export function dbListViews(configId: string, database: string): Promise<ApiResp
 /** 获取存储过程列表 */
 export function dbListProcedures(configId: string, database: string): Promise<ApiResponse<DatabaseObjectInfo[]>> {
   return invoke('db_list_procedures', { configId, database })
+}
+
+/** 获取函数列表 */
+export function dbListFunctions(configId: string, database: string): Promise<ApiResponse<DatabaseObjectInfo[]>> {
+  return invoke('db_list_functions', { configId, database })
+}
+
+/**
+ * 取对象源码（视图定义 / 存储过程体 / 函数体 / 触发器体）。
+ *
+ * 与 `dbTableSchema` 不是一回事：后者返回「可读的 DDL」（部分库是按列拼出来的），
+ * 这里返回数据库自己承认的源文本。
+ */
+export function dbObjectSource(
+  configId: string,
+  database: string,
+  kind: ObjectSourceKind,
+  name: string
+): Promise<ApiResponse<string>> {
+  return invoke('db_object_source', { configId, database, kind, name })
 }
 
 /** 获取触发器列表 */

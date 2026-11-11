@@ -133,14 +133,16 @@ node inspect-wasm.js text-toolkit/plugin.wasm
 ## 桥协议速查（`page.js` 里用到的那套）
 
 ```
-插件页 → 宿主   { v: 1, kind: 'ready' }
-插件页 → 宿主   { v: 1, kind: 'call', reqId, func, input }
-宿主 → 插件页   { v: 1, reqId, ok: true,  data }
-宿主 → 插件页   { v: 1, reqId, ok: false, error }
-宿主 → 插件页   { v: 1, kind: 'theme', dark, wasm }
+插件页 → 宿主   { v: 2, kind: 'ready' }
+插件页 → 宿主   { v: 2, kind: 'call', reqId, func, input }
+宿主 → 插件页   { v: 2, reqId, ok: true,  data }
+宿主 → 插件页   { v: 2, reqId, ok: false, error }
+宿主 → 插件页   { v: 2, kind: 'context', dark, locale, wasm }
 ```
 
-- `v` 必须等于 `PLUGIN_BRIDGE_VERSION`（当前 `1`），不等会被宿主直接丢弃。
+- `v` 必须是宿主认识的版本号（当前 `PLUGIN_BRIDGE_VERSION = 2`，老页面的 `1` 仍然接受）。宿主**按你
+  握手的版本应答**：发 `ready` 用 `1` 就收到 `{ kind:'theme', dark, wasm }`，用 `2` 才收得到 `context`。
 - `input` 原样 JSON 序列化后交给 WASM 的 `func`；`func` 就是 guest 侧 `#[plugin_fn]` 导出的名字。
-- `kind: 'theme'` 是宿主推的，`dark` 跟主题、`wasm` 表示 WASM 运行时是否可用（插件页据此禁用依赖后端的按钮，而不是等调用失败）。
+- `kind: 'context'` 是宿主推的，`dark` 跟主题、`locale` 是宿主当前语言（`zh_CN` / `zh_TW` / `en`，
+  **不是** `navigator.language`）、`wasm` 表示 WASM 运行时是否可用（插件页据此禁用依赖后端的按钮）。
 - host 也只在 iframe **自己**的 `contentWindow` 上收消息，所以插件页除了 `parent.postMessage` 没有第二条通道。

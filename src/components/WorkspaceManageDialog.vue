@@ -2,8 +2,8 @@
 <!-- 共享的工作区管理弹窗：基于 GlobalDialog 统一风格，
      整合 MenuBar / AppStatusBar 中重复的管理界面（切换/重命名/删除/新建） -->
 <template>
-  <GlobalDialog v-model="visible" title="管理工作区" width="420px">
-    <div v-if="workspaceList.length === 0" class="ws-empty">暂无工作区</div>
+  <GlobalDialog v-model="visible" :title="t('workspace.manageTitle')" width="420px">
+    <div v-if="workspaceList.length === 0" class="ws-empty">{{ t('workspace.noWorkspaces') }}</div>
     <div
       v-for="ws in workspaceList"
       :key="ws.id"
@@ -29,36 +29,37 @@
         <div class="ws-item-main" @click="handleSelectWorkspace(ws)">
           <div class="ws-item-name">
             {{ ws.name }}
-            <span v-if="currentWsId === ws.id" class="ws-badge">当前</span>
+            <span v-if="currentWsId === ws.id" class="ws-badge">{{ t('workspace.current') }}</span>
           </div>
-          <div class="ws-item-folders">{{ ws.folders.join(', ') || '无关联文件夹' }}</div>
+          <div class="ws-item-folders">{{ ws.folders.join(', ') || t('workspace.noFolders') }}</div>
         </div>
         <div class="ws-item-actions">
-          <span class="ws-btn" title="重命名" @click.stop="startRename(ws)">✏</span>
-          <span class="ws-btn ws-btn-danger" title="删除" @click.stop="requestDelete(ws)">🗑</span>
+          <span class="ws-btn" :title="t('workspace.rename')" @click.stop="startRename(ws)">✏</span>
+          <span class="ws-btn ws-btn-danger" :title="t('workspace.delete')" @click.stop="requestDelete(ws)">🗑</span>
         </div>
       </template>
     </div>
     <template #footer>
-      <span class="ws-create-link" @click="handleCreateWorkspace">+ 新建工作区</span>
+      <span class="ws-create-link" @click="handleCreateWorkspace">{{ t('workspace.newWorkspace') }}</span>
     </template>
   </GlobalDialog>
 
   <!-- 删除确认 -->
-  <GlobalDialog v-model="showDeleteConfirm" title="确认删除" width="400px">
+  <GlobalDialog v-model="showDeleteConfirm" :title="t('workspace.confirmDeleteTitle')" width="400px">
     <div class="ws-delete-message">
-      确定删除工作区「{{ deletingWs?.name }}」吗？
-      <div class="ws-delete-sub">该操作不可恢复。</div>
+      {{ t('workspace.confirmDeleteMessage', { name: deletingWs?.name }) }}
+      <div class="ws-delete-sub">{{ t('workspace.deleteIrreversible') }}</div>
     </div>
     <template #footer>
-      <app-button size="small" @click="showDeleteConfirm = false">取消</app-button>
-      <app-button size="small" type="danger" plain @click="confirmDelete">删除</app-button>
+      <app-button size="small" @click="showDeleteConfirm = false">{{ t('settingsPlugin.common.cancel') }}</app-button>
+      <app-button size="small" type="danger" plain @click="confirmDelete">{{ t('workspace.delete') }}</app-button>
     </template>
   </GlobalDialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { open } from '@/core/runtime'
 import GlobalDialog from './GlobalDialog.vue'
 import { useWorkspaceStore } from '@/store/modules/workspace'
@@ -81,6 +82,7 @@ interface Emits {
 const emit = defineEmits<Emits>()
 
 const workspaceStore = useWorkspaceStore()
+const { t } = useI18n()
 
 const visible = ref<boolean>(props.modelValue)
 const workspaceList = ref<WorkspaceSummary[]>([])
@@ -117,7 +119,7 @@ async function handleSelectWorkspace(ws: WorkspaceSummary) {
   const result = await workspaceStore.switchWorkspace(ws.id)
   visible.value = false
   if (result.success) {
-    NotificationUtil.success(`已切换到工作区: ${ws.name}`)
+    NotificationUtil.success(t('workspace.switched', { name: ws.name }))
   }
 }
 
@@ -134,7 +136,7 @@ async function handleCreateWorkspace() {
     await loadWorkspaceList()
     emit('list-changed')
     if (result.success) {
-      NotificationUtil.success(`工作区已创建并切换: ${config.name}`)
+      NotificationUtil.success(t('workspace.createdAndSwitched', { name: config.name }))
     }
   }
 }
@@ -162,7 +164,7 @@ async function confirmRename(ws: WorkspaceSummary) {
   }
   const updated = await workspaceService.update(ws.id, { name: newName })
   if (updated) {
-    NotificationUtil.success(`工作区已重命名: ${newName}`)
+    NotificationUtil.success(t('workspace.renamed', { name: newName }))
     await loadWorkspaceList()
     emit('list-changed')
     // 如果重命名的是当前工作区，刷新 store
@@ -170,7 +172,7 @@ async function confirmRename(ws: WorkspaceSummary) {
       await workspaceStore.loadCurrentWorkspace(ws.id)
     }
   } else {
-    NotificationUtil.error('重命名失败')
+    NotificationUtil.error(t('workspace.renameFailed'))
   }
   cancelRename()
 }
@@ -178,7 +180,7 @@ async function confirmRename(ws: WorkspaceSummary) {
 // ===== 删除 =====
 function requestDelete(ws: WorkspaceSummary) {
   if (ws.id === workspaceStore.currentWorkspace?.id) {
-    NotificationUtil.warn('无法删除当前正在使用的工作区')
+    NotificationUtil.warn(t('workspace.cannotDeleteCurrent'))
     return
   }
   deletingWs.value = ws
@@ -191,7 +193,7 @@ async function confirmDelete() {
   deletingWs.value = null
   if (!ws) return
   await workspaceStore.deleteWorkspace(ws.id)
-  NotificationUtil.success(`工作区已删除: ${ws.name}`)
+  NotificationUtil.success(t('workspace.deleted', { name: ws.name }))
   await loadWorkspaceList()
   emit('list-changed')
 }

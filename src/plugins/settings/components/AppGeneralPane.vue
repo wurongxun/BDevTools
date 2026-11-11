@@ -1,7 +1,7 @@
 <template>
   <!-- 通用 -->
   <section class="settings-group">
-    <h3 class="settings-group-title">通用</h3>
+    <h3 class="settings-group-title">{{ $t('settingsPlugin.general.sectionGeneral') }}</h3>
     <div class="settings-group-body">
       <div class="settings-item">
         <div class="setting-info">
@@ -17,7 +17,7 @@
       <div class="settings-item">
         <div class="setting-info">
           <span class="setting-label">{{ $t('darkMode.name') }}</span>
-          <span class="setting-description">切换界面深浅色（与顶栏主题按钮同步）</span>
+          <span class="setting-description">{{ $t('settingsPlugin.general.darkModeDesc') }}</span>
         </div>
         <div class="setting-control">
           <el-switch v-model="dark" inline-prompt :active-icon="Check" :inactive-icon="Close" />
@@ -26,12 +26,22 @@
 
       <div class="settings-item">
         <div class="setting-info">
+          <span class="setting-label">{{ $t('highContrast.name') }}</span>
+          <span class="setting-description">{{ $t('settingsPlugin.general.highContrastDesc') }}</span>
+        </div>
+        <div class="setting-control">
+          <el-switch v-model="highContrast" inline-prompt :active-icon="Check" :inactive-icon="Close" />
+        </div>
+      </div>
+
+      <div class="settings-item">
+        <div class="setting-info">
           <span class="setting-label">{{ $t('locale.language') }}</span>
-          <span class="setting-description">选择界面显示语言</span>
+          <span class="setting-description">{{ $t('settingsPlugin.general.localeDesc') }}</span>
         </div>
         <div class="setting-control">
           <el-select v-model="language" @change="languageChange" placeholder="选择语言" style="width: 180px">
-            <el-option v-for="item in LANGUAGE_OPTIONS" :key="item.value" :label="item.label" :value="item.value"
+            <el-option v-for="item in LANGUAGE_OPTIONS" :key="item.value" :label="$t('settingsPlugin.languages.' + item.value)" :value="item.value"
               :disabled="item.disabled" />
           </el-select>
         </div>
@@ -41,15 +51,17 @@
 
   <!-- 网络 -->
   <section class="settings-group">
-    <h3 class="settings-group-title">网络</h3>
+    <h3 class="settings-group-title">{{ $t('settingsPlugin.general.sectionNetwork') }}</h3>
     <div class="settings-group-body">
       <div class="settings-item">
         <div class="setting-info">
-          <span class="setting-label">网络检测</span>
-          <span class="setting-description">检测当前网络连接状态（功能开发中，暂不可用）</span>
+          <span class="setting-label">{{ $t('settingsPlugin.general.networkCheck') }}</span>
+          <span class="setting-description">{{ $t('settingsPlugin.general.networkCheckDesc') }}</span>
         </div>
         <div class="setting-control">
-          <app-button type="primary" disabled plain title="功能开发中，暂不可用">检测网络</app-button>
+          <app-button type="primary" disabled plain :title="$t('settingsPlugin.general.comingSoon')">
+            {{ $t('settingsPlugin.general.networkCheckBtn') }}
+          </app-button>
         </div>
       </div>
     </div>
@@ -57,29 +69,29 @@
 
   <!-- 更新 -->
   <section class="settings-group">
-    <h3 class="settings-group-title">更新</h3>
+    <h3 class="settings-group-title">{{ $t('settingsPlugin.general.sectionUpdate') }}</h3>
     <div class="settings-group-body">
       <div class="settings-item settings-item--update">
         <div class="setting-info">
           <span class="setting-label">
-            应用更新
+            {{ $t('settingsPlugin.general.appUpdate') }}
             <span class="update-current">当前 {{ current_version || '—' }}</span>
           </span>
 
           <span v-if="update_phase === 'downloading'" class="setting-description">
-            正在下载 {{ update_info?.version }}…
+            {{ $t('settingsPlugin.general.updateDownloading', { version: update_info?.version }) }}
           </span>
           <span v-else-if="update_phase === 'installing'" class="setting-description">
-            安装包已下载，正在启动安装程序，完成后应用会自动重启
+            {{ $t('settingsPlugin.general.updateInstalling') }}
           </span>
           <span v-else-if="update_phase === 'error'" class="setting-description update-error">
             {{ update_error }}
           </span>
           <span v-else-if="has_update && update_info" class="setting-description">
-            发现新版本 <b>{{ update_info.version }}</b>
-            <template v-if="update_info.date"> · 发布于 {{ update_info.date }}</template>
+            {{ $t('settingsPlugin.general.updateFoundPrefix') }} <b>{{ update_info.version }}</b>
+            <template v-if="update_info.date"> · {{ $t('settingsPlugin.general.updateReleasedOn', { date: update_info.date }) }}</template>
           </span>
-          <span v-else class="setting-description">检查并安装新版本，获取最新功能和修复</span>
+          <span v-else class="setting-description">{{ $t('settingsPlugin.general.updateDefaultDesc') }}</span>
 
           <!-- 下载进度：安装包有几十 MB，没有进度反馈会被当成卡死 -->
           <div v-if="update_busy" class="update-progress">
@@ -94,7 +106,7 @@
 
           <!-- 发布说明 -->
           <details v-if="update_info?.body && update_phase !== 'installing'" class="update-notes">
-            <summary>更新内容</summary>
+            <summary>{{ $t('settingsPlugin.general.updateNotes') }}</summary>
             <pre class="update-notes-body">{{ update_info.body }}</pre>
           </details>
         </div>
@@ -107,7 +119,7 @@
             :disabled="update_busy"
             @click="installAppUpdate"
           >
-            {{ update_phase === 'installing' ? '安装中' : update_busy ? '下载中' : '立即更新' }}
+            {{ update_phase === 'installing' ? $t('settingsPlugin.general.updating') : update_busy ? $t('settingsPlugin.general.downloading') : $t('settingsPlugin.general.updateNow') }}
           </app-button>
           <app-button
             v-else
@@ -117,7 +129,7 @@
             :disabled="update_phase === 'checking'"
             @click="checkAppUpdate()"
           >
-            检查更新
+            {{ $t('settingsPlugin.general.checkUpdate') }}
           </app-button>
         </div>
       </div>
@@ -126,12 +138,12 @@
 
   <!-- 其他 -->
   <section class="settings-group">
-    <h3 class="settings-group-title">其他设置</h3>
+    <h3 class="settings-group-title">{{ $t('settingsPlugin.general.sectionOther') }}</h3>
     <div class="settings-group-body">
       <div class="settings-item">
         <div class="setting-info">
-          <span class="setting-label">文本默认读取行数</span>
-          <span class="setting-description">编辑器打开文件时默认读取的行数，建议最大值不超过20万行，行数直接影响内存占用，请谨慎设置</span>
+          <span class="setting-label">{{ $t('settingsPlugin.general.readLinesLabel') }}</span>
+          <span class="setting-description">{{ $t('settingsPlugin.general.readLinesDesc') }}</span>
         </div>
         <div class="setting-control">
           <div class="read-lines-control">
@@ -140,13 +152,13 @@
               type="number"
               :min="1"
               :max="READ_LINES_MAX"
-              aria-label="文本默认读取行数"
-              placeholder="默认读取行数"
+              :aria-label="$t('settingsPlugin.general.readLinesLabel')"
+              :placeholder="$t('settingsPlugin.general.readLinesPlaceholder')"
               @keyup.enter="onReadLines"
               style="width: 180px"
             />
             <app-button type="primary" @click="onReadLines" plain>
-              确认
+              {{ $t('settingsPlugin.general.confirm') }}
             </app-button>
           </div>
         </div>
@@ -154,33 +166,37 @@
 
       <div class="settings-item">
         <div class="setting-info">
-          <span class="setting-label">注册</span>
-          <span class="setting-description">注册应用到 windows「打开方式」列表</span>
+          <span class="setting-label">{{ $t('settingsPlugin.general.register') }}</span>
+          <span class="setting-description">{{ $t('settingsPlugin.general.registerDesc') }}</span>
         </div>
         <div class="setting-control">
           <app-button type="primary" @click="handleRegisterAssociation" plain>
-            注册
+            {{ $t('settingsPlugin.general.register') }}
           </app-button>
         </div>
       </div>
 
       <div class="settings-item">
         <div class="setting-info">
-          <span class="setting-label">清除缓存</span>
-          <span class="setting-description">清理应用缓存文件</span>
+          <span class="setting-label">{{ $t('settingsPlugin.general.clearCache') }}</span>
+          <span class="setting-description">{{ $t('settingsPlugin.general.clearCacheDesc') }}</span>
         </div>
         <div class="setting-control">
-          <app-button type="danger" disabled plain title="功能开发中，暂不可用">清除缓存</app-button>
+          <app-button type="danger" disabled plain :title="$t('settingsPlugin.general.comingSoon')">
+            {{ $t('settingsPlugin.general.clearCache') }}
+          </app-button>
         </div>
       </div>
 
       <div class="settings-item">
         <div class="setting-info">
-          <span class="setting-label">清除浏览器缓存</span>
-          <span class="setting-description">清理内置浏览器缓存数据</span>
+          <span class="setting-label">{{ $t('settingsPlugin.general.clearBrowserCache') }}</span>
+          <span class="setting-description">{{ $t('settingsPlugin.general.clearBrowserCacheDesc') }}</span>
         </div>
         <div class="setting-control">
-          <app-button type="danger" disabled plain title="功能开发中，暂不可用">清除浏览器缓存</app-button>
+          <app-button type="danger" disabled plain :title="$t('settingsPlugin.general.comingSoon')">
+            {{ $t('settingsPlugin.general.clearBrowserCache') }}
+          </app-button>
         </div>
       </div>
     </div>
@@ -189,6 +205,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Check, Close } from '@element-plus/icons-vue'
 import { invoke } from '@/api/rpc'
 import type { ResponseData } from '@/entity/entitys'
@@ -196,19 +213,22 @@ import useStore from '@/store'
 import { autostartDisable, autostartEnable, checkUpdate, getVersion, publish } from '@/core/runtime'
 import type { DownloadEvent, Store, Update } from '@/core/runtime'
 import { isDark, toggleDark } from '@/composables/useDark'
+import { isHighContrast, toggleHighContrast } from '@/composables/useHighContrast'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { useSettingsStore } from './useSettingsStore'
 
 const { appConfig: userStore } = useStore()
 
+/** i18n：脚本里的提示文案走 t()，模板里走 $t() */
+const { t } = useI18n()
+
 /** 文本默认读取行数上限，与界面描述中的建议值保持一致 */
 const READ_LINES_MAX = 200000
 
 const LANGUAGE_OPTIONS = [
-  { value: 'zh_CN', label: '简体中文', disabled: false },
-  { value: 'zh_TW', label: '繁体中文（中国台湾）', disabled: false },
-  { value: 'zh_HK', label: '繁体中文（中国香港）', disabled: false },
-  { value: 'en', label: 'English', disabled: false },
+  { value: 'zh_CN', disabled: false },
+  { value: 'zh_TW', disabled: false },
+  { value: 'en', disabled: false },
 ]
 
 const autostart = ref<boolean>(false)
@@ -223,6 +243,17 @@ const dark = computed<boolean>({
   get: () => isDark.value,
   set: (value: boolean) => {
     void applyDarkChange(value)
+  },
+})
+
+/**
+ * 高对比度开关：与上面的暗黑开关同构（以全局单例为唯一真相）。
+ * 它是**正交**于明暗的第二个开关，两者可任意组合（浅/深 × 普通/高对比）。
+ */
+const highContrast = computed<boolean>({
+  get: () => isHighContrast.value,
+  set: (value: boolean) => {
+    void applyHighContrastChange(value)
   },
 })
 
@@ -261,7 +292,7 @@ onMounted(async () => {
   try {
     store = await useSettingsStore()
   } catch (e) {
-    NotificationUtil.error(`读取应用配置失败：${e instanceof Error ? e.message : String(e)}`)
+    NotificationUtil.error(t('settingsPlugin.general.readConfigFailed', { msg: e instanceof Error ? e.message : String(e) }))
     return
   }
 
@@ -286,6 +317,12 @@ onMounted(async () => {
     userStore.setDark(dark_val.value)
     // 与顶栏保持一致：以持久化的值为准同步主题状态
     if (dark_val.value !== isDark.value) toggleDark()
+  }
+  // 启动时已由 initHighContrast() 读过，这里再对齐一次（与 dark 同节奏），
+  // 防止 KV 值被别的窗口改过而本窗口的开关显示成旧值
+  const hc_val = await store.get<{ value: boolean }>('high_contrast')
+  if (hc_val !== undefined && hc_val.value !== isHighContrast.value) {
+    toggleHighContrast()
   }
 })
 
@@ -321,6 +358,15 @@ async function applyDarkChange(value: boolean) {
   userStore.setDark(value)
 }
 
+/** 应用高对比度变更（键 `high_contrast`，与上面的 dark 同一套路） */
+async function applyHighContrastChange(value: boolean) {
+  if (store) {
+    await store.set('high_contrast', { value })
+    await store.save()
+  }
+  if (value !== isHighContrast.value) toggleHighContrast()
+}
+
 // 步骤1：注册应用到"打开方式"列表
 async function handleRegisterAssociation() {
   const res = await invoke<ResponseData<unknown>>('register_file_association')
@@ -334,11 +380,11 @@ async function onReadLines() {
   // 校验：必须是正整数且不超过建议上限，避免脏值直接落盘
   const value = Number(read_lines.value)
   if (!Number.isInteger(value) || value <= 0) {
-    NotificationUtil.warn('请输入大于 0 的整数行数')
+    NotificationUtil.warn(t('settingsPlugin.general.readLinesInvalid'))
     return
   }
   if (value > READ_LINES_MAX) {
-    NotificationUtil.warn(`读取行数建议不超过 ${READ_LINES_MAX} 行，请重新设置`)
+    NotificationUtil.warn(t('settingsPlugin.general.readLinesTooLarge', { n: READ_LINES_MAX }))
     return
   }
   read_lines.value = value
@@ -346,7 +392,7 @@ async function onReadLines() {
     await store.set('read_lines', { value })
     await store.save()
     userStore.setReadLines(value)
-    NotificationUtil.success(`已保存，默认读取 ${value} 行`)
+    NotificationUtil.success(t('settingsPlugin.general.readLinesSaved', { value }))
   }
 }
 
@@ -385,17 +431,17 @@ async function checkAppUpdate(manual = true) {
         body: (result.body || '').trim(),
       }
       update_phase.value = 'ready'
-      if (manual) NotificationUtil.success(`发现新版本 ${update_info.value.version}`)
+      if (manual) NotificationUtil.success(t('settingsPlugin.general.updateFoundToast', { version: update_info.value.version }))
     } else {
       update_info.value = null
       update_phase.value = 'idle'
-      if (manual) NotificationUtil.info('当前已是最新版本')
+      if (manual) NotificationUtil.info(t('settingsPlugin.general.upToDate'))
     }
   } catch (error) {
     update_phase.value = 'error'
     update_error.value = updateErrorText(error)
     console.error('Failed to check for updates:', error)
-    if (manual) NotificationUtil.error(`检查更新失败：${update_error.value}`)
+    if (manual) NotificationUtil.error(t('settingsPlugin.general.checkUpdateFailed', { msg: update_error.value }))
   }
 }
 
@@ -407,7 +453,7 @@ async function installAppUpdate() {
   if (!pending_update) await checkAppUpdate(false)
   if (!pending_update) {
     update_phase.value = 'error'
-    update_error.value = '拿不到更新包信息，请重新检查更新'
+    update_error.value = t('settingsPlugin.general.noUpdateInfo')
     return
   }
 
@@ -437,12 +483,12 @@ async function installAppUpdate() {
     // Windows 上基本走不到这里：安装器进程起来后宿主就 std::process::exit(0) 了，
     // 由安装器自己重启应用（NSIS 收到 /R）。保留分支是为了非 Windows 平台与异常可控。
     update_phase.value = 'done'
-    NotificationUtil.success(`已安装 ${version || '新版本'}，应用即将重启`)
+    NotificationUtil.success(t('settingsPlugin.general.installedRestart', { version: version || '' }))
   } catch (error) {
     update_phase.value = 'error'
     update_error.value = updateErrorText(error)
     console.error('更新失败:', error)
-    NotificationUtil.error(`更新失败：${update_error.value}`)
+    NotificationUtil.error(t('settingsPlugin.general.updateFailed', { msg: update_error.value }))
   }
 }
 

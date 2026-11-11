@@ -1,7 +1,7 @@
 <template>
   <div class="help-container">
     <!-- 顶部固定条：章节导航。住在滚动容器之外，正文滚动时保持不动。 -->
-    <nav class="help-topbar" aria-label="帮助章节">
+    <nav class="help-topbar" :aria-label="$t('settingsPlugin.help.navAria')">
       <div class="help-tablist" role="tablist" aria-orientation="horizontal">
         <button
           v-for="section in SECTIONS"
@@ -13,7 +13,7 @@
           :class="{ 'is-active': activeSection === section.id }"
           @click="scrollToSection(section.id)"
         >
-          {{ section.title }}
+          {{ $t(section.key) }}
         </button>
       </div>
     </nav>
@@ -22,33 +22,31 @@
     <div ref="scrollEl" class="help-scroll">
       <!-- 产品介绍 -->
       <section id="product-intro" class="help-section">
-        <h2>产品介绍</h2>
+        <h2>{{ $t('settingsPlugin.help.productIntro') }}</h2>
         <div class="section-content">
           <p>
-            <strong>{{ $t('appName') }}</strong>
-            是一款面向开发者的桌面端工具集：写笔记、看日志、连服务器、查数据库、分析 Java 内存，
-            不必在多个软件之间来回切换，所有数据默认保存在本机。应用采用「插件」结构，互不干扰。
+            {{ $t('settingsPlugin.help.productIntroDesc', { appName: $t('appName') }) }}
           </p>
           <div class="features-grid">
             <div class="feature-card">
-              <h3><el-icon class="feature-ic"><Folder /></el-icon>文件</h3>
-              <p>文件树浏览、代码与 Markdown 编辑；超过 1MB 的大文件自动降级为只读虚拟滚动。</p>
+              <h3><el-icon class="feature-ic"><Folder /></el-icon>{{ $t('settingsPlugin.help.featFile') }}</h3>
+              <p>{{ $t('settingsPlugin.help.featFileDesc') }}</p>
             </div>
             <div class="feature-card">
-              <h3><el-icon class="feature-ic"><DataLine /></el-icon>日志</h3>
-              <p>GB 级日志分块懒加载，支持关键词 / 正则检索、级别配色、自定义高亮与堆栈识别。</p>
+              <h3><el-icon class="feature-ic"><DataLine /></el-icon>{{ $t('settingsPlugin.help.featLog') }}</h3>
+              <p>{{ $t('settingsPlugin.help.featLogDesc') }}</p>
             </div>
             <div class="feature-card">
-              <h3><el-icon class="feature-ic"><Connection /></el-icon>SSH 连接</h3>
-              <p>多标签 SSH 终端与 SFTP 文件传输，连接可保存复用。</p>
+              <h3><el-icon class="feature-ic"><Connection /></el-icon>{{ $t('settingsPlugin.help.featSsh') }}</h3>
+              <p>{{ $t('settingsPlugin.help.featSshDesc') }}</p>
             </div>
             <div class="feature-card">
-              <h3><el-icon class="feature-ic"><Coin /></el-icon>数据库</h3>
-              <p>多数据库连接与库表浏览，SQL 编写执行、结果分页查看，可导出 CSV / Excel。</p>
+              <h3><el-icon class="feature-ic"><Coin /></el-icon>{{ $t('settingsPlugin.help.featDb') }}</h3>
+              <p>{{ $t('settingsPlugin.help.featDbDesc') }}</p>
             </div>
             <div class="feature-card">
-              <h3><el-icon class="feature-ic"><DataAnalysis /></el-icon>内存分析</h3>
-              <p>Java 堆转储（.hprof / .phd）解析：直方图、泄漏检测（支配树 + Retained Heap）、GC Roots 引用追踪。</p>
+              <h3><el-icon class="feature-ic"><DataAnalysis /></el-icon>{{ $t('settingsPlugin.help.featMemory') }}</h3>
+              <p>{{ $t('settingsPlugin.help.featMemoryDesc') }}</p>
             </div>
           </div>
         </div>
@@ -56,7 +54,7 @@
 
       <!-- 关于我们 -->
       <section id="company-info" class="help-section">
-        <h2>关于我们</h2>
+        <h2>{{ $t('settingsPlugin.help.aboutUs') }}</h2>
         <div class="section-content">
 
         </div>
@@ -64,58 +62,58 @@
 
       <!-- 操作指南 -->
       <section id="user-guide" class="help-section">
-        <h2>操作指南</h2>
+        <h2>{{ $t('settingsPlugin.help.guide') }}</h2>
         <div class="section-content">
           <div class="guide-step">
-            <h3>1. 创建新笔记</h3>
-            <p>点击主界面的"新建笔记"按钮，即可开始创建您的第一篇笔记。</p>
+            <h3>{{ $t('settingsPlugin.help.guide1Title') }}</h3>
+            <p>{{ $t('settingsPlugin.help.guide1Desc') }}</p>
           </div>
           <div class="guide-step">
-            <h3>2. 编辑与格式化</h3>
-            <p>使用 Markdown 语法进行内容编辑，支持标题、列表、代码块、链接等常用格式。</p>
+            <h3>{{ $t('settingsPlugin.help.guide2Title') }}</h3>
+            <p>{{ $t('settingsPlugin.help.guide2Desc') }}</p>
           </div>
           <div class="guide-step">
-            <h3>3. 保存与管理</h3>
-            <p>笔记会自动保存，您可以在侧边栏的笔记列表中查看和管理所有笔记。</p>
+            <h3>{{ $t('settingsPlugin.help.guide3Title') }}</h3>
+            <p>{{ $t('settingsPlugin.help.guide3Desc') }}</p>
           </div>
           <div class="guide-step">
-            <h3>4. 导出分享</h3>
-            <p>点击"导出"按钮，将您的笔记导出为多种格式，方便分享给他人。</p>
+            <h3>{{ $t('settingsPlugin.help.guide4Title') }}</h3>
+            <p>{{ $t('settingsPlugin.help.guide4Desc') }}</p>
           </div>
         </div>
       </section>
 
       <!-- 常见问题 -->
       <section id="faq" class="help-section">
-        <h2>常见问题解答</h2>
+        <h2>{{ $t('settingsPlugin.help.faq') }}</h2>
 
       </section>
 
       <!-- 问题解决指南 -->
       <section id="troubleshooting" class="help-section">
-        <h2>问题解决指南</h2>
+        <h2>{{ $t('settingsPlugin.help.troubleshooting') }}</h2>
         <div class="section-content">
           <div class="troubleshooting-item">
-            <h3>应用启动缓慢</h3>
+            <h3>{{ $t('settingsPlugin.help.trobSlowTitle') }}</h3>
             <div class="solution">
-              <p><strong>可能原因：</strong>系统资源不足或缓存文件过多</p>
-              <p><strong>解决方案：</strong></p>
+              <p><strong>{{ $t('settingsPlugin.help.trobSlowCause') }}</strong></p>
+              <p><strong>{{ $t('settingsPlugin.help.solution') }}</strong></p>
               <ol>
-                <li>关闭不必要的后台程序以释放系统资源</li>
-                <li>清理应用缓存：设置 &gt; 存储 &gt; 清理缓存</li>
-                <li>重启应用</li>
+                <li>{{ $t('settingsPlugin.help.trobSlowStep1') }}</li>
+                <li>{{ $t('settingsPlugin.help.trobSlowStep2') }}</li>
+                <li>{{ $t('settingsPlugin.help.trobSlowStep3') }}</li>
               </ol>
             </div>
           </div>
           <div class="troubleshooting-item">
-            <h3>内容显示异常</h3>
+            <h3>{{ $t('settingsPlugin.help.trobDisplayTitle') }}</h3>
             <div class="solution">
-              <p><strong>可能原因：</strong>渲染引擎问题或文件损坏</p>
-              <p><strong>解决方案：</strong></p>
+              <p><strong>{{ $t('settingsPlugin.help.trobDisplayCause') }}</strong></p>
+              <p><strong>{{ $t('settingsPlugin.help.solution') }}</strong></p>
               <ol>
-                <li>刷新页面或重启应用</li>
-                <li>检查 Markdown 语法是否正确</li>
-                <li>尝试在其他编辑器中打开文件</li>
+                <li>{{ $t('settingsPlugin.help.trobDisplayStep1') }}</li>
+                <li>{{ $t('settingsPlugin.help.trobDisplayStep2') }}</li>
+                <li>{{ $t('settingsPlugin.help.trobDisplayStep3') }}</li>
               </ol>
             </div>
           </div>
@@ -136,12 +134,12 @@ import { Coin, Connection, DataAnalysis, DataLine, Folder } from '@element-plus/
  * 三处必须同源：此前页签是手写的 <li> 列表、章节是手写的 <section>，
  * 增删章节要改两个地方，漏改就会点空。
  */
-const SECTIONS: ReadonlyArray<{ id: string; title: string }> = [
-  { id: 'product-intro', title: '产品介绍' },
-  { id: 'company-info', title: '关于我们' },
-  { id: 'user-guide', title: '操作指南' },
-  { id: 'faq', title: '常见问题' },
-  { id: 'troubleshooting', title: '问题解决' },
+const SECTIONS: ReadonlyArray<{ id: string; key: string }> = [
+  { id: 'product-intro', key: 'settingsPlugin.help.productIntro' },
+  { id: 'company-info', key: 'settingsPlugin.help.aboutUs' },
+  { id: 'user-guide', key: 'settingsPlugin.help.guide' },
+  { id: 'faq', key: 'settingsPlugin.help.faq' },
+  { id: 'troubleshooting', key: 'settingsPlugin.help.troubleshooting' },
 ]
 
 const activeSection = ref(SECTIONS[0].id)

@@ -18,11 +18,11 @@
         </div>
 
         <!--
-          停靠面板（ToolPlugin.dockPanel，如终端）：
+          停靠面板（view 贡献的 dock 槽位，如终端）：
           用 v-show 而不是 v-if —— 面板必须常驻挂载，否则每次显隐都会销毁重建 PTY 会话/xterm 实例。
           显隐与高度由 layout store 持有；拖到顶 = 面板占满主区（editor 隐藏），拖到底 = 隐藏面板。
         -->
-        <template v-if="dockPlugin">
+        <template v-if="dockItem">
           <div
             v-show="dockVisible || dockDragging"
             class="dock-resize-handle"
@@ -31,7 +31,7 @@
             aria-orientation="horizontal"
             tabindex="0"
             :aria-valuenow="dockHeight"
-            :aria-valuemin="DOCK_MIN_HEIGHT"
+            :aria-valuemin="dockMinHeight"
             :aria-valuemax="dockMaxHeight"
             aria-label="调整底部面板高度"
             @mousedown="onDockResizeStart"
@@ -45,7 +45,9 @@
             :class="{ 'is-expanded': dockExpanded }"
             :style="dockExpanded ? {} : { height: dockHeight + 'px' }"
           >
-            <component :is="dockComponent" />
+            <ErrorBoundary v-slot="{ retryKey }" :scope="dockScope">
+              <component :is="dockComponent" :key="retryKey" />
+            </ErrorBoundary>
           </div>
         </template>
       </main>
@@ -59,12 +61,15 @@
 
 <script setup lang="ts" name="Layout">
 import AppNavbar from './components/AppNavbar/index.vue'
+import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import AppEditorMain from './components/AppEditorMain/index.vue'
 import AppImmersiveBar from './components/AppImmersiveBar/index.vue'
 import AppSidebar from './components/AppSidebar/index.vue'
 import AppStatusBar from './components/AppStatusBar/index.vue'
 import useStore from '@/store/index'
 import { pluginManager } from '@/core/pluginManager'
+import { contributionRegistry } from '@/core/registry'
+import type { ViewPayload } from '@/core/registry'
 import { storeToRefs } from 'pinia'
 import { watch, nextTick, onMounted, onUnmounted, ref, computed } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
@@ -86,22 +91,37 @@ const sideBoxRef = ref<HTMLElement | null>(null)
 const mainContentRef = ref<HTMLElement | null>(null)
 const windowWidth = ref(window.innerWidth)
 
-// ==================== 停靠面板（ToolPlugin.dockPanel） ====================
-/** 当前窗口里停靠在底部的插件（如终端）。受窗口预设的插件清单过滤 */
-const dockPlugin = computed(() =>
-  useLayoutStore.filteredPlugins.find(p => p.dockPanel?.position === 'bottom'),
+// ==================== 本窗口可见性（窗口策略，不属于注册表） ====================
+/** 当前窗口可见的插件 ID（窗口预设的显示清单；空清单 = 全部） */
+const visibleIds = computed(() => new Set(useLayoutStore.filteredPlugins.map(p => p.id)))
+
+// ==================== 停靠面板（view 的 dock 槽位） ====================
+/** 当前窗口里停靠在底部的面板条目（如终端）。受窗口预设的插件清单过滤 */
+const dockItem = computed(() =>
+  contributionRegistry
+    .views<ViewPayload>('dock')
+    .find(e => visibleIds.value.has(e.pluginId) && e.payload.position === 'bottom'),
 )
-const dockComponent = computed(() => dockPlugin.value?.dockPanel?.component)
+/** 面板出错时的可读名字（告诉用户崩掉的是哪个插件的哪一块） */
+function panelLabel(pluginId: string): string {
+  return pluginManager.getPlugin(pluginId)?.label ?? pluginId
+}
+
+/** 停靠面板出错时的可读名字（同上面的 panelLabel，多了 fallback：面板可能刚被禁用） */
+const dockScope = computed(() => `${panelLabel(dockItem.value?.pluginId ?? '')} · 停靠面板`)
+
+const dockComponent = computed(() => dockItem.value?.payload.component)
 const dockVisible = computed(() => useLayoutStore.dockPanelVisible.bottom)
 const dockExpanded = computed(() => useLayoutStore.dockPanelExpanded.bottom)
 const dockHeight = computed(() => useLayoutStore.dockPanelHeight.bottom)
 const dockDragging = ref(false)
 /** 面板可拖拽的最大高度：主区至少留 EDITOR_MIN_HEIGHT */
 const EDITOR_MIN_HEIGHT = 80
-const DOCK_MIN_HEIGHT = dockPlugin.value?.dockPanel?.minHeight ?? 80
+/** 最小高度由插件声明（未声明用 80），插件切换后随之变化，故必须是 computed */
+const dockMinHeight = computed(() => dockItem.value?.payload.minHeight ?? 80)
 const dockMaxHeight = computed(() => {
   const mainH = mainContentRef.value?.clientHeight ?? window.innerHeight
-  return Math.max(DOCK_MIN_HEIGHT, mainH - EDITOR_MIN_HEIGHT)
+  return Math.max(dockMinHeight.value, mainH - EDITOR_MIN_HEIGHT)
 })
 
 const SIDEBAR_MIN_WIDTH = 60
@@ -110,35 +130,40 @@ const SIDEBAR_DEFAULT_WIDTH = 220
 /** 活动栏（activity-bar）固定宽度：插件面板收起时侧边栏收缩到该宽度 */
 const ACTIVITY_BAR_WIDTH = 48
 
-/** 当前激活插件的侧边栏布局配置（插件可声明 sidebarMinWidth/MaxWidth/DefaultWidth，未声明用全局默认） */
+/** 侧栏面板条目（已按插件顺序排好；再按本窗口清单过滤） */
+const sidebarItems = computed(() =>
+  contributionRegistry.views<ViewPayload>('sidebar').filter(e => visibleIds.value.has(e.pluginId)),
+)
+
+/** 当前激活插件的侧边栏布局配置（插件可声明宽度约束，未声明用全局默认） */
 const activeSidebarCfg = computed(() => {
-  const plugin = pluginManager.getPlugin(pluginManager.activeToolId.value)
+  const entry = sidebarItems.value.find(e => e.pluginId === pluginManager.activeToolId.value)
   return {
-    min: plugin?.sidebarMinWidth ?? SIDEBAR_MIN_WIDTH,
-    max: plugin?.sidebarMaxWidth ?? SIDEBAR_MAX_WIDTH,
-    def: plugin?.sidebarDefaultWidth ?? SIDEBAR_DEFAULT_WIDTH,
+    min: entry?.payload.minWidth ?? SIDEBAR_MIN_WIDTH,
+    max: entry?.payload.maxWidth ?? SIDEBAR_MAX_WIDTH,
+    def: entry?.payload.defaultWidth ?? SIDEBAR_DEFAULT_WIDTH,
   }
 })
 
 /**
- * 侧栏面板区当前实际显示的插件
+ * 侧栏面板区当前实际显示的条目
  * 专注模式下面板区固定显示第一个启用插件（与 AppSidebar 的判定保持一致），其余情况用激活插件
  */
-const activeSidebarPlugin = computed(() => {
-  const list = useLayoutStore.filteredPlugins
-  if (isFocusMode.value && list.length > 0) return list[0]
-  const active = pluginManager.getPlugin(pluginManager.activeToolId.value)
+const activeSidebarItem = computed(() => {
+  // 专注模式按「第一个可见插件」取，与 AppSidebar/AppEditorMain 同一口径
+  const targetId = isFocusMode.value
+    ? useLayoutStore.filteredPlugins[0]?.id
+    : pluginManager.activeToolId.value
   // 激活插件不在本窗口的显示清单里 → 按「无面板」处理（hasSidebar 为 false）
   // 否则侧栏会为一块并不渲染的面板留出宽度（判定必须与 AppSidebar 的 showPanelArea 对齐）
-  if (active && !list.some(p => p.id === active.id)) return undefined
-  return active
+  return sidebarItems.value.find(e => e.pluginId === targetId)
 })
 
 /**
- * 当前插件是否提供侧栏面板（ToolPlugin.sidebarPanel 可选）
+ * 当前插件是否提供侧栏面板（sidebar 槽位是可选的）
  * 未提供时：侧栏收缩到活动栏宽度、隐藏拖拽手柄，主面板占满宽度
  */
-const hasSidebar = computed(() => Boolean(activeSidebarPlugin.value?.sidebarPanel))
+const hasSidebar = computed(() => Boolean(activeSidebarItem.value))
 
 /** 每个插件独立的侧边栏宽度（持久化存储） */
 const pluginSidebarWidths: Record<string, number> = {}
@@ -160,9 +185,9 @@ const setSidebarWidthNow = (target: number) => {
 
 /** 插件切换时恢复该插件记住的宽度：无动画、宽度相同则跳过；切换后即时通知一次布局更新（消除延迟链） */
 watch(() => pluginManager.activeToolId.value, async (newId) => {
-  // 面板收起、或该插件未提供 sidebarPanel：保持活动栏宽度，不恢复插件记住的宽度
+  // 面板收起、或该插件未提供 sidebarPanel：只剩活动栏（活动栏也隐藏时收起为 0），不恢复插件记住的宽度
   if (useLayoutStore.sidebarPanelCollapsed || !hasSidebar.value) {
-    setSidebarWidthNow(ACTIVITY_BAR_WIDTH)
+    setSidebarWidthNow(activityBarHidden.value ? 0 : ACTIVITY_BAR_WIDTH)
     await nextTick()
     triggerLayoutUpdate('plugin-switch')
     return
@@ -173,13 +198,13 @@ watch(() => pluginManager.activeToolId.value, async (newId) => {
   triggerLayoutUpdate('plugin-switch')
 })
 
-/** 插件面板收起/展开：收起时缩到活动栏宽度，展开时恢复该插件记住的宽度 */
+/** 插件面板收起/展开：收起时缩到活动栏宽度（活动栏隐藏则收起为 0），展开时恢复记住的宽度 */
 watch(() => useLayoutStore.sidebarPanelCollapsed, async (collapsed) => {
   const activeId = pluginManager.activeToolId.value
   if (collapsed) {
     // 记住收起前的宽度，展开时恢复（无侧栏插件不记，避免把活动栏宽度存成该插件的宽度）
     if (hasSidebar.value) pluginSidebarWidths[activeId] = sidebarWidth.value
-    setSidebarWidthNow(ACTIVITY_BAR_WIDTH)
+    setSidebarWidthNow(activityBarHidden.value ? 0 : ACTIVITY_BAR_WIDTH)
   } else if (hasSidebar.value) {
     setSidebarWidthNow(pluginSidebarWidths[activeId] ?? activeSidebarCfg.value.def)
   }
@@ -188,26 +213,27 @@ watch(() => useLayoutStore.sidebarPanelCollapsed, async (collapsed) => {
 })
 
 /**
- * 活动栏是否被隐藏：专注模式（窗口预设）与沉浸式都会隐藏它
+ * 活动栏是否被隐藏：专注模式（窗口预设）、沉浸式，或用户收起插件入口（QuickActions 第三个按钮）
  * 活动栏被隐藏且当前插件没有侧栏面板时，侧栏整条收起（0）——留一个活动栏的宽度会变成一条空白带
  */
-const activityBarHidden = computed(() => isFocusMode.value || isImmersive.value)
+const activityBarHidden = computed(() => isFocusMode.value || isImmersive.value || useLayoutStore.activityBarCollapsed)
 
 /** 按「有无侧栏面板 + 活动栏是否隐藏」把侧栏宽度收敛到该有的值 */
 const syncSidebarWidth = () => {
   const activeId = pluginManager.activeToolId.value
-  if (!hasSidebar.value) {
+  // 面板收起或当前插件没有侧栏时只剩活动栏；活动栏也被隐藏则整条侧栏收起为 0
+  if (!hasSidebar.value || useLayoutStore.sidebarPanelCollapsed) {
     setSidebarWidthNow(activityBarHidden.value ? 0 : ACTIVITY_BAR_WIDTH)
-  } else if (!useLayoutStore.sidebarPanelCollapsed) {
+  } else {
     setSidebarWidthNow(pluginSidebarWidths[activeId] ?? activeSidebarCfg.value.def)
   }
 }
 
 /**
- * 侧栏有无会随激活插件、启用插件列表（布局预设）、沉浸式开关变化
+ * 侧栏有无会随激活插件、启用插件列表（布局预设）、沉浸式、插件入口显隐变化
  * 无侧栏：收敛到活动栏宽度（活动栏也被隐藏时为 0）；恢复有侧栏：回到该插件记住的宽度
  */
-watch([hasSidebar, isImmersive], () => {
+watch([hasSidebar, isImmersive, activityBarHidden], () => {
   syncSidebarWidth()
   nextTick(() => triggerLayoutUpdate('sidebar-availability'))
 }, { immediate: true })
@@ -307,7 +333,7 @@ const onDockResizeStart = (e: MouseEvent) => {
   const onMouseMove = (moveEvent: MouseEvent) => {
     const next = rect.bottom - moveEvent.clientY
     const maxH = rect.height - EDITOR_MIN_HEIGHT
-    if (next <= DOCK_MIN_HEIGHT) {
+    if (next <= dockMinHeight.value) {
       useLayoutStore.setDockPanelExpanded('bottom', false)
       useLayoutStore.setDockPanelVisible('bottom', false)
     } else if (next >= maxH) {
@@ -340,11 +366,11 @@ const onDockResizeKeydown = (e: KeyboardEvent) => {
   let next = dockHeight.value
   if (e.key === 'ArrowUp') next = Math.min(dockMaxHeight.value, dockHeight.value + 16)
   else if (e.key === 'ArrowDown') next = dockHeight.value - 16
-  else if (e.key === 'Home') next = DOCK_MIN_HEIGHT
+  else if (e.key === 'Home') next = dockMinHeight.value
   else if (e.key === 'End') next = dockMaxHeight.value
   else return
   e.preventDefault()
-  if (next <= DOCK_MIN_HEIGHT) {
+  if (next <= dockMinHeight.value) {
     useLayoutStore.setDockPanelExpanded('bottom', false)
     useLayoutStore.setDockPanelVisible('bottom', false)
   } else if (next >= dockMaxHeight.value) {
@@ -476,6 +502,10 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  // 外壳本身是滚动容器（overflow:hidden 也算），若参与 overscroll 链，
+  // 内嵌滚动区滚到头后会把余量传到这里 —— 弹的就是「整个桌面」。此处到头即止。
+  // 根级（html/body/#app）已在 styles/index.scss 统一钉死，这里是第一道闸。
+  overscroll-behavior: none;
   box-sizing: border-box;
 
   .main-area {
@@ -495,10 +525,10 @@ onUnmounted(() => {
     .side-box {
       flex-shrink: 0;
       height: 100%;
-      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-        min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-        max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-        opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      //transition: width 0.1s cubic-bezier(0.4, 0, 0.2, 1),
+      //  min-width 0.1s cubic-bezier(0.4, 0, 0.2, 1),
+      //  max-width 0.1s cubic-bezier(0.4, 0, 0.2, 1),
+      //  opacity 0.1s cubic-bezier(0.4, 0, 0.2, 1);
       z-index: 1000;
       box-sizing: border-box;
       overflow: hidden;

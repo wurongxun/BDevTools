@@ -1,15 +1,19 @@
 // 宿主桥：纯前端插件只通过 parent.postMessage 与宿主通信。
 // P0/P1 不依赖 WASM 后端，但 RC.bridge.call() 已就绪，供后期真实传输 / KV 持久化接入。
 
-export const BRIDGE_VERSION = 1 // 必须与宿主 PLUGIN_BRIDGE_VERSION 一致
+// v2：`theme` 合并进 `context`（多了 `locale`）。宿主兼容 v1——用哪个版本发 ready 就用哪个
+// 版本回，但 v1 应答里没有 `locale`。
+export const BRIDGE_VERSION = 2 // 必须与宿主 PLUGIN_BRIDGE_VERSION 一致
 
 type Listener = (payload: any) => void
 
 class Bridge {
   runtimeWasm: boolean | null = null
+  /** 宿主当前语言（context.locale）；插件页自己带字典时按它切换 */
+  locale: string | null = null
   private seq = 0
   private pending: Record<number, { resolve: (v: any) => void; reject: (e: any) => void }> = {}
-  private listeners: Record<string, Listener[]> = { theme: [], ready: [] }
+  private listeners: Record<string, Listener[]> = { context: [], theme: [], ready: [] }
 
   post(msg: Record<string, any>): void {
     msg.v = BRIDGE_VERSION
@@ -30,8 +34,17 @@ class Bridge {
 
   handleMessage(data: any): void {
     if (!data || data.v !== BRIDGE_VERSION) return
+    // v1 页面（还活在旧协议上的插件）收到的是 theme 消息，这里一并兼容
     if (data.kind === 'theme') {
       this.runtimeWasm = data.wasm === true
+      this.emit('theme', data)
+      return
+    }
+    if (data.kind === 'context') {
+      this.runtimeWasm = data.wasm === true
+      this.locale = typeof data.locale === 'string' ? data.locale : null
+      this.emit('context', data)
+      // 同时发 theme：老订阅方不必改一次全部改完
       this.emit('theme', data)
       return
     }

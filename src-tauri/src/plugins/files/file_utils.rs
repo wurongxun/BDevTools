@@ -11,25 +11,6 @@ use std::fs;
 use std::io::Read;
 use chardetng::EncodingDetector;
 
-// 打开目录（项目）
-pub async fn file_manager_open_path(ctx: &AppContext, path: String) -> ResData<String> {
-    match ctx.open_path(&path) {
-        Ok(_) => {
-            return ResData {
-                code: 200,
-                msg: "打开项目成功".to_string(),
-                data: "".to_string(),
-            };
-        }
-        Err(e) => {
-            return ResData {
-                code: 500,
-                msg: e,
-                data: "".to_string(),
-            };
-        }
-    }
-}
 pub async fn get_document_notebooks(
     ctx: &AppContext,
     working_directory: Option<String>,

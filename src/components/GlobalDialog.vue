@@ -19,7 +19,7 @@
           ✕
         </button>
       </div>
-      <div class="dialog-body">
+      <div class="dialog-body" :style="{ maxHeight: props.bodyMaxHeight }">
         <slot />
       </div>
       <div class="dialog-footer" v-if="$slots.footer">
@@ -48,6 +48,10 @@ interface Props {
   /** 是否垂直居中；默认 true，传 false 则靠上（15vh）显示 */
   verticalCenter?: boolean
   closeOnOverlay?: boolean
+  /** 内容区最大高度；默认 60vh，编辑器类弹窗可放宽 */
+  bodyMaxHeight?: string
+  /** 关闭前钩子：返回 false 可拦截关闭（例如保存失败要用户确认） */
+  beforeClose?: () => boolean | Promise<boolean>
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -55,7 +59,8 @@ const props = withDefaults(defineProps<Props>(), {
   width: '520px',
   height: '',
   verticalCenter: true,
-  closeOnOverlay: false
+  closeOnOverlay: false,
+  bodyMaxHeight: '60vh'
 })
 
 interface Emits {
@@ -106,11 +111,14 @@ function getFocusableElements(): HTMLElement[] {
  */
 function onKeydownCapture(e: KeyboardEvent) {
   if (!dialogVisible.value) return
+  // 弹窗内又打开了更高层的 ElMessageBox（例如「保存失败，仍要关闭吗」）时，
+  // 键盘完全交给它：否则这里的捕获监听会吞掉 Esc/Tab，确认框既关不掉也切不了焦点。
+  if (document.querySelector('.el-overlay-message-box')) return
 
   if (e.key === 'Escape') {
     e.stopPropagation()
     e.preventDefault()
-    handleClose()
+    void handleClose()
     return
   }
 
@@ -170,7 +178,11 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydownCapture, true)
 })
 
-const handleClose = (): void => {
+const handleClose = async (): Promise<void> => {
+  if (props.beforeClose) {
+    const allow = await props.beforeClose()
+    if (!allow) return
+  }
   dialogVisible.value = false
 }
 </script>

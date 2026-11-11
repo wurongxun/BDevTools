@@ -1,0 +1,22 @@
+# Cargo workspace root 必须位于所有 member 的公共父目录。
+# crates/ 与 src-tauri/ 平级，member 不能写在 ../ 里（Cargo 要求 hierarchically below
+# the workspace root），所以 [workspace] 只能放仓库根，而不是 src-tauri/Cargo.toml。
+# 内置插件按 crate 拆分：未选中的插件 crate 不进入构建图（feature 见 src-tauri/Cargo.toml）。
+[workspace]
+members = [
+    "src-tauri",
+    "crates/bdevtools-core",
+    "crates/plugin-database",
+    "crates/plugin-mat",
+    "crates/plugin-logs",
+    "crates/plugin-ssh",
+]
+resolver = "2"
+
+# [profile.*] 只允许在 workspace root 声明，写在 member 里会被 Cargo 忽略并告警。
+# strip 只剥离符号，不改运行时行为，也不增加编译时间。
+# 刻意不加 panic = "abort"：MAT 依赖 catch_unwind 兜住 jvm-hprof 对未知子记录
+# （Android ART 变体）的 panic（crates/plugin-mat/src/mat_hprof.rs），abort 下会直接退出进程。
+# 也暂不加 lto：依赖里含 vendored-openssl，LTO 会明显拉长链接时间。
+[profile.release]
+strip = true

@@ -22,10 +22,12 @@
  * 能再改：tauri 的 `set_theme` 只到 tao 窗口层（标题栏 / 菜单），系统主题变化也只 emit
  * `WINDOW_THEME_CHANGED` 事件。⇒ 宿主之后切主题时，**已打开**的独立窗口不会跟着变，
  * 关掉重开才对齐。
- * 这个窗口也收不到宿主的主题广播：`web3d-*` 不在任何 capability 的 `windows` 里，`listen`
- * 会被 ACL 拒；它和宿主还**不同源**（`plugin.localhost` vs `tauri.localhost`），
- * localStorage / `storage` 事件同样传不过去。要运行期同步只能由 Rust `eval()` 注入。
- * 所以取「创建时对齐」：主题由接线层注入（见 `setHostThemeProvider`），不写死 `dark`。
+ * 这个窗口也收不到宿主的主题广播，当然也收不到语言：`web3d-*` 不在任何 capability 的
+ * `windows` 里，`listen` 会被 ACL 拒；它和宿主还**不同源**（`plugin.localhost` vs
+ * `tauri.localhost`），localStorage / `storage` 事件同样传不过去。要运行期同步只能由 Rust
+ * `eval()` 注入。
+ * 所以两者的取法都是「创建时对齐」：主题由接线层注入（见 `setHostThemeProvider`）后传给 wry，
+ * 不写死 `dark`；语言拼进 URL 的 `?lang=`，插件页用 `location.search` 读，只有初值。
  */
 import { ref } from 'vue'
 import { WebviewWindow } from '@/core/runtime'
@@ -87,6 +89,27 @@ export function setHostThemeProvider(provider: () => 'dark' | 'light'): void {
 }
 
 /**
+ * 宿主语言提供者（`AppLocale`：`zh_CN` / `zh_TW` / `en`）。
+ *
+ * 注入而不是直接 import store：与 `hostThemeProvider` 同一个理由（`core/` 不依赖 `store/`）。
+ *
+ * 用途只有一个：独立窗口没有桥（见文件头），运行期拿不到语言变更，所以语言只能**建窗时**
+ * 塞进 URL 的 `?lang=` 由插件页自己读 —— 也就是只能对齐「打开那一刻」，之后宿主切语言
+ * 它不会跟着变。这是已知边界，为此还顺手要求这类窗口保留系统装饰（不会因为丢了宿主能力
+ * 而变得拖不动/关不掉）。面板内的沙箱 iframe 不走这条路：它由桥推 `context.locale`，实时。
+ */
+let hostLocaleProvider: (() => string) | null = null
+
+/** 注入「当前宿主语言」取值函数（`main.ts` 调用一次） */
+export function setHostLocaleProvider(provider: () => string): void {
+  hostLocaleProvider = provider
+}
+
+function currentHostLocale(): string | undefined {
+  return hostLocaleProvider ? hostLocaleProvider() : undefined
+}
+
+/**
  * 建窗时用的窗口主题。
  *
  * 未注入时返回 `undefined`（＝交给系统主题），**刻意不回落成 `dark`**：漏接注入线时
@@ -127,7 +150,8 @@ export async function openPluginWindow(pluginId: string, entry: string, title: s
   }
 
   const win = new WebviewWindow(label, {
-    url: pluginAssetUrl(pluginId, entry),
+    // `?lang=` 是这个窗口唯一能拿到的宿主上下文初值（清楚原因见 setHostLocaleProvider 的注释）
+    url: pluginAssetUrl(pluginId, entry, { lang: currentHostLocale() }),
     title,
     width: 1100,
     height: 720,

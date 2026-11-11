@@ -2,4 +2,4 @@
 //!
 //! 本模块不允许引入任何 tauri / tauri_plugin_* 依赖。
 
-pub mod ctx;
+pub use bdevtools_core::ctx;

@@ -30,6 +30,7 @@
       @dragend="handleDragEnd"
       @mouseenter="showTooltip($event, doc.id)"
       @mouseleave="hideTooltip"
+      @contextmenu="onTabContextMenu($event, doc.id)"
     >
       <!-- 文件图标 -->
       <span class="tab-icon">
@@ -55,64 +56,16 @@
         </svg>
       </button>
 
-      <!-- 收纳按钮 - 显示所有文件下拉菜单 -->
-      <div class="dropdown-wrapper" ref="dropdownWrapper">
-        <button
-          class="dropdown-btn"
-          @click="toggleDropdown"
-          title="显示所有打开的文件"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M4 6h8M4 8h8M4 10h8" stroke="currentColor" stroke-width="1.5"/>
-          </svg>
-        </button>
-
-        <!-- 下拉菜单 -->
-        <div
-          v-show="showDropdown"
-          class="dropdown-menu"
-          :style="dropdownStyle"
-        >
-          <div class="dropdown-header">
-            <span>打开的文件 ({{ documentList.length }})</span>
-            <button
-              v-if="documentList.length > 1"
-              class="close-all-btn"
-              @click="closeAllTabs"
-              title="关闭全部"
-            >
-              关闭全部
-            </button>
-          </div>
-          <div class="dropdown-list">
-            <div
-              v-for="doc in documentList"
-              :key="doc.id"
-              class="dropdown-item"
-              :class="{
-                'dropdown-item-active': doc.id === activeDocumentId,
-                'dropdown-item-modified': doc.isDirty
-              }"
-              @click="selectFromDropdown(doc.id)"
-            >
-              <span class="dropdown-icon">
-                <FileIcon :type="doc.type" />
-              </span>
-              <span class="dropdown-name">{{ doc.name }}</span>
-              <span v-if="doc.isDirty" class="dropdown-dirty">●</span>
-              <button
-                class="dropdown-close"
-                @click.stop="closeFromDropdown(doc.id)"
-                title="关闭"
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                  <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- 收纳菜单：复用宿主 TabBarOverflowMenu（M3 移除 files 自建的第二套下拉） -->
+      <TabBarOverflowMenu
+        :items="overflowItems"
+        :active-id="activeDocumentId || ''"
+        button-title="显示所有打开的文件"
+        header-label="打开的文件"
+        @select="selectFromOverflow"
+        @close="closeFromOverflow"
+        @close-all="closeAllTabs"
+      />
 
       <!-- Tooltip 提示框 -->
       <div
@@ -128,23 +81,42 @@
   <!-- 关闭全部确认（Tauri WebView2 不支持原生 confirm，统一走 GlobalDialog） -->
   <GlobalDialog v-model="showCloseAllConfirm" title="关闭全部" width="400px">
     <div class="close-all-message">
-      确定要关闭所有打开的文件吗？未保存的更改会先自动保存。
+      确定要关闭所有打开的文件吗？<template v-if="dirtyCount > 0">其中有 {{ dirtyCount }} 个文件有未保存的更改，会一并保存。</template>
     </div>
     <template #footer>
       <app-button size="small" @click="showCloseAllConfirm = false">取消</app-button>
       <app-button size="small" type="danger" plain @click="confirmCloseAllTabs">全部关闭</app-button>
     </template>
   </GlobalDialog>
+
+  <!-- 单个文档关闭确认：禁止「关闭即静默写回」，由用户显式选择 -->
+  <GlobalDialog v-model="showCloseConfirm" title="未保存的更改" width="420px">
+    <div class="close-all-message">
+      「{{ pendingCloseName }}」有未保存的更改，请选择如何处理。
+    </div>
+    <template #footer>
+      <app-button size="small" @click="cancelPendingClose">取消</app-button>
+      <app-button size="small" plain @click="discardAndClose">不保存</app-button>
+      <app-button size="small" type="primary" @click="saveAndClose">保存并关闭</app-button>
+    </template>
+  </GlobalDialog>
 </template>
 
 <script setup lang="ts">
-import { useDocumentManagerStore } from '../store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { TabBarContainer, TabBarItem, TabCloseButton } from '@/components/TabBar'
+import { TabBarContainer, TabBarItem, TabCloseButton, TabBarOverflowMenu } from '@/components/TabBar'
 import FileIcon from './FileIcon.vue'
 import GlobalDialog from '@/components/GlobalDialog.vue'
+import { showContextMenu } from '@/components/context-menu/useContextMenu'
+import { call } from '@/api/rpc'
+import NotificationUtil from '@/utils/NotificationUtil'
+import { openSearchPanel } from '../search/useFileSearch'
+import { useSplitView } from '../view/useSplitView'
+import { openInTerminal, runCurrentFile } from '../terminal/useTerminalLaunch'
 
 const docStore = useDocumentManagerStore();
+const split = useSplitView()
 
 // 「关闭全部」确认弹窗
 const showCloseAllConfirm = ref(false)
@@ -153,9 +125,6 @@ const showCloseAllConfirm = ref(false)
 const tabBarContainer = ref<InstanceType<typeof TabBarContainer> | null>(null)
 const canScrollLeft = ref(false)
 const canScrollRight = ref(false)
-const showDropdown = ref(false)
-const dropdownWrapper = ref<HTMLElement | null>(null)
-const dropdownStyle = ref<any>({})
 
 // Tooltip 相关
 const tooltipVisible = ref(false)
@@ -166,6 +135,16 @@ let tooltipTimer: number | null = null
 // 计算属性
 const documentList = computed(() => docStore.documentList)
 const activeDocumentId = computed(() => docStore.activeDocumentPath)
+
+/** 宿主收纳菜单只吃展示数据，关闭/激活的业务语义仍由本组件决定。 */
+const overflowItems = computed(() =>
+  documentList.value.map((doc) => ({
+    id: doc.id,
+    label: doc.name,
+    title: doc.id,
+    dirty: !!doc.isDirty
+  }))
+)
 
 /**
  * 按文档 id 取标签页的真实 DOM 节点。
@@ -217,15 +196,118 @@ function hideTooltip() {
   tooltipVisible.value = false
 }
 
-// 处理标签页点击
+// 处理标签页点击：分屏时把文档放进当前 pane（同路径双开会被 useSplitView 拒绝）
 function handleTabClick(docId: string) {
-  docStore.setActiveDocument(docId)
+  split.activateDocument(docId)
   scrollToTab(docId)
+}
+
+// ===== 关闭前确认：禁止「关闭即静默写回」，由用户显式选择 =====
+const showCloseConfirm = ref(false)
+const pendingCloseId = ref<string | null>(null)
+const pendingCloseName = computed(() => {
+  if (!pendingCloseId.value) return ''
+  return docStore.documents.get(pendingCloseId.value)?.name || ''
+})
+const dirtyCount = computed(() => documentList.value.filter(d => d.isDirty).length)
+
+/** 标签右键菜单：复用宿主 showContextMenu（Tauri WebView2 已屏蔽原生右键菜单）。 */
+function onTabContextMenu(e: MouseEvent, docId: string) {
+  e.preventDefault()
+  hideTooltip()
+  showContextMenu({
+    x: e.clientX,
+    y: e.clientY,
+    items: [
+      { label: '关闭', onClick: () => requestClose(docId) },
+      { label: '关闭其他', onClick: () => docStore.closeOtherDocuments(docId) },
+      {
+        label: '关闭全部',
+        onClick: () => { showCloseAllConfirm.value = true }
+      },
+      { divider: true },
+      { label: '在右侧分屏打开', onClick: () => split.openInRightPane(docId) },
+      {
+        label: '与当前文件比较',
+        onClick: () => {
+          const current = docStore.activeDocumentPath || ''
+          if (!current || current === docId) {
+            NotificationUtil.warn('请先激活另一份文件再比较')
+            return
+          }
+          split.openDiff(current, docId)
+        }
+      },
+      { label: '复制路径', onClick: () => void copyTabPath(docId) },
+      { label: '在文件管理器中显示', onClick: () => void revealTabPath(docId) },
+      { label: '在集成终端打开所在目录', onClick: () => { openInTerminal(docId) } },
+      { label: '在集成终端运行当前脚本', onClick: () => { runCurrentFile(docId) } },
+      { divider: true },
+      { label: '在文件中查找', onClick: () => openSearchPanel() }
+    ]
+  })
+}
+
+async function copyTabPath(docId: string) {
+  try {
+    await navigator.clipboard.writeText(docId)
+  } catch {
+    // WebView2 下 clipboard API 可能不可用，退回 execCommand（与 logs LogTabs 同范式）
+    const ta = document.createElement('textarea')
+    ta.value = docId
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    ta.remove()
+  }
+  NotificationUtil.success('已复制文件路径')
+}
+
+async function revealTabPath(docId: string) {
+  try {
+    const res = await call<{ code: number; msg: string }>('file_manager_open_path', { path: docId })
+    if (res?.code !== 200) NotificationUtil.error(res?.msg || '打开所在目录失败')
+  } catch (e: any) {
+    console.error('[files/tabs] 打开所在目录失败', e)
+    NotificationUtil.error(e?.message || '打开所在目录失败')
+  }
+}
+
+function requestClose(docId: string) {
+  const doc = docStore.documents.get(docId)
+  if (doc?.isDirty) {
+    pendingCloseId.value = docId
+    showCloseConfirm.value = true
+    return
+  }
+  docStore.closeDocument(docId)
+}
+
+function cancelPendingClose() {
+  showCloseConfirm.value = false
+  pendingCloseId.value = null
+}
+
+function discardAndClose() {
+  const id = pendingCloseId.value
+  cancelPendingClose()
+  if (id) docStore.closeDocument(id, { skipSave: true })
+}
+
+async function saveAndClose() {
+  const id = pendingCloseId.value
+  if (!id) { cancelPendingClose(); return }
+  const ok = await docStore.saveDocument(id)
+  cancelPendingClose()
+  // 已显式保存，关闭时跳过 store 里那条历史自动保存
+  if (ok) docStore.closeDocument(id, { skipSave: true })
 }
 
 // 处理标签页关闭
 function handleTabClose(docId: string) {
-  docStore.closeDocument(docId)
+  // 关闭标签页  Tooltip也同时关闭
+  hideTooltip()
+  requestClose(docId)
 }
 
 // 获取 tab 列表容器
@@ -287,44 +369,14 @@ function updateScrollButtons() {
   canScrollRight.value = scrollLeft + clientWidth < scrollWidth - 1
 }
 
-// 切换下拉菜单
-function toggleDropdown() {
-  showDropdown.value = !showDropdown.value
-  if (showDropdown.value) {
-    calculateDropdownPosition()
-  }
-}
-
-// 计算下拉菜单位置
-function calculateDropdownPosition() {
-  nextTick(() => {
-    const wrapper = dropdownWrapper.value
-    if (!wrapper) return
-
-    const rect = wrapper.getBoundingClientRect()
-    const menuWidth = Math.min(350, window.innerWidth - rect.right - 20)
-
-    dropdownStyle.value = {
-      right: '0',
-      top: `${rect.bottom}px`,
-      maxWidth: `${menuWidth}px`
-    }
-  })
-}
-
-// 从下拉菜单选择文件
-function selectFromDropdown(docId: string) {
-  docStore.setActiveDocument(docId)
-  showDropdown.value = false
+// 宿主收纳菜单的三个意图上报：激活 / 关闭单个 / 关闭全部
+function selectFromOverflow(docId: string) {
+  split.activateDocument(docId)
   scrollToTab(docId)
 }
 
-// 从下拉菜单关闭文件
-function closeFromDropdown(docId: string) {
-  docStore.closeDocument(docId)
-  if (documentList.value.length === 0) {
-    showDropdown.value = false
-  }
+function closeFromOverflow(docId: string) {
+  requestClose(docId)
 }
 
 // 关闭所有标签页（先弹确认，避免误触；确认后走批量关闭，快照只同步一次）
@@ -332,20 +384,12 @@ function closeAllTabs() {
   showCloseAllConfirm.value = true
 }
 
-function confirmCloseAllTabs() {
+async function confirmCloseAllTabs() {
   showCloseAllConfirm.value = false
+  // 用户点「全部关闭」即授权保存全部脏文档；显式保存后再关闭，避免 store 里那条兜底自动保存
+  if (dirtyCount.value > 0) await docStore.saveAllDocuments()
   docStore.closeAllDocuments()
-  showDropdown.value = false
-}
-
-// 点击外部关闭下拉菜单
-function handleClickOutside(event: MouseEvent) {
-  if (!showDropdown.value) return
-
-  const target = event.target as HTMLElement
-  if (!target.closest('.dropdown-wrapper')) {
-    showDropdown.value = false
-  }
+  split.disableSplit()
 }
 
 // 监听文档列表变化，自动滚动到新激活的标签页
@@ -363,11 +407,6 @@ onMounted(() => {
     updateScrollButtons()
   }
 
-  // 添加全局点击事件监听
-  document.addEventListener('click', handleClickOutside)
-
-  // 窗口大小改变时重新计算菜单位置
-  window.addEventListener('resize', calculateDropdownPosition)
 })
 
 onUnmounted(() => {
@@ -375,9 +414,6 @@ onUnmounted(() => {
   if (container) {
     container.removeEventListener('scroll', updateScrollButtons)
   }
-
-  document.removeEventListener('click', handleClickOutside)
-  window.removeEventListener('resize', calculateDropdownPosition)
 
   // 清理 tooltip 定时器
   if (tooltipTimer) {
@@ -526,224 +562,6 @@ function handleDragEnd() {
   color: #e2b714;
   font-size: theme.getVar('fontSizeLg');
   line-height: 1;
-}
-
-/* 下拉菜单包装器 */
-.dropdown-wrapper {
-  position: relative;
-  flex-shrink: 0;
-}
-
-/* 下拉按钮 */
-.dropdown-btn {
-  width: 32px;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #2d2d2d;
-  border: none;
-  border-left: 1px solid #1e1e1e;
-  color: #cccccc;
-  cursor: pointer;
-  transition: background-color 0.2s;
-
-  @include theme.useTheme {
-     background-color: color.adjust(theme.getVar('bgColor'), $lightness:5%);
-    border-left-color: theme.getVar('borderColor');
-    color: theme.getVar('textColor');
-  }
-}
-
-.dropdown-btn:hover {
-  background-color: #3e3e3e;
-  color: #ffffff;
-
-  @include theme.useTheme {
-     background-color: color.adjust(theme.getVar('bgColor'), $lightness:10%);
-    color: theme.getVar('textColor');
-  }
-}
-
-/* 下拉菜单 */
-.dropdown-menu {
-  position: fixed;
-  background-color: #252526;
-  border: 1px solid #3e3e3e;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
-  max-height: calc(100vh - 100px);
-  display: flex;
-  flex-direction: column;
-  animation: dropdownFadeIn 0.15s ease-out;
-
-  @include theme.useTheme {
-    background-color: theme.getVar('bgColor');
-    border-color: theme.getVar('borderColor');
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  }
-}
-
-@keyframes dropdownFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 下拉菜单头部 */
-.dropdown-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background-color: #2d2d2d;
-  border-bottom: 1px solid #1e1e1e;
-  font-size: theme.getVar('fontSizeSmall');
-  color: #cccccc;
-  font-weight: 500;
-
-  @include theme.useTheme {
-     background-color: color.adjust(theme.getVar('bgColor'), $lightness:5%);
-    border-bottom-color: theme.getVar('borderColor');
-    color: theme.getVar('textColor');
-  }
-}
-
-/* 关闭全部按钮 */
-.close-all-btn {
-  padding: 2px 8px;
-  background: transparent;
-  border: 1px solid #3e3e3e;
-  border-radius: var(--radius-sm);
-  color: #cccccc;
-  font-size: theme.getVar('fontSizeSm');
-  cursor: pointer;
-  transition: all 0.15s;
-
-  @include theme.useTheme {
-    border-color: theme.getVar('borderColor');
-    color: theme.getVar('textColor');
-  }
-}
-
-.close-all-btn:hover {
-  background-color: #c42b1c;
-  border-color: #c42b1c;
-  color: #ffffff;
-}
-
-/* 下拉列表 */
-.dropdown-list {
-  overflow-y: auto;
-  overflow-x: hidden;
-  max-height: 400px;
-}
-
-/* 下拉项 */
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: background-color 0.15s;
-  border-bottom: 1px solid #1e1e1e;
-
-  @include theme.useTheme {
-    border-bottom-color: theme.getVar('borderColor');
-  }
-}
-
-.dropdown-item:last-child {
-  border-bottom: none;
-}
-
-.dropdown-item:hover {
-  background-color: #2a2d2e;
-
-  @include theme.useTheme {
-     background-color: color.adjust(theme.getVar('bgColor'), $lightness:8%);
-  }
-}
-
-// 激活项高亮统一走主题令牌 hoverColor（与菜单 hover、活动栏一致），
-// 不再硬编码 VS Code 蓝 #094771/#0e5f94（审查报告 #22：亮色主题下同样生效、与浅色体系冲突）
-.dropdown-item-active {
-  @include theme.useTheme {
-    background-color: theme.getVar('hoverColor');
-    color: theme.getVar('textColor');
-  }
-}
-
-.dropdown-item-active:hover {
-  @include theme.useTheme {
-    background-color: theme.getVar('activityBarHover');
-    color: theme.getVar('textColor');
-  }
-}
-
-/* 下拉项图标 */
-.dropdown-icon {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 下拉项名称 */
-.dropdown-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: theme.getVar('fontSize');
-}
-
-/* 下拉项修改指示器 */
-.dropdown-dirty {
-  flex-shrink: 0;
-  color: #e2b714;
-  font-size: theme.getVar('fontSize');
-}
-
-/* 下拉项关闭按钮：命中区 24×24（WCAG 2.5.8），始终可见以保证键盘/触屏可发现（审查报告 #26） */
-.dropdown-close {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background-color 0.15s;
-
-  @include theme.useTheme {
-    color: theme.getVar('textSecondary');
-  }
-}
-
-.dropdown-item:hover .dropdown-close {
-  opacity: 1;
-}
-
-.dropdown-close:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-
-  @include theme.useTheme {
-    background-color: rgba(255, 255, 255, 0.15);
-    color: theme.getVar('textColor');
-  }
 }
 
 /* Tooltip 提示框样式 */

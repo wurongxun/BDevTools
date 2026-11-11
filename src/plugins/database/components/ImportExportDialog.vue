@@ -5,9 +5,13 @@
     width="480px"
     @close="handleClose"
   >
-    <el-form label-width="150px">
+    <!--
+      label-width 与底部「导出查询结果」弹窗**刻意一致**（100px）：
+      两个弹窗长得像一套，才不会让人以为是两个软件拼起来的。
+    -->
+    <el-form label-width="100px">
       <el-form-item label="目标表">
-        <span>{{ table }}</span>
+        <span class="form-static mono">{{ database ? `${database}.${table}` : table }}</span>
       </el-form-item>
 
       <template v-if="mode === 'export'">
@@ -18,10 +22,12 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="保存路径">
-          <div class="path-field">
-            <el-input v-model="exportPath" small placeholder="选择文件保存路径" />
-            <app-button bare :icon="FolderOpened" title="浏览" aria-label="浏览保存路径" @click="chooseExportPath" />
-          </div>
+          <PathField
+            v-model="exportPath"
+            placeholder="选择文件保存路径"
+            browse-label="浏览保存路径"
+            @browse="chooseExportPath"
+          />
         </el-form-item>
       </template>
 
@@ -33,10 +39,12 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="选择文件">
-          <div class="path-field">
-            <el-input v-model="importPath" placeholder="选择要导入的文件" />
-            <app-button bare :icon="FolderOpened" title="浏览" aria-label="浏览导入文件" @click="chooseImportFile" />
-          </div>
+          <PathField
+            v-model="importPath"
+            placeholder="选择要导入的文件"
+            browse-label="浏览导入文件"
+            @browse="chooseImportFile"
+          />
         </el-form-item>
         <el-form-item v-if="importFormat === 'csv'" label="包含表头">
           <el-switch v-model="hasHeader" />
@@ -44,16 +52,35 @@
       </template>
     </el-form>
 
+    <div class="dialog-note">
+      {{
+        mode === 'export'
+          ? '导出由后端整表读取后写文件，不受网格分页影响。'
+          : '导入逐行 INSERT，某一行失败不会回滚已成功的行；错误最多列前 10 条。'
+      }}
+    </div>
+
     <div v-if="importResult" class="import-result">
-      <el-alert :title="`导入完成: 成功 ${importResult.success_count} 行, 失败 ${importResult.error_count} 行`" type="info" />
+      <div class="result-title">导入结果</div>
+      <el-alert
+        :title="`成功 ${importResult.success_count} 行，失败 ${importResult.error_count} 行`"
+        :type="importResult.error_count > 0 ? 'warning' : 'success'"
+        :closable="false"
+      />
       <div v-if="importResult.errors.length > 0" class="error-list">
         <div v-for="(err, idx) in importResult.errors" :key="idx" class="error-item">{{ err }}</div>
       </div>
     </div>
 
     <template #footer>
-      <app-button size="small" @click="handleClose">关闭</app-button>
-      <app-button size="small" type="primary" @click="handleExecute" :loading="executing" :disabled="mode === 'import' && !importPath">
+      <app-button size="small" @click="handleClose">取消</app-button>
+      <app-button
+        size="small"
+        type="primary"
+        :loading="executing"
+        :disabled="!canExecute"
+        @click="handleExecute"
+      >
         {{ mode === 'export' ? '导出' : '导入' }}
       </app-button>
     </template>
@@ -61,10 +88,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { FolderOpened } from '@element-plus/icons-vue'
 import GlobalDialog from '@/components/GlobalDialog.vue'
+import PathField from './PathField.vue'
 import { save } from '@/core/runtime'
 import { open } from '@/core/runtime'
 import { dbExportCsv, dbExportExcel, dbImportCsv, dbImportExcel } from '../api/importExport'
@@ -81,6 +108,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
 }>()
+
+/** 主动作能不能点：路径没选就禁用，比「点了弹一句请选择」体面 */
+const canExecute = computed(() =>
+  props.mode === 'export' ? !!exportPath.value : !!importPath.value
+)
 
 const visible = ref(false)
 const executing = ref(false)
@@ -153,24 +185,28 @@ function handleClose() {
 </script>
 
 <style scoped>
-.path-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
+/* 说明性文字：与表单区隔开，别跟输入项抢注意力 */
+.form-static {
+  font-size: var(--font-size-md);
+  color: var(--el-text-color-primary);
 }
-/* el-input 自带 width:100%，在 flex 行里必须交出宽度控制权，
-   否则占满整行把浏览按钮挤到下一行（外层 el-form-item__content 是 flex-wrap:wrap） */
-.path-field :deep(.el-input) {
-  flex: 1;
-  min-width: 0;
+.mono {
+  font-family: var(--font-family-mono);
 }
-/* 浏览按钮是固定 22×22 图标按钮，禁止被压缩 */
-.path-field :deep(.el-button) {
-  flex: none;
+.dialog-note {
+  margin-top: 12px;
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
 }
 .import-result {
   margin-top: 12px;
+}
+.result-title {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--el-text-color-primary);
 }
 .error-list {
   margin-top: 8px;
@@ -184,7 +220,7 @@ function handleClose() {
 .error-item {
   font-size: var(--font-size-base);
   /* 错误文字用 EP danger（light=#f56c6c / dark 已注入），跟随主题 */
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   line-height: 1.6;
 }
 </style>

@@ -66,7 +66,7 @@
                   tabindex="-1"
                   aria-disabled="true"
                 >
-                  <span class="option-label">暂无记录</span>
+                  <span class="option-label">{{ t('menu.noRecent') }}</span>
                 </div>
                 <div
                   v-for="(subItem, subIdx) in item.submenu"
@@ -88,7 +88,7 @@
                   tabindex="-1"
                   @click.stop="handleMenuCommand({ label: '清除最近文件夹', command: 'clearRecentProjects' })"
                 >
-                  <span class="option-label">清除最近文件夹</span>
+                  <span class="option-label">{{ t('menu.clearRecent') }}</span>
                 </div>
               </div>
             </div>
@@ -104,6 +104,7 @@
             >
               <span class="option-label">{{ item.label }}</span>
               <span v-if="item.shortcut" class="option-shortcut">{{ item.shortcut }}</span>
+              <span v-if="item.checked" class="option-check" aria-hidden="true">✓</span>
             </div>
           </template>
         </div>
@@ -126,28 +127,35 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { load, Store } from '@/core/runtime'
+import { useI18n } from 'vue-i18n'
+import { load, Store, checkUpdate } from '@/core/runtime'
+import { settingsRequestedTab } from '@/core/settingsNavigation'
 import { invoke } from '@/api/rpc'
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/Types/entitys'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { changeWorkspace } from '@/utils/index'
 import { useWorkspaceStore } from '@/store/modules/workspace'
+import { useLanguageSwitch, LANGUAGE_OPTIONS } from '@/composables/useLanguageSwitch'
+import type { AppLocale } from '@/locales'
 import WorkspaceManageDialog from '@/components/WorkspaceManageDialog.vue'
 import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
 
 import { get_file_Api } from '@/api/file'
 import useStore from '@/store'
-import { useDocumentManagerStore } from '@/plugins/files/store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 import { subscribe } from '@/core/runtime'
 import { WINDOW_PRESETS_CHANGED_EVENT } from '@/core/windowPresets'
 import { openAppWindow, createEditorWindow, createPresetWindow } from '@/utils/WindowUtils'
 import { pluginManager } from '@/core/pluginManager'
+import { openCommandPalette } from '@/composables/useCommandPalette'
 import type { WindowPresetConfig } from '@/utils/WindowUtils'
 import type { WindowMeta } from '@/Types/workspace'
 const {fileTreeStore,useLayoutStore } = useStore()
 const workspaceStore = useWorkspaceStore()
 const docStore = useDocumentManagerStore()
+const { currentLanguage, switchLanguage } = useLanguageSwitch()
+const { t } = useI18n()
 const activeMenu = ref<string | null>(null)
 const activeSubmenu = ref<string | null>(null)
 const showWorkspaceDialog = ref(false)
@@ -160,6 +168,8 @@ interface MenuItem {
   disabled?: boolean
   command: string
   submenu?: MenuItem[]
+  /** 语言菜单用：当前选中的语言项打勾 */
+  checked?: boolean
 }
 
 interface Menu {
@@ -172,7 +182,7 @@ interface Menu {
 const windowPresets = ref<WindowPresetConfig[]>([])
 const mainWindowPreset = ref<WindowPresetConfig>({
   id: 'main',
-  name: '主窗口',
+  name: t('menu.mainWindow'),
   enabledPlugins: [],
   width: 960,
   height: 640,
@@ -191,6 +201,22 @@ const hasFilesPlugin = computed(() => {
 })
 
 
+/** 结果落在 files 插件的菜单命令：执行前先切过去，否则打开的文件 / 目录变化看不见 */
+const FILE_MENU_COMMANDS = new Set(['openFile', 'openWorkingDirectory', 'openRecentProject'])
+
+/**
+ * 跳到 files 插件：打开的文件由它的主面板（编辑器）承载，选中的目录由它的侧栏（文件树）呈现。
+ * 侧栏收起时顺带展开 —— 与活动栏点击插件的行为一致，否则「跳转」只剩图标高亮、文件树仍不可见。
+ * 本窗口未启用或当前构建未注册 files 插件时保持原状，避免把别的插件面板误展开。
+ */
+function switchToFilesPlugin() {
+  if (!hasFilesPlugin.value || !pluginManager.hasPlugin('files')) return
+  pluginManager.switchTool('files')
+  if (useLayoutStore.sidebarPanelCollapsed) {
+    useLayoutStore.setSidebarPanelCollapsed(false)
+  }
+}
+
 // ===== 最近文件夹 =====
 // 统一从当前工作区的 folders 获取（打开文件夹时由 workspace store 置顶写入），不再单独维护
 const recentProjectDirs = computed(() => workspaceStore.currentFolders ?? [])
@@ -206,8 +232,8 @@ const menus = computed<Menu[]>(() => {
   const fileItems: MenuItem[] = []
 
   if (hasFilesPlugin.value) {
-    fileItems.push({ label: '打开文件', shortcut: 'Ctrl+O', command: 'openFile' })
-    fileItems.push({ label: '打开文件夹', shortcut: 'Ctrl+Shift+O', command: 'openWorkingDirectory' })
+    fileItems.push({ label: t('menu.openFile'), shortcut: 'Ctrl+O', command: 'openFile' })
+    fileItems.push({ label: t('menu.openFolder'), shortcut: 'Ctrl+Shift+O', command: 'openWorkingDirectory' })
 
     // 最近文件夹子菜单（来源于当前工作区 folders）
     const submenuItems: MenuItem[] = recentProjectDirs.value.map(p => ({
@@ -217,7 +243,7 @@ const menus = computed<Menu[]>(() => {
     } as MenuItem & { _dirPath: string }))
 
     fileItems.push({
-      label: '最近的文件夹',
+      label: t('menu.recentFolders'),
       command: 'recentProjects',
       submenu: submenuItems
     })
@@ -232,10 +258,12 @@ const menus = computed<Menu[]>(() => {
   fileItems.push({ divider: true, label: '', command: '' })
 
   // 工作区菜单项
-  fileItems.push({ label: '打开工作区', command: 'openWorkspace' })
-  fileItems.push({ label: '更换工作文件夹', shortcut: 'Ctrl+Shift+O', command: 'openWorkingDirectory' })
+  fileItems.push({ label: t('menu.openWorkspace'), command: 'openWorkspace' })
+  fileItems.push({ label: t('menu.changeWorkFolder'), shortcut: 'Ctrl+Shift+O', command: 'openWorkingDirectory' })
 
-  fileItems.push({ label: '设置', command: 'settings' })
+  // 命令面板：统一唤起插件贡献的命令（插件间不互相 import，只通过命令表交互）
+  fileItems.push({ label: t('menu.commandPalette'), shortcut: 'Ctrl+Shift+P', command: 'commandPalette' })
+  fileItems.push({ label: t('menu.settings'), command: 'settings' })
 
   // 窗口菜单项：列出所有配置的窗口预设
   const windowItems: MenuItem[] = allWindowPresets.value.map(preset => ({
@@ -243,16 +271,37 @@ const menus = computed<Menu[]>(() => {
     command: `window_preset_${preset.id}`
   }))
   windowItems.push({ divider: true, label: '', command: '' })
-  windowItems.push({ label: '新建窗口', shortcut: 'Ctrl+Shift+N', command: 'newWindow' })
+  windowItems.push({ label: t('menu.newWindow'), shortcut: 'Ctrl+Shift+N', command: 'newWindow' })
+
+  // 语言切换菜单：与设置页共用 useLanguageSwitch 同一套切换逻辑
+  const languageItems: MenuItem[] = LANGUAGE_OPTIONS.map(opt => ({
+    label: t(opt.labelKey),
+    command: `lang_${opt.value}`,
+    checked: opt.value === currentLanguage.value
+  }))
 
   return [
     {
-      label: '文件(F)',
+      label: `${t('menu.file')}(F)`,
       items: fileItems
     },
     {
-      label: '窗口(W)',
+      label: `${t('locale.language')}(L)`,
+      items: languageItems
+    },
+    {
+      label: `${t('menu.window')}(W)`,
       items: windowItems
+    },
+    {
+      label: `${t('menu.aboutMenu')}(A)`,
+      items: [
+        { label: t('menu.aboutApp'), command: 'aboutApp' },
+        { divider: true, label: '', command: '' },
+        { label: t('menu.checkUpdate'), command: 'checkUpdate' },
+        { divider: true, label: '', command: '' },
+        { label: t('menu.quitApp'), command: 'quitApp' }
+      ]
     }
   ]
 })
@@ -272,15 +321,15 @@ const pendingNameAction = ref<'file' | 'folder'>('file')
 
 /** 文件名/文件夹名校验：拦截空值与 Windows 非法字符 */
 function validateName(value: string): string | true {
-  if (!value) return '名称不能为空'
-  if (/[\\/:*?"<>|]/.test(value)) return '名称不能包含 \\ / : * ? " < > | 字符'
+  if (!value) return t('menu.nameEmpty')
+  if (/[\\/:*?"<>|]/.test(value)) return t('menu.nameInvalid')
   return true
 }
 
 async function handleNameConfirm(name: string) {
   const dir = await getWorkingDirectory()
   if (!dir) {
-    NotificationUtil.warn('请先选择工作目录')
+    NotificationUtil.warn(t('menu.warnSelectDir'))
     return
   }
   if (pendingNameAction.value === 'file') {
@@ -289,10 +338,10 @@ async function handleNameConfirm(name: string) {
       new_note_md_file_name: name
     })
     if (res?.code === 200) {
-      NotificationUtil.success('文件创建成功')
+      NotificationUtil.success(t('menu.fileCreated'))
       await get_file_Api()
     } else {
-      NotificationUtil.error(res?.msg || '创建失败')
+      NotificationUtil.error(res?.msg || t('menu.createFailed'))
     }
   } else {
     const res = await tauri_request<ResponseData<string>>('create_folder', {
@@ -300,11 +349,32 @@ async function handleNameConfirm(name: string) {
       new_folder_name: name
     })
     if (res?.code === 200) {
-      NotificationUtil.success('文件夹创建成功')
+      NotificationUtil.success(t('menu.folderCreated'))
       await get_file_Api()
     } else {
-      NotificationUtil.error(res?.msg || '创建失败')
+      NotificationUtil.error(res?.msg || t('menu.createFailed'))
     }
+  }
+}
+
+/**
+ * 菜单「检查更新」：与设置页共用 `checkUpdate`（同一事实源），这里只做即时反馈；
+ * 发现新版本时切到设置插件的「应用」分区，下载安装仍由那边的更新卡片负责。
+ */
+async function checkForAppUpdate() {
+  try {
+    const result = await checkUpdate()
+    if (result) {
+      NotificationUtil.success(t('settingsPlugin.general.updateFoundToast', { version: result.version || '' }))
+      settingsRequestedTab.value = 'app'
+      pluginManager.switchTool('settings')
+    } else {
+      NotificationUtil.info(t('settingsPlugin.general.upToDate'))
+    }
+  } catch (e) {
+    NotificationUtil.error(t('settingsPlugin.general.checkUpdateFailed', {
+      msg: e instanceof Error ? e.message : String(e)
+    }))
   }
 }
 
@@ -322,17 +392,26 @@ const handleMenuCommand = async (item: MenuItem) => {
   if (openedMenuIndex >= 0) nextTick(() => focusTopMenu(openedMenuIndex))
   if (item.disabled) return
 
+  // 语言切换：lang_{locale} 命令统一走 useLanguageSwitch
+  if (item.command.startsWith('lang_')) {
+    await switchLanguage(item.command.slice(5) as AppLocale)
+    return
+  }
+
+  // 打开文件 / 打开文件夹 / 最近文件夹统一先落到 files 插件，再弹选择框（对话框期间视图已就位）
+  if (FILE_MENU_COMMANDS.has(item.command)) switchToFilesPlugin()
+
   switch (item.command) {
     case 'newFile': {
       const dir = await getWorkingDirectory()
       if (!dir) {
-        NotificationUtil.warn('请先选择工作目录')
+        NotificationUtil.warn(t('menu.warnSelectDir'))
         return
       }
       // 用项目内输入弹窗替代浏览器原生 prompt()：可主题化、可校验
       pendingNameAction.value = 'file'
-      namePromptTitle.value = '新建文件'
-      namePromptMessage.value = `将在 ${dir} 下创建文件`
+      namePromptTitle.value = t('menu.newFileTitle')
+      namePromptMessage.value = t('menu.newFileMessage', { dir })
       showNamePrompt.value = true
       break
     }
@@ -378,19 +457,19 @@ const handleMenuCommand = async (item: MenuItem) => {
       // 清空当前工作区的 folders（最近文件夹列表随工作区 folders 统一管理）
       await workspaceStore.updateCurrentWorkspace({ folders: [] })
       await workspaceStore.loadAllWorkspaces()
-      NotificationUtil.success('已清除最近文件夹')
+      NotificationUtil.success(t('menu.recentCleared'))
       break
     }
 
     case 'newFolder': {
       const dir = await getWorkingDirectory()
       if (!dir) {
-        NotificationUtil.warn('请先选择工作目录')
+        NotificationUtil.warn(t('menu.warnSelectDir'))
         return
       }
       pendingNameAction.value = 'folder'
-      namePromptTitle.value = '新建文件夹'
-      namePromptMessage.value = `将在 ${dir} 下创建文件夹`
+      namePromptTitle.value = t('menu.newFolderTitle')
+      namePromptMessage.value = t('menu.newFolderMessage', { dir })
       showNamePrompt.value = true
       break
     }
@@ -407,13 +486,37 @@ const handleMenuCommand = async (item: MenuItem) => {
       pluginManager.switchTool('settings')
       break
     }
+    case 'commandPalette': {
+      openCommandPalette()
+      break
+    }
     case 'encodingUtf8':
     case 'encodingGbk':
     case 'encodingUtf16':
     case 'encodingAscii': {
       const encoding = item.label
       window.dispatchEvent(new CustomEvent('encoding-change', { detail: { encoding } }))
-      NotificationUtil.success(`编码已切换为 ${encoding}`)
+      NotificationUtil.success(t('menu.encodingChanged', { encoding }))
+      break
+    }
+    case 'aboutApp': {
+      // 关于：直达设置插件的「关于」分区，不再另开独立窗口
+      settingsRequestedTab.value = 'about'
+      pluginManager.switchTool('settings')
+      break
+    }
+    case 'checkUpdate': {
+      await checkForAppUpdate()
+      break
+    }
+    case 'quitApp': {
+      // 与托盘「退出」同一入口：app.exit(0) 走 ExitRequested，绕过主窗口 close-to-tray
+      try {
+        await invoke('quit_app')
+      } catch (e) {
+        console.warn('退出应用失败:', e)
+        NotificationUtil.error(t('menu.quitAppFailed'))
+      }
       break
     }
     case 'help': {
@@ -428,9 +531,9 @@ const handleMenuCommand = async (item: MenuItem) => {
       // 不传工作区 ID，新窗口启动时弹窗让用户选择工作区或新建临时工作区
       const meta = await createEditorWindow()
       if (meta) {
-        NotificationUtil.success(`编辑器窗口已创建: ${meta.label}`)
+        NotificationUtil.success(t('menu.windowCreated', { label: meta.label }))
       } else {
-        NotificationUtil.error('创建编辑器窗口失败，请查看控制台日志')
+        NotificationUtil.error(t('menu.createEditorWindowFailed'))
       }
       break
     }
@@ -460,7 +563,7 @@ async function loadWindowPresets() {
   }
   const mainVal = await store.get<WindowPresetConfig>('main_window_preset')
   if (mainVal) {
-    mainWindowPreset.value = { ...mainVal, id: 'main', name: mainVal.name || '主窗口' }
+    mainWindowPreset.value = { ...mainVal, id: 'main', name: mainVal.name || t('menu.mainWindow') }
   }
 }
 
@@ -479,13 +582,13 @@ async function handleWindowPresetClick(presetId: string) {
     const res = await invoke<ResponseData<WindowMeta[]>>('get_window_list')
     if (res.code !== 200 || !Array.isArray(res.data)) {
       console.warn('查询窗口列表返回异常:', res.code, res.msg)
-      NotificationUtil.error('读取窗口列表失败，暂时无法打开该预设的窗口')
+      NotificationUtil.error(t('menu.readWindowListFailed'))
       return
     }
     windows = res.data
   } catch (e) {
     console.warn('查询窗口列表失败:', e)
-    NotificationUtil.error('读取窗口列表失败，暂时无法打开该预设的窗口')
+    NotificationUtil.error(t('menu.readWindowListFailed'))
     return
   }
 
@@ -503,13 +606,13 @@ async function handleWindowPresetClick(presetId: string) {
   switch (result.reason) {
     case 'duplicate':
       // 后端说这个预设的窗口已经开着（前端这份列表略旧）：已聚焦过去，说明一下而不是静默
-      NotificationUtil.info('该预设的窗口已打开，已切换到该窗口')
+      NotificationUtil.info(t('menu.presetWindowOpened'))
       break
     case 'workspace-locked':
-      NotificationUtil.warn('该预设绑定的工作区已在其他窗口中打开')
+      NotificationUtil.warn(t('menu.presetWorkspaceLocked'))
       break
     default:
-      NotificationUtil.error('创建窗口失败，请查看控制台日志')
+      NotificationUtil.error(t('menu.createWindowFailed'))
   }
 }
 
@@ -847,6 +950,16 @@ onUnmounted(() => {
           font-size: var(--font-size-sm);
           opacity: 0.5;
           margin-left: 24px;
+        }
+
+        .option-check {
+          font-size: var(--font-size-sm);
+          margin-left: 24px;
+          flex-shrink: 0;
+
+          @include theme.useTheme {
+            color: theme.getVar('focusRing');
+          }
         }
 
         .submenu-arrow {

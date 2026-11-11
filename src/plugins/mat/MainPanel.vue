@@ -30,7 +30,7 @@
           <template #image>
             <el-icon :size="64"><DataAnalysis /></el-icon>
           </template>
-          <p class="welcome-hint">从左侧打开 .hprof 堆转储文件，定位内存泄漏、分析对象占用</p>
+          <p class="welcome-hint">从左侧打开 .hprof（或 .hprof.gz）堆转储文件，定位内存泄漏、分析对象占用</p>
         </el-empty>
       </div>
     </div>

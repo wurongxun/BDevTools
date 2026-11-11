@@ -4,6 +4,8 @@
 @use './tokens.scss';
 @use './element.scss';
 @use './logs.scss';
+// 必须排在 theme.scss 之后：contrast.scss 靠选择器特异性覆盖主主题变量
+@use './contrast.scss';
 
 // 生成设计令牌 CSS 变量（字体/字号/圆角/间距/阴影）
 @include tokens.tokensVars();
@@ -19,17 +21,42 @@
 // 生成主题 CSS 变量（滚动条等全局样式使用）
 @include theme.themeVars();
 
+// ============================================================
+// 桌面应用外壳：视口永不滚动、永不回弹（overscroll）
+//
+// 现象：触控板双指下滑（即内容向上滚）滚到某个内嵌滚动区的尽头后，多余的滚动量会沿
+// 「overscroll 链」一层层往外传，最后由视口吃掉 —— 表现为**整个桌面（含标题栏）往下弹一下
+// 再弹回来**，标题栏看起来「没有固定在顶部」。
+//
+// 桌面应用根本没有「页面滚动」这一层：外壳永远是 100% 高度、靠内部容器各自滚动。
+// 所以这里把根级三层（html / body / #app）全部钉死：
+//   - `overflow: hidden`  视口不可滚动（overflow:hidden 只是禁止用户滚动，
+//                         内部容器各自的 `overflow:auto` 不受影响）；
+//   - `overscroll-behavior: none`  到头即止，既不自己回弹、也不把余量传给外层，
+//     内嵌滚动区（文件树 / 编辑器 / 日志…）滚到头就此打住，不会顶到整屏。
+// ============================================================
 html {
   height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   @include mixin.scrollbar;
 }
 
 body {
   height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   -moz-osx-font-smoothing: grayscale;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-family: var(--font-family-base);
+}
+
+// 高度由 index.html 的内联样式给出（首屏字体兜底，避免样式表加载前的跳动），
+// 这里只补滚动相关约束，不重复声明 height。
+#app {
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 *,

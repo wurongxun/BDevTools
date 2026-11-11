@@ -72,9 +72,12 @@ export const appConfigInfo = defineStore('app_Config', {
       this.appConfig = app_Config
     },
     setLanguage(language: string) {
-      this.language = language
+      // 繁体中文（台湾）与（香港）已合并为同一「繁体中文」选项（统一用 zh_TW），
+      // 这里把历史持久化的 zh_HK 归一到 zh_TW，保证显示与勾选一致。
+      const normalized = language === 'zh_HK' ? 'zh_TW' : language
+      this.language = normalized
       // 同步切换 i18n（启动恢复与设置页切换共用此入口）
-      i18n.global.locale.value = language as AppLocale
+      i18n.global.locale.value = normalized as AppLocale
     },
     setMdWorkingDirectory(md_working_directory: string) {
       this.md_working_directory = md_working_directory

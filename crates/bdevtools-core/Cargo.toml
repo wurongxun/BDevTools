@@ -1,0 +1,28 @@
+[package]
+name = "bdevtools-core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Pure-Rust shared base for BDevTools (no Tauri dependency)"
+
+[lib]
+name = "bdevtools_core"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+lazy_static = "1.5.1"
+parking_lot = "0.12.5"
+md5 = "0.8"
+hex = "0.4"
+encoding_rs = "0.8"
+regex = "1.13.1"
+rusqlite = { version = "0.31", features = ["bundled"] }
+anyhow = "1.0.104"
+log = "0.4.34"
+chrono = "0.4"
+# P3 会话保险库：PBKDF2 + AES-256-GCM（ring 已在依赖树中，纯 Rust，不触发 OpenSSL 重编）
+ring = "0.17"
+base64 = "0.22"

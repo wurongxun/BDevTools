@@ -262,7 +262,7 @@ onMounted(() => {
 
 .sb-err {
   font-size: var(--font-size-xs);
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

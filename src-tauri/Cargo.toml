@@ -1,6 +1,9 @@
+# Tauri 宿主 crate。Cargo workspace 声明在仓库根 Cargo.toml：
+# crates/ 与 src-tauri/ 平级，Cargo 要求所有 member 都在 workspace root 之下。
+# 内置插件按 crate 拆分，由同名 feature 控制是否进入构建图。
 [package]
 name = "BDevTools"
-version = "1.6.0"
+version = "1.7.4"
 description = "A backend development tools"
 authors = ["you"]
 edition = "2021"
@@ -15,38 +18,85 @@ name = "backend_dev_tools_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
-default = ["wasm-runtime"]
+default = [
+  "wasm-runtime",
+  "plugin-files",
+  "plugin-ssh",
+  "plugin-logs",
+  "plugin-database",
+  "plugin-mat",
+  "plugin-terminal",
+]
 # 第三方插件 WASM 运行时（Extism/wasmtime）。
 # 关闭（--no-default-features）后 plugin_call 回落为 501 预留错误，插件只能跑纯前端沙箱页面；
 # 用于不支持的平台（如 Android/iOS）或需要瘦身的构建。
 wasm-runtime = ["dep:extism"]
 
+# ===== 内置插件编译期裁剪 =====
+# 每个 feature 做两件事：放行该插件的后端模块与命令、链接它专属的重依赖。
+# 前后端必须同开同关，否则会出现「前端有入口、后端无命令」的哑 bug
+# —— 由 `.workbuddy/tools/verify-plugin-selection.mjs` 守着。
+#
+# 常用组合：
+#   全量（默认）           cargo build
+#   只要 database         cargo build --no-default-features --features plugin-database
+#   只要 logs + terminal  cargo build --no-default-features --features plugin-logs,plugin-terminal
+#
+# 注意：`settings` / `web3d` / `placeholder` 只有前端、没有后端模块，因此没有对应 feature，
+# 由前端的 `BUILTIN_PLUGINS` 环境变量单独控制（见 package.json 的 build:* 脚本）。
+plugin-files = ["dep:chardetng"]
+plugin-ssh = ["dep:bdevtools-plugin-ssh"]
+plugin-logs = ["dep:bdevtools-plugin-logs", "dep:fancy-regex", "dep:rayon", "dep:memchr"]
+# database **依赖** files：SQL 脚本管理复用了 files 的文件读写命令
+# （read_note_file / write_script_file / list_script_files / rename_script_file / up_folder_name）。
+# 故开 plugin-database 会自动带上 plugin-files 模块；files 的**前端插件**仍可单独裁掉
+# （那是 UI 与编辑器的取舍，不是后端模块）。想连 files 模块一起裁，就不能要 database。
+plugin-database = [
+  "plugin-files",
+  "dep:bdevtools-plugin-database",
+  "dep:sqlx",
+  "dep:tiberius",
+  "dep:odbc-api",
+  "dep:tokio-util",
+  "dep:calamine",
+  "dep:rust_xlsxwriter",
+  "dep:csv",
+]
+plugin-mat = ["dep:bdevtools-plugin-mat", "dep:jvm-hprof", "dep:memmap2"]
+plugin-terminal = ["dep:portable-pty", "dep:base64"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+# 公共基础层：纯 Rust，所有插件共享，始终参与构建
+bdevtools-core = { path = "../crates/bdevtools-core" }
+# 拆分出去的内置插件：由同名 feature 控制是否进入构建图
+bdevtools-plugin-database = { path = "../crates/plugin-database", optional = true }
+bdevtools-plugin-mat = { path = "../crates/plugin-mat", optional = true }
+bdevtools-plugin-logs = { path = "../crates/plugin-logs", optional = true }
+bdevtools-plugin-ssh = { path = "../crates/plugin-ssh", optional = true }
+
 tauri = { version = "2", features = ["image-png", "protocol-asset", "tray-icon", "unstable"] }
 tauri-plugin-opener = "2"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = "0.4"
-anyhow = "1.0.44"
+anyhow = "1.0.104"
 # 数据库目录（元数据）抽象：trait 内 async fn 需要 Box<dyn>，故引入该 proc-macro
 async-trait = "0.1"
-log = "0.4.0"
+log = "0.4.34"
 md5 = "0.8"
 hex = "0.4"
 tauri-plugin-fs = "2"
-lazy_static = "1.5.0"
-parking_lot = "0.12.3"
+lazy_static = "1.5.1"
+parking_lot = "0.12.5"
 tauri-plugin-dialog = "2"
 tauri-plugin-os = "2"
 # 文件编码处理
 encoding_rs = "0.8"
-chardetng = "1.0.0"
-# SSH/SFTP 远程连接
-ssh2 = { version = "0.9", features = ["vendored-openssl"] }
+chardetng = { version = "1.0.0", optional = true }
 # UUID 生成
 uuid = { version = "1", features = ["v4"] }
 # SQLite 数据库
@@ -57,41 +107,64 @@ tauri-plugin-notification = "2"
 # 其内部 keydown 不会冒泡到宿主 window，DOM 层监听对插件内的按键无能为力）
 tauri-plugin-global-shortcut = "2"
 # 数据库驱动（MySQL + PostgreSQL）
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "mysql", "postgres"] }
+#
+# 下面几个「类型支持」特性的取舍，一句话：SQLx 的 `try_get` 会先做**列类型白名单**检查
+# （`Type::compatible`），不在白名单里的类型直接解码失败。缺哪个特性，对应那一类列就整列
+# 退化成「类型转换失败」，而不是报错到 UI —— 所以它们是**功能开关**，不是可选优化。
+# 各特性「为什么必须存在」的完整论证见 `crates/plugin-database/src/operations.rs` 的类型分支注释。
+#
+# rust_decimal：DECIMAL/NUMERIC 的唯一无损接法。sqlx 刻意不让 f64 兼容 DECIMAL
+#   （源码注释原文：floating-point numbers have different semantics），塞进 f64 会静默丢精度。
+#   注意 sqlx 0.8 的特性名就叫 rust_decimal —— 没有叫 decimal 的。
+# chrono：DATE / TIME / DATETIME / TIMESTAMP / TIMESTAMPTZ。缺了它们这些列整列报废。
+# json：MySQL 的 ColumnType::Json 不在 str/[u8] 的白名单里，必须靠它才能读出来。
+# uuid：BINARY(16) 存 UUID 是 MySQL 主流做法；PG 的 UUID 列同理。
+# 四个依赖都是纯 Rust、无原生库（C/C++ 工具链）要求，加进来不会像 openssl 那样拖垮构建。
+sqlx = { version = "0.8", features = [
+  "runtime-tokio-rustls",
+  "mysql",
+  "postgres",
+  "rust_decimal",
+  "chrono",
+  "json",
+  "uuid",
+], optional = true }
+# 时间处理。版本必须与 sqlx 的约束（0.4.34+）落在同一 semver 区间，
+# 否则会出现两份 chrono ⇒ `chrono::TimeDelta` 与 sqlx 的 Decode 实现不是同一个类型。
 # SQL Server 驱动：纯 Rust TDS 协议实现，无原生依赖（sqlx 自 0.7 起移除 mssql，故单独引入）
-tiberius = { version = "0.12", default-features = false, features = ["tds73", "native-tls", "chrono"] }
+tiberius = { version = "0.12", default-features = false, features = ["tds73", "native-tls", "chrono"], optional = true }
 # tiberius 需要把 tokio 的 TcpStream 适配成 futures 的 AsyncRead/AsyncWrite
-tokio-util = { version = "0.7", features = ["compat"] }
+tokio-util = { version = "0.7", features = ["compat"], optional = true }
 # Oracle 驱动：走系统 ODBC（需用户机已安装 Oracle ODBC 驱动，避免引入 OCI 原生依赖）
-odbc-api = "29"
+odbc-api = { version = "29", optional = true }
 # 流式读取查询结果（sqlx 已依赖，无额外编译成本）
 futures-util = "0.3"
 # CSV 文件读写
-csv = "1.3"
+csv = { version = "1.4", optional = true }
 # Excel 文件读取
-calamine = "0.26"
+calamine = { version = "0.37.0", optional = true }
 # Excel 文件写入
-rust_xlsxwriter = "0.80"
+rust_xlsxwriter = { version = "0.80", optional = true }
 # 正则表达式（跨平台）
-regex = "1.9.3"
+regex = "1.13.1"
 # 单文件内并行：ripgrep 的并行是跨文件级的，单文件内切分必须自己做（§2.8）
-rayon = "1"
+rayon = { version = "1", optional = true }
 # SIMD 子串匹配（memchr::memmem）：文本模式下可在原始字节上匹配，免逐行解码
-memchr = "2"
+memchr = { version = "2", optional = true }
 # 正则双引擎降级：regex 不支持前瞻/后顾/反向引用时换它（纯 Rust，借鉴 klogg 的 Hyperscan→Qt 正则）
-fancy-regex = "0.13"
+fancy-regex = { version = "0.13", optional = true }
 # Java 堆转储（HPROF）解析：零拷贝 mmap 解析（MAT 插件）
-jvm-hprof = "0.1"
-memmap2 = "0.9"
+jvm-hprof = { version = "0.1", optional = true }
+memmap2 = { version = "0.9", optional = true }
 # 第三方插件包（.zip）解包：只用 deflate，不引入 bzip2/zstd 等额外后端
 zip = { version = "2", default-features = false, features = ["deflate"] }
 # 本地交互式终端（terminal 插件）：跨平台 PTY 抽象
 # Windows 走 ConPTY、Unix 走 openpty，读写/resize(SIGWINCH)/kill/进程退出由该 crate 统一处理，
 # 避免自己写两套平台相关的 unsafe 代码。
-portable-pty = "0.9"
+portable-pty = { version = "0.9", optional = true }
 # 终端输出流编码：PTY 吐出的是任意字节（含跨块截断的 UTF-8 序列），
 # 以 base64 原样透传给前端，由 xterm 按 Uint8Array 消费，避免边界处乱码。
-base64 = "0.22"
+base64 = { version = "0.22", optional = true }
 # 第三方插件 WASM 运行时（可选，见 [features].wasm-runtime）。
 # Extism 基于 wasmtime，给插件侧提供 PDK 的 ABI；插件逻辑跑在这儿，宿主能力经 host function 注入。
 # host_http 直接用 Extism 内建的 `http_request`（含 allowed_hosts 白名单 + 响应体上限），
@@ -119,3 +192,4 @@ tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
+

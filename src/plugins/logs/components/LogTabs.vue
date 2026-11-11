@@ -254,15 +254,15 @@ function streamLabel(state?: string): string {
   background: var(--el-fill-color);
 
   &.st-live {
-    color: var(--el-color-success);
+    color: var(--stateSuccessFg);
     background: var(--el-color-success-light-9);
   }
   &.st-error {
-    color: var(--el-color-danger);
+    color: var(--stateErrorFg);
     background: var(--el-color-danger-light-9);
   }
   &.st-connecting {
-    color: var(--el-color-warning);
+    color: var(--stateWarningFg);
     background: var(--el-color-warning-light-9);
   }
 }

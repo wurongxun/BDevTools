@@ -12,6 +12,35 @@ $themes: (
     // 错误「文字」色（不是填充色）：EP 的 --el-color-danger #f56c6c 白底仅 2.90:1、
     // #f1f1f1 上 2.57:1，达不到 WCAG AA 4.5:1。此值实测 on #ffffff 5.44:1 / on #f1f1f1 4.81:1。
     dangerText: #c0392b,
+    // ---- 语义状态色族（对标 VSCode 的 errorForeground / editorWarning.border 体系）----
+    // 两套分工，禁止混用：
+    //   *Fg   = 文字/图标色，必须 ≥4.5:1（下面 worst 为在 5 种真实底色上的最低比值）
+    //   *Fill = 底块/条带背景色（徽标、提示条背景），不承载文字对比度要求
+    // 之所以自建而不是直接用 --el-color-*：EP 那套是填充色，当文字用普遍不达标
+    //（--el-color-danger 白底仅 2.90:1，见 dangerText 注释）。新代码一律用本族，
+    // 不要再写 #67c23a / #e6a23c 这类裸色值。
+    stateErrorFg: #b02a1e, // worst 5.36:1（on activityBarBg #e8e8e8）
+    stateWarningFg: #8a5a00, // worst 4.84:1（与 logs.scss 的 lv-warn 同色）
+    stateInfoFg: #005a9e, // worst 5.80:1（与 focusRing 同色）
+    stateSuccessFg: #256d29, // worst 5.20:1（唯一达标的绿：#2e7d32 仅 4.18 不达标）
+    stateErrorFill: #fde2e2, // error 20% over #ffffff
+    stateWarningFill: #faecd8,
+    stateInfoFill: #d9ecff,
+    stateSuccessFill: #e1f3d8,
+    // ---- 编辑器色（对标 VSCode 的 editor.* 系列，供 Monaco defineTheme 读取）----
+    // monaco 的 defineTheme 只接受具体色值、不认 CSS 变量，所以这里既是「唯一数据源」，
+    // 也由 MonacoEditor.vue 用 getComputedStyle 读出来喂给 monaco —— 改这里编辑器跟着变。
+    // 编辑区比面板(#f1f1f1)更亮，符合「内容区最亮」的桌面层次。
+    editorBg: #ffffff,
+    editorFg: #212121, // 16.10:1
+    editorGutterBg: #ffffff,
+    editorLineNumberFg: #666666, // 5.74:1（行号是文本，需 ≥4.5）
+    editorSelectionBg: #add6ff, // fg on 选区 10.61:1
+    editorLineHighlightBg: #f0f0f0,
+    editorCursorFg: #005a9e,
+    editorIndentGuideBg: #e6e6e6,
+    // 浮层（自动补全 / 悬浮提示）边界：属非文本 UI，需 ≥3:1（on #fff 3.95:1，与 borderStrong 同口径）
+    editorWidgetBorder: #808080,
     shadowColor: #eee,
     // borderColor = 柔和分隔线；borderStrong = 控件边界（输入框/下拉/复选框）
     // 二者分工见 WCAG 1.4.11：控件边界需 ≥3:1。注意不能只看白底——控件也会坐在
@@ -19,8 +48,19 @@ $themes: (
     //   #cac9c9 → 1.65 / 1.46 / 1.45  （原值，最差 1.45:1，不达标）
     //   #8c8c8c → 3.36 / 2.98 / 2.95  （仅白底达标，边缘底色仍不达标）
     //   #808080 → 3.95 / 3.50 / 3.47  （采用；顺序为 on #fff / #f1f1f1 / #f0f0f0）
+    tabBarBg: #e8e8e8,
+    // 活动栏「选中」凹槽底色：柔蓝，与中性灰的 hover(#dcdcdc) 拉开色相差
+    // （旧实现选中直接复用 activityBarHover ⇒ 「悬停即像选中」）
+    activityBarActiveBg: #bcd9f7,
+    // 选中指示条：旧值 hoverColor(#ecf5ff) 对 #dcdcdc 仅 1.25:1（非文本需 ≥3:1），
+    // 换成 #005a9e 后对 activityBarBg(#e8e8e8) 5.81:1
+    activityBarIndicator: #005a9e,
     borderColor: #e6e6e6,
     borderStrong: #808080,
+    // 高对比度模式（html.hc）专用：常规模式下**不应**使用，只在 contrast.scss 里被引用。
+    // 对标 VSCode 的 contrastBorder / contrastActiveBorder：给元素加分离边框提升可辨识度。
+    contrastBorder: #000000,
+    contrastActiveBorder: #000000,
     hoverColor: #ecf5ff,
     sidebarBg: #f0f0f0,
     activityBarBg: #e8e8e8,
@@ -50,16 +90,46 @@ $themes: (
     // 错误「文字」色（暗色）：EP 的 #f56c6c 在 #3c3f41 上仅 3.66:1，不达标。
     // 此值实测 on #3c3f41 5.01:1 / on #2d3137 6.17:1。
     dangerText: #ff9494,
+    // ---- 语义状态色族（暗色）----（分工与 light 同，见 light 段注释）
+    stateErrorFg: #ff9494, // worst 5.01:1
+    stateWarningFg: #e6a23c, // worst 4.85:1
+    stateInfoFg: #79c0ff, // worst 5.45:1（与 focusRing 同色）
+    stateSuccessFg: #67c23a, // worst 4.73:1
+    stateErrorFill: #61484a, // error 20% over #3c3f41
+    stateWarningFill: #5e5340,
+    stateInfoFill: #3d5267,
+    stateSuccessFill: #455940,
+    // ---- 编辑器色（暗色）----（分工与分工见 light 段）
+    // 编辑区 #2b2b2b 比外壳主区 #2d3137 更深，形成「内容凹陷」层次（同 VSCode dark+ 思路）
+    editorBg: #2b2b2b,
+    editorFg: #bbbbbb, // 7.38:1
+    editorGutterBg: #2b2b2b,
+    editorLineNumberFg: #949494, // 4.67:1（#858585 仅 3.84 不达标）
+    // 选区：VSCode dark+ 用 #264f78，但 fg 落在上面只有 4.42:1；调深到 #234060 得 5.54:1
+    editorSelectionBg: #234060,
+    editorLineHighlightBg: #323537,
+    editorCursorFg: #79c0ff,
+    editorIndentGuideBg: #373a3c,
+    editorWidgetBorder: #8c9094, // on editorBg #2b2b2b 4.40:1
     shadowColor: #1a1a1a,    // 阴影色
     borderColor: #373a3c,    // 柔和分隔线 IDEA_BORDER_COLOR（仅用于面板分割）
     // 控件边界：实测 #8c9094 on bgColor 3.30:1 / on sidebarBg 3.84:1（WCAG 1.4.11 需 3:1）
     borderStrong: #8c9094,
+    // 高对比度模式专用（见 light 段同名注释）
+    contrastBorder: #ffffff,
+    contrastActiveBorder: #ffffff,
+          tabBarBg: #3c3f41,
     hoverColor: #4b6eaf,     // 悬停/选中高亮 IDEA_MENU_HOVER
     sidebarBg: #323537,      // 侧边栏背景 IDEA_TOOLBAR_BG
     activityBarBg: #3c3f41,  // 活动栏背景 IDEA_TITLE_BAR_BG
     activityBarHover: #4b6eaf, // 活动栏悬停 IDEA_MENU_HOVER
     // 激活色：#bbbbbb 落在 #4b6eaf 上仅 2.64:1，改为纯白（实测 5.06:1）
     activityBarActive: #ffffff,
+    // 选中凹槽底色：比 hover 蓝(#4b6eaf)更深的蓝，配合亮色指示条读作「按下/选中」
+    activityBarActiveBg: #2f5d9c,
+    // 选中指示条：旧值 hoverColor 与 activityBarHover 同为 #4b6eaf，
+    // 条子画在同色底上完全不可见；换成 #79c0ff 后对 activityBarBg(#3c3f41) 5.46:1
+    activityBarIndicator: #79c0ff,
     // 键盘焦点环颜色：暗背景下需高亮色才可见
     focusRing: #79c0ff,
     scrollbarThumb: #505355, // 滚动条滑块 中灰

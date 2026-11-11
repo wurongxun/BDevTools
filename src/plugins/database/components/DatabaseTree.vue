@@ -45,7 +45,12 @@
             class="node-label"
             :class="{ 'is-connected': data.type === 'table' && isTableActive(data) }"
           >{{ node.label }}</span>
-          <span v-if="data.type === 'connection' && isConnected(data.data?.id)" class="connected-badge">已连接</span>
+          <AppStatusDot
+            v-if="data.type === 'connection' && isConnected(data.data?.id)"
+            color="success"
+            label="已连接"
+            title="已连接"
+          />
         </span>
       </template>
     </el-tree>
@@ -114,7 +119,8 @@ import { useConnectionStore, useEditorStore, useDbSidebarStore } from '../store'
 import {
   dbListDatabases, dbListTables, dbTableColumns,
   dbCatalogCapabilities, dbListUsers, dbListAdmins,
-  dbListViews, dbListProcedures, dbListTriggers, dbListEvents, dbListDatabaseIndexes,
+  dbListViews, dbListProcedures, dbListFunctions, dbListTriggers, dbListEvents,
+  dbListDatabaseIndexes,
 } from '../api/metadata'
 import type { MenuItem } from '@/components/context-menu/ContextMenu.vue'
 import type {
@@ -332,7 +338,14 @@ async function ensureCapabilities(configId: string): Promise<CatalogCapabilities
 /** 连接级分组 */
 type ConnGroupKey = 'databases' | 'users' | 'admins' | 'system'
 /** 库级分组 */
-type DbGroupKey = 'tables' | 'views' | 'indexes' | 'procedures' | 'triggers' | 'events'
+type DbGroupKey =
+  | 'tables'
+  | 'views'
+  | 'indexes'
+  | 'procedures'
+  | 'functions'
+  | 'triggers'
+  | 'events'
 /** 系统信息子项 */
 type SysInfoKey = 'session-status' | 'global-status' | 'session-variables' | 'global-variables'
 
@@ -347,6 +360,7 @@ const DB_GROUP_LABELS: Record<DbGroupKey, string> = {
   views: '视图',
   indexes: '索引',
   procedures: '存储过程',
+  functions: '函数',
   triggers: '触发器',
   events: '事件',
 }
@@ -362,6 +376,7 @@ const DB_GROUP_LEAF_TYPE: Record<Exclude<DbGroupKey, 'tables'>, TreeNode['type']
   views: 'view',
   indexes: 'index',
   procedures: 'procedure',
+  functions: 'function',
   triggers: 'trigger',
   events: 'event',
 }
@@ -499,6 +514,7 @@ async function loadNode(node: any, resolve: (data: TreeNode[]) => void) {
     if (caps.views) groups.push('views')
     if (caps.database_indexes) groups.push('indexes')
     if (caps.procedures) groups.push('procedures')
+    if (caps.functions) groups.push('functions')
     if (caps.triggers) groups.push('triggers')
     if (caps.events) groups.push('events')
     resolve(groups.map(g => ({
@@ -540,6 +556,7 @@ async function loadNode(node: any, resolve: (data: TreeNode[]) => void) {
     // 其余分组：拉对象列表，渲染为叶子节点
     const fetcher = group === 'views' ? dbListViews
       : group === 'procedures' ? dbListProcedures
+      : group === 'functions' ? dbListFunctions
       : group === 'triggers' ? dbListTriggers
       : group === 'events' ? dbListEvents
       : null
@@ -623,6 +640,7 @@ const DB_GROUP_OBJECT_TYPE: Record<Exclude<DbGroupKey, 'tables'>, ObjectListType
   views: 'view',
   indexes: 'index',
   procedures: 'procedure',
+  functions: 'function',
   triggers: 'trigger',
   events: 'event',
 }
@@ -633,6 +651,7 @@ const OBJECT_LIST_TITLE: Record<ObjectListType, string> = {
   view: '视图',
   index: '索引',
   procedure: '存储过程',
+  function: '函数',
   trigger: '触发器',
   event: '事件',
 }
@@ -652,6 +671,36 @@ function openObjectList(configId: string, objectType: ObjectListType, database?:
     configId,
     database,
     objectType,
+  })
+}
+
+/** 打开单个视图的查看器（数据 / 字段 / 源码） */
+function openViewViewer(configId: string, database?: string, name?: string) {
+  if (!configId || !database || !name) return
+  editorStore.openTab({
+    title: name,
+    type: 'view',
+    configId,
+    database,
+    objectName: name,
+  })
+}
+
+/** 打开单个例程的查看器（源码 + 属性） */
+function openRoutineViewer(
+  configId: string,
+  database: string | undefined,
+  name: string | undefined,
+  kind: 'procedure' | 'function' | 'trigger'
+) {
+  if (!configId || !database || !name) return
+  editorStore.openTab({
+    title: name,
+    type: 'routine',
+    configId,
+    database,
+    objectName: name,
+    objectType: kind,
   })
 }
 
@@ -679,11 +728,17 @@ function handleDblClick(data: TreeNode) {
   if (data.type === 'user') { openObjectList(d?.configId, 'user'); return }
   if (data.type === 'admin') { openObjectList(d?.configId, 'admin'); return }
 
-  // 视图 / 索引 / 存储过程 / 触发器 / 事件 叶子：打开所属分组的完整列表
-  if (
-    data.type === 'view' || data.type === 'index' ||
-    data.type === 'procedure' || data.type === 'trigger' || data.type === 'event'
-  ) {
+  // 视图：打开**单个视图**的详情（数据 / 字段 / 源码）
+  if (data.type === 'view') { openViewViewer(d?.configId, d?.database, d?.name); return }
+
+  // 存储过程 / 函数 / 触发器：打开**单个例程**的详情（源码 + 属性）
+  if (data.type === 'procedure' || data.type === 'function' || data.type === 'trigger') {
+    openRoutineViewer(d?.configId, d?.database, d?.name, data.type)
+    return
+  }
+
+  // 索引 / 事件没有单对象视图（没有「看一条索引」这种需求），仍打开所属分组的完整列表
+  if (data.type === 'index' || data.type === 'event') {
     const objectType = DB_GROUP_OBJECT_TYPE[d?.group as Exclude<DbGroupKey, 'tables'>]
     if (objectType) openObjectList(d?.configId, objectType, d?.database)
     return
@@ -957,13 +1012,8 @@ defineExpose({ refreshTree })
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.connected-badge {
-  font-size: var(--font-size-xs);
-  color: #67c23a;
-  margin-left: 4px;
-}
 .is-connected {
-  color: #67c23a;
+  color: var(--stateSuccessFg);
 }
 .is-disconnected {
   color: var(--el-text-color-disabled);

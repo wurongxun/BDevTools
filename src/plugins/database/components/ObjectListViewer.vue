@@ -47,7 +47,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import {
-  dbListUsers, dbListAdmins, dbListViews, dbListProcedures,
+  dbListUsers, dbListAdmins, dbListViews, dbListProcedures, dbListFunctions,
   dbListTriggers, dbListEvents, dbListDatabaseIndexes,
 } from '../api/metadata'
 import type { DatabaseIndexInfo, DatabaseObjectInfo, DbAdminInfo, DbUserInfo, ObjectListType } from '../types'
@@ -76,6 +76,7 @@ const TITLE_MAP: Record<ObjectListType, string> = {
   view: '视图',
   index: '索引',
   procedure: '存储过程',
+  function: '函数',
   trigger: '触发器',
   event: '事件',
 }
@@ -108,6 +109,14 @@ const COLUMN_MAP: Record<ObjectListType, ColumnDef[]> = {
     { prop: 'index_type', label: '索引类型', width: 100 },
   ],
   procedure: [
+    { prop: 'name', label: '名称' },
+    { prop: 'object_type', label: '类型', width: 100 },
+    { prop: 'definer', label: '定义者', width: 140 },
+    { prop: 'created', label: '创建时间', width: 160 },
+    { prop: 'modified', label: '最后修改', width: 160 },
+    { prop: 'status', label: '状态', width: 90 },
+  ],
+  function: [
     { prop: 'name', label: '名称' },
     { prop: 'object_type', label: '类型', width: 100 },
     { prop: 'definer', label: '定义者', width: 140 },
@@ -209,6 +218,7 @@ async function load() {
     } else {
       const fetcher = objectType === 'view' ? dbListViews
         : objectType === 'procedure' ? dbListProcedures
+        : objectType === 'function' ? dbListFunctions
         : objectType === 'trigger' ? dbListTriggers
         : dbListEvents
       const res = await fetcher(configId, props.database!)
@@ -267,7 +277,7 @@ watch(() => [props.configId, props.database, props.objectType], load)
 }
 .viewer-error {
   padding: 16px;
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   font-size: var(--font-size-md);
 }
 .viewer-footer {

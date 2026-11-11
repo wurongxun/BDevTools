@@ -1,6 +1,6 @@
 <template>
-  <nav class="settings-nav" aria-label="设置分类">
-    <div class="settings-nav-head">设置</div>
+  <nav class="settings-nav" :aria-label="$t('settingsPlugin.nav.title')">
+    <div class="settings-nav-head">{{ $t('settingsPlugin.nav.title') }}</div>
     <div class="settings-nav-list" role="tablist" aria-orientation="vertical">
       <button
         v-for="item in NAV_ITEMS"
@@ -11,7 +11,7 @@
         :aria-selected="modelValue === item.id"
         @click="emit('update:modelValue', item.id)"
       >
-        {{ item.label }}
+        {{ $t('settingsPlugin.nav.' + item.id) }}
       </button>
     </div>
   </nav>
@@ -26,10 +26,10 @@ defineProps<{ modelValue: SettingTab }>()
 const emit = defineEmits<{ 'update:modelValue': [SettingTab] }>()
 
 const NAV_ITEMS: ReadonlyArray<{ id: SettingTab; label: string }> = [
-  { id: 'app', label: '应用设置' },
-  { id: 'window', label: '窗口设置' },
-  { id: 'plugin', label: '插件' },
-  { id: 'help', label: '帮助' },
-  { id: 'about', label: '关于' },
+  { id: 'app', label: 'app' },
+  { id: 'window', label: 'window' },
+  { id: 'plugin', label: 'plugin' },
+  { id: 'help', label: 'help' },
+  { id: 'about', label: 'about' },
 ]
 </script>

@@ -11,7 +11,12 @@
 
     <!-- 首次构建（大 dump 较慢，明确提示） -->
     <div v-else-if="buildState.loading" v-loading="true" class="rf-loading">
-      <div class="rf-loading-tip">正在解析对象引用图并构建索引（大 dump 首次需数十秒，之后查询为毫秒级）…</div>
+      <div class="rf-loading-box">
+        <WorkerProgress v-if="worker && !worker.finished" :dump-id="dump.id" counters />
+        <div v-else class="rf-loading-tip">
+          正在解析对象引用图并构建索引（大 dump 首次需数十秒，之后查询为毫秒级）…
+        </div>
+      </div>
     </div>
 
     <template v-else-if="buildInfo">
@@ -34,6 +39,10 @@
             {{ formatInt(buildInfo.reachable_nodes) }} 可达对象 · {{ formatInt(buildInfo.classes) }} 类 · {{ formatInt(buildInfo.edge_count) }} 引用边
           </span>
           <el-tag v-if="buildInfo.cached" size="small" type="success" effect="plain">会话缓存命中</el-tag>
+          <el-tag v-if="buildInfo.index_hit" size="small" type="primary" effect="plain">索引命中</el-tag>
+          <span v-if="buildInfo.shallow_caliber" class="rf-caliber" :title="buildInfo.shallow_caliber">
+            浅堆口径 {{ buildInfo.shallow_caliber }}
+          </span>
           <span class="rf-elapsed">索引构建 {{ buildInfo.elapsed_ms }} ms</span>
         </div>
 
@@ -98,17 +107,46 @@
                 <div v-else-if="inst && inst.total === 0" class="rf-list-empty">
                   <el-icon><InfoFilled /></el-icon><span>该类没有实例（纯静态持有 / 数组类等场景请查泄漏检测）</span>
                 </div>
-                <button
+                <div v-if="inst && inst.total > 0" class="rf-inst-bar">
+                  <span class="rf-inst-bar-text mono">{{ instOffset + 1 }}–{{ Math.min(instOffset + instPageSize, inst.total) }} / {{ formatInt(inst.total) }}</span>
+                  <app-button size="small" text class="rf-sort" @click="toggleInstSort">
+                    排序：{{ instSort === 'shallow' ? '浅堆' : 'ID' }}
+                  </app-button>
+                </div>
+                <el-dropdown
                   v-for="row in inst?.rows ?? []"
                   :key="row.obj_id"
-                  type="button"
-                  class="rf-inst"
-                  :class="{ active: isTraceTail(row.obj_id) }"
-                  @click="openObj(row.obj_id, `${curClassName} @ ${row.obj_id}`)"
+                  trigger="contextmenu"
+                  class="rf-inst-dd"
+                  @command="(cmd: string) => onInstCommand(cmd, row.obj_id)"
                 >
-                  <span class="mono rf-inst-id">{{ row.obj_id }}</span>
-                  <span class="rf-inst-shallow mono">{{ formatBytes(row.shallow_bytes) }}</span>
-                </button>
+                  <button
+                    type="button"
+                    class="rf-inst"
+                    :class="{ active: isTraceTail(row.obj_id) }"
+                    :title="`${row.obj_id} · 右键更多操作`"
+                    @click="openObj(row.obj_id, `${curClassName} @ ${row.obj_id}`)"
+                  >
+                    <span class="mono rf-inst-id">{{ row.obj_id }}</span>
+                    <span class="rf-inst-shallow mono">{{ formatBytes(row.shallow_bytes) }}</span>
+                  </button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="trace">追踪该对象</el-dropdown-item>
+                      <el-dropdown-item command="copy-id">复制对象 id</el-dropdown-item>
+                      <el-dropdown-item command="copy-class">复制类名</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+                <div v-if="inst && inst.total > instPageSize" class="rf-pager">
+                  <app-button size="small" text :disabled="instOffset === 0 || instLoading" @click="pageInst(-1)">上一页</app-button>
+                  <app-button
+                    size="small"
+                    text
+                    :disabled="instOffset + instPageSize >= inst.total || instLoading"
+                    @click="pageInst(1)"
+                  >下一页</app-button>
+                </div>
               </template>
             </div>
           </aside>
@@ -172,6 +210,53 @@
                     <span>出引用 {{ detail.outgoing_total }} · 入引用 {{ detail.incoming_total }}</span>
                   </div>
 
+                  <!-- 对象值：字段值 / 数组内容 / String 值 -->
+                  <div class="rf-sec">
+                    <div class="rf-sec-title">
+                      <el-icon><InfoFilled /></el-icon>
+                      字段值 / 内容
+                      <span class="rf-sec-hint">按需扫描 · {{ valuesState.data ? valuesState.data.elapsed_ms + ' ms' : '' }}</span>
+                      <app-button size="small" text aria-label="重新读取对象值" @click="reloadValues">
+                        <el-icon><Refresh /></el-icon>
+                      </app-button>
+                    </div>
+                    <div v-if="valuesState.loading" class="rf-sec-empty">正在读取对象值（大 dump 可能需数秒）…</div>
+                    <div v-else-if="valuesState.error" class="rf-values-error">
+                      {{ valuesState.error }}
+                      <app-button size="small" text @click="reloadValues">重试</app-button>
+                    </div>
+                    <template v-else-if="valuesState.data">
+                      <div v-if="valuesState.data.string_value" class="rf-string">
+                        <b>String 值</b>
+                        <span class="mono">{{ valuesState.data.string_value }}</span>
+                      </div>
+                      <div v-if="valuesState.data.loader_obj_id" class="rf-values-meta">
+                        ClassLoader：<span class="mono">{{ valuesState.data.loader_obj_id }}</span>
+                      </div>
+                      <div v-if="valuesState.data.array_preview" class="rf-array">
+                        <div class="rf-values-meta">数组内容（共 {{ formatInt(valuesState.data.array_total) }} 个元素）</div>
+                        <pre class="mono">{{ valuesState.data.array_preview }}</pre>
+                      </div>
+                      <div v-if="valuesState.data.fields.length" class="rf-fields">
+                        <div class="rf-values-meta">字段（{{ formatInt(valuesState.data.fields_total) }}）</div>
+                        <div v-for="(f, fi) in valuesState.data.fields" :key="fi" class="rf-field-row">
+                          <span class="rf-field-name mono" :title="f.name">{{ f.name }}</span>
+                          <span class="rf-field-type">{{ f.type_name }}</span>
+                          <button
+                            v-if="f.target_obj_id"
+                            type="button"
+                            class="rf-field-value mono rf-field-link"
+                            :title="`追踪 ${f.target_obj_id}`"
+                            @click="openObj(f.target_obj_id, `${f.name} @ ${f.target_obj_id}`)"
+                          >{{ f.value }}</button>
+                          <span v-else class="rf-field-value mono">{{ f.value }}</span>
+                        </div>
+                      </div>
+                      <div v-if="valuesState.data.note" class="rf-more">{{ valuesState.data.note }}</div>
+                      <div v-if="!valuesState.data.fields.length && !valuesState.data.array_preview && !valuesState.data.string_value" class="rf-sec-empty">该对象没有可展示的字段值</div>
+                    </template>
+                  </div>
+
                   <!-- Path to GC Roots -->
                   <div class="rf-sec">
                     <div class="rf-sec-title">
@@ -203,8 +288,47 @@
                             <span v-if="p.is_root" class="rf-node-root">ROOT</span>
                           </button>
                           <span v-if="i < detail.path.length - 1" class="rf-path-via mono">{{ viaText(p.via, detail.path[i + 1]) }}</span>
+                          <span v-if="p.ref_kind && p.ref_kind !== 'strong'" class="rf-weak mono">{{ p.ref_kind }}</span>
                         </div>
                         <el-icon v-if="i < detail.path.length - 1" class="rf-path-arrow"><ArrowDown /></el-icon>
+                      </template>
+                    </div>
+
+                    <!-- 多条最短路径：可切换是否排除弱/软/虚/终结器引用 -->
+                    <div class="rf-paths">
+                      <div class="rf-paths-tools">
+                        <el-checkbox v-model="excludeWeak" size="small" @change="resetPaths">排除弱引用</el-checkbox>
+                        <app-button size="small" text :disabled="pathsState.loading" @click="loadPaths">枚举多条最短路径</app-button>
+                        <span v-if="pathsState.data" class="rf-sec-hint">
+                          {{ pathsState.data.paths.length }} / {{ formatInt(pathsState.data.total) }} 条
+                        </span>
+                      </div>
+                      <div v-if="pathsState.loading" class="rf-sec-empty">正在枚举路径（大堆可能需数秒）…</div>
+                      <div v-else-if="pathsState.error" class="rf-list-err">{{ pathsState.error }}</div>
+                      <template v-else-if="pathsState.data">
+                        <div v-if="!pathsState.data.paths.length" class="rf-sec-empty">没有可展示的路径</div>
+                        <div v-for="(pp, pi) in pathsState.data.paths" :key="pi" class="rf-path-alt">
+                          <div class="rf-path-alt-head">
+                            <span class="rf-path-alt-idx mono">#{{ pi + 1 }}</span>
+                            <span class="mono">{{ rootLabel(pp.root_kind) }}</span>
+                            <span class="rf-sec-hint">{{ pp.length }} 跳</span>
+                          </div>
+                          <div v-for="(p, i) in pp.items" :key="i" class="rf-path-alt-hop">
+                            <button
+                              type="button"
+                              class="rf-path-node mono"
+                              :class="{ root: p.is_root, focus: i === pp.items.length - 1 }"
+                              :title="`${p.obj_id} · 点击继续追踪`"
+                              @click="p.is_root || openObj(p.obj_id, `${p.class_name} @ ${p.obj_id}`, p.via)"
+                            >
+                              <span class="rf-node-name">{{ p.class_name }}</span>
+                              <span v-if="p.is_root" class="rf-node-root">ROOT</span>
+                            </button>
+                            <span v-if="p.ref_kind && p.ref_kind !== 'strong'" class="rf-weak mono">{{ p.ref_kind }}</span>
+                            <span v-if="i < pp.items.length - 1" class="rf-path-via mono">{{ pp.items[i + 1].via || '—' }}</span>
+                          </div>
+                        </div>
+                        <div v-if="pathsState.data.note" class="rf-more">{{ pathsState.data.note }}</div>
                       </template>
                     </div>
                   </div>
@@ -302,13 +426,23 @@ import {
 } from '@element-plus/icons-vue'
 import { useMatStore } from '../../store'
 import type { RefIntentPreset } from '../../store'
+import WorkerProgress from '../WorkerProgress.vue'
 import { formatBytes, formatInt } from '../../api/matApi'
+import { ElMessage } from 'element-plus'
 import {
+  fetchGcRootPaths,
+  fetchObjectValues,
   fetchRefInspect,
   fetchRefInstances,
   fetchRefSearchClasses,
 } from '../../api/matApi'
-import type { RefClassHit, RefInstances, RefObjectDetail } from '../../api/matApi'
+import type {
+  GcRootPathsResult,
+  ObjectValues,
+  RefClassHit,
+  RefInstances,
+  RefObjectDetail,
+} from '../../api/matApi'
 import type { MatDump } from '../../types'
 
 /**
@@ -324,6 +458,26 @@ const props = defineProps<{
 
 const store = useMatStore()
 
+/**
+ * 后台分析作业（若有）。
+ *
+ * 这里只做**展示**：真正触发后台分析在概览页，本页不自动起进程 —— 否则用户
+ * 点进「引用追踪」会莫名其妙多出一个后台任务。作业完成后由下面的 watch 重载。
+ */
+const worker = computed(() => store.workerJobOf(props.dump.id))
+
+
+// 后台分析完成 ⇒ 索引已落盘：本页若正停在 loading（且没有在途请求），
+// 重新触发一次构建 —— 这次命中索引，毫秒级返回。
+watch(
+  () => worker.value?.finished,
+  (fin) => {
+    if (fin && worker.value?.ok && !buildState.value.loading && !buildState.value.data) {
+      void store.rebuildRefs(props.dump.id)
+    }
+  },
+)
+
 // ---------- 会话构建状态 ----------
 const buildState = computed(() => store.refsCache[props.dump.id] ?? { loading: false, error: '', data: null })
 const buildInfo = computed(() => buildState.value.data)
@@ -337,6 +491,10 @@ const curClassName = ref('')
 const inst = ref<RefInstances | null>(null)
 const instLoading = ref(false)
 const instErr = ref('')
+/** 实例分页（后端分页，不再硬截 Top 300） */
+const instOffset = ref(0)
+const instPageSize = 100
+const instSort = ref<'shallow' | 'id'>('shallow')
 
 // ---------- 详情 / 追踪栈（右侧） ----------
 interface TraceItem {
@@ -350,6 +508,34 @@ const detailMap = reactive<Record<string, { loading: boolean; error: string; dat
 const detState = computed(() => detailMap[focusObjId.value] ?? { loading: false, error: '', data: null })
 const detLoading = computed(() => trace.value.length > 0 && detState.value.loading)
 const detail = computed(() => (focusObjId.value ? detState.value.data : null))
+
+// ---------- 多条 GC Roots 路径（按对象 id 缓存，避免重复枚举） ----------
+const excludeWeak = ref(true)
+const pathsMap = reactive<Record<string, { loading: boolean; error: string; data: GcRootPathsResult | null }>>({})
+const pathsState = computed(
+  () => pathsMap[focusObjId.value] ?? { loading: false, error: '', data: null },
+)
+
+/** 「排除弱引用」开关变化 / 切换对象时清掉旧结果（口径变了旧结果会误导） */
+function resetPaths() {
+  const id = focusObjId.value
+  if (id) delete pathsMap[id]
+}
+
+async function loadPaths() {
+  const id = focusObjId.value
+  if (!id || !props.dump.path) return
+  pathsMap[id] = { loading: true, error: '', data: null }
+  try {
+    pathsMap[id] = {
+      loading: false,
+      error: '',
+      data: await fetchGcRootPaths(props.dump.path, id, excludeWeak.value, 0, 5),
+    }
+  } catch (e: any) {
+    pathsMap[id] = { loading: false, error: e?.message || String(e), data: null }
+  }
+}
 
 const KEEP_TRACE = 60
 
@@ -389,23 +575,56 @@ function backToClasses() {
   instErr.value = ''
 }
 
-async function selectClass(name: string) {
-  curClassName.value = name
-  mode.value = 'instances'
+async function loadInstances(name: string, offset: number, autoOpen: boolean) {
   instLoading.value = true
   instErr.value = ''
-  inst.value = null
   try {
-    inst.value = await fetchRefInstances(props.dump.path, name)
+    inst.value = await fetchRefInstances(props.dump.path, name, offset, instPageSize, instSort.value)
+    instOffset.value = offset
   } catch (e: any) {
     instErr.value = e?.message || String(e)
   } finally {
     instLoading.value = false
   }
-  // 自动查看该类浅堆最大的实例（多数场景用户想直接看持有大对象的引用链）
-  if (inst.value && inst.value.rows.length) {
+  // 自动查看该类浅堆最大的实例（仅首屏；翻页不打断用户当前追踪）
+  if (autoOpen && inst.value && inst.value.rows.length) {
     const top = inst.value.rows[0]
     openObj(top.obj_id, `${name} @ ${top.obj_id}`)
+  }
+}
+
+async function selectClass(name: string) {
+  curClassName.value = name
+  mode.value = 'instances'
+  inst.value = null
+  instOffset.value = 0
+  await loadInstances(name, 0, true)
+}
+
+/** 翻页（后端分页，10 万实例也能翻到底） */
+function pageInst(dir: number) {
+  const total = inst.value?.total ?? 0
+  const next = instOffset.value + dir * instPageSize
+  if (next < 0 || next >= total) return
+  void loadInstances(curClassName.value, next, false)
+}
+
+/** 切换排序口径后回到第一页重查 */
+function toggleInstSort() {
+  instSort.value = instSort.value === 'shallow' ? 'id' : 'shallow'
+  void loadInstances(curClassName.value, 0, false)
+}
+
+/** 实例行右键菜单 */
+function onInstCommand(cmd: string, objId: string) {
+  if (cmd === 'trace') {
+    void openObj(objId, `${curClassName.value} @ ${objId}`)
+  } else if (cmd === 'copy-id') {
+    void navigator.clipboard?.writeText(objId)
+    ElMessage.success('已复制对象 id')
+  } else if (cmd === 'copy-class') {
+    void navigator.clipboard?.writeText(curClassName.value)
+    ElMessage.success('已复制类名')
   }
 }
 
@@ -439,6 +658,31 @@ async function loadDetail(objId: string) {
     detailMap[objId] = { loading: false, error: (e?.message || String(e)), data: null }
   }
 }
+
+// ---------- 对象值（按需扫描，按对象 id 缓存，避免重复扫 dump） ----------
+const valuesMap = reactive<Record<string, { loading: boolean; error: string; data: ObjectValues | null }>>({})
+const valuesState = computed(() => valuesMap[focusObjId.value] ?? { loading: false, error: '', data: null })
+
+async function loadValues(objId: string): Promise<void> {
+  if (!objId || !props.dump.path) return
+  const exist = valuesMap[objId]
+  if (exist?.data || exist?.loading) return
+  valuesMap[objId] = { loading: true, error: '', data: null }
+  try {
+    valuesMap[objId] = { loading: false, error: '', data: await fetchObjectValues(props.dump.path, objId, 200) }
+  } catch (e: any) {
+    valuesMap[objId] = { loading: false, error: (e?.message || String(e)), data: null }
+  }
+}
+
+function reloadValues(): void {
+  const id = focusObjId.value
+  if (!id) return
+  delete valuesMap[id]
+  void loadValues(id)
+}
+
+watch(focusObjId, (id) => { if (id) void loadValues(id) }, { immediate: true })
 
 // ---------- 跨视图跳转预设（直方图 / 泄漏检测入口） ----------
 let lastIntentSeq = 0
@@ -482,6 +726,8 @@ function resetAll() {
   instErr.value = ''
   trace.value = []
   for (const k of Object.keys(detailMap)) delete detailMap[k]
+  for (const k of Object.keys(valuesMap)) delete valuesMap[k]
+  for (const k of Object.keys(pathsMap)) delete pathsMap[k]
 }
 
 watch(
@@ -554,7 +800,7 @@ function viaText(via: string, _next: unknown): string {
   gap: 8px;
   padding: 8px 12px;
   font-size: var(--font-size-sm);
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   background: var(--el-color-danger-light-9);
   border-bottom: 1px solid var(--el-color-danger-light-7);
 
@@ -566,17 +812,28 @@ function viaText(via: string, _next: unknown): string {
 
 .rf-loading {
   flex: 1;
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.rf-loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 460px;
+  text-align: center;
+}
+
 .rf-loading-tip {
-  position: absolute;
-  top: 58%;
   font-size: var(--font-size-sm);
   color: var(--el-text-color-secondary);
+
+  &.dim {
+    font-size: var(--font-size-xs);
+    color: var(--el-text-color-placeholder);
+  }
 }
 
 // ---------- 超限说明 ----------
@@ -585,7 +842,7 @@ function viaText(via: string, _next: unknown): string {
   gap: 8px;
   padding: 6px 12px;
   font-size: var(--font-size-sm);
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
   background: var(--el-color-warning-light-9);
   border-bottom: 1px solid var(--el-color-warning-light-7);
   flex-shrink: 0;
@@ -622,8 +879,20 @@ function viaText(via: string, _next: unknown): string {
   color: var(--el-text-color-secondary);
 }
 
-.rf-elapsed {
+// 浅堆口径：一行灰字，长文本单行省略（完整内容在 title 里）
+.rf-caliber {
   margin-left: auto;
+  max-width: 320px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--font-size-xs);
+  color: var(--el-text-color-secondary);
+  cursor: help;
+}
+
+.rf-elapsed {
+  margin-left: 8px;
   font-size: var(--font-size-xs);
   color: var(--el-text-color-placeholder);
 }
@@ -758,7 +1027,7 @@ function viaText(via: string, _next: unknown): string {
 .rf-list-err {
   padding: 10px;
   font-size: var(--font-size-sm);
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
 }
 
 // ---------- 右侧 ----------
@@ -948,12 +1217,12 @@ function viaText(via: string, _next: unknown): string {
   font-size: var(--font-size-sm);
 
   &.ok {
-    color: var(--el-color-success);
+    color: var(--stateSuccessFg);
     background: var(--el-color-success-light-9);
   }
 
   &.warn {
-    color: var(--el-color-warning);
+    color: var(--stateWarningFg);
     background: var(--el-color-warning-light-9);
   }
 }
@@ -1053,7 +1322,7 @@ function viaText(via: string, _next: unknown): string {
 }
 
 .rf-inc-count {
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
   font-size: var(--font-size-sm);
 }
 
@@ -1164,17 +1433,182 @@ function viaText(via: string, _next: unknown): string {
 }
 
 .rf-out-count {
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
   flex-shrink: 0;
 }
 
 .rf-more {
   margin-top: 6px;
   font-size: var(--font-size-xs);
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
 }
 
 .rf-notes-act {
   margin-top: 6px;
+}
+
+.rf-values-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-xs);
+  color: var(--stateErrorFg);
+}
+
+.rf-values-meta {
+  font-size: var(--font-size-xs);
+  color: var(--el-text-color-secondary);
+  margin-bottom: 4px;
+}
+
+.rf-string {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-sm);
+  word-break: break-all;
+}
+
+.rf-array pre {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  max-height: 96px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: var(--font-size-xs);
+  background: var(--el-fill-color-light);
+  border-radius: var(--radius-xs);
+}
+
+.rf-fields {
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--radius-xs);
+  padding: 4px 6px;
+}
+
+.rf-field-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: var(--font-size-xs);
+  border-bottom: 1px dashed var(--el-border-color-lighter);
+
+  &:last-child { border-bottom: none; }
+}
+
+.rf-field-name {
+  width: 180px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rf-field-type {
+  width: 64px;
+  flex-shrink: 0;
+  color: var(--el-text-color-placeholder);
+}
+
+.rf-field-value {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+  text-align: left;
+}
+
+.rf-field-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: var(--el-color-primary);
+
+  &:hover { text-decoration: underline; }
+}
+
+.rf-inst-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 8px 4px;
+  font-size: var(--font-size-xs);
+  color: var(--el-text-color-secondary);
+}
+
+.rf-inst-bar-text {
+  font-variant-numeric: tabular-nums;
+}
+
+.rf-inst-dd {
+  display: block;
+  width: 100%;
+}
+
+.rf-pager {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 0 2px;
+}
+
+.rf-paths {
+  margin-top: 8px;
+  border-top: 1px dashed var(--el-border-color-lighter);
+  padding-top: 6px;
+}
+
+.rf-paths-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.rf-path-alt {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--radius-xs);
+  padding: 6px 8px;
+  margin-bottom: 6px;
+}
+
+.rf-path-alt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-xs);
+  color: var(--el-text-color-secondary);
+  margin-bottom: 4px;
+}
+
+.rf-path-alt-idx {
+  font-weight: 600;
+  color: var(--el-color-primary);
+}
+
+.rf-path-alt-hop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 1px 0;
+}
+
+.rf-weak {
+  font-size: var(--font-size-xs);
+  color: var(--stateWarningFg, var(--el-color-warning));
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0 3px;
+  line-height: 1.4;
 }
 </style>

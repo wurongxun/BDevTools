@@ -3,7 +3,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { EditorTab, SqlResult } from '../types'
+import type { EditorTab, SqlExecuteMode, SqlResult } from '../types'
 
 let tabCounter = 0
 /** 「新建查询」强制新建的递增序号，用于标题后缀（新查询 1 / 新查询 2 …） */
@@ -11,8 +11,27 @@ let newQuerySeq = 0
 
 /** 脚本 tab 单条执行结果项（含执行语句 + 结果） */
 export interface ScriptResultEntry {
+  /** 唯一标识。**不能用数组下标当组件 key** —— 关闭中间某个子结果会让下标平移，
+   *  KeepAlive 里旧下标的缓存实例会被错当成新条目复用，显示张冠李戴的结果。 */
+  id: string
   sql: string
   result: SqlResult | null
+}
+
+/** 新增子结果时省略 id（由 store 统一生成） */
+export type NewScriptResultEntry = Omit<ScriptResultEntry, 'id'>
+
+/** 子结果 id 自增序号（同一会话内唯一即可） */
+let resultSeq = 0
+
+/**
+ * 「是不是同一条 SQL」的比较形态：折叠空白 + 去首尾空 + 去语句末分号。
+ * **刻意不做大小写归一**：MySQL 的 `=` 在非二进制排序规则下不区分大小写，PG / Oracle 区分，
+ * 一旦把 `where name='X'` 和 `where name='x'` 判成同一条，这两种库上会看到互相覆盖的结果。
+ * 空白差异却是同一个意图（换个缩进不该被当成新语句），所以只归空白。
+ */
+function normalizeSqlKey(sql: string): string {
+  return sql.replace(/\s+/g, ' ').trim().replace(/;\s*$/, '')
 }
 
 export const useEditorStore = defineStore('dbEditor', () => {
@@ -63,6 +82,7 @@ export const useEditorStore = defineStore('dbEditor', () => {
       // 对象列表 / 系统信息 tab 的细分类型（object-list 按 objectType 区分视图/索引/…，
       // system-info 按 subType 区分会话状态/全局变量…）
       objectType: tab.objectType,
+      objectName: tab.objectName,
       subType: tab.subType,
     }
     // 检查是否已存在相同的 Tab：sql 文件按路径去重，其余按类型+连接+库+表+细分类型去重
@@ -76,6 +96,7 @@ export const useEditorStore = defineStore('dbEditor', () => {
         t.database === newTab.database &&
         t.table === newTab.table &&
         t.objectType === newTab.objectType &&
+        t.objectName === newTab.objectName &&
         t.subType === newTab.subType
       )
     })
@@ -98,6 +119,19 @@ export const useEditorStore = defineStore('dbEditor', () => {
     }
   }
 
+  /**
+   * 关闭全部 Tab。
+   *
+   * 逐个调 `closeTab` 也行，但那会对同一个数组做 n 次 splice（中间态还有激活项反复易主），
+   * 直接整体清空，再一次性清掉各 tab 的子结果缓存（否则 tabResults 会留下一堆孤儿结果）。
+   */
+  function closeAllTabs() {
+    const ids = tabs.value.map(t => t.id)
+    ids.forEach(id => clearTabResults(id))
+    tabs.value = []
+    activeTabId.value = ''
+  }
+
   /** 更新 Tab 内容 */
   function updateTabContent(tabId: string, content: string) {
     const tab = tabs.value.find(t => t.id === tabId)
@@ -107,11 +141,51 @@ export const useEditorStore = defineStore('dbEditor', () => {
     }
   }
 
-  /** 追加一条执行结果（多语句分次调用，自动激活最新子结果） */
-  function appendTabResult(tabId: string, entry: ScriptResultEntry) {
+  /**
+   * 记录一次执行结果，返回它落在哪个下标（并自动激活该子结果）。
+   *
+   * - `reuse`（「执行 SQL 语句」）：同一条语句已经有子结果就**就地替换**它，不再追加新的
+   *   子 tab —— 反复跑同一条语句时不会堆出一串同名标签。没有同语句时才追加。
+   * - `new-tab`（「在新标签页中执行」）：忽略同语句，**永远追加**。这是用户明确要留多份结果
+   *   做对比时才点的，静默复用会让他以为「第二份没出来」。
+   *
+   * 同语句命中**最后一个**：用户可能已经用 new-tab 攒了好几个同语句结果，「执行 SQL 语句」
+   * 应该落到最新的那个（DBeaver / DataGrip 的「重跑当前语句」也是这个语义）。
+   *
+   * ⚠ 复用时是「替换数组元素 + **换发新 id**」，不是改其中的字段：SqlTab 里
+   * QueryResultView 以 `:key="entry.id"` 挂在 KeepAlive 上，id 不变 ⇒ 复用的还是旧实例，
+   * 而它只在挂载那次消费 `initialResult` ⇒ 新结果没人认领，用户会以为「点了没反应」。
+   * 换 id 会换出新实例，结果 / 页码 / 列过滤都从这一次执行重新开始；旧实例交给 KeepAlive
+   * 的 `max` 淘汰（这本来就是「关闭子 tab 不会自动出缓存」那条约定的兜底）。
+   */
+  function recordExecution(
+    tabId: string,
+    entry: NewScriptResultEntry,
+    mode: SqlExecuteMode = 'reuse',
+  ): number {
     if (!tabResults.value[tabId]) tabResults.value[tabId] = []
-    tabResults.value[tabId].push(entry)
-    activeResultIndex.value[tabId] = tabResults.value[tabId].length - 1
+    const arr = tabResults.value[tabId]
+
+    let idx = -1
+    if (mode === 'reuse') {
+      const key = normalizeSqlKey(entry.sql)
+      for (let i = arr.length - 1; i >= 0; i--) {
+        if (normalizeSqlKey(arr[i].sql) === key) {
+          idx = i
+          break
+        }
+      }
+    }
+
+    const next: ScriptResultEntry = { ...entry, id: `res_${++resultSeq}` }
+    if (idx >= 0) {
+      arr[idx] = next
+    } else {
+      arr.push(next)
+      idx = arr.length - 1
+    }
+    activeResultIndex.value[tabId] = idx
+    return idx
   }
 
   /** 设置激活的子结果索引 */
@@ -199,8 +273,9 @@ export const useEditorStore = defineStore('dbEditor', () => {
     activeResultIndex,
     openTab,
     closeTab,
+    closeAllTabs,
     updateTabContent,
-    appendTabResult,
+    recordExecution,
     setActiveResultIndex,
     closeResultAt,
     updateResultAt,

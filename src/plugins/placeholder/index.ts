@@ -1,7 +1,7 @@
 import { markRaw } from 'vue'
 import { Grid } from '@element-plus/icons-vue'
-import type { ToolPlugin } from '@/core/pluginManager'
-import MainPanel from './MainPanel.vue'
+import type { BuiltinPluginImpl } from '@/core/pluginManager'
+import { lazyView } from '@/core/plugin/lazy'
 
 /**
  * 占位插件 —— 用于验证「插件不提供 sidebarPanel」时宿主的布局适配
@@ -13,11 +13,8 @@ import MainPanel from './MainPanel.vue'
  * 验证完成后：删除本目录，并移除 src/plugins/index.ts 中的 import 与注册两行即可。
  */
 export default {
-  id: 'placeholder',
-  label: '占位示例',
-  description: '无侧栏插件的布局适配示例（只有主面板，无侧栏/标签条）',
   icon: markRaw(Grid),
   // 刻意不提供 sidebarPanel
-  mainPanel: markRaw(MainPanel),
+  mainPanel: lazyView('placeholder', 'main', () => import('./MainPanel.vue')),
   order: 99,
-} satisfies ToolPlugin
+} satisfies BuiltinPluginImpl

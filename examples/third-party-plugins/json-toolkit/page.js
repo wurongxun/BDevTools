@@ -4,18 +4,21 @@
  * 这个 iframe 是不透明源（sandbox="allow-scripts"，没有 allow-same-origin）：
  * 访问不到 parent、拿不到任何 Tauri 对象，唯一的出口是把消息发给宿主。
  *
- * 桥协议（与宿主 PLUGIN_BRIDGE_VERSION 一致）：
+ * 桥协议（v2，与宿主 `PLUGIN_BRIDGE_VERSION` 一致）：
  *   页面 → 宿主：{ v, kind: 'ready' }
  *                { v, kind: 'call', reqId, func, input }
- *   宿主 → 页面：{ v, kind: 'theme', dark }
+ *   宿主 → 页面：{ v, kind: 'context', dark, locale, wasm }
  *                { v, reqId, ok: true, data } | { v, reqId, ok: false, error }
+ *
+ * v1 的 `theme` 消息在 v2 里合并进了 `context`；宿主仍能兼容 v1 页面
+ * （用哪个版本发 ready 就用哪个版本回），但那样拿不到 `locale`。
  *
  * 注意：宿主 CSP 为 script-src 'self'，内联脚本与内联事件处理器都会被拒绝。
  */
 (function () {
   'use strict'
 
-  var BRIDGE = 1
+  var BRIDGE = 2
   var seq = 0
   var pending = new Map()
 
@@ -48,8 +51,8 @@
     var d = e.data
     if (!d || typeof d !== 'object' || d.v !== BRIDGE) return
 
-    if (d.kind === 'theme') {
-      applyTheme(!!d.dark)
+    if (d.kind === 'context') {
+      applyContext(d)
       return
     }
     var p = pending.get(d.reqId)
@@ -59,9 +62,13 @@
     else p.reject(new Error(d.error || '插件调用失败'))
   })
 
-  function applyTheme(dark) {
-    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
-    el.theme.textContent = dark ? 'dark' : 'light'
+  /** 宿主上下文：主题 + 语言（语言是宿主设置，不是 navigator.language） */
+  function applyContext(ctx) {
+    document.documentElement.setAttribute('data-theme', ctx.dark ? 'dark' : 'light')
+    el.theme.textContent = ctx.dark ? 'dark' : 'light'
+    if (ctx.locale) {
+      document.documentElement.setAttribute('data-locale', ctx.locale)
+    }
   }
 
   function show(text, isError) {
@@ -161,6 +168,6 @@
   })
 
   el.bridge.textContent = String(BRIDGE)
-  // 握手：宿主收到 ready 后才会回灌主题
+  // 握手：宿主收到 ready 后才会回灌上下文（按这里发的版本号应答）
   post({ kind: 'ready' })
 })()

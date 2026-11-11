@@ -28,12 +28,38 @@ export function showContextMenu(options: ContextMenuOptions) {
   const visible = ref(true)
   const position = ref({ x: options.x, y: options.y })
 
+  // 先占好实例壳子：关闭是异步的（留 150ms 给收起动画），期间可能已经开了新菜单
+  const instance: {
+    app: ReturnType<typeof createApp> | null
+    container: HTMLDivElement
+    close: () => void
+  } = { app: null, container, close: () => {} }
+
+  let closing = false
+
+  instance.close = () => {
+    // 重复关闭直接忽略：原来的实现会排两个定时器，第二次清空引用更危险
+    if (closing) return
+    closing = true
+    visible.value = false
+    setTimeout(() => {
+      instance.app?.unmount()
+      if (container.parentNode) {
+        container.parentNode.removeChild(container)
+      }
+      // 只有「自己仍是当前实例」时才清空：关闭期间新开的菜单不能被这次清空抹掉引用，
+      // 否则下一次打开时检测不到旧菜单 ⇒ 两个菜单叠在一起、旧的永远关不掉
+      if (contextMenuInstance === instance) {
+        contextMenuInstance = null
+      }
+    }, 150)
+  }
+
   const app = createApp({
     setup() {
-      const handleSelect = (item: MenuItem) => {
-        if (item.onClick) {
-          item.onClick()
-        }
+      // 不要在这里调 item.onClick：ContextMenu 内部已经调过一次了，
+      // 再调一次就是两遍（过滤条件会被加两条）。这里只负责关闭。
+      const handleSelect = (_item: MenuItem) => {
         closeContextMenu()
       }
 
@@ -52,22 +78,9 @@ export function showContextMenu(options: ContextMenuOptions) {
     }
   })
 
+  instance.app = app
   app.mount(container)
-
-  contextMenuInstance = {
-    app,
-    container,
-    close: () => {
-      visible.value = false
-      setTimeout(() => {
-        app.unmount()
-        if (container.parentNode) {
-          container.parentNode.removeChild(container)
-        }
-        contextMenuInstance = null
-      }, 150)
-    }
-  }
+  contextMenuInstance = instance
 
   return contextMenuInstance
 }

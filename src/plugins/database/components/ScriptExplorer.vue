@@ -572,7 +572,7 @@ onUnmounted(() => {
   background: var(--el-fill-color-light);
 }
 .ctx-item.danger {
-  color: var(--el-color-danger);
+  color: var(--stateErrorFg);
 }
 .delete-message {
   font-size: var(--font-size-md);

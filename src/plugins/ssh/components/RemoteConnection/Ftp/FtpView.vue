@@ -88,8 +88,35 @@
           </div>
         </div>
         <div class="file-list">
+          <!-- 表头：名称 / 大小 / 类型 / 修改时间可点击排序 -->
+          <div class="file-list-header">
+            <span class="col-icon-spacer" aria-hidden="true" />
+            <template v-for="col in localColumns" :key="col.key">
+              <button
+                v-if="col.sortable"
+                type="button"
+                class="col-btn"
+                :class="[col.cls, { 'col-sorted': localSort.key === col.key }]"
+                :aria-label="sortLabel(localSort, col)"
+                @click="toggleSort('local', col.key)"
+              >
+                <span class="col-label">{{ col.label }}</span>
+                <svg
+                  class="sort-arrows"
+                  :class="sortArrowClass(localSort, col.key)"
+                  viewBox="0 0 10 14"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path class="arrow-up" d="M5 0 9 5H1Z" />
+                  <path class="arrow-down" d="M5 14 1 9h8Z" />
+                </svg>
+              </button>
+              <span v-else class="col-static" :class="col.cls">{{ col.label }}</span>
+            </template>
+          </div>
           <div
-            v-for="file in localFiles"
+            v-for="file in sortedLocalFiles"
             :key="file.path"
             class="file-item"
             :class="{
@@ -104,6 +131,7 @@
             </span>
             <span class="file-name">{{ file.name }}</span>
             <span class="file-size">{{ file.isDirectory ? '' : formatSize(file.size) }}</span>
+            <span class="file-type" :title="fileTypeOf(file)">{{ fileTypeOf(file) }}</span>
             <span class="file-time">{{ file.modifiedTime }}</span>
           </div>
           <div v-if="localFiles.length === 0" class="empty-tip">
@@ -115,8 +143,9 @@
       <!-- 分隔线 -->
       <div class="panel-divider" />
 
-      <!-- 远程文件面板 -->
-      <div class="ftp-panel remote-panel">
+      <!-- 远程文件面板（系统级拖放落点） -->
+      <div class="ftp-panel remote-panel" :class="{ 'drop-active': dropActive }" ref="remotePanelEl">
+        <div v-if="dropActive" class="drop-overlay">松开即上传到 {{ remotePath }}</div>
         <div class="panel-header">
           <span class="panel-title">远程文件</span>
           <!-- 面包屑导航 -->
@@ -145,7 +174,34 @@
           </div>
         </div>
         <div class="file-list">
-          <!-- 上级目录 -->
+          <!-- 表头：名称 / 大小 / 类型 / 修改时间可点击排序，权限列仅展示 -->
+          <div class="file-list-header">
+            <span class="col-icon-spacer" aria-hidden="true" />
+            <template v-for="col in remoteColumns" :key="col.key">
+              <button
+                v-if="col.sortable"
+                type="button"
+                class="col-btn"
+                :class="[col.cls, { 'col-sorted': remoteSort.key === col.key }]"
+                :aria-label="sortLabel(remoteSort, col)"
+                @click="toggleSort('remote', col.key)"
+              >
+                <span class="col-label">{{ col.label }}</span>
+                <svg
+                  class="sort-arrows"
+                  :class="sortArrowClass(remoteSort, col.key)"
+                  viewBox="0 0 10 14"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path class="arrow-up" d="M5 0 9 5H1Z" />
+                  <path class="arrow-down" d="M5 14 1 9h8Z" />
+                </svg>
+              </button>
+              <span v-else class="col-static" :class="col.cls">{{ col.label }}</span>
+            </template>
+          </div>
+          <!-- 上级目录（补齐列占位，保持与数据行对齐；不参与排序） -->
           <div
             v-if="remotePath !== '/' && remotePath !== ''"
             class="file-item file-item-dir"
@@ -154,10 +210,12 @@
             <span class="file-icon">📂</span>
             <span class="file-name">...</span>
             <span class="file-size"></span>
+            <span class="file-type"></span>
+            <span class="file-perm"></span>
             <span class="file-time"></span>
           </div>
           <div
-            v-for="file in remoteFiles"
+            v-for="file in sortedRemoteFiles"
             :key="file.path"
             class="file-item"
             :class="{
@@ -173,6 +231,8 @@
             </span>
             <span class="file-name">{{ file.name }}</span>
             <span class="file-size">{{ file.isDirectory ? '' : formatSize(file.size) }}</span>
+            <span class="file-type" :title="fileTypeOf(file)">{{ fileTypeOf(file) }}</span>
+            <span class="file-perm" title="Unix 权限（右键可修改）">{{ file.permissions || '-' }}</span>
             <span class="file-time">{{ file.modifiedTime }}</span>
           </div>
           <div v-if="remoteFiles.length === 0 && isConnected" class="empty-tip">
@@ -218,6 +278,21 @@
       </template>
     </GlobalDialog>
 
+    <!-- 411 = 二次验证（SFTP 会话独立，需要单独输入一次验证码） -->
+    <GlobalDialog v-model="showMfaDialog" title="二次验证" width="420px">
+      <div class="ftp-delete-message">{{ mfaMessage }}</div>
+      <el-input
+        v-model="mfaCode"
+        placeholder="请输入动态验证码"
+        autocomplete="off"
+        @keyup.enter="confirmMfa"
+      />
+      <template #footer>
+        <app-button size="small" @click="showMfaDialog = false">取消</app-button>
+        <app-button size="small" type="primary" @click="confirmMfa">验证并连接</app-button>
+      </template>
+    </GlobalDialog>
+
     <!-- 右键上下文菜单 -->
     <teleport to="body">
       <div
@@ -226,29 +301,48 @@
         :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }"
         @click.stop
       >
-        <div class="context-menu-item" @click="handleSaveBookmark">
+        <div v-if="contextMenuTarget?.isDirectory" class="context-menu-item" @click="handleSaveBookmark">
           <el-icon><Star /></el-icon> 保存为书签
+        </div>
+        <div class="context-menu-item" @click="handleChmod">
+          <el-icon><Lock /></el-icon> 修改权限
+        </div>
+        <div class="context-menu-item" @click="handleDownloadSelected">
+          <el-icon><Download /></el-icon> 下载所选
         </div>
       </div>
     </teleport>
+
+    <!-- 修改 Unix 权限（八进制，如 755） -->
+    <GlobalPromptDialog
+      v-if="showChmodDialog"
+      v-model="showChmodDialog"
+      title="修改权限"
+      message="输入三位或四位八进制权限值，例如 755 / 0644"
+      :initial-value="chmodInitial"
+      :validator="validateChmod"
+      @confirm="confirmChmod"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@/api/rpc'
-import { desktopDir, dirname, open } from '@/core/runtime'
-import { Star, Close } from '@element-plus/icons-vue'
+import { desktopDir, dirname, open, onFileDrop } from '@/core/runtime'
+import { Star, Close, Lock, Download } from '@element-plus/icons-vue'
 // 保留 Element Plus 图标导入（其他位置可能使用）
-import { ElInput } from 'element-plus'
+import { ElInput, ElMessage } from 'element-plus'
 import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
 import GlobalDialog from '@/components/GlobalDialog.vue'
 import { ConnectionStatus } from '../../../types'
-import type { ConnectionTab, RemoteConnection, FtpFileItem } from '../../../types'
-import { useDocumentManagerStore } from '@/plugins/files/store/documents'
+import type { ConnectionTab, RemoteConnection, FtpFileItem, TransferItem } from '../../../types'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 import { useConnectionStore, useFtpStore } from '../../../store'
 import NotificationUtil from '@/utils/NotificationUtil'
+import { withConnectOverrides } from '../../../utils/target'
 import TransferPanel from '../TransferPanel.vue'
+import type { Unsubscribe } from '@/core/runtime'
 
 const props = defineProps<{
   tab: ConnectionTab
@@ -278,6 +372,116 @@ const selectedRemoteFiles = ref<string[]>([])
 
 const localFiles = computed(() => panel.value?.localFiles || [])
 const remoteFiles = computed(() => panel.value?.remoteFiles || [])
+
+// ==================== 列表排序 / 文件类型 ====================
+
+type SortKey = 'name' | 'size' | 'type' | 'time'
+type SortOrder = 'asc' | 'desc'
+interface SortState { key: SortKey | null; order: SortOrder }
+interface FileColumn {
+  key: SortKey | 'perm'
+  label: string
+  cls: string
+  sortable: boolean
+}
+
+/** 两侧面板各自排序；key 为 null 时保持后端顺序（目录在前、名称升序） */
+const localSort = ref<SortState>({ key: null, order: 'asc' })
+const remoteSort = ref<SortState>({ key: null, order: 'asc' })
+
+const COL_NAME: FileColumn = { key: 'name', label: '名称', cls: 'col-name', sortable: true }
+const COL_SIZE: FileColumn = { key: 'size', label: '大小', cls: 'col-size', sortable: true }
+const COL_TYPE: FileColumn = { key: 'type', label: '类型', cls: 'col-type', sortable: true }
+const COL_PERM: FileColumn = { key: 'perm', label: '权限', cls: 'col-perm', sortable: false }
+const COL_TIME: FileColumn = { key: 'time', label: '修改时间', cls: 'col-time', sortable: true }
+const localColumns: FileColumn[] = [COL_NAME, COL_SIZE, COL_TYPE, COL_TIME]
+const remoteColumns: FileColumn[] = [COL_NAME, COL_SIZE, COL_TYPE, COL_PERM, COL_TIME]
+
+/** 首次点击各列的默认方向：名称/类型升序，大小/时间降序 */
+const DEFAULT_ORDER: Record<SortKey, SortOrder> = {
+  name: 'asc', size: 'desc', type: 'asc', time: 'desc'
+}
+
+function toggleSort(side: 'local' | 'remote', key: SortKey | 'perm') {
+  if (key === 'perm') return
+  const state = side === 'local' ? localSort : remoteSort
+  state.value = state.value.key === key
+    ? { key, order: state.value.order === 'asc' ? 'desc' : 'asc' }
+    : { key, order: DEFAULT_ORDER[key] }
+}
+
+function sortLabel(state: SortState, col: FileColumn): string {
+  if (state.key !== col.key) return `按${col.label}排序`
+  return `按${col.label}排序，当前${state.order === 'asc' ? '升序' : '降序'}，点击切换方向`
+}
+
+function sortArrowClass(state: SortState, key: SortKey | 'perm'): string {
+  if (key === 'perm' || state.key !== key) return ''
+  return state.order === 'asc' ? 'sort-asc' : 'sort-desc'
+}
+
+/** 常见扩展名归到可读类别；未登记的显示「XXX 文件」，无扩展名显示「文件」 */
+const FILE_TYPE_LABELS: Record<string, string> = {
+  txt: '文本文档', md: 'Markdown 文档', log: '日志文件', pdf: 'PDF 文档',
+  doc: 'Word 文档', docx: 'Word 文档', xls: 'Excel 表格', xlsx: 'Excel 表格',
+  csv: 'CSV 表格', ppt: 'PPT 演示', pptx: 'PPT 演示',
+  json: 'JSON 文件', xml: 'XML 文件', yaml: 'YAML 文件', yml: 'YAML 文件',
+  html: 'HTML 文档', css: 'CSS 样式', scss: 'SCSS 样式', sql: 'SQL 脚本',
+  js: 'JavaScript 文件', mjs: 'JavaScript 文件', cjs: 'JavaScript 文件',
+  ts: 'TypeScript 文件', vue: 'Vue 组件', jsx: 'JavaScript 文件', tsx: 'TypeScript 文件',
+  py: 'Python 脚本', java: 'Java 源码', rs: 'Rust 源码', go: 'Go 源码',
+  c: 'C 源码', cpp: 'C++ 源码', h: 'C 头文件', sh: 'Shell 脚本', bat: '批处理文件', ps1: 'PowerShell 脚本',
+  png: '图像', jpg: '图像', jpeg: '图像', gif: '图像', svg: '图像',
+  webp: '图像', bmp: '图像', ico: '图像',
+  mp4: '视频', avi: '视频', mov: '视频', mkv: '视频',
+  mp3: '音频', wav: '音频', flac: '音频',
+  zip: '压缩文件', rar: '压缩文件', '7z': '压缩文件', tar: '压缩文件',
+  gz: '压缩文件', bz2: '压缩文件', tgz: '压缩文件',
+  exe: '应用程序', msi: '安装包', dll: '动态链接库', so: '共享库', jar: 'JAR 包'
+}
+
+function fileTypeOf(file: FtpFileItem): string {
+  if (file.isDirectory) return '文件夹'
+  const dot = file.name.lastIndexOf('.')
+  const ext = dot > 0 ? file.name.slice(dot + 1).toLowerCase() : ''
+  if (!ext) return '文件'
+  return FILE_TYPE_LABELS[ext] || `${ext.toUpperCase()} 文件`
+}
+
+function compareFiles(a: FtpFileItem, b: FtpFileItem, key: SortKey): number {
+  switch (key) {
+    case 'name':
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    case 'size':
+      return (Number(a.size) || 0) - (Number(b.size) || 0)
+    case 'type':
+      return fileTypeOf(a).localeCompare(fileTypeOf(b), 'zh-CN')
+    case 'time':
+      // 后端格式固定 "YYYY-MM-DD HH:mm:ss"（本地时区），字典序即时间序；空值视为最旧
+      return (a.modifiedTime || '').localeCompare(b.modifiedTime || '')
+    default:
+      return 0
+  }
+}
+
+/** 目录恒在前（与后端默认顺序一致），同组内按所选列排序，同值按名称兜底 */
+function sortFiles(files: FtpFileItem[], state: SortState): FtpFileItem[] {
+  const list = [...files]
+  if (!state.key) return list
+  const key = state.key
+  const dir = state.order === 'asc' ? 1 : -1
+  list.sort((a, b) => {
+    if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1
+    const cmp = compareFiles(a, b, key)
+    return cmp !== 0
+      ? cmp * dir
+      : a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+  })
+  return list
+}
+
+const sortedLocalFiles = computed(() => sortFiles(localFiles.value, localSort.value))
+const sortedRemoteFiles = computed(() => sortFiles(remoteFiles.value, remoteSort.value))
 
 // 面包屑导航
 const breadcrumbParts = computed(() => {
@@ -316,6 +520,7 @@ onMounted(async () => {
   ftpStore.initPanel(props.tab.id)
   loadBookmarks()
   window.addEventListener('click', handleGlobalClick)
+  void setupFileDrop()
   // 本地目录默认读取桌面目录
   try {
     const desktop = await desktopDir()
@@ -329,14 +534,24 @@ onMounted(async () => {
 onUnmounted(() => {
   stopConnectionCheck()
   window.removeEventListener('click', handleGlobalClick)
+  unlistenDrop?.()
+  unlistenDrop = null
   if (sftpSessionId) {
     invoke('sftp_disconnect', { sessionId: sftpSessionId }).catch(() => {})
   }
   ftpStore.destroyPanel(props.tab.id)
 })
 
-async function handleConnect() {
+const showMfaDialog = ref(false)
+const mfaMessage = ref('')
+const mfaCode = ref('')
+
+/** optionsOverride 为字符串时表示带一次性验证码重连；来自 @click 的事件对象一律忽略 */
+async function handleConnect(optionsOverride?: string | Event) {
   if (isConnected.value) return
+  const options = typeof optionsOverride === 'string'
+    ? optionsOverride
+    : (props.connection.advanced_options || '')
 
   isConnecting.value = true
   connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.CONNECTING)
@@ -349,7 +564,9 @@ async function handleConnect() {
       username: props.connection.username,
       password: props.connection.password,
       authType: props.connection.auth_type || 'password',
-      privateKeyPath: props.connection.private_key_path || ''
+      privateKeyPath: props.connection.private_key_path || '',
+      passphrase: props.connection.passphrase || '',
+      options
     })
 
     if (res.code === 200) {
@@ -363,36 +580,203 @@ async function handleConnect() {
       startConnectionCheck()
     } else {
       connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.ERROR)
+      // 409 = 未知主机密钥：SFTP 侧不重复做信任交互，引导用户先在终端连一次
+      const msg = res.code === 409
+        ? '该主机密钥尚未保存，请先打开此连接的终端并完成指纹确认'
+        : (res.msg || 'SFTP 连接失败')
+      if (res.code === 411) {
+        mfaMessage.value = String(res.msg || '')
+        mfaCode.value = ''
+        showMfaDialog.value = true
+      } else {
+        ElMessage.error(msg)
+      }
     }
   } catch (error) {
     connectionStore.updateTabStatus(props.tab.id, ConnectionStatus.ERROR)
     console.error('SFTP connect error:', error)
+    ElMessage.error('SFTP 连接异常')
   } finally {
     isConnecting.value = false
   }
 }
 
+function confirmMfa() {
+  const code = mfaCode.value.trim()
+  if (!code) return
+  showMfaDialog.value = false
+  void handleConnect(withConnectOverrides(props.connection.advanced_options, { mfaCode: code }))
+}
+
+/** 拼接远端路径（base 可能是 '/'） */
+function joinRemote(base: string, name: string): string {
+  return `${base.replace(/\/+$/, '')}/${name}`
+}
+
+/** 本地路径沿用原串的分隔符，避免 Windows 上混用 / 与 \ 触发路径解析差异 */
+function joinLocal(base: string, name: string): string {
+  const sep = base.includes('\\') ? '\\' : '/'
+  return `${base.replace(/[\\/]+$/, '')}${sep}${name}`
+}
+
+/** 把选中的路径还原成文件项；拖放进来的路径不在列表里，用 local_stat 补齐 */
+async function resolveLocalItems(paths: string[]): Promise<FtpFileItem[]> {
+  const out: FtpFileItem[] = []
+  for (const p of paths) {
+    const known = localFiles.value.find(f => f.path === p)
+    if (known) { out.push(known); continue }
+    const res = await invoke<any>('local_stat', { path: p })
+    const stat = res.code === 200 ? res.data : null
+    out.push({
+      name: p.split(/[/\\]/).pop() || p,
+      path: p,
+      isDirectory: stat?.isDirectory ?? false,
+      size: stat?.size ?? 0,
+      modifiedTime: '',
+      permissions: ''
+    })
+  }
+  return out
+}
+
+/**
+ * 本地目录递归展开：每个子目录先在远端 mkdir（已存在会报错，忽略），
+ * 再把文件摊平成完整目标路径的 TransferItem。目录深度用显式队列，避免递归爆栈。
+ */
+async function expandLocal(items: FtpFileItem[], remoteBase: string): Promise<TransferItem[]> {
+  const out: TransferItem[] = []
+  const queue = items.map(item => ({ item, remoteDir: remoteBase }))
+  while (queue.length > 0 && sftpSessionId) {
+    const { item, remoteDir } = queue.shift()!
+    if (item.isDirectory) {
+      const targetDir = joinRemote(remoteDir, item.name)
+      await invoke('sftp_mkdir', { sessionId: sftpSessionId, path: targetDir }).catch(() => {})
+      const res = await invoke<any>('local_list_dir', { path: item.path })
+      if (res.code === 200) {
+        for (const child of res.data as FtpFileItem[]) queue.push({ item: child, remoteDir: targetDir })
+      }
+    } else {
+      out.push({
+        fileName: item.name,
+        sourcePath: item.path,
+        targetPath: joinRemote(remoteDir, item.name),
+        size: item.size
+      })
+    }
+  }
+  return out
+}
+
+/** 远端目录递归展开：本地先 ensure_dir，再逐层列目录 */
+async function expandRemote(items: FtpFileItem[], localBase: string): Promise<TransferItem[]> {
+  const out: TransferItem[] = []
+  const queue = items.map(item => ({ item, localDir: localBase }))
+  while (queue.length > 0 && sftpSessionId) {
+    const { item, localDir } = queue.shift()!
+    if (item.isDirectory) {
+      const targetDir = joinLocal(localDir, item.name)
+      await invoke('ensure_dir', { path: targetDir }).catch(() => {})
+      const res = await invoke<any>('sftp_list_dir', { sessionId: sftpSessionId, path: item.path })
+      if (res.code === 200) {
+        for (const child of res.data as FtpFileItem[]) queue.push({ item: child, localDir: targetDir })
+      }
+    } else {
+      out.push({
+        fileName: item.name,
+        sourcePath: item.path,
+        targetPath: joinLocal(localDir, item.name),
+        size: item.size
+      })
+    }
+  }
+  return out
+}
+
+async function uploadPaths(paths: string[]) {
+  if (!sftpSessionId || paths.length === 0) return
+  const items = await expandLocal(await resolveLocalItems(paths), remotePath.value)
+  if (items.length === 0) { NotificationUtil.warn('所选目录中没有可上传的文件'); return }
+  ftpStore.enqueueUploads(props.tab.id, sftpSessionId, items)
+}
+
 async function handleUpload() {
-  if (!sftpSessionId || selectedLocalFiles.value.length === 0) return
-  await ftpStore.uploadFiles(
-    props.tab.id,
-    sftpSessionId,
-    selectedLocalFiles.value,
-    remotePath.value
-  )
+  await uploadPaths(selectedLocalFiles.value)
 }
 
 async function handleDownload() {
   if (!sftpSessionId || selectedRemoteFiles.value.length === 0) return
   const dir = await open({ directory: true, multiple: false })
-  if (dir) {
-    await ftpStore.downloadFiles(
-      props.tab.id,
-      sftpSessionId,
-      selectedRemoteFiles.value,
-      dir
-    )
-  }
+  if (!dir) return
+  const selected = selectedRemoteFiles.value
+    .map(p => remoteFiles.value.find(f => f.path === p))
+    .filter((f): f is FtpFileItem => !!f)
+  const items = await expandRemote(selected, String(dir))
+  if (items.length === 0) { NotificationUtil.warn('所选目录中没有可下载的文件'); return }
+  ftpStore.enqueueDownloads(props.tab.id, sftpSessionId, items)
+}
+
+/** 右键「下载所选」：与工具栏一致，但复用当前选区 */
+function handleDownloadSelected() {
+  closeAllContextMenus()
+  void handleDownload()
+}
+
+// ==================== 权限（chmod） ====================
+
+const showChmodDialog = ref(false)
+const chmodInitial = ref('')
+const chmodPath = ref('')
+
+function validateChmod(value: string): string | true {
+  const v = value.trim()
+  if (!/^[0-7]{3,4}$/.test(v)) return '请输入 3~4 位八进制数字（0-7）'
+  return true
+}
+
+function handleChmod() {
+  const file = contextMenuTarget.value
+  if (!file) return
+  chmodPath.value = file.path
+  chmodInitial.value = (file.permissions || '').slice(-3) || '644'
+  closeAllContextMenus()
+  showChmodDialog.value = true
+}
+
+async function confirmChmod(value: string) {
+  if (!sftpSessionId) return
+  const mode = parseInt(value.trim(), 8)
+  await ftpStore.chmodRemote(props.tab.id, sftpSessionId, chmodPath.value, mode)
+}
+
+// ==================== 系统级拖放上传 ====================
+
+const remotePanelEl = ref<HTMLElement>()
+const dropActive = ref(false)
+let unlistenDrop: Unsubscribe | null = null
+
+function isInsideRemotePanel(position?: { x: number; y: number }): boolean {
+  if (!position || !remotePanelEl.value) return false
+  const rect = remotePanelEl.value.getBoundingClientRect()
+  const dpr = window.devicePixelRatio || 1
+  const x = position.x / dpr
+  const y = position.y / dpr
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+}
+
+async function setupFileDrop() {
+  unlistenDrop = await onFileDrop((payload) => {
+    // 所有 FTP tab 都常驻（v-show），必须只让激活且已连接的那个响应，
+    // 否则一次拖放会被 N 个面板重复入队。
+    const isFocusedTab = connectionStore.activeTabId === props.tab.id
+      || (connectionStore.splitEnabled && connectionStore.secondaryTabId === props.tab.id)
+    if (!isConnected.value || !isFocusedTab) return
+    if (payload.type === 'leave') { dropActive.value = false; return }
+    const overPanel = isInsideRemotePanel(payload.position)
+    dropActive.value = payload.type !== 'drop' && overPanel
+    if (payload.type === 'drop' && overPanel && payload.paths.length > 0) {
+      void uploadPaths(payload.paths)
+    }
+  })
 }
 
 // 弹窗状态（新建目录/重命名/删除确认，统一使用 Global 弹窗组件）
@@ -598,7 +982,6 @@ function navigateToBookmark(path: string) {
 // 右键菜单
 function handleRemoteFileContext(file: FtpFileItem, event: MouseEvent) {
   event.preventDefault()
-  if (!file.isDirectory) return
   contextMenuTarget.value = file
   contextMenuX.value = event.clientX
   contextMenuY.value = event.clientY
@@ -628,6 +1011,10 @@ function handleRemoveBookmark(path: string) {
 
 // 点击外部关闭右键菜单
 function handleGlobalClick() {
+  contextMenuVisible.value = false
+}
+
+function closeAllContextMenus() {
   contextMenuVisible.value = false
 }
 
@@ -890,6 +1277,115 @@ function formatSize(bytes: number): string {
   }
 }
 
+/* 表头固定在列表顶部，列宽与 .file-item 的列一一对应 */
+.file-list-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  flex-shrink: 0;
+  font-size: theme.getVar('fontSizeSm');
+
+  @include theme.useTheme {
+    background-color: theme.getVar('sidebarBg');
+    border-bottom: 1px solid theme.getVar('borderColor');
+    color: theme.getVar('textSecondary');
+  }
+}
+
+.col-icon-spacer {
+  flex-shrink: 0;
+  width: 18px;
+}
+
+.col-name, .file-name { flex: 1; min-width: 0; }
+.col-size, .file-size { flex-shrink: 0; width: 70px; }
+.col-type, .file-type { flex-shrink: 0; width: 84px; }
+.col-perm, .file-perm { flex-shrink: 0; width: 54px; }
+.col-time, .file-time { flex-shrink: 0; width: 130px; }
+
+.col-btn,
+.col-static {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  white-space: nowrap;
+  text-align: right;
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+
+  &.col-name,
+  &.col-type {
+    justify-content: flex-start;
+    text-align: left;
+  }
+}
+
+.col-btn {
+  cursor: pointer;
+
+  &:hover {
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+    }
+  }
+
+  &.col-sorted {
+    font-weight: 500;
+
+    @include theme.useTheme {
+      color: theme.getVar('textColor');
+    }
+  }
+}
+
+.col-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sort-arrows {
+  width: 8px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+
+  .arrow-up,
+  .arrow-down { opacity: 0.35; }
+
+  &.sort-asc .arrow-up,
+  &.sort-desc .arrow-down { opacity: 1; }
+}
+
+.col-btn:hover .sort-arrows,
+.col-btn.col-sorted .sort-arrows {
+  opacity: 1;
+}
+
+.file-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: theme.getVar('fontSizeSm');
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+}
+
 .file-item {
   display: flex;
   align-items: center;
@@ -940,6 +1436,41 @@ function formatSize(bytes: number): string {
   @include theme.useTheme {
     color: theme.getVar('textSecondary');
   }
+}
+
+.file-perm {
+  flex-shrink: 0;
+  width: 54px;
+  text-align: right;
+  font-family: var(--font-family-mono);
+  font-size: theme.getVar('fontSizeSm');
+
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
+  }
+}
+
+.remote-panel {
+  position: relative;
+}
+
+.drop-active {
+  outline: 2px dashed var(--el-color-primary);
+  outline-offset: -4px;
+}
+
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: theme.getVar('fontSize');
+  font-weight: 500;
+  background-color: rgba(64, 128, 255, 0.12);
+  color: var(--el-color-primary);
 }
 
 .file-time {

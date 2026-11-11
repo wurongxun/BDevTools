@@ -139,7 +139,7 @@ const hasChildren = (bookmark: BookmarkItem): boolean => {
 }
 
 .bookmark-icon {
-  color: var(--el-color-warning);
+  color: var(--stateWarningFg);
   flex-shrink: 0;
   font-size: theme.getVar('fontSize');
 }

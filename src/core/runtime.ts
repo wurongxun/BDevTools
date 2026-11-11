@@ -36,6 +36,34 @@ export function publish(event: string, payload?: unknown): Promise<void> {
 // ==================== 路径 ====================
 export { desktopDir, dirname } from '@tauri-apps/api/path'
 
+// ==================== 系统级文件拖放 ====================
+// WebView 里的 HTML5 DataTransfer 只有 File 对象，拿不到绝对路径；
+// 桌面壳的 onDragDropEvent 才给 paths。业务层一律走本适配，不直接 import Tauri。
+import { getCurrentWebview } from '@tauri-apps/api/webview'
+
+/** 拖放事件类型；position 是物理像素，比较 DOM rect 时需除以 devicePixelRatio */
+export type FileDropType = 'enter' | 'over' | 'leave' | 'drop'
+export interface FileDropPayload {
+  type: FileDropType
+  paths: string[]
+  position?: { x: number; y: number }
+}
+
+export async function onFileDrop(handler: (payload: FileDropPayload) => void): Promise<Unsubscribe> {
+  return getCurrentWebview().onDragDropEvent((event) => {
+    const p = event.payload as {
+      type: string
+      paths?: string[]
+      position?: { x: number; y: number }
+    }
+    handler({
+      type: p.type as FileDropType,
+      paths: p.paths ?? [],
+      position: p.position,
+    })
+  })
+}
+
 // ==================== 应用信息 ====================
 export { getName, getTauriVersion, getVersion } from '@tauri-apps/api/app'
 

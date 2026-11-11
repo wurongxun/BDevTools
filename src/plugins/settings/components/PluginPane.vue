@@ -1,22 +1,10 @@
 <template>
   <!-- 插件管理 -->
   <section v-show="tab === 'manage'" class="settings-group">
+    <p class="settings-group-desc">{{ $t('settingsPlugin.plugin.manageDesc1') }}</p>
+    <p class="settings-group-desc">{{ $t('settingsPlugin.plugin.manageDesc2') }}</p>
     <p class="settings-group-desc">
-      内置插件随应用编译，不可卸载；第三方插件以包形式安装（plugin.json + 页面资源 + 可选 plugin.wasm），
-      页面跑在不透明源的沙箱 iframe 中——只占用主面板，不提供侧栏、不接管标签条；
-      后端逻辑跑在 Extism WASM 沙箱中，宿主能力（日志 / KV / 文件 / HTTP）按清单声明逐次校验后放行。
-      安装后默认在所有窗口启用（窗口预设里已显式勾选插件清单的会自动追加该插件）。
-    </p>
-    <p class="settings-group-desc">
-      第三方插件卡片上的<b>页面能力</b>可以逐项关闭：它决定插件页的 CSP（能否编译 WASM、能否 fetch 包内
-      资源等），关闭后对应的放开项会从响应头里消失 —— <b>下次打开插件页生效</b>。
-      这里只能<b>收紧</b>（在插件自己声明的范围内减），不能替插件声明它没要过的东西；
-      关掉的项插件并不知道，可能表现为白屏或报错，卡片上会标出并给「恢复默认」。
-    </p>
-    <p class="settings-group-desc">
-      活动栏显示哪些插件，事实源是<b>本窗口所属窗口预设</b>的插件清单（即「窗口设置」里的
-      「启用插件」勾选，空清单 = 全部）。卡片右侧的 <b>加入 / 移出</b> 是这份清单的快捷开关：
-      改完立即生效，并写回该窗口预设 —— 以后用这个预设打开的新窗口也按新清单显示。
+      {{ $t('settingsPlugin.plugin.manageDesc3') }}
       {{ presetScopeHint }}
     </p>
 
@@ -25,18 +13,13 @@
       <el-icon class="plugin-runtime-ic"><Cpu /></el-icon>
       <div class="plugin-runtime-body">
         <div class="plugin-runtime-title">
-          WASM 运行时：{{ runtimeReady ? runtimeName : '未启用' }}
+          {{ $t('settingsPlugin.plugin.wasmRuntime') }}：{{ runtimeReady ? runtimeName : $t('settingsPlugin.plugin.wasmDisabled') }}
         </div>
         <div v-if="runtimeReady" class="plugin-runtime-meta">
-          单次调用 ≤ {{ runtimeTimeoutSec }}s / {{ runtimeFuelYi }} 亿指令 ·
-          线性内存 ≤ {{ pluginRuntimeInfo?.max_memory_mb }}MB ·
-          HTTP 响应 ≤ {{ pluginRuntimeInfo?.max_http_response_mb }}MB ·
-          单次文件读 ≤ {{ pluginRuntimeInfo?.max_fs_read_mb }}MB ·
-          流式块 ≤ {{ pluginRuntimeInfo?.max_fs_chunk_mb }}MB（最多 {{ pluginRuntimeInfo?.max_fs_handles }} 个句柄）
+          {{ $t('settingsPlugin.plugin.wasmMeta', { timeout: runtimeTimeoutSec, fuel: runtimeFuelYi, mem: pluginRuntimeInfo?.max_memory_mb, http: pluginRuntimeInfo?.max_http_response_mb, fs: pluginRuntimeInfo?.max_fs_read_mb, chunk: pluginRuntimeInfo?.max_fs_chunk_mb, handles: pluginRuntimeInfo?.max_fs_handles }) }}
         </div>
         <div v-else class="plugin-runtime-meta">
-          本次构建关闭了 wasm-runtime：带 WASM 后端的插件无法执行，只有沙箱页面可用
-          （调用会返回「运行时未启用」）。
+          {{ $t('settingsPlugin.plugin.wasmOffDesc') }}
         </div>
         <!-- 调试开关：插件调用出错时导出线性内存快照（编译期选项，切换后自动重编） -->
         <div v-if="runtimeReady" class="plugin-runtime-switch">
@@ -46,10 +29,9 @@
             :disabled="memdumpBusy"
             @change="toggleMemdump"
           />
-          <span class="plugin-runtime-switch-label">出错时导出内存快照</span>
+          <span class="plugin-runtime-switch-label">{{ $t('settingsPlugin.plugin.memdumpLabel') }}</span>
           <span class="plugin-runtime-switch-hint">
-            排查用：调用出错时把插件线性内存（≤ {{ pluginRuntimeInfo?.max_memory_mb }}MB）
-            写进其私有数据目录，反复出错会反复写盘，别长期开着
+            {{ $t('settingsPlugin.plugin.memdumpHint', { mb: pluginRuntimeInfo?.max_memory_mb }) }}
           </span>
         </div>
       </div>
@@ -57,12 +39,11 @@
 
     <div class="plugin-toolbar">
       <app-button type="primary" :loading="pluginBusy" @click="installPluginFrom('zip')">
-        从 ZIP 包安装
+        {{ $t('settingsPlugin.plugin.installFromZip') }}
       </app-button>
-      <app-button :loading="pluginBusy" @click="installPluginFrom('dir')">从目录安装</app-button>
+      <app-button :loading="pluginBusy" @click="installPluginFrom('dir')">{{ $t('settingsPlugin.plugin.installFromDir') }}</app-button>
       <span class="plugin-count">
-        共 {{ pluginListItems.length }} 个插件（第三方 {{ thirdPartyPluginCount }} 个）·
-        本窗口活动栏显示 {{ windowVisibleCount }} 个
+        {{ $t('settingsPlugin.plugin.pluginCount', { total: pluginListItems.length, tp: thirdPartyPluginCount, n: windowVisibleCount }) }}
       </span>
     </div>
 
@@ -75,12 +56,12 @@
       >
         <div class="plugin-order">
           <app-button
-            size="small" circle :icon="Top" title="上移"
+            size="small" circle :icon="Top" :title="$t('settingsPlugin.plugin.moveUp')"
             :disabled="pluginBusy || index === 0 || !item.enabled"
             @click="movePlugin(item.id, -1)"
           />
           <app-button
-            size="small" circle :icon="Bottom" title="下移"
+            size="small" circle :icon="Bottom" :title="$t('settingsPlugin.plugin.moveDown')"
             :disabled="pluginBusy || index === pluginListItems.length - 1 || !item.enabled"
             @click="movePlugin(item.id, 1)"
           />
@@ -89,20 +70,25 @@
         <div class="plugin-info">
           <div class="plugin-name-row">
             <span class="plugin-name">{{ item.label }}</span>
-            <el-tag v-if="item.source === 'builtin'" size="small" type="info">内置</el-tag>
-            <el-tag v-else size="small" type="primary">第三方</el-tag>
+            <el-tag v-if="item.source === 'builtin'" size="small" type="info">{{ $t('settingsPlugin.plugin.tagBuiltin') }}</el-tag>
+            <el-tag v-else size="small" type="primary">{{ $t('settingsPlugin.plugin.tagThirdParty') }}</el-tag>
             <el-tag v-if="item.source === 'third-party'" size="small">{{ item.version }}</el-tag>
-            <el-tag v-if="!item.enabled" size="small" type="warning">已禁用</el-tag>
-            <el-tag v-else-if="item.pinned" size="small" type="info" title="宿主常驻入口，不可禁用">常驻</el-tag>
+            <el-tag v-if="!item.enabled" size="small" type="warning">{{ $t('settingsPlugin.plugin.tagDisabled') }}</el-tag>
+            <el-tag
+              v-else-if="item.pinned"
+              size="small"
+              type="info"
+              :title="$t('settingsPlugin.plugin.tagPinnedTitle')"
+            >{{ $t('settingsPlugin.plugin.tagPinned') }}</el-tag>
             <el-tag
               v-if="item.hasWasm"
               size="small"
               :type="runtimeReady ? 'success' : 'danger'"
             >
-              {{ runtimeReady ? '含 WASM 后端' : 'WASM 未启用' }}
+              {{ runtimeReady ? $t('settingsPlugin.plugin.tagWasmOn') : $t('settingsPlugin.plugin.tagWasmOff') }}
             </el-tag>
             <!-- 入口形态：声明了 standaloneWindow 的插件，点活动栏图标直接开独立窗口 -->
-            <el-tag v-if="item.standaloneWindow" size="small">独立窗口</el-tag>
+            <el-tag v-if="item.standaloneWindow" size="small">{{ $t('settingsPlugin.plugin.tagStandalone') }}</el-tag>
           </div>
           <div class="plugin-meta">
             <span class="plugin-id">{{ item.id }}</span>
@@ -115,14 +101,39 @@
               <span>{{ formatPluginSize(item.sizeBytes) }}</span>
             </template>
           </div>
+          <!-- 依赖：声明了谁，以及当前哪些不可用（没打包 / 没安装 / 被停用）。
+               宿主不自动补依赖，所以「缺了什么」必须让用户一眼看到 -->
+          <div v-if="item.dependencies.length" class="plugin-perms">
+            <span class="plugin-perms-label">{{ $t('settingsPlugin.plugin.depsLabel') }}</span>
+            <span
+              v-for="dep in item.dependencies"
+              :key="dep"
+              class="plugin-perm"
+              :class="{ 'is-missing': item.missingDependencies.includes(dep) }"
+              :title="item.missingDependencies.includes(dep) ? $t('settingsPlugin.plugin.depMissingTitle', { dep }) : dep"
+            >
+              {{ dep }}
+            </span>
+            <span v-if="item.missingDependencies.length" class="plugin-deps-warn">
+              {{ $t('settingsPlugin.plugin.depsWarn', { n: item.missingDependencies.length }) }}
+            </span>
+          </div>
+          <!-- 激活耗时：懒激活之后「装得多」不再等于「启动慢」，这个数字说明慢是谁造成的。
+               未激活显示「未激活」而不是 0 —— 0 会跟「快到测不出来」混淆 -->
+          <div class="plugin-perms">
+            <span class="plugin-perms-label">{{ $t('settingsPlugin.plugin.activationLabel') }}</span>
+            <span class="plugin-stat">
+              {{ item.activationMs === null ? $t('settingsPlugin.plugin.activationOff') : `${item.activationMs} ms` }}
+            </span>
+          </div>
           <div v-if="item.permissions.length" class="plugin-perms">
-            <span class="plugin-perms-label">权限声明</span>
+            <span class="plugin-perms-label">{{ $t('settingsPlugin.plugin.permsLabel') }}</span>
             <span v-for="perm in item.permissions" :key="perm" class="plugin-perm">{{ perm }}</span>
           </div>
           <!-- 页面能力：**可收紧**（只能减，不能加）。生效口径 = 声明 − 收紧，
                收紧后该项对应的 CSP 指令消失，下一次加载插件页生效。 -->
           <div v-if="item.pageCapabilities.length" class="plugin-perms">
-            <span class="plugin-perms-label">页面能力</span>
+            <span class="plugin-perms-label">{{ $t('settingsPlugin.plugin.pageCapsLabel') }}</span>
             <button
               v-for="cap in item.pageCapabilities"
               :key="cap"
@@ -138,21 +149,27 @@
           </div>
           <div v-if="deniedCapsOf(item).length" class="plugin-caps-warn">
             <span class="plugin-caps-warn-text">
-              你已关闭 {{ deniedCapsOf(item).length }} 项页面能力，插件可能异常
-              （下次打开插件页生效）
+              {{ $t('settingsPlugin.plugin.capsWarn', { n: deniedCapsOf(item).length }) }}
             </span>
             <app-button size="small" plain :disabled="pluginBusy" @click="restorePluginCaps(item)">
-              恢复默认
+              {{ $t('settingsPlugin.plugin.restoreDefault') }}
             </app-button>
           </div>
           <!-- 上一次调用的资源占用（宿主本次会话没调用过则不显示） -->
           <div v-if="item.lastStats" class="plugin-stats">
-            <span class="plugin-perms-label">上次调用</span>
+            <span class="plugin-perms-label">{{ $t('settingsPlugin.plugin.lastCallLabel') }}</span>
             <span class="plugin-stat" :class="{ 'is-fail': !item.lastStats.ok }">
               {{ statsSummary(item.lastStats) }}
             </span>
             <span v-if="item.lastStats.memdump_path" class="plugin-stat-path">
               {{ item.lastStats.memdump_path }}
+            </span>
+          </div>
+          <!-- 熔断：解释「为什么这个插件现在点不动」—— 冷却期内后端直接拒调用，
+               页面上什么都不说的话，用户只会以为界面坏了 -->
+          <div v-if="item.lastStats?.circuit_cooldown_ms" class="plugin-caps-warn">
+            <span class="plugin-caps-warn-text">
+              {{ $t('settingsPlugin.plugin.circuitWarn', { n: item.lastStats.consec_failures, sec: Math.ceil(item.lastStats.circuit_cooldown_ms / 1000) }) }}
             </span>
           </div>
         </div>
@@ -163,7 +180,7 @@
             size="small" plain
             @click="loadStats(item.id)"
           >
-            资源
+            {{ $t('settingsPlugin.plugin.btnStats') }}
           </app-button>
           <!-- 本窗口的插件清单开关：写回**本窗口所属窗口预设**的 enabledPlugins
                （与右边的启用/禁用是两件事 —— 那个是全局的，会影响所有窗口）。
@@ -176,7 +193,7 @@
             :title="windowPluginTitle(item)"
             @click="toggleWindowPlugin(item)"
           >
-            {{ isWindowPluginVisible(item.id) ? '移出' : '加入' }}
+            {{ isWindowPluginVisible(item.id) ? $t('settingsPlugin.plugin.btnRemove') : $t('settingsPlugin.plugin.btnAdd') }}
           </app-button>
           <!-- 宿主常驻入口（设置）不给开关：关掉它就没有插件管理页面了 -->
           <el-switch
@@ -192,14 +209,14 @@
             size="small" plain
             @click="openPluginSettings(item)"
           >
-            设置
+            {{ $t('settingsPlugin.plugin.btnSettings') }}
           </app-button>
           <app-button
             v-if="item.source === 'third-party'"
             size="small" type="danger" plain :disabled="pluginBusy"
             @click="askUninstallPlugin(item)"
           >
-            卸载
+            {{ $t('settingsPlugin.plugin.btnUninstall') }}
           </app-button>
         </div>
       </div>
@@ -212,25 +229,25 @@
   </div>
 
   <!-- 插件卸载确认 -->
-  <GlobalDialog v-model="showUninstallDialog" title="卸载插件" width="40%">
+  <GlobalDialog v-model="showUninstallDialog" :title="$t('settingsPlugin.plugin.uninstallTitle')" width="40%">
     <div class="plugin-uninstall">
       <div class="uninstall-text">
-        确定卸载「{{ pendingUninstall?.label }}」（<span class="plugin-id">{{ pendingUninstall?.id }}</span>）吗？
+        {{ $t('settingsPlugin.plugin.uninstallText', { label: pendingUninstall?.label, id: pendingUninstall?.id }) }}
       </div>
       <el-checkbox v-model="uninstallRemoveData">
-        同时删除该插件在所有工作区的私有数据（不可恢复）
+        {{ $t('settingsPlugin.plugin.uninstallRemoveData') }}
       </el-checkbox>
     </div>
     <template #footer>
-      <app-button @click="showUninstallDialog = false">取消</app-button>
-      <app-button type="danger" :loading="pluginBusy" @click="confirmUninstallPlugin">卸载</app-button>
+      <app-button @click="showUninstallDialog = false">{{ $t('settingsPlugin.common.cancel') }}</app-button>
+      <app-button type="danger" :loading="pluginBusy" @click="confirmUninstallPlugin">{{ $t('settingsPlugin.plugin.btnUninstall') }}</app-button>
     </template>
   </GlobalDialog>
 
   <!-- 插件设置：清单 contributes.configuration 声明的项，宿主统一渲染 -->
   <GlobalDialog
     v-model="showSettingsDialog"
-    :title="`插件设置 · ${settingsPlugin?.label ?? ''}`"
+    :title="$t('settingsPlugin.plugin.settingsTitle', { label: settingsPlugin?.label ?? '' })"
     width="45%"
   >
     <div v-if="settingsPlugin" class="plugin-settings">
@@ -270,9 +287,9 @@
       </div>
     </div>
     <template #footer>
-      <app-button @click="showSettingsDialog = false">取消</app-button>
+      <app-button @click="showSettingsDialog = false">{{ $t('settingsPlugin.common.cancel') }}</app-button>
       <app-button type="primary" :loading="settingsBusy" @click="confirmPluginSettings">
-        保存
+        {{ $t('settingsPlugin.common.save') }}
       </app-button>
     </template>
   </GlobalDialog>
@@ -280,6 +297,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Bottom, Cpu, Top } from '@element-plus/icons-vue'
 import { open, publish } from '@/core/runtime'
 import { fetchPluginSettings, savePluginSettings } from '@/core/plugin/api'
@@ -316,6 +334,9 @@ const props = defineProps<{
   /** 插件分区内部页签（页签按钮在父级的顶部固定条里） */
   tab: PluginTab
 }>()
+
+/** i18n：模板走 $t()，脚本里的提示文案走 t() */
+const { t } = useI18n()
 
 /** 当前窗口的布局 store：本窗口显示清单（enabledPlugins）的唯一读写口 */
 const { useLayoutStore } = useStore()
@@ -367,8 +388,8 @@ const currentPreset = computed(() => findPreset(thisWindowPresetId.value))
 const presetScopeHint = computed(() => {
   if (!presetResolved.value) return ''
   const preset = currentPreset.value
-  if (!preset) return '本窗口不属于任何窗口预设，这份清单无法保存。'
-  return `当前对应预设「${preset.name}」。`
+  if (!preset) return t('settingsPlugin.plugin.presetNoScope')
+  return t('settingsPlugin.plugin.presetBelongsTo', { name: preset.name })
 })
 
 /**
@@ -381,16 +402,16 @@ const presetScopeHint = computed(() => {
  *  - 移出最后一个会把清单清空，而空清单 = 显示全部 —— 等于全都又回来了。
  */
 function windowPluginBlockReason(item: PluginListItem): string {
-  if (!presetResolved.value) return '正在读取窗口预设…'
-  if (!currentPreset.value) return '本窗口不属于任何窗口预设，这份清单无法保存'
+  if (!presetResolved.value) return t('settingsPlugin.plugin.readingPreset')
+  if (!currentPreset.value) return t('settingsPlugin.plugin.notInPreset')
   if (currentPreset.value.focusMode) {
-    return '专注模式下只能保留一个插件：先在「窗口设置」里关掉专注模式'
+    return t('settingsPlugin.plugin.focusModeBlock')
   }
   if (!item.enabled && !isWindowPluginVisible(item.id)) {
-    return '插件已禁用：先启用，再加入本窗口'
+    return t('settingsPlugin.plugin.disabledBlock')
   }
   if (isWindowPluginVisible(item.id) && useLayoutStore.resolveWindowPluginList().length <= 1) {
-    return '至少保留一个插件'
+    return t('settingsPlugin.plugin.keepOneBlock')
   }
   return ''
 }
@@ -399,10 +420,12 @@ function windowPluginBlockReason(item: PluginListItem): string {
 function windowPluginTitle(item: PluginListItem): string {
   const blocked = windowPluginBlockReason(item)
   if (blocked) return blocked
-  const where = currentPreset.value ? `「${currentPreset.value.name}」预设` : '窗口预设'
+  const where = currentPreset.value
+    ? t('settingsPlugin.plugin.presetClause', { name: currentPreset.value.name })
+    : t('settingsPlugin.plugin.presetGeneric')
   return isWindowPluginVisible(item.id)
-    ? `从本窗口活动栏移出，并写回${where}的插件清单（该预设以后打开的窗口也不再显示）`
-    : `加入本窗口活动栏，并写回${where}的插件清单（该预设以后打开的窗口也会显示）`
+    ? t('settingsPlugin.plugin.removeFromWindowTitle', { preset: where })
+    : t('settingsPlugin.plugin.addToWindowTitle', { preset: where })
 }
 
 /**
@@ -419,10 +442,12 @@ async function toggleWindowPlugin(item: PluginListItem) {
       return
     }
     NotificationUtil.success(
-      res.visible ? `「${item.label}」已加入本窗口活动栏` : `「${item.label}」已移出本窗口活动栏`,
+      res.visible
+        ? t('settingsPlugin.plugin.addedToWindow', { label: item.label })
+        : t('settingsPlugin.plugin.removedFromWindow', { label: item.label }),
     )
   } catch (e) {
-    NotificationUtil.error(`更新窗口插件清单失败：${pluginErrorText(e)}`)
+    NotificationUtil.error(t('settingsPlugin.plugin.updateWindowListFailed', { msg: pluginErrorText(e) }))
   } finally {
     pluginBusy.value = false
   }
@@ -478,10 +503,10 @@ async function toggleMemdump(value: unknown) {
   try {
     await setPluginMemdumpEnabled(on)
     NotificationUtil.success(
-      on ? '已开启出错内存快照：插件调用出错时导出线性内存' : '已关闭出错内存快照',
+      on ? t('settingsPlugin.plugin.memdumpOn') : t('settingsPlugin.plugin.memdumpOff'),
     )
   } catch (e) {
-    NotificationUtil.error(`更新出错快照开关失败：${pluginErrorText(e)}`)
+    NotificationUtil.error(t('settingsPlugin.plugin.memdumpToggleFailed', { msg: pluginErrorText(e) }))
     // 失败时把开关拉回后端真实状态，避免界面显示与磁盘配置不一致
     await refreshPluginRuntimeInfo()
   } finally {
@@ -510,7 +535,7 @@ async function openPluginSettings(item: PluginListItem) {
     settingsValues.value = await fetchPluginSettings(item.id)
     showSettingsDialog.value = true
   } catch (e) {
-    NotificationUtil.error(e instanceof Error ? e.message : '读取插件设置失败')
+    NotificationUtil.error(e instanceof Error ? e.message : t('settingsPlugin.plugin.readSettingsFailed'))
   } finally {
     settingsBusy.value = false
   }
@@ -529,7 +554,7 @@ async function confirmPluginSettings() {
     })
     showSettingsDialog.value = false
   } catch (e) {
-    NotificationUtil.error(e instanceof Error ? e.message : '保存插件设置失败')
+    NotificationUtil.error(e instanceof Error ? e.message : t('settingsPlugin.plugin.saveSettingsFailed'))
   } finally {
     settingsBusy.value = false
   }
@@ -537,7 +562,7 @@ async function confirmPluginSettings() {
 
 async function loadStats(id: string) {
   const s = await refreshPluginLastStats(id)
-  if (!s) NotificationUtil.info('该插件在本次会话中还没有调用记录')
+  if (!s) NotificationUtil.info(t('settingsPlugin.plugin.noCallStats'))
 }
 
 /** 拉取全部「带 WASM 后端的第三方插件」的调用统计（进入插件管理页时静默执行） */
@@ -559,7 +584,7 @@ function formatBytes(bytes: number | null | undefined): string {
 
 /** 上次调用统计摘要（单行文字，供插件卡片展示） */
 function statsSummary(s: CallStats): string {
-  const parts: string[] = [`${s.func}()`, s.ok ? '成功' : '失败']
+  const parts: string[] = [`${s.func}()`, s.ok ? t('settingsPlugin.plugin.statsOk') : t('settingsPlugin.plugin.statsFail')]
   if (s.fuel_used != null) parts.push(`${(s.fuel_used / 1e6).toFixed(1)}M 指令`)
   // 进程增量是近似口径：插件线性内存属于宿主进程，负数（回收多于分配）按 0 计
   if (s.mem_delta_bytes != null) parts.push(`进程内存 +${formatBytes(s.mem_delta_bytes)}`)
@@ -604,8 +629,10 @@ async function installPluginFrom(kind: 'zip' | 'dir') {
   const picked = await open({
     multiple: false,
     directory: kind === 'dir',
-    title: kind === 'zip' ? '选择插件包（.zip）' : '选择插件目录',
-    ...(kind === 'zip' ? { filters: [{ name: '插件包', extensions: ['zip'] }] } : {}),
+    title: kind === 'zip' ? t('settingsPlugin.plugin.pickZip') : t('settingsPlugin.plugin.pickDir'),
+    ...(kind === 'zip'
+      ? { filters: [{ name: t('settingsPlugin.plugin.zipFilter'), extensions: ['zip'] }] }
+      : {}),
   })
   // 用户取消
   if (!picked || typeof picked !== 'string') return
@@ -613,9 +640,9 @@ async function installPluginFrom(kind: 'zip' | 'dir') {
   try {
     const item = await installThirdPartyPlugin(picked)
     await syncCurrentWindowPluginListFromPreset()
-    NotificationUtil.success(`插件「${item.name}」安装成功`)
+    NotificationUtil.success(t('settingsPlugin.plugin.installSuccess', { name: item.name }))
   } catch (e) {
-    NotificationUtil.error(`安装失败：${pluginErrorText(e)}`)
+    NotificationUtil.error(t('settingsPlugin.plugin.installFailed', { msg: pluginErrorText(e) }))
   } finally {
     pluginBusy.value = false
   }
@@ -627,7 +654,7 @@ async function togglePluginEnabled(id: string, value: unknown) {
   try {
     await setPluginEnabled(id, Boolean(value))
   } catch (e) {
-    NotificationUtil.error(`更新插件状态失败：${pluginErrorText(e)}`)
+    NotificationUtil.error(t('settingsPlugin.plugin.toggleEnabledFailed', { msg: pluginErrorText(e) }))
   } finally {
     pluginBusy.value = false
   }
@@ -647,7 +674,10 @@ function deniedCapsOf(item: PluginListItem): string[] {
 
 function capTitle(cap: string, item: PluginListItem): string {
   const on = !item.deniedPageCapabilities.includes(cap)
-  return `pageCapabilities: ${cap}（${on ? '已启用，点击关闭' : '已关闭，点击恢复'}）`
+  return t('settingsPlugin.plugin.capTitleText', {
+    cap,
+    state: on ? t('settingsPlugin.plugin.capEnabledState') : t('settingsPlugin.plugin.capDisabledState'),
+  })
 }
 
 /** 收紧 / 恢复单项页面能力 */
@@ -658,7 +688,7 @@ async function togglePluginCap(item: PluginListItem, cap: string) {
     const next = cur.includes(cap) ? cur.filter(c => c !== cap) : [...cur, cap]
     await setPluginPageCapsDenied(item.id, next)
   } catch (e) {
-    NotificationUtil.error(`保存页面能力失败：${pluginErrorText(e)}`)
+    NotificationUtil.error(t('settingsPlugin.plugin.saveCapFailed', { msg: pluginErrorText(e) }))
   } finally {
     pluginBusy.value = false
   }
@@ -670,7 +700,7 @@ async function restorePluginCaps(item: PluginListItem) {
   try {
     await setPluginPageCapsDenied(item.id, [])
   } catch (e) {
-    NotificationUtil.error(`恢复页面能力失败：${pluginErrorText(e)}`)
+    NotificationUtil.error(t('settingsPlugin.plugin.restoreCapFailed', { msg: pluginErrorText(e) }))
   } finally {
     pluginBusy.value = false
   }
@@ -682,7 +712,7 @@ async function movePlugin(id: string, delta: number) {
   try {
     await movePluginInOrder(id, delta)
   } catch (e) {
-    NotificationUtil.error(`调整顺序失败：${pluginErrorText(e)}`)
+    NotificationUtil.error(t('settingsPlugin.plugin.moveFailed', { msg: pluginErrorText(e) }))
   } finally {
     pluginBusy.value = false
   }
@@ -703,11 +733,11 @@ async function confirmUninstallPlugin() {
   try {
     await uninstallThirdPartyPlugin(item.id, uninstallRemoveData.value)
     await syncCurrentWindowPluginListFromPreset()
-    NotificationUtil.success(`插件「${item.label}」已卸载`)
+    NotificationUtil.success(t('settingsPlugin.plugin.uninstallSuccess', { label: item.label }))
     showUninstallDialog.value = false
     pendingUninstall.value = null
   } catch (e) {
-    NotificationUtil.error(`卸载失败：${pluginErrorText(e)}`)
+    NotificationUtil.error(t('settingsPlugin.plugin.uninstallFailed', { msg: pluginErrorText(e) }))
   } finally {
     pluginBusy.value = false
   }
@@ -760,7 +790,7 @@ async function confirmUninstallPlugin() {
 
   &.is-off {
     @include theme.useTheme {
-      color: var(--el-color-danger);
+      color: var(--stateErrorFg);
     }
   }
 }
@@ -846,7 +876,7 @@ async function confirmUninstallPlugin() {
 
 .plugin-setting-key {
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-base);
 
   @include theme.useTheme {
     color: theme.getVar('textTertiary');
@@ -854,7 +884,7 @@ async function confirmUninstallPlugin() {
 }
 
 .plugin-setting-desc {
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-base);
   line-height: 1.5;
 
   @include theme.useTheme {
@@ -1008,6 +1038,21 @@ async function confirmUninstallPlugin() {
 .plugin-caps-warn-text {
   flex: 1;
   min-width: 0;
+}
+
+// 依赖里「当前不可用」的那一项
+.plugin-perm.is-missing {
+  @include theme.useTheme {
+    color: theme.getVar('dangerText');
+  }
+}
+
+.plugin-deps-warn {
+  font-size: var(--font-size-xs);
+
+  @include theme.useTheme {
+    color: theme.getVar('dangerText');
+  }
 }
 
 .plugin-ops {

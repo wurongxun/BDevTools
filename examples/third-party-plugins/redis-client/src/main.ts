@@ -1,14 +1,17 @@
 import { createApp } from 'vue'
 import AppRoot from './components/AppRoot.vue'
-import { bridge } from './bridge'
+import { bridge, BRIDGE_VERSION } from './bridge'
 import './ui.css'
 
-// 收宿主消息：主题推送 + 调用回包都走这里
+// 收宿主消息：上下文推送（主题 / 语言 / WASM）+ 调用回包都走这里
 window.addEventListener('message', (e) => {
   bridge.handleMessage(e.data)
   const d = e.data
-  if (d && d.v === 1 && d.kind === 'theme') {
+  if (d && d.v === BRIDGE_VERSION && (d.kind === 'context' || d.kind === 'theme')) {
     document.documentElement.setAttribute('data-theme', d.dark ? 'dark' : 'light')
+    if (d.kind === 'context' && d.locale) {
+      document.documentElement.setAttribute('data-locale', d.locale)
+    }
   }
 })
 

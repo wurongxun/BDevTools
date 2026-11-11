@@ -57,7 +57,24 @@
           <!-- DDL -->
           <div class="props-section">
             <div class="section-title">DDL</div>
-            <pre class="ddl-box">{{ loadingProps ? '加载中...' : (ddl || '暂无数据') }}</pre>
+            <!--
+              复制按钮放在**外层容器**的右上角，不放在 <pre> 里：
+              pre 自己会滚动（max-height + overflow:auto），按钮跟着内容滚走就没法点了。
+            -->
+            <div class="ddl-wrap">
+              <pre class="ddl-box">{{ loadingProps ? '加载中...' : (ddl || '暂无数据') }}</pre>
+              <el-tooltip content="复制 DDL" placement="top">
+                <app-button
+                  v-if="ddl && !loadingProps"
+                  class="ddl-copy"
+                  bare
+                  size="small"
+                  :icon="DocumentCopy"
+                  aria-label="复制 DDL"
+                  @click="copyDdl"
+                ></app-button>
+              </el-tooltip>
+            </div>
           </div>
         </div>
       </el-tab-pane>
@@ -68,7 +85,7 @@
           <el-icon class="reserve-icon" title="预留功能"><MoreFilled /></el-icon>
         </template>
         <div class="reserve-panel">
-          <p style="color: #909399; font-size: var(--font-size-md);">预留功能区（图表 / ER 图 / 统计 等后续可加）</p>
+          <p style="color: var(--textSecondary); font-size: var(--font-size-md);">预留功能区（图表 / ER 图 / 统计 等后续可加）</p>
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -78,10 +95,11 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MoreFilled } from '@element-plus/icons-vue'
+import { MoreFilled, DocumentCopy } from '@element-plus/icons-vue'
 import QueryResultView from './QueryResultView.vue'
 import { useConnectionStore } from '../store'
 import { dbTableColumns, dbTableSchema, dbListTables } from '../api/metadata'
+import { copyText } from '../utils/clipboard'
 import type { ColumnInfo, TableInfo } from '../types'
 
 /**
@@ -113,6 +131,10 @@ async function ensureConnection(): Promise<boolean> {
     return false
   }
   return true
+}
+
+function copyDdl() {
+  copyText(ddl.value, 'DDL 已复制')
 }
 
 function formatSize(bytes?: number | null): string {
@@ -269,7 +291,21 @@ watch(
 .cols-table {
   font-family: var(--font-family-mono);
 }
+.ddl-wrap {
+  position: relative;
+}
+.ddl-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  /* 长行会把文字顶到右上角，按钮得垫一层底才看得清 */
+  background: var(--el-bg-color-overlay);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--el-box-shadow-light);
+}
 .ddl-box {
+  /* 给右上角按钮留出位置，首行文字不会被压住 */
+  padding-right: 40px;
   margin: 0;
   padding: 12px;
   background: var(--el-fill-color-light);

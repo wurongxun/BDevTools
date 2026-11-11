@@ -9,10 +9,14 @@
  * - 唯一的转出通道是 `plugin_call`：后端把它转发进 Extism WASM 沙箱，宿主能力
  *   （日志 / KV / 文件 / HTTP）由 host function 按清单声明的权限逐次校验后放行
  *
- * 桥协议（`v` 恒为 PLUGIN_BRIDGE_VERSION）：
+ * 桥协议：
  *   插件 → 宿主：`{ v, kind: 'ready' }`、`{ v, kind: 'call', reqId, func, input }`
  *   宿主 → 插件：`{ v, reqId, ok, data }` / `{ v, reqId, ok:false, error }`、
- *                `{ v, kind: 'theme', dark, wasm }`
+ *                `{ v, kind: 'context', dark, locale, wasm }`（v2）
+ *
+ * **版本协商**：插件页用哪个版本发 `ready`，宿主就用哪个版本回（`peerVersion`）。
+ * 这样 v1 插件不会被静默丢弃（表现为「页面一直显示没握手」），只是拿不到 `locale`；
+ * v1 应答是旧的 `{ kind:'theme', dark, wasm }`。
  *
  * 宿主保留方法（`func` 以 `__host_` 开头，由本面板处理，**不进 WASM**）：
  *   `__host_dialog_open` / `__host_dialog_save` —— 文件对话框（见 `runHostFunc`）
@@ -20,13 +24,18 @@
  * `plugin_call` 的返回码语义（插件页据此区分「后端没实现」与「执行出错」）：
  *   200 成功 · 501 插件没有 WASM 后端或运行时未启用 · 500 执行期错误
  */
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import useStore from '@/store'
 import { callPlugin, fetchPluginFsRoots, fetchPluginSettings } from '@/core/plugin/api'
 import { PLUGIN_SETTINGS_CHANGED_EVENT, pluginRuntimeInfo } from '@/core/plugin/registry'
 import { subscribe, type Unsubscribe } from '@/core/runtime'
 import { open as openDialog, save as saveDialog } from '@/core/runtime'
 import { pluginAssetUrl } from '@/core/plugin/url'
-import { PLUGIN_BRIDGE_VERSION } from '@/core/plugin/types'
+import {
+  PLUGIN_BRIDGE_VERSION,
+  PLUGIN_BRIDGE_V1,
+  type HostContext,
+} from '@/core/plugin/types'
 import { isDark } from '@/composables/useDark'
 
 const props = defineProps<{
@@ -43,6 +52,17 @@ const iframeRef = ref<HTMLIFrameElement | null>(null)
 const ready = ref(false)
 const hint = ref('')
 const src = pluginAssetUrl(props.pluginId, props.entry)
+
+/**
+ * 宿主当前语言。
+ *
+ * 取 **store 而不是订阅 `language-changed` 事件**：store 是「本窗口实际生效的语言」的唯一真
+ * （`setLanguage` 内部同时切 i18n），跨窗口同步由 `main.ts` 订阅事件后调 `setLanguage` 完成 —— 也就是说 watch store 天然覆盖跨窗口，且不依赖「谁去 publish」。
+ * 后者有实际风险：语言切换入口现在有两份等价实现（`useLanguageSwitch` 与
+ * `AppGeneralPane.languageChange`），将来谁漏了 publish 就会静默漏更新。
+ */
+const { appConfig } = useStore()
+const currentLocale = computed(() => appConfig.language)
 
 let timer: ReturnType<typeof setTimeout> | undefined
 /** 设置变更订阅的取消函数（面板卸载即失效，订阅状态不需要持久化） */
@@ -67,12 +87,67 @@ function postToPlugin(payload: Record<string, unknown>) {
   iframeRef.value?.contentWindow?.postMessage(payload, '*')
 }
 
+/**
+ * 握手时协商出的协议版本。
+ *
+ * 插件页用哪个版本发 `ready`，宿主就用哪个版本回。这样老插件不会「一条消息都收不到」，
+ * 只是停留在 v1 的能力集上；新插件直接拿 v2 的 `context`。默认值取当前版本 —— 握手还没
+ * 完成时这个值用不上（`ready` 为 false，不会下发任何东西）。
+ */
+let peerVersion: number = PLUGIN_BRIDGE_VERSION
+
+/** 按协商版本回一条宿主消息（版本号集中在这里写，调用点不许自己拼 `v`） */
+function reply(payload: Record<string, unknown>) {
+  postToPlugin({ v: peerVersion, ...payload })
+}
+
+/** 当前宿主上下文快照 */
+function hostContext(): HostContext {
+  return {
+    dark: isDark.value,
+    locale: currentLocale.value,
+    // 插件页可据此禁用「依赖后端」的按钮，而不是等到调用失败才发现
+    wasm: pluginRuntimeInfo.value?.available === true,
+  }
+}
+
+/**
+ * 下发宿主上下文给插件页，插件页自行决定是否消费。
+ *
+ * v2 = `{ kind:'context', dark, locale, wasm }`；v1 回落到旧的 `theme` 消息（不带
+ * `locale`，因为 v1 插件本来也不认识这个字段）。
+ */
+function pushContext() {
+  const ctx = hostContext()
+  // v1 回落成旧的 theme 消息：它本来也不认识 `locale`，带了只会让读者误会它支持
+  if (peerVersion <= PLUGIN_BRIDGE_V1) {
+    reply({ kind: 'theme', dark: ctx.dark, wasm: ctx.wasm })
+    return
+  }
+  reply({ kind: 'context', ...ctx })
+}
+
 /** 宿主保留方法：`func` 以 `__host_` 开头的一律不进 WASM，由本面板直接处理 */
 const HOST_FUNCS = new Set(['__host_dialog_open', '__host_dialog_save'])
 
-/** 路径归一化：统一分隔符、去尾斜杠、忽略大小写（Windows 下 `D:\\A` 与 `d:/a/` 同义） */
+/**
+ * 路径归一化：统一分隔符、折叠 `.` 与 `..`、去尾斜杠、忽略大小写。
+ *
+ * **必须折叠 `..`**：只做前缀比较的话 `{root}/a/../b` 会「看起来在范围内」；有了排除区
+ * （其它插件的数据目录）之后，这个洞会直接变成绕过隔离的入口。比较两侧都过这个函数，
+ * 所以折叠不会误伤正常路径（UNC 的前导空段在两侧同样被丢掉）。
+ */
 function normPath(p: string): string {
-  return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+  const out: string[] = []
+  for (const seg of p.replace(/\\/g, '/').split('/')) {
+    if (seg === '' || seg === '.') continue
+    if (seg === '..') {
+      out.pop()
+      continue
+    }
+    out.push(seg)
+  }
+  return out.join('/').toLowerCase()
 }
 
 /** 路径是否落在任一作用域内（作用域目录本身也算在内） */
@@ -94,6 +169,10 @@ function withinRoots(p: string, roots: string[]): boolean {
  * 作用域约束：返回路径必须落在清单声明的 `fs` 作用域内。对话框返回的是字符串、本身不授予
  * 访问权，但允许它指向任意位置会误导用户（选了却读不了），所以这里直接拒绝而不是透传。
  * 判定用的根目录由宿主给出（与 `host_fs_open` 同一份），前端只做前缀比较，不重解析清单。
+ *
+ * 声明了 `fs:read:*` / `fs:write:*` 的插件走**通配模式**：任意路径都能选，只剩「排除区」
+ * （`deny`：其它插件的数据目录 / 内置插件数据 / 插件安装根）这一道闸 —— 排除区与后端
+ * `host_fs_open` 用的是同一份列表，否则用户会选到「前端放行、后端拒绝」的路径。
  */
 async function runHostFunc(
   func: string,
@@ -102,15 +181,25 @@ async function runHostFunc(
   const kind = func === '__host_dialog_save' ? 'save' : 'open'
   const perm = kind === 'save' ? 'fs:write' : 'fs:read'
   const roots = await fetchPluginFsRoots(props.pluginId)
+  // 通配作用域（`fs:read:*` / `fs:write:*`）：任意路径，只剩排除区这一道闸
+  const any = kind === 'save' ? roots.writeAny : roots.readAny
   const allowed = kind === 'save' ? roots.write : roots.read
-  if (allowed.length === 0) {
+  const deny = Array.isArray(roots.deny) ? roots.deny : []
+  if (!any && allowed.length === 0) {
     return { ok: false, error: `插件未声明任何 ${perm} 作用域，不能使用宿主文件对话框` }
+  }
+  /** 该路径是否可被选中：排除区优先 → 通配放行 → 否则逐个前缀比较 */
+  const pickable = (p: string): boolean => {
+    if (withinRoots(p, deny)) return false
+    return any || withinRoots(p, allowed)
   }
   const opt = (input ?? {}) as Record<string, unknown>
   const filters = Array.isArray(opt.filters)
     ? (opt.filters as { name: string; extensions: string[] }[])
     : undefined
-  const defaultPath = typeof opt.defaultPath === 'string' ? opt.defaultPath : allowed[0]
+  // 插件给的起始目录也要过同一道闸：否则它能先把对话框指到排除区里
+  const wanted = typeof opt.defaultPath === 'string' ? opt.defaultPath : undefined
+  const defaultPath = wanted && pickable(wanted) ? wanted : allowed[0]
 
   const picked =
     kind === 'save'
@@ -120,22 +209,14 @@ async function runHostFunc(
   // 用户取消 → null（插件必须处理，这是最常见的空指针来源）
   if (picked === null || picked === undefined) return { ok: true, data: null }
   const paths = Array.isArray(picked) ? picked : [picked]
-  const rejected = paths.filter((x) => !withinRoots(x, allowed))
+  const rejected = paths.filter((x) => !pickable(x))
   if (rejected.length > 0) {
-    return { ok: false, error: `所选路径不在插件声明的 ${perm} 作用域内：${rejected.join('、')}` }
+    const why = paths.some((x) => withinRoots(x, deny))
+      ? '其它插件的数据目录与插件安装目录不可访问'
+      : `不在插件声明的 ${perm} 作用域内`
+    return { ok: false, error: `所选路径${why}：${rejected.join('、')}` }
   }
   return { ok: true, data: Array.isArray(picked) ? paths : paths[0] }
-}
-
-/** 同步宿主主题（与 WASM 运行时可用性）给插件页，插件页自行决定是否消费 */
-function pushTheme() {
-  postToPlugin({
-    v: PLUGIN_BRIDGE_VERSION,
-    kind: 'theme',
-    dark: isDark.value,
-    // 插件页可据此禁用「依赖后端」的按钮，而不是等到调用失败才发现
-    wasm: pluginRuntimeInfo.value?.available === true,
-  })
 }
 
 /** 首次下发插件设置（清单 `contributes.configuration`；没声明就是空对象，不下发） */
@@ -143,20 +224,21 @@ async function pushSettings() {
   try {
     const values = await fetchPluginSettings(props.pluginId)
     if (Object.keys(values).length === 0) return
-    postToPlugin({ v: PLUGIN_BRIDGE_VERSION, kind: 'settings', data: values })
+    reply({ kind: 'settings', data: values })
   } catch {
     // 拿不到设置不该影响面板本身：插件页会回落到自己的默认值
   }
 }
 
-function markReady() {
+function markReady(version: number) {
+  peerVersion = version
   ready.value = true
   hint.value = ''
   if (timer) {
     clearTimeout(timer)
     timer = undefined
   }
-  pushTheme()
+  pushContext()
   pushSettings()
 }
 
@@ -166,11 +248,11 @@ async function onMessage(e: MessageEvent) {
   if (!frame || e.source !== frame.contentWindow) return
   const data = e.data as BridgeMessage | null
   if (!data || typeof data !== 'object') return
-  // 协议版本校验：版本不匹配说明对端不是本协议，直接忽略
-  if (data.v !== PLUGIN_BRIDGE_VERSION) return
+  // 协议版本校验：v1 与当前版本都接受（老插件不被静默丢弃），其它版本说明对端不是本协议
+  if (data.v !== PLUGIN_BRIDGE_VERSION && data.v !== PLUGIN_BRIDGE_V1) return
 
   if (data.kind === 'ready') {
-    markReady()
+    markReady(data.v as number)
     return
   }
   if (data.kind !== 'call' || typeof data.reqId !== 'number') return
@@ -179,19 +261,20 @@ async function onMessage(e: MessageEvent) {
   // 宿主保留方法：文件对话框等宿主侧能力，不进 WASM
   if (HOST_FUNCS.has(func)) {
     const payload = await runHostFunc(func, data.input)
-    postToPlugin({ v: PLUGIN_BRIDGE_VERSION, reqId: data.reqId, ...payload })
+    reply({ reqId: data.reqId, ...payload })
     return
   }
   // 其余一律走 WASM 桥（插件的真实后端打包在自己的 plugin.wasm 里，经 plugin_call 调用）
-  const reply = await callPlugin(props.pluginId, func, data.input)
-  const payload = reply.code === 200
-    ? { ok: true, data: reply.data }
-    : { ok: false, error: reply.msg || '插件调用失败' }
-  postToPlugin({ v: PLUGIN_BRIDGE_VERSION, reqId: data.reqId, ...payload })
+  const result = await callPlugin(props.pluginId, func, data.input)
+  const payload = result.code === 200
+    ? { ok: true, data: result.data }
+    : { ok: false, error: result.msg || '插件调用失败' }
+  reply({ reqId: data.reqId, ...payload })
 }
 
-watch(isDark, () => {
-  if (ready.value) pushTheme()
+// 主题或语言变化时重推上下文（语言跟着 store，跨窗口已由 main.ts 的 language-changed 同步）
+watch([isDark, currentLocale], () => {
+  if (ready.value) pushContext()
 })
 
 onMounted(async () => {
@@ -200,7 +283,7 @@ onMounted(async () => {
   settingsUnsub = await subscribe<SettingsChanged>(PLUGIN_SETTINGS_CHANGED_EVENT, (p) => {
     if (!p || p.id !== props.pluginId) return
     if (ready.value) {
-      postToPlugin({ v: PLUGIN_BRIDGE_VERSION, kind: 'settings', data: p.values })
+      reply({ kind: 'settings', data: p.values })
     }
   })
   timer = setTimeout(() => {

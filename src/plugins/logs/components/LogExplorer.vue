@@ -280,7 +280,7 @@ onUnmounted(() => {
   text-align: center;
 
   &.error {
-    color: var(--el-color-danger);
+    color: var(--stateErrorFg);
   }
 }
 

@@ -20,9 +20,13 @@
  *    会把整个应用界面顶掉。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
 import { isDark } from '@/composables/useDark'
+
+/** i18n：模板走 $t()，脚本里的文档标题走 t() */
+const { t } = useI18n()
 
 // ==================== 文档装载 ====================
 
@@ -37,28 +41,37 @@ const RAW = import.meta.glob('/docs/plugin-dev/*.md', {
 interface DocMeta {
   /** 文件名（不含 .md），与 docs/plugin-dev/ 下的文件同名 */
   file: string
-  /** 导航里显示的名字 */
-  title: string
-  /** 分组标题 */
-  group: string
+  /** 导航里显示名字的 i18n key（落在 settingsPlugin.devDocs 下） */
+  titleKey: string
+  /** 分组：start / ref / eng，对应 devDocs.groupStart/Ref/Eng */
+  group: 'start' | 'ref' | 'eng'
 }
 
 /** 导航清单：顺序即阅读顺序。新增文档要在这里登记（见 docs/plugin-dev/checklist.md） */
 const DOCS: DocMeta[] = [
-  { file: 'README', title: '总览与阅读路径', group: '开始' },
-  { file: 'quickstart', title: '快速开始（15 分钟）', group: '开始' },
-  { file: 'examples', title: '最小示例仓库', group: '开始' },
-  { file: 'manifest', title: '清单字段表 plugin.json', group: '参考' },
-  { file: 'capabilities', title: '能力边界与 API 参考', group: '参考' },
-  { file: 'web3d', title: '3D 与游戏（WebGL / WASM 引擎）', group: '参考' },
-  { file: 'bridge', title: '桥协议与生命周期', group: '参考' },
-  { file: 'errors', title: '错误码与 FAQ', group: '参考' },
-  { file: 'debugging', title: '调试指南', group: '工程' },
-  { file: 'packaging', title: '打包与发布', group: '工程' },
-  { file: 'checklist', title: '发布前核对清单', group: '工程' },
+  { file: 'README', titleKey: 'docReadme', group: 'start' },
+  { file: 'quickstart', titleKey: 'docQuickstart', group: 'start' },
+  { file: 'examples', titleKey: 'docExamples', group: 'start' },
+  { file: 'manifest', titleKey: 'docManifest', group: 'ref' },
+  { file: 'capabilities', titleKey: 'docCapabilities', group: 'ref' },
+  { file: 'web3d', titleKey: 'docWeb3d', group: 'ref' },
+  { file: 'bridge', titleKey: 'docBridge', group: 'ref' },
+  { file: 'errors', titleKey: 'docErrors', group: 'ref' },
+  { file: 'debugging', titleKey: 'docDebugging', group: 'eng' },
+  { file: 'packaging', titleKey: 'docPackaging', group: 'eng' },
+  { file: 'checklist', titleKey: 'docChecklist', group: 'eng' },
 ]
 
-const GROUPS = ['开始', '参考', '工程']
+const GROUPS: { id: 'start' | 'ref' | 'eng'; key: string }[] = [
+  { id: 'start', key: 'settingsPlugin.devDocs.groupStart' },
+  { id: 'ref', key: 'settingsPlugin.devDocs.groupRef' },
+  { id: 'eng', key: 'settingsPlugin.devDocs.groupEng' },
+]
+
+/** 文档显示标题（随语言切换） */
+function docTitle(d: DocMeta): string {
+  return t('settingsPlugin.devDocs.' + d.titleKey)
+}
 
 /** 搜索命中上限（避免一篇文档把结果刷屏） */
 const MAX_HITS = 80
@@ -72,7 +85,7 @@ function textOf(file: string): string {
 const navGroups = computed(() =>
   GROUPS.map((group) => ({
     group,
-    items: DOCS.filter((d) => d.group === group && textOf(d.file)),
+    items: DOCS.filter((d) => d.group === group.id && textOf(d.file)),
   })).filter((g) => g.items.length > 0),
 )
 
@@ -196,9 +209,9 @@ const hits = computed<Hit[]>(() => {
       }
       out.push({
         file: doc.file,
-        docTitle: doc.title,
+        docTitle: docTitle(doc),
         headingIndex: owner ? owner.index : -1,
-        headingText: owner ? owner.text : doc.title,
+        headingText: owner ? owner.text : docTitle(doc),
         line: line.replace(/^[-*>+]\s+/, '').slice(0, 160),
       })
     })
@@ -325,11 +338,11 @@ watch(current, () => nextTick(onScroll))
           v-model="keyword"
           class="pdd-search-input"
           type="search"
-          placeholder="搜索全部文档…"
-          aria-label="搜索插件开发文档"
+          :placeholder="$t('settingsPlugin.devDocs.searchPlaceholder')"
+          :aria-label="$t('settingsPlugin.devDocs.searchAria')"
         />
         <span v-if="isSearching" class="pdd-search-count">
-          {{ hitCount }} 条{{ hitCount >= MAX_HITS ? '（已截断）' : '' }}
+          {{ $t('settingsPlugin.devDocs.hitsCount', { n: hitCount }) }}{{ hitCount >= MAX_HITS ? $t('settingsPlugin.devDocs.hitsTruncated') : '' }}
         </span>
       </div>
 
@@ -348,13 +361,13 @@ watch(current, () => nextTick(onScroll))
           </span>
           <span class="pdd-hit-line">{{ hit.line }}</span>
         </button>
-        <div v-if="!hits.length" class="pdd-empty">没有匹配「{{ keyword }}」的内容</div>
+        <div v-if="!hits.length" class="pdd-empty">{{ $t('settingsPlugin.devDocs.noMatch', { keyword }) }}</div>
       </div>
 
       <!-- 文档列表 -->
       <div v-else class="pdd-nav-list">
-        <template v-for="g in navGroups" :key="g.group">
-          <div class="pdd-nav-group">{{ g.group }}</div>
+        <template v-for="g in navGroups" :key="g.group.id">
+          <div class="pdd-nav-group">{{ $t(g.group.key) }}</div>
           <button
             v-for="doc in g.items"
             :key="doc.file"
@@ -363,7 +376,7 @@ watch(current, () => nextTick(onScroll))
             :class="{ 'is-active': doc.file === current }"
             @click="openDoc(doc.file)"
           >
-            {{ doc.title }}
+            {{ docTitle(doc) }}
           </button>
         </template>
       </div>
@@ -372,7 +385,7 @@ watch(current, () => nextTick(onScroll))
     <!-- 中：正文 -->
     <div class="pdd-main">
       <div class="pdd-head">
-        <span class="pdd-head-title">{{ currentMeta?.title }}</span>
+        <span class="pdd-head-title">{{ currentMeta ? docTitle(currentMeta) : '' }}</span>
         <span class="pdd-head-file">docs/plugin-dev/{{ current }}.md</span>
       </div>
       <!-- 在容器上统一拦链接；MdPreview 只负责渲染 -->
@@ -390,8 +403,8 @@ watch(current, () => nextTick(onScroll))
     </div>
 
     <!-- 右：本文章节目录 -->
-    <nav class="pdd-outline" aria-label="本页目录">
-      <div class="pdd-outline-title">本页目录</div>
+    <nav class="pdd-outline" :aria-label="$t('settingsPlugin.devDocs.outlineTitle')">
+      <div class="pdd-outline-title">{{ $t('settingsPlugin.devDocs.outlineTitle') }}</div>
       <div class="pdd-outline-list">
         <button
           v-for="h in outline"
@@ -404,7 +417,7 @@ watch(current, () => nextTick(onScroll))
         >
           {{ h.text }}
         </button>
-        <div v-if="!outline.length" class="pdd-empty">（本文没有分节标题）</div>
+        <div v-if="!outline.length" class="pdd-empty">{{ $t('settingsPlugin.devDocs.noOutline') }}</div>
       </div>
     </nav>
   </div>

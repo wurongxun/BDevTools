@@ -372,7 +372,7 @@ onUnmounted(() => {
   flex-shrink: 0;
 
   &--fail {
-    color: var(--el-color-danger);
+    color: var(--stateErrorFg);
     background-color: var(--el-color-danger-light-9);
   }
 }

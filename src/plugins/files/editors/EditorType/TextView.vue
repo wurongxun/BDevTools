@@ -19,6 +19,8 @@
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
+          <el-checkbox v-model="useRegex" size="small" class="search-option" title="把关键词当正则表达式">正则</el-checkbox>
+          <el-checkbox v-model="ignoreCase" size="small" class="search-option" title="忽略大小写">忽略大小写</el-checkbox>
           <div class="search-actions">
             <app-button size="small" @click="prevMatch" :disabled="currentMatch <= 1">
               <el-icon><ArrowUp /></el-icon>
@@ -51,12 +53,28 @@
           class="code-line virtual-line"
           :class="{
             highlight: highlightSet.has(item.lineNumber),
-            target: item.lineNumber === targetLineNumber
+            target: item.lineNumber === targetLineNumber,
+            'is-dirty': item.dirty,
+            'is-deleted': item.deleted
           }"
           :style="{ transform: 'translateY(' + item.offset + 'px)' }"
+          @dblclick="onLineDblClick(item)"
         >
           <span class="line-number">{{ item.lineNumber }}</span>
-          <span class="line-content" v-html="highlightText(item.text)"></span>
+          <textarea
+            v-if="editMode && editingLine === item.lineNumber"
+            :ref="setLineEditorRef"
+            v-model="editText"
+            class="line-editor"
+            spellcheck="false"
+            @keydown="onLineEditorKeydown"
+            @blur="commitLineEdit"
+          />
+          <template v-else>
+            <span class="line-content" v-html="highlightText(item.text)"></span>
+            <span v-if="item.extraLines" class="line-badge">+{{ item.extraLines }} 行</span>
+            <span v-if="item.deleted" class="line-badge is-danger">待删除</span>
+          </template>
         </div>
       </div>
     </div>
@@ -86,7 +104,7 @@
         <el-icon><DArrowRight /></el-icon>
       </app-button>
       <span class="line-range">行 {{ currentStartLine }}-{{ currentEndLine }}</span>
-      <el-dropdown trigger="click" @command="onEncodingChange" class="encoding-selector">
+      <el-dropdown trigger="click" @command="onEncodingChange" class="encoding-selector" :disabled="editMode">
         <span class="encoding-label">{{ currentEncoding }}</span>
         <template #dropdown>
           <el-dropdown-menu>
@@ -94,21 +112,64 @@
                               :class="{ 'is-active': enc === currentEncoding }">
               {{ enc }}
             </el-dropdown-item>
+            <el-dropdown-item divided command="__convert__">
+              转换文件编码 / 换行符…（写盘 + 备份）
+            </el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
       <span v-if="totalLines > 0" class="line-info">共 {{ totalLines }} 行</span>
       <span v-if="isLoadingChunk" class="loading-tip">加载中...</span>
+      <!-- M4 / E7：>1MB 文件默认仍是只读分块查看；显式开启行编辑后才收集行补丁 -->
+      <span class="edit-mode-divider"></span>
+      <app-button
+        size="small"
+        :class="{ 'is-on': editMode }"
+        :disabled="!canEdit || prefs.pureViewMode"
+        :title="editModeHint"
+        @click="toggleEditMode"
+      >
+        {{ editMode ? '退出行编辑' : '行编辑' }}
+      </app-button>
+      <app-button
+        v-if="editMode"
+        size="small"
+        text
+        title="在当前行前插入一个空行（Ctrl+Insert）"
+        @click="insertLineAbove"
+      >插入行</app-button>
+      <template v-if="dirtyCount > 0">
+        <span class="dirty-count">{{ dirtyCount }} 行待保存</span>
+        <app-button size="small" :disabled="saving" @click="saveLarge(false)">保存</app-button>
+        <app-button size="small" text title="丢弃全部未保存的行改动" @click="askDiscardLargeEdits">撤销</app-button>
+      </template>
+      <template v-if="isExternalModified">
+        <span class="conflict-tip">磁盘已被外部修改</span>
+        <app-button size="small" @click="reloadLarge">重载</app-button>
+        <app-button size="small" @click="askForceSave">强制保存</app-button>
+      </template>
     </div>
+
+    <GlobalDialog v-model="confirmVisible" :title="confirmTitle" width="420px">
+      <div class="large-confirm-message">{{ confirmMessage }}</div>
+      <template #footer>
+        <app-button size="small" @click="confirmVisible = false">取消</app-button>
+        <app-button size="small" type="danger" plain @click="runConfirm">确定</app-button>
+      </template>
+    </GlobalDialog>
   </div>
 </template>
 
 <script setup lang="ts" name="TextView">import { ref, watch, nextTick, onMounted, onActivated, onDeactivated,onBeforeUnmount, computed } from 'vue'
+import { onRevealLine, onLargeRefresh } from '../../navigation/editorEvents'
+import { openConvertDialog } from '../../encoding/useEncodingConvert'
+import { prefs } from '../../preferences/useEditorPreferences'
+import GlobalDialog from '@/components/GlobalDialog.vue'
 import { invoke } from '@/api/rpc'
 import { Search, ArrowUp, ArrowDown, Close, ArrowLeft, ArrowRight, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
 import NotificationUtil from '@/utils/NotificationUtil'
 import useStore from '@/store'
-import { useDocumentManagerStore } from '../../store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 const {appConfig } = useStore();
 const docStore = useDocumentManagerStore()
 /**
@@ -138,6 +199,9 @@ const emit = defineEmits<{
 
 /** 搜索功能状态：关键词、搜索会话ID、匹配序号与总数、跳转目标、搜索栏显隐 */
 const keyword = ref('')
+/** 搜索模式：后端 files_query_lines 支持 text / regex（M2 已把查询能力收归 files，不再依赖 plugin-logs） */
+const useRegex = ref(false)
+const ignoreCase = ref(true)
 const searchId = ref('')
 const currentMatch = ref(0)
 const totalMatches = ref(0)
@@ -230,7 +294,26 @@ interface VisibleItem {
   lineNumber: number
   text: string
   offset: number
+  dirty?: boolean
+  deleted?: boolean
+  extraLines?: number
 }
+
+/**
+ * 脏行只投影到「可见行」上，不改 `lines.value`、也不碰块缓存：
+ * `lines.value` 可能直接引用缓存里的数组，原地改写会污染其它块。
+ */
+const dirtyLines = computed(() => {
+  const map = new Map<number, { text: string; del: boolean }>()
+  if (!props.path) return map
+  for (const e of docStore.largeEditsFor(props.path)) {
+    // 行编辑只产生单行区间；多行展开靠 text 里的 \n，行号仍是磁盘原始行号
+    if (e.start_line === e.end_line) {
+      map.set(e.start_line, { text: e.delete ? '' : e.text, del: !!e.delete })
+    }
+  }
+  return map
+})
 
 const visibleItems = computed<VisibleItem[]>(() => {
   const total = lines.value.length
@@ -241,15 +324,218 @@ const visibleItems = computed<VisibleItem[]>(() => {
   const endIdx = Math.min(total, startIdx + visibleCount + VIRTUAL_BUFFER * 2)
 
   const items: VisibleItem[] = []
+  const dirty = dirtyLines.value
   for (let i = startIdx; i < endIdx; i++) {
+    const lineNumber = firstLineNumber.value + i
+    const d = dirty.get(lineNumber)
+    let text = lines.value[i]
+    let extraLines = 0
+    if (d) {
+      if (d.del) {
+        // 删除标记仍显示原行（加删除线），便于一眼看出会删掉什么、也便于撤销
+        text = lines.value[i]
+      } else {
+        const parts = d.text.split('\n')
+        text = parts[0]
+        extraLines = Math.max(0, parts.length - 1)
+      }
+    }
     items.push({
-      lineNumber: firstLineNumber.value + i,
-      text: lines.value[i],
-      offset: i * LINE_HEIGHT
+      lineNumber,
+      text,
+      offset: i * LINE_HEIGHT,
+      dirty: !!d,
+      deleted: !!d?.del,
+      extraLines
     })
   }
   return items
 })
+
+// ==================== M4 / E7：大文件行级编辑 ====================
+//
+// 约定：>1MB 文件默认仍是只读分块查看，用户显式开启「行编辑」后才收集行补丁。
+// 补丁按**磁盘原始行号**存进 docStore.largeEdits（content 仍然是 null，不整读），
+// 保存统一走 docStore.saveDocument → files_apply_line_edits → file_meta::save_note。
+// 多行展开/删除不会让后续补丁错位，因为每条补丁都锚在原始行号上，且后端按倒序应用。
+
+/** 与后端 file_large::MAX_EDITABLE_BYTES 保持一致 */
+const LARGE_EDIT_MAX_BYTES = 32 * 1024 * 1024
+
+const editMode = ref(false)
+const editingLine = ref<number | null>(null)
+const editText = ref('')
+const saving = ref(false)
+const confirmVisible = ref(false)
+const confirmTitle = ref('')
+const confirmMessage = ref('')
+let confirmAction: (() => void) | null = null
+let lineEditorEl: HTMLTextAreaElement | null = null
+let unsubLargeRefresh: (() => void) | null = null
+
+const dirtyCount = computed(() =>
+  props.path ? docStore.largeEditsFor(props.path).length : 0
+)
+const isExternalModified = computed(
+  () => !!docStore.documents.get(props.path)?.externalModified
+)
+const canEdit = computed(() => {
+  const size = docStore.documents.get(props.path)?.diskSize
+  return size == null || size <= LARGE_EDIT_MAX_BYTES
+})
+const editModeHint = computed(() => {
+  if (!canEdit.value) return '文件超过 32MB，暂不支持行编辑（仍可分块只读查看）'
+  if (prefs.pureViewMode) return '纯查看模式已开启，行编辑被禁用'
+  return '双击任意行编辑；Enter 提交、Esc 取消、Tab 编辑下一行、Ctrl+Delete 标记删除整行'
+})
+
+function setLineEditorRef(el: unknown) {
+  lineEditorEl = (el as HTMLTextAreaElement) || null
+}
+
+function originalLineText(line: number): string {
+  const idx = line - firstLineNumber.value
+  return idx >= 0 && idx < lines.value.length ? lines.value[idx] : ''
+}
+
+function editForLine(line: number) {
+  return docStore
+    .largeEditsFor(props.path)
+    .find((e) => e.start_line === line && e.end_line === line)
+}
+
+function toggleEditMode() {
+  if (!canEdit.value || prefs.pureViewMode) {
+    NotificationUtil.warn(editModeHint.value)
+    return
+  }
+  editMode.value = !editMode.value
+  if (!editMode.value && editingLine.value != null) editingLine.value = null
+}
+
+function onLineDblClick(item: VisibleItem) {
+  if (!editMode.value) return
+  // 已标记删除的行：双击即撤销删除标记
+  if (item.deleted) {
+    docStore.setLargeLineEdit(props.path, item.lineNumber, undefined)
+    return
+  }
+  editingLine.value = item.lineNumber
+  const existing = editForLine(item.lineNumber)
+  editText.value = existing && !existing.delete ? existing.text : item.text
+  void nextTick(() => {
+    lineEditorEl?.focus()
+    lineEditorEl?.setSelectionRange(editText.value.length, editText.value.length)
+  })
+}
+
+function onLineEditorKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    // blur 随后触发 commitLineEdit，此时 editingLine 已为空会直接早退
+    editingLine.value = null
+    return
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'Delete' || e.key === 'Backspace')) {
+    e.preventDefault()
+    const line = editingLine.value
+    editingLine.value = null
+    if (line != null) docStore.setLargeLineEdit(props.path, line, null)
+    return
+  }
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    commitLineEdit()
+    return
+  }
+  if (e.key === 'Tab') {
+    e.preventDefault()
+    const next = (editingLine.value ?? 0) + 1
+    commitLineEdit()
+    if (next - firstLineNumber.value < lines.value.length) {
+      onLineDblClick({ lineNumber: next, text: originalLineText(next), offset: 0 })
+    }
+  }
+}
+
+function commitLineEdit() {
+  const line = editingLine.value
+  if (line == null) return
+  editingLine.value = null
+  const normalized = editText.value.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  if (normalized === originalLineText(line)) {
+    // 改回原文 = 撤销这一行的补丁，别把无意义的编辑也写回磁盘
+    docStore.setLargeLineEdit(props.path, line, undefined)
+  } else {
+    docStore.setLargeLineEdit(props.path, line, normalized)
+  }
+}
+
+function insertLineAbove() {
+  if (!editMode.value) return
+  const line =
+    editingLine.value ?? (targetLineNumber.value || currentStartLine.value)
+  const existing = editForLine(line)
+  const base = existing && !existing.delete ? existing.text : originalLineText(line)
+  editingLine.value = null
+  // 前缀 \n = 在该行前插入一个空行；后端把 text 按 \n 展开成多行
+  docStore.setLargeLineEdit(props.path, line, '\n' + base)
+  NotificationUtil.info(`已在第 ${line} 行前插入空行，保存后行号会重排`)
+}
+
+async function saveLarge(force: boolean) {
+  if (saving.value || dirtyCount.value === 0) return
+  saving.value = true
+  try {
+    const ok = await docStore.saveDocument(
+      props.path,
+      force ? { force: true } : undefined
+    )
+    if (ok) NotificationUtil.info('大文件行改动已保存')
+  } catch (e) {
+    NotificationUtil.error('保存失败：' + String(e))
+  } finally {
+    saving.value = false
+  }
+}
+
+function openConfirm(title: string, message: string, run: () => void) {
+  confirmTitle.value = title
+  confirmMessage.value = message
+  confirmAction = run
+  confirmVisible.value = true
+}
+
+function runConfirm() {
+  confirmVisible.value = false
+  const run = confirmAction
+  confirmAction = null
+  run?.()
+}
+
+function askDiscardLargeEdits() {
+  openConfirm(
+    '撤销行改动',
+    `确定丢弃 ${dirtyCount.value} 行未保存的改动吗？此操作不可撤销。`,
+    () => {
+      docStore.clearLargeEdits(props.path)
+      editingLine.value = null
+    }
+  )
+}
+
+function askForceSave() {
+  openConfirm(
+    '强制保存',
+    '磁盘文件已被外部修改。强制保存会用当前内容覆盖磁盘上的新改动，确定继续吗？',
+    () => { void saveLarge(true) }
+  )
+}
+
+async function reloadLarge() {
+  editingLine.value = null
+  await docStore.reloadDocument(props.path)
+}
 
 
 
@@ -756,6 +1042,33 @@ function scrollToLineNumber(lineNumber: number) {
   viewerRef.value.scrollTop = Math.max(0, targetScroll)
 }
 
+/**
+ * 外部「跳到第 N 行」入口（M2 遗留 → M3 补齐）。
+ *
+ * TextView 是分块虚拟滚动，不能直接 setScrollTop：目标行可能根本不在当前块里。
+ * 复用 restoreView 的「按行号反算块首行」思路，必要时先 loadChunk 再定位，
+ * 并用 scrollGuard 抑制触底自动加载把刚落好的位置冲掉（editor-and-tabs.md:40）。
+ */
+async function jumpToAbsoluteLine(lineNumber: number) {
+  if (!props.path || !Number.isFinite(lineNumber) || lineNumber < 1) return
+  const line = Math.floor(lineNumber)
+  const chunk = Math.max(1, Number(CHUNK_SIZE.value) || 1)
+  const startLine = Math.floor((line - 1) / chunk) * chunk + 1
+  const inCurrentBlock =
+    line >= currentStartLine.value && line <= currentEndLine.value
+  if (!inCurrentBlock) {
+    const ok = await loadChunk(props.path, startLine)
+    if (!ok) return
+  }
+  await nextTick()
+  targetLineNumber.value = line
+  scrollGuard = true
+  scrollToLineNumber(line)
+  window.setTimeout(() => { scrollGuard = false }, 400)
+}
+
+let unsubRevealLine: (() => void) | null = null
+
 function onCompositionStart() {
   compositionEndTime = 0
 }
@@ -769,26 +1082,45 @@ function onSearchKeyup(e: KeyboardEvent) {
   doSearch()
 }
 
+/** 长任务取消：新查询先请求取消旧任务，并用 token 丢弃过期结果（复用 logs 范式） */
+let queryToken = 0
+const activeQueryTaskId = ref('')
+
 async function doSearch() {
   if (!keyword.value || !props.path) return
+  if (activeQueryTaskId.value) {
+    void invoke('files_search_cancel', { taskId: activeQueryTaskId.value }).catch((e) => {
+      console.warn('取消上一次文件查询失败（旧任务可能已结束）', e)
+      return false
+    })
+  }
+  const token = ++queryToken
+  const taskId = `files-query-${token}`
+  activeQueryTaskId.value = taskId
   isSearching.value = true
   showOverlay.value = true
   overlayText.value = '搜索中...'
   try {
-    // 迁移到统一的 log_query_lines（§2.7）：无筛选 + 关键词，恒忽略大小写（与旧口径一致）
-    const res: any = await invoke('logs_query_lines', {
+    // M2：查询能力收归 files 自己的 `files_query_lines`，只开 plugin-files 的裁剪构建也能用。
+    const res: any = await invoke('files_query_lines', {
       filePath: props.path,
-      encoding: currentEncoding.value,
       keyword: keyword.value,
-      mode: 'text',
-      ignoreCase: true,
-      maxMatches: 200000
+      mode: useRegex.value ? 'regex' : 'text',
+      ignoreCase: ignoreCase.value,
+      maxMatches: 200000,
+      taskId
     })
+    if (token !== queryToken) return // 已有更新的查询，旧结果静默丢弃
+    activeQueryTaskId.value = ''
     if (res && res.code === 200) {
       totalMatches.value = res.data.matched
       matchLineNumbers.value = res.data.lines || []
       if (res.data.matches_truncated) {
         NotificationUtil.warn(`匹配过多，仅保留前 ${matchLineNumbers.value.length} 条可跳转`)
+      }
+      if (res.data.cancelled) {
+        isSearching.value = false
+        return
       }
       if (totalMatches.value > 0) {
         currentMatch.value = 1
@@ -802,17 +1134,39 @@ async function doSearch() {
       isSearching.value = false
     }
   } catch (e: any) {
+    if (token !== queryToken) return
+    activeQueryTaskId.value = ''
     console.error('搜索异常:', e)
     NotificationUtil.error(e?.message || '搜索异常，请重试')
     isSearching.value = false
   } finally {
-    showOverlay.value = false
+    if (token === queryToken) showOverlay.value = false
   }
 }
 
 
+/**
+ * 统一的「这一行是否命中」口径：后端查询与本地高亮必须用同一套规则，
+ * 否则会出现「跳转到第 N 行但那行不高亮」。正则非法时静默返回 false（不抛异常）。
+ */
+function buildLineMatcher(): (line: string) => boolean {
+  const kw = keyword.value
+  if (!kw) return () => false
+  if (useRegex.value) {
+    try {
+      const re = new RegExp(kw, ignoreCase.value ? 'i' : '')
+      return (line: string) => re.test(line)
+    } catch {
+      return () => false
+    }
+  }
+  return (line: string) => ignoreCase.value
+    ? line.toLowerCase().includes(kw.toLowerCase())
+    : line.includes(kw)
+}
+
 function navigateInBlock(targetLine: number, matchIndex: number) {
-  const kw = keyword.value.toLowerCase()
+  const matches = buildLineMatcher()
   const startLine = Math.max(currentStartLine.value, targetLine - CHUNK_SIZE.value)
   const endLine = Math.min(currentEndLine.value, targetLine + CHUNK_SIZE.value)
   const startIdx = startLine - firstLineNumber.value
@@ -823,7 +1177,7 @@ function navigateInBlock(targetLine: number, matchIndex: number) {
   currentEndLine.value = startLine + lines.value.length - 1
   const newHighlight = new Set<number>()
   for (let i = 0; i < lines.value.length; i++) {
-    if (lines.value[i].toLowerCase().includes(kw)) {
+    if (matches(lines.value[i])) {
       newHighlight.add(startLine + i)
     }
   }
@@ -864,10 +1218,10 @@ async function loadPreview(index: number) {
       }
       currentStartLine.value = startLine
       currentEndLine.value = startLine + newLines.length - 1
-      const kw = keyword.value.toLowerCase()
+      const matches = buildLineMatcher()
       const newHighlight = new Set<number>()
       for (let i = 0; i < newLines.length; i++) {
-        if (newLines[i].toLowerCase().includes(kw)) {
+        if (matches(newLines[i])) {
           newHighlight.add(startLine + i)
         }
       }
@@ -908,9 +1262,17 @@ function jumpToMatch(val: number | string) {
 function highlightText(line: string): string {
   if (!keyword.value) return escapeHtml(line)
   const escaped = escapeHtml(line)
-  const kw = escapeHtml(keyword.value)
-  const regex = new RegExp(`(${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-  return escaped.replace(regex, '<mark class="match-hl">$1</mark>')
+  try {
+    // 正则模式直接用用户表达式；文本模式转义元字符。大小写跟随搜索栏开关。
+    const pattern = useRegex.value
+      ? `(${keyword.value})`
+      : `(${keyword.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`
+    const regex = new RegExp(pattern, ignoreCase.value ? 'gi' : 'g')
+    return escaped.replace(regex, '<mark class="match-hl">$1</mark>')
+  } catch {
+    // 正则写到一半或非法：不高亮即可，绝不让整页渲染抛错
+    return escaped
+  }
 }
 
 function escapeHtml(str: string): string {
@@ -938,6 +1300,13 @@ watch(showSearchBar, (val) => {
   }
 })
 function onKeydown(e: KeyboardEvent) {
+  // 行内输入框里的按键归 textarea 自己处理，别被块导航 / 查找快捷键吞掉
+  if ((e.target as HTMLElement | null)?.closest?.('.line-editor')) return
+  if (editMode.value && (e.ctrlKey || e.metaKey) && e.key === 'Insert') {
+    e.preventDefault()
+    insertLineAbove()
+    return
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
     e.preventDefault()
     showSearchBar.value = true
@@ -990,7 +1359,21 @@ onMounted(async () => {
   }
   addKeydownListener()
   window.addEventListener('encoding-change', onGlobalEncodingChange);
-
+  // 搜索结果 / 书签 / 大纲统一通过事件请求跳行，大文件也支持跨块定位
+  unsubRevealLine = onRevealLine((detail) => {
+    if (detail.path !== props.path) return
+    void jumpToAbsoluteLine(detail.line)
+  })
+  // 保存 / 外部刷新后磁盘行号可能因增删行重排：块缓存与组件内状态快照都必须失效
+  unsubLargeRefresh = onLargeRefresh((detail) => {
+    if (detail.path !== props.path) return
+    clearChunkCache()
+    savedState.delete(props.path)
+    editingLine.value = null
+    const start = currentStartLine.value > 1 ? currentStartLine.value : 1
+    void loadChunk(props.path, start)
+    countTotalLinesAsync(props.path)
+  })
 })
 
 onActivated(() => {
@@ -1027,6 +1410,15 @@ onDeactivated(() => {
 
 onBeforeUnmount(() => {
   removeKeydownListener()
+  // 组件销毁后不能再有在飞的大文件查询：请求取消并让回调按 token 自弃
+  queryToken++
+  if (activeQueryTaskId.value) {
+    void invoke('files_search_cancel', { taskId: activeQueryTaskId.value }).catch((e) => {
+      console.warn('卸载时取消文件查询失败', e)
+      return false
+    })
+    activeQueryTaskId.value = ''
+  }
   // KeepAlive 淘汰（:max=8）走的是 unmount 而非 deactivate，这里再兜底上报一次
   if (reportTimer) {
     clearTimeout(reportTimer)
@@ -1040,6 +1432,8 @@ onBeforeUnmount(() => {
   savedState.clear()
   clearChunkCache()
   window.removeEventListener('encoding-change', onGlobalEncodingChange)
+  unsubRevealLine?.()
+  unsubLargeRefresh?.()
 })
 
 // ========== 异步统计总行数（不阻塞首次显示） ==========
@@ -1083,12 +1477,23 @@ function normalizeEncodingName(name: string): string {
 }
 
 function onEncodingChange(enc: string) {
+  // M4：下拉里的「转换」是真正重写磁盘字节，与其余「仅换显示解码」的选项严格区分
+  if (enc === '__convert__') {
+    openConvertDialog(props.path)
+    return
+  }
+  // 编辑模式下显示编码与写回编码不能分叉：先退出行编辑或保存，再切换
+  if (editMode.value) {
+    NotificationUtil.warn('行编辑模式下不能切换显示编码，请先保存或退出行编辑')
+    return
+  }
   if (enc === currentEncoding.value) return
   switchEncoding(enc)
 }
 
 function onGlobalEncodingChange(e: Event) {
   const enc = (e as CustomEvent).detail.encoding
+  if (editMode.value) return
   if (enc && enc !== currentEncoding.value) {
     switchEncoding(enc)
   }
@@ -1341,7 +1746,7 @@ async function switchEncoding(enc: string) {
   width: 36px;
   height: 36px;
   border: 3px solid rgba(255, 255, 255, 0.15);
-  border-top-color: #409eff;
+  border-top-color: var(--el-color-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -1366,6 +1771,93 @@ async function switchEncoding(enc: string) {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* ===== M4 / E7 行编辑 ===== */
+.edit-mode-divider {
+  width: 1px;
+  height: 14px;
+  flex-shrink: 0;
+  margin: 0 4px;
+  @include useTheme {
+    background: getVar(borderColor);
+  }
+}
+
+.code-line.is-dirty {
+  @include useTheme {
+    background: rgba(0, 122, 204, 0.12);
+    box-shadow: inset 2px 0 0 getVar(stateInfoFg);
+  }
+}
+
+.code-line.is-deleted .line-content {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+.line-editor {
+  flex: 1;
+  min-width: 0;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 4px;
+  border: 1px solid;
+  border-radius: 2px;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+  font-family: var(--font-family-mono);
+  font-size: getVar(fontSize);
+  @include useTheme {
+    color: getVar(textColor);
+    background: getVar(bgColor);
+    border-color: getVar(stateInfoFg);
+  }
+}
+
+.line-badge {
+  flex-shrink: 0;
+  margin-left: 8px;
+  padding: 0 4px;
+  font-size: getVar(fontSizeSmall);
+  border-radius: 2px;
+  @include useTheme {
+    color: getVar(stateInfoFg);
+    background: getVar(bgColor);
+  }
+
+  &.is-danger {
+    color: #d03050;
+  }
+}
+
+.dirty-count,
+.conflict-tip {
+  font-size: getVar(fontSizeSmall);
+  white-space: nowrap;
+  margin-left: 4px;
+}
+
+.dirty-count {
+  color: #f5c542;
+}
+
+.conflict-tip {
+  color: #d03050;
+}
+
+.is-on {
+  font-weight: 600;
+}
+
+.large-confirm-message {
+  font-size: getVar(fontSize);
+  line-height: 1.6;
+  @include useTheme {
+    color: getVar(textColor);
+  }
 }
 
 </style>

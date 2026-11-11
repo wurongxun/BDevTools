@@ -29,8 +29,8 @@ const handleCmd = (cmd: string) => emit('command', cmd)
   justify-content: center;
   border: none;
   background: transparent;
-  color: #57606a;
-  border-radius: 3px;
+  color: var(--textSecondary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   position: relative;
   transition: all .15s;
@@ -41,8 +41,8 @@ const handleCmd = (cmd: string) => emit('command', cmd)
     right: 1px;
     bottom: 1px;
     font-size: 8px !important;
-    color: #8c959f;
+    color: var(--textSecondary);
   }
-  &:hover { background: #eaeef2; color: #0969da; .arrow { color: #0969da; } }
+  &:hover { background: var(--hoverColor); color: var(--el-color-primary); .arrow { color: var(--el-color-primary); } }
 }
 </style>

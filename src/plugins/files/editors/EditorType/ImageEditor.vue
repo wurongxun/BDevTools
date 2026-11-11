@@ -49,7 +49,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ZoomIn, ZoomOut, RefreshRight } from '@element-plus/icons-vue'
 import { convertFileSrc } from '@/core/runtime'
-import { useDocumentManagerStore } from '../../store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 
 defineOptions({ name: 'ImageEditor' })
 

@@ -32,7 +32,7 @@ interface AppButtonProps {
   bg?: boolean
   /** 图标：可传组件对象（如 `:icon="Edit"`），或图标名字符串（如 `icon="Close"`） */
   icon?: string | object
-  /** 无边框纯图标工具栏按钮（桌面风格）：透明背景、无边框、紧凑 22×22，hover 浮起 */
+  /** 无边框纯图标工具栏按钮（桌面风格）：透明背景、无边框、紧凑 24×24，hover 浮起 */
   bare?: boolean
   autoInsertSpace?: boolean
 }

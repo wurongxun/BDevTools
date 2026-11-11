@@ -1,7 +1,7 @@
 import { markRaw } from 'vue'
 import { Monitor } from '@element-plus/icons-vue'
-import type { ToolPlugin } from '@/core/pluginManager'
-import MainPanel from './MainPanel.vue'
+import type { BuiltinPluginImpl } from '@/core/pluginManager'
+import { lazyView } from '@/core/plugin/lazy'
 
 /**
  * 3D 与游戏（宿主级容器）
@@ -19,10 +19,7 @@ import MainPanel from './MainPanel.vue'
  * 只提供 `mainPanel`（无侧栏）→ 天然走「无侧栏插件」布局，列表占满主区。
  */
 export default {
-  id: 'web3d',
-  label: '3D 与游戏',
-  description: '在新窗口里运行声明了页面能力 / 独立窗口的第三方 3D / 游戏插件',
   icon: markRaw(Monitor),
-  mainPanel: markRaw(MainPanel),
+  mainPanel: lazyView('web3d', 'main', () => import('./MainPanel.vue')),
   order: 98,
-} satisfies ToolPlugin
+} satisfies BuiltinPluginImpl

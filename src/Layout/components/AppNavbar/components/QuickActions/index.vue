@@ -1,6 +1,7 @@
 <template>
-  <!-- 标题栏左侧快捷操作区（菜单左边）： 侧边栏 / 插件面板 / 沉浸式 / 主题 。
-       原先这组按钮在右侧 FunctionalArea 里，现整体搬到菜单左侧，四个按钮排在一起。 -->
+  <!-- 标题栏左侧快捷操作区（菜单左边）：侧边栏 / 插件面板 / 插件入口 / 沉浸式 / 主题。
+       前三个是同一组布局开关（图标同源：外框 + 区域实心/空心，显示时高亮）。
+       原先这组按钮在右侧 FunctionalArea 里，现整体搬到菜单左侧。 -->
   <div class="quick-actions">
 
 
@@ -20,7 +21,9 @@
       </svg>
     </button>
 
-    <!-- 隐藏/显示插件面板（仅收起 sidebarPanel，保留活动栏图标列）；当前插件没有侧栏时禁用 -->
+    <!-- 隐藏/显示插件面板（仅收起 sidebarPanel，保留活动栏图标列）；当前插件没有侧栏时禁用。
+         图标与「切换侧边栏」同源：外框 + 右侧栏。面板显示时右侧栏实心、隐藏时空心，
+         与 VS Code「切换辅助侧栏」语义一致（面板在右侧）。 -->
     <button
       type="button"
       class="qa-icon"
@@ -31,8 +34,34 @@
       :title="sidebarToggleLabel"
       @click="toggleSidebarPanel"
     >
-      <el-icon v-if="sidebarPanelCollapsed" class="qa-el-icon"><Expand /></el-icon>
-      <el-icon v-else class="qa-el-icon"><Fold /></el-icon>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <rect x="9" y="3" width="6" height="18" rx="1" :fill="!sidebarPanelCollapsed ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.2" opacity="0.9"/>
+      </svg>
+    </button>
+
+    <!-- 隐藏/显示插件入口（活动栏图标列，含底部常驻入口）：只收起图标列，保留插件面板。
+         与前两个按钮同源：外框 + 区域实心/空心、显示时高亮；这里用竖排三个方块表示插件入口，
+         避免与「左侧竖条 = 侧边栏」「中间竖条 = 插件面板」混淆。
+         专注模式已经隐藏活动栏，此时按钮无意义，故禁用并说明。 -->
+    <button
+      type="button"
+      class="qa-icon"
+      :class="{ 'is-active': !activityBarCollapsed && !focusMode }"
+      :disabled="focusMode"
+      :aria-pressed="!activityBarCollapsed && !focusMode"
+      :aria-label="activityBarToggleLabel"
+      :title="activityBarToggleLabel"
+      @click="toggleActivityBar"
+    >
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <g :fill="!activityBarCollapsed ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.2" opacity="0.9">
+          <rect x="5.5" y="5.5" width="4" height="3.5" rx="0.8"/>
+          <rect x="5.5" y="10.25" width="4" height="3.5" rx="0.8"/>
+          <rect x="5.5" y="15" width="4" height="3.5" rx="0.8"/>
+        </g>
+      </svg>
     </button>
 
     <!-- 沉浸式：只留插件界面（插件侧栏面板 + 主面板），隐藏标题栏 / 活动栏 / 状态栏。
@@ -77,7 +106,7 @@
 <script lang="ts" setup name="QuickActions">
 import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { Sunny, Moon, Fold, Expand } from '@element-plus/icons-vue'
+import { Sunny, Moon } from '@element-plus/icons-vue'
 import { load, Store } from '@/core/runtime'
 import { pluginManager } from '@/core/pluginManager'
 import { isDark, toggleDark } from '@/composables/useDark'
@@ -91,7 +120,7 @@ import {
 const store = useStore()
 
 const { isCollapse } = storeToRefs(store.system)
-const { sidebarPanelCollapsed, immersiveMode } = storeToRefs(store.useLayoutStore)
+const { sidebarPanelCollapsed, immersiveMode, activityBarCollapsed, focusMode } = storeToRefs(store.useLayoutStore)
 
 /** 当前激活插件是否提供侧栏面板（未提供时面板切换按钮无意义，禁用并给出说明） */
 const hasSidebar = computed(() => pluginManager.activeHasSidebar)
@@ -100,6 +129,12 @@ const hasSidebar = computed(() => pluginManager.activeHasSidebar)
 const sidebarToggleLabel = computed(() => {
   if (!hasSidebar.value) return '当前插件没有侧栏面板'
   return sidebarPanelCollapsed.value ? '显示插件面板' : '隐藏插件面板'
+})
+
+/** 插件入口切换按钮的文案（无障碍标签与 tooltip 共用）；专注模式已代它隐藏活动栏 */
+const activityBarToggleLabel = computed(() => {
+  if (focusMode.value) return '专注模式下插件入口已隐藏'
+  return activityBarCollapsed.value ? '显示插件入口' : '隐藏插件入口'
 })
 
 /**
@@ -125,6 +160,11 @@ function toggleSidebar(){
 // ========== 插件面板切换（仅隐藏 sidebarPanel，保留活动栏） ==========
 function toggleSidebarPanel(){
   store.useLayoutStore.toggleSidebarPanel()
+}
+
+// ========== 插件入口（活动栏图标列）切换 ==========
+function toggleActivityBar(){
+  store.useLayoutStore.toggleActivityBar()
 }
 
 // ========== 沉浸式 ==========

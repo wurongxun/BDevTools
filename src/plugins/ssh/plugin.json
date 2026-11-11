@@ -1,0 +1,5 @@
+{
+  "id": "ssh",
+  "name": "SSH 连接",
+  "description": "SSH 终端与 SFTP 文件传输，支持远程日志拉取"
+}

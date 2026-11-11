@@ -1,7 +1,6 @@
 import { markRaw } from 'vue'
-import type { ToolPlugin } from '@/core/pluginManager'
-import SidebarPanel from './sidebar/SidebarPanel.vue'
-import LogWorkspace from './components/LogWorkspace.vue'
+import type { BuiltinPluginImpl } from '@/core/pluginManager'
+import { lazyView } from '@/core/plugin/lazy'
 import Logs from '@/components/Icon/Logs.vue'
 /**
  * 日志工作台插件
@@ -9,12 +8,9 @@ import Logs from '@/components/Icon/Logs.vue'
  * 自定义高亮规则、堆栈识别与悬停元信息。
  */
 export default {
-  id: 'logs',
-  label: '日志',
-  description: '大文件日志工作台：分块懒加载、正则检索、级别配色与高亮规则',
   icon: markRaw(Logs),
-  sidebarPanel: markRaw(SidebarPanel),
-  mainPanel: markRaw(LogWorkspace),
+  sidebarPanel: lazyView('logs', 'sidebar', () => import('./sidebar/SidebarPanel.vue')),
+  mainPanel: lazyView('logs', 'main', () => import('./components/LogWorkspace.vue')),
   workspaceDirs: ['logs'],
   order: 2,
-} satisfies ToolPlugin
+} satisfies BuiltinPluginImpl

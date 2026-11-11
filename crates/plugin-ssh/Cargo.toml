@@ -1,0 +1,24 @@
+[package]
+name = "bdevtools-plugin-ssh"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "BDevTools built-in ssh plugin (pure Rust business layer)"
+
+[lib]
+name = "bdevtools_plugin_ssh"
+path = "src/lib.rs"
+
+[dependencies]
+bdevtools-core = { path = "../bdevtools-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+chrono = "0.4"
+anyhow = "1.0.104"
+lazy_static = "1.5.1"
+uuid = { version = "1", features = ["v4"] }
+# 终端输出按原始字节透传（跨块 UTF-8 / GBK 由前端 TextDecoder 流式解码），与 terminal 插件同款编码
+base64 = "0.22"
+# 重依赖随插件 crate 一起裁剪：不开 plugin-ssh 时 vendored-openssl 根本不进构建图。
+ssh2 = { version = "0.9", features = ["vendored-openssl"] }

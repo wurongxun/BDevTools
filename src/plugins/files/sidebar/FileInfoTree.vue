@@ -95,10 +95,19 @@
           </div>
         </template>
       </el-tree>
-      <!-- 空状态 -->
+      <!-- 空状态：工作区没有关联文件夹（竖向引导，对齐 VS Code 的「未打开文件夹」）。
+           刻意不预置目录 —— 目录由用户自己选，这里只给两个明确入口。 -->
       <div v-show="treeChildrenData.length === 0" class="empty-tree-actions">
-        <div class="empty-hint" @click="changeWorkspace()">请选择文件夹</div>
-      
+        <el-icon class="empty-guide-icon"><FolderOpened /></el-icon>
+        <p class="empty-guide-text">尚未打开文件夹</p>
+        <div class="empty-guide-actions">
+          <app-button size="small" type="primary" class="guide-btn" @click="handleOpenFolder">
+            打开文件夹
+          </app-button>
+          <app-button size="small" class="guide-btn" @click="handleOpenFile">
+            打开文件
+          </app-button>
+        </div>
       </div>
     </div>
 
@@ -148,6 +157,11 @@
               <FolderOpened />
             </el-icon> 在文件管理器中显示
           </div>
+          <div class="ctx-item" @click="handleOpenTerminalHere">
+            <el-icon>
+              <Monitor />
+            </el-icon> 在集成终端打开此文件夹
+          </div>
           <div class="ctx-divider" />
           <div class="ctx-item" @click="showRenameDialog">
             <el-icon>
@@ -176,6 +190,16 @@
             <el-icon>
               <FolderOpened />
             </el-icon> 在文件管理器中显示
+          </div>
+          <div class="ctx-item" @click="handleOpenTerminalHere">
+            <el-icon>
+              <Monitor />
+            </el-icon> 在集成终端打开所在目录
+          </div>
+          <div class="ctx-item" @click="handleRunCurrentFile">
+            <el-icon>
+              <VideoPlay />
+            </el-icon> 在集成终端运行此脚本
           </div>
           <div class="ctx-divider" />
           <div class="ctx-item" @click="showRenameDialog">
@@ -216,17 +240,24 @@ import {
   Picture,
   Notebook,
   Grid,
-  Refresh
+  Refresh,
+  Monitor,
+  VideoPlay
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import GlobalPromptDialog from '@/components/GlobalPromptDialog.vue'
 import NotificationUtil from '@/utils/NotificationUtil'
 import { tauri_request } from '@/utils/tauri_request'
 import { ResponseData } from '@/entity/entitys'
-import { useDocumentManagerStore } from '../store/documents'
+import { useDocumentManagerStore } from '@/store/modules/documents'
 import useStore from '@/store/index'
 import { TreeNode } from '@/Types/entitys'
 import { changeWorkspace } from '@/utils/index'
+import {
+  openDirectoryInTerminal,
+  openInTerminal,
+  runCurrentFile
+} from '../terminal/useTerminalLaunch'
 
 const { appConfig } = useStore()
 const docStore = useDocumentManagerStore()
@@ -478,6 +509,22 @@ async function handleOpenInExplorer() {
   closeContextMenu()
 }
 
+/** M4 / F4：文件夹节点直接用自身路径作 cwd，文件节点取其所在目录。 */
+function handleOpenTerminalHere() {
+  const node = contextNode.value
+  if (!node) return
+  const path = node.folder || node.filePath || ''
+  if (node.isFolder) openDirectoryInTerminal(path)
+  else openInTerminal(path)
+  closeContextMenu()
+}
+
+function handleRunCurrentFile() {
+  const path = contextNode.value?.filePath || ''
+  if (path) runCurrentFile(path)
+  closeContextMenu()
+}
+
 function showRenameDialog() {
   const node = contextNode.value
   if (!node) return
@@ -540,6 +587,23 @@ function handleRefresh() {
   emit('refresh')
 }
 
+/**
+ * 空状态「打开文件」：只把文件开进编辑器，**不改工作目录**。
+ * 与 MenuBar 的「打开文件」行为一致 —— 用户还没选目录时，不该替他决定文件树根在哪。
+ */
+async function handleOpenFile() {
+  const { open } = await import('@/core/runtime')
+  const selected = await open({ multiple: false, filters: [{ name: '文件', extensions: ['*'] }] })
+  if (typeof selected === 'string' && selected) {
+    docStore.openDocument(selected)
+  }
+}
+
+/** 空状态「打开文件夹」：选目录作为工作目录（changeWorkspace 内部会刷新文件树并持久化） */
+function handleOpenFolder() {
+  void changeWorkspace()
+}
+
 // ===== 根目录操作 =====
 function handleAddRootFile() {
   const rootNode: TreeNode = {
@@ -596,37 +660,21 @@ async function handleNodeDrop(draggingNode: any, dropNode: any, type: string) {
   try {
     const oldPath = dragged.filePath || dragged.folder
     const name = oldPath.split(/[/\\]/).pop() || ''
-    const newPath = `${target.folder}/${name}`
+    // 目标文件夹的真实路径：根节点是工作区本身（folder），其余文件夹用 filePath
+    const targetDir = target.isRoot ? (target.folder || target.filePath) : (target.filePath || target.folder)
+    if (!oldPath || !targetDir) {
+      NotificationUtil.error('无法解析拖拽路径')
+      return
+    }
+    const newPath = `${targetDir.replace(/[\\/]+$/, '')}/${name}`
 
-    if (dragged.isFolder) {
-      const res = await tauri_request<ResponseData<string>>('up_folder_name', {
-        path: oldPath,
-        upFolderName: name,
-        fatherPath: target.folder
-      })
-      // 后端可能需要不同的参数，这里尝试 move
-      if (res?.code !== 200) {
-        // 尝试用 rename 方式移动
-        const res2 = await tauri_request<ResponseData<string>>('move_file', {
-          oldPath,
-          newPath
-        })
-        if (res2?.code !== 200 && res?.code !== 200) {
-          NotificationUtil.error('移动失败：后端不支持拖拽移动')
-          emit('refresh')
-          return
-        }
-      }
-    } else {
-      const res = await tauri_request<ResponseData<string>>('move_file', {
-        oldPath,
-        newPath
-      })
-      if (res?.code !== 200) {
-        NotificationUtil.error('移动失败')
-        emit('refresh')
-        return
-      }
+    // 统一走 move_file：旧实现文件夹分支先把 fatherPath 喂给只接受 (path, name) 的
+    // up_folder_name，再回退到一个从未注册的 move_file，两条路都必然失败。
+    const res = await tauri_request<ResponseData<string>>('move_file', { oldPath, newPath })
+    if (res?.code !== 200) {
+      NotificationUtil.error(res?.msg || '移动失败')
+      emit('refresh')
+      return
     }
     NotificationUtil.success(`已移动到 ${target.label}`)
     emit('refresh')
@@ -1000,44 +1048,49 @@ onBeforeUnmount(() => {
   }
 }
 
-// ===== 空状态 =====
+// ===== 空状态（工作区未关联文件夹）：竖向引导，对齐 VS Code =====
 .empty-tree-actions {
-  display: grid;
-  justify-content: center;
-  gap: 12px;
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+}
 
-  .button-card {
-    padding: 12px 24px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
+// 装饰性大图标（文案已表达同样含义）：用次要层级，不抢主体
+.empty-guide-icon {
+  align-self: center;
+  font-size: var(--font-size-5xl);
 
-    @include theme.useTheme {
-      background-color: theme.getVar('bgColor');
-      border-color: theme.getVar('borderColor');
-    }
-
-    .svg-icon {
-      font-size: theme.getVar('fontSizeXl');
-      color: var(--el-color-primary);
-      transition: color 0.2s;
-
-      &:hover {
-        color: var(--el-color-primary-light-4);
-      }
-    }
+  @include theme.useTheme {
+    color: theme.getVar('textSecondary');
   }
 }
 
-.empty-hint {
+.empty-guide-text {
+  margin: 0;
   text-align: center;
-  padding: 20px;
 
   @include theme.useTheme {
     color: theme.getVar('textSecondary');
     font-size: theme.getVar('fontSize');
+  }
+}
+
+// 竖向堆叠 + 按钮撑满侧边栏宽度（VS Code 观感）
+.empty-guide-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+
+  // 选择器要写成 `.el-button.guide-btn`：EP 的 `.el-button + .el-button { margin-left: 12px }`
+  // 特异性是 (0,0,2)，单类的 `.guide-btn` (0,0,1) 压不住它 —— 实测第二个按钮仍被右推 12px。
+  // 提到 (0,0,3) 才能稳定归零，且不依赖 CSS 加载顺序。
+  // （项目只在 .is-bare 上归零过这条，见 element.scss —— 普通按钮的兄弟间距一直都在。）
+  .el-button.guide-btn {
+    width: 100%;
+    margin-left: 0;
+    justify-content: center;
   }
 }
 
