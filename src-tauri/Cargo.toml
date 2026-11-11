@@ -3,7 +3,7 @@
 # 内置插件按 crate 拆分，由同名 feature 控制是否进入构建图。
 [package]
 name = "BDevTools"
-version = "1.7.3"
+version = "1.7.4"
 description = "A backend development tools"
 authors = ["you"]
 edition = "2021"
