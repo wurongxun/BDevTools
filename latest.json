@@ -1,11 +1,11 @@
 {
-  "version": "1.7.4",
-  "notes": "feat(code-editor): 启用编辑器顶栏并扩展多项编辑功能\n\n- 重新启用并扩展顶栏：光标行列、选区统计、编码/EOL、字号显示\n- 工具栏改为 bare 图标按钮（24×24），含书签、大纲、偏好、缩放、语言切换、保存\n- 新增外部修改冲突三选一对话框（重新加载/强制保存/稍后处理）\n- 新增分屏同步滚动、宏录制回放、行操作（排序/去重/大小写转换）\n- 新增 DiffEditor.vue 文本比较视图组件\n- store 层增加文件元数据字段（eol/bom/diskMtimeMs/diskSize）及 409 冲突检测\n- 新增大文件（>1MB）行级补丁编辑与保存机制\n- 移除组件内直接 import monaco，统一通过 MonacoEditor 封装透传\n- 样式使用 CSS 间距令牌与主题变量替代硬编码值",
-  "pub_date": "2026-11-11T08:00:00+08:00",
+  "version": "1.7.3",
+  "notes": "一、SSH\n1、修复插件BUG\n2、增强 SSH 插件核心功能与安全性\n3、添加自动化、高亮、保险库与会话日志\n4、宏编辑支持多行输入与自动保存状态可见 \n5、重构终端工具栏布局与编码选择器\n6、添加文件列表排序功能及文件类型列\n\n- 为本地和远程文件列表添加可点击排序的表头（名称/大小/类型/时间）\n- 新增文件类型列，根据扩展名显示可读类别（如文本文档、图像等）\n- 实现目录恒在前、同组内按所选列排序、同值按名称兜底的排序策略\n- 添加排序箭头指示器及悬停/激活状态样式\n- 修复后端 mtime 时间戳未转换本地时区导致显示偏差 8 小时的问题\n 二、完善MAT插件功能\n1、新增多视图与对比功能 \n2、引入 sidecar 子进程后台分析避免主窗口冻结\n\n- 新增 mat_worker 模块实现 sidecar 自派发（__mat_worker --path --dom）\n- 新增 mat_progress 模块提供 NDJSON 进度汇供子进程上报\n- 新增 mat_layout 模块作为浅堆口径唯一真源\n- 新增 WorkerProgress 组件在视图内展示后台作业进度条\n- store 增加 ensureAnalysisReady 闸门统一拦截重视图调用\n- store 增加 startWorker/cancelWorker/waitForWorker/autoPrewarm 作业管理\n- 支配树/泄漏检测/深堆列视图接入闸门确保不阻塞主进程\n- 大 dump 打开即自动预热索引（≥256MB 门槛，同时仅跑一个）\n- 后端新增 mat_worker_start/cancel/status 四个 Tauri 命令\n- DumpViewer 从 el-tabs 迁移至 TabBarContainer + KeepAlive 实现惰性挂载 \n三、拆分内置插件为独立 workspace crate",
+  "pub_date": "2026-11-07T08:00:00+08:00",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUOFVHSVdiU3RaUTNnVWpGZUMwQjhyRitNRmh6bUN6NDhaRktyWDJxWU1XVE5XTUFGVlpIUVNsenE5ZmhxSjlKZ3pNRHZxemc5QkllMXRwRmc1L0VZaTYwVk5qQW94ekFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MzU2NTcwCWZpbGU6QkRldlRvb2xzXzEuNy40X3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjcuNApoUDhLR0NFTXh1cUZUYUVsS0tTbjlNdmd2bGdaVFRSYVpOR2FaOHV2Sk1lb1doU2xBc1RGQkZkNDNyRGtJUVJ1bDFKQWQ0QWhIZWZHTm9xZnI4aXdCdz09Cg==",
-      "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.7.4/BDevTools_1.7.4_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUOFVHSVdiU3RaUThHNnZOMkhiT3ZmSUF6NE1vZzRUQnJiY2RnQ0tWazRUUHA3aVdna3hrZlpzZ2lZQXlENm5yNUZIcnVSU0tLUm5hWHk3NFlNV0Vqdk0zNWRtSUJXRGdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MDQzOTk1CWZpbGU6QkRldlRvb2xzXzEuNy4zX3g2NC1zZXR1cC5leGUJdmVyc2lvbjoxLjcuMwpyZy90Mi9weEdWODFUaXRiZlloZTRuVU9WRk5JNFhMRXRyVTh5MkNubU5pbzFVTldlSW1yZmVKTi9PYlpRR3h2U3MvaENCc1drd3BUeHhoRWh2V1pCZz09Cg==",
+      "url": "https://gitee.com/wurongxun/BackendDevTools/releases/download/v1.7.3/BDevTools_1.7.3_x64-setup.exe"
     }
   }
 }
